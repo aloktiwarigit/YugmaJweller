@@ -26,10 +26,15 @@ export function generateRlsSql(): string {
 const invoked = process.argv[1] ?? '';
 if (invoked.endsWith('generate-rls.ts') || invoked.endsWith('generate-rls.js')) {
   // Dynamic side-effect import so the pure function above stays clean for tests.
-  void import('../schema').then(() => {
-    const out = generateRlsSql();
-    const target = join(process.cwd(), 'packages/db/src/migrations/__generated__rls.sql');
-    writeFileSync(target, out);
-    console.log(`wrote ${target}`);
-  });
+  import('../schema')
+    .then(() => {
+      const out = generateRlsSql();
+      const target = join(process.cwd(), 'packages/db/src/migrations/__generated__rls.sql');
+      writeFileSync(target, out);
+      console.log(`wrote ${target}`);
+    })
+    .catch((err) => {
+      console.error('generate-rls: failed to load schema', err);
+      process.exit(1);
+    });
 }

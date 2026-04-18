@@ -19,8 +19,35 @@ export async function assertRlsInvariants(pool: Pool): Promise<AssertResult> {
       if (meta.kind === 'tenant') {
         if (!relrowsecurity) fails.push(`${meta.name}: RLS not enabled (invariant 2)`);
         if (!relforcerowsecurity) fails.push(`${meta.name}: FORCE RLS not set (invariant 2)`);
-        const p = await c.query(`SELECT polname FROM pg_policy WHERE polrelid = to_regclass($1)`, [meta.name]);
-        if (p.rowCount === 0) fails.push(`${meta.name}: no policy (invariant 2)`);
+        const p = await c.query(
+          `SELECT polname,
+                  pg_get_expr(polqual, polrelid) AS using_expr,
+                  pg_get_expr(polwithcheck, polrelid) AS check_expr
+             FROM pg_policy
+            WHERE polrelid = to_regclass($1)`,
+          [meta.name],
+        );
+        if (p.rowCount === 0) {
+          fails.push(`${meta.name}: no policy (invariant 2)`);
+        } else {
+          const row = p.rows[0] as { using_expr: string | null; check_expr: string | null };
+          const usingMatches =
+            row.using_expr?.includes('shop_id') &&
+            row.using_expr?.includes(`current_setting('app.current_shop_id'`);
+          if (!usingMatches) {
+            fails.push(
+              `${meta.name}: policy USING missing shop_id/current_setting pattern (got: ${row.using_expr ?? 'NULL'}) (invariant 2)`,
+            );
+          }
+          const checkMatches =
+            row.check_expr?.includes('shop_id') &&
+            row.check_expr?.includes(`current_setting('app.current_shop_id'`);
+          if (!checkMatches) {
+            fails.push(
+              `${meta.name}: policy WITH CHECK missing shop_id/current_setting pattern (got: ${row.check_expr ?? 'NULL'}) (invariant 2)`,
+            );
+          }
+        }
       } else if (meta.kind === 'global') {
         if (relrowsecurity) fails.push(`${meta.name}: RLS enabled on platformGlobalTable (invariant 3)`);
       }

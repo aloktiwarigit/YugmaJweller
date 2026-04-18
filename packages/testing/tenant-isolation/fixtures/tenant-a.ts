@@ -24,7 +24,9 @@ fixtureRegistry.add({
           [id, `seed.a.${i}`],
         );
       }
-      await c.query('RESET ROLE');
-    } finally { c.release(); }
+    } finally {
+      await c.query('RESET ROLE').catch(() => undefined);
+      c.release();
+    }
   },
 });

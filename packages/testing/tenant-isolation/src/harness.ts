@@ -52,8 +52,10 @@ export async function runTenantIsolationHarness(pool: Pool): Promise<HarnessResu
         fails.push(`${meta.name}: no-ctx read returned rows (invariant 12)`);
       }
     }
-    await c.query('RESET ROLE');
-  } finally { c.release(); }
+  } finally {
+    await c.query('RESET ROLE').catch(() => undefined);
+    c.release();
+  }
 
   return { ok: fails.length === 0, failures: fails };
 }

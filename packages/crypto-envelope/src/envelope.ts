@@ -15,19 +15,29 @@ export async function encryptColumn(
   plaintext: string,
 ): Promise<EnvelopeCiphertext> {
   const { plaintext: dek, encryptedDek } = await kms.generateDataKey(keyArn);
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', dek, iv);
-  const ct = Buffer.concat([cipher.update(Buffer.from(plaintext, 'utf8')), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  dek.fill(0);
-  return { ciphertext: ct, encryptedDek, iv, tag, keyArn };
+  try {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', dek, iv);
+    const ciphertext = Buffer.concat([cipher.update(Buffer.from(plaintext, 'utf8')), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    return { ciphertext, encryptedDek, iv, tag, keyArn };
+  } finally {
+    dek.fill(0);
+  }
 }
 
 export async function decryptColumn(kms: KmsAdapter, payload: EnvelopeCiphertext): Promise<string> {
   const dek = await kms.decryptDataKey(payload.encryptedDek, payload.keyArn);
-  const decipher = createDecipheriv('aes-256-gcm', dek, payload.iv);
-  decipher.setAuthTag(payload.tag);
-  const plain = Buffer.concat([decipher.update(payload.ciphertext), decipher.final()]);
-  dek.fill(0);
-  return plain.toString('utf8');
+  try {
+    const decipher = createDecipheriv('aes-256-gcm', dek, payload.iv);
+    decipher.setAuthTag(payload.tag);
+    const plain = Buffer.concat([decipher.update(payload.ciphertext), decipher.final()]);
+    try {
+      return plain.toString('utf8');
+    } finally {
+      plain.fill(0);
+    }
+  } finally {
+    dek.fill(0);
+  }
 }
