@@ -1,1 +1,9 @@
-{ "extends": "../../../tsconfig.base.json", "include": ["src/**/*", "test/**/*", "fixtures/**/*"] }
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "exactOptionalPropertyTypes": false
+  },
+  "include": ["src/**/*", "test/**/*", "fixtures/**/*"]
+}

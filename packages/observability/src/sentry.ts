@@ -17,6 +17,7 @@ export function initSentry(): void {
         event.request.data = redactPii(event.request.data);
       }
       if (event.request?.headers) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { authorization: _a, cookie: _c, 'x-tenant-id': _t, ...safeHeaders } =
           event.request.headers as Record<string, string>;
         event.request.headers = safeHeaders;

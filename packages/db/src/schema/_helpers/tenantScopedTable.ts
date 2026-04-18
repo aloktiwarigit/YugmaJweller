@@ -7,6 +7,7 @@ type ColumnBuilders = Record<string, PgColumnBuilderBase>;
 // compatibility with the test accessor pattern `t._.columns`.
 const drizzleColumnsSymbol = Symbol.for('drizzle:Columns');
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function tenantScopedTable<N extends string, C extends ColumnBuilders>(
   name: N,
   columns: C,

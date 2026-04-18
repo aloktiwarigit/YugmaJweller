@@ -24,4 +24,36 @@ module.exports = {
   },
   settings: { 'import/resolver': { typescript: true } },
   ignorePatterns: ['dist', 'node_modules', '*.js.map'],
+  overrides: [
+    {
+      files: ['packages/tenant-context/**/*.ts', '**/packages/tenant-context/**/*.ts'],
+      rules: { 'no-restricted-imports': ['error', { patterns: [
+        { group: ['bullmq', 'bullmq/*'], message: 'Import bullmq only from packages/queue.' },
+        { group: ['@aws-sdk/client-kms', '@aws-sdk/client-kms/*'], message: 'Import @aws-sdk/client-kms only from packages/crypto-envelope.' },
+        { group: ['@azure/keyvault-keys', '@azure/keyvault-keys/*'], message: 'Import @azure/keyvault-keys only from packages/crypto-envelope.' },
+      ] }] },
+    },
+    {
+      files: ['packages/cache/**/*.ts', '**/packages/cache/**/*.ts'],
+      rules: { 'no-restricted-imports': ['error', { patterns: [
+        { group: ['bullmq', 'bullmq/*'], message: 'Import bullmq only from packages/queue.' },
+        { group: ['@aws-sdk/client-kms', '@aws-sdk/client-kms/*'], message: 'Import @aws-sdk/client-kms only from packages/crypto-envelope.' },
+        { group: ['@azure/keyvault-keys', '@azure/keyvault-keys/*'], message: 'Import @azure/keyvault-keys only from packages/crypto-envelope.' },
+      ] }] },
+    },
+    {
+      files: ['packages/queue/**/*.ts', '**/packages/queue/**/*.ts'],
+      rules: { 'no-restricted-imports': ['error', { patterns: [
+        { group: ['@aws-sdk/client-kms', '@aws-sdk/client-kms/*'], message: 'Import @aws-sdk/client-kms only from packages/crypto-envelope.' },
+        { group: ['@azure/keyvault-keys', '@azure/keyvault-keys/*'], message: 'Import @azure/keyvault-keys only from packages/crypto-envelope.' },
+      ] }] },
+    },
+    {
+      files: ['packages/crypto-envelope/**/*.ts', '**/packages/crypto-envelope/**/*.ts'],
+      rules: { 'no-restricted-imports': ['error', { patterns: [
+        { group: ['ioredis', 'ioredis/*'], message: 'Import ioredis only from packages/cache.' },
+        { group: ['bullmq', 'bullmq/*'], message: 'Import bullmq only from packages/queue.' },
+      ] }] },
+    },
+  ],
 };

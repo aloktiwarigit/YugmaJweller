@@ -8,6 +8,7 @@ import { TenantInterceptor, type TenantLookup, type Tenant } from '@goldsmith/te
 
 @Injectable()
 class NoopTenantLookup implements TenantLookup {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async byId(_id: string): Promise<Tenant | undefined> { return undefined; }
 }
 
