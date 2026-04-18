@@ -1,0 +1,16 @@
+rules:
+  - id: goldsmith.no-raw-bullmq-import
+    languages: [typescript]
+    severity: ERROR
+    message: |
+      Direct import of bullmq is forbidden outside packages/queue. Use TenantQueue +
+      createTenantWorker so tenant metadata is always present (threat-model S1-M7).
+    patterns:
+      - pattern-either:
+          - pattern: import { Queue } from 'bullmq'
+          - pattern: import { Worker } from 'bullmq'
+          - pattern: import { QueueEvents } from 'bullmq'
+          - pattern: require('bullmq')
+    paths:
+      exclude:
+        - "packages/queue/**"

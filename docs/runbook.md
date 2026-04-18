@@ -1,14 +1,17 @@
 ---
 title: Goldsmith — Operations Runbook
-status: v1 — Sprint-1 gate draft
+status: v1.1 — E2-S1 update
 author: Alokt (Principal Architect) · facilitated via Claude
-date: 2026-04-17
+date: 2026-04-18
 reviewCadence: Before every release; quarterly in steady state
 supersedes: none
 companionDocs:
   - docs/threat-model.md (STRIDE — mitigations S1-M* referenced here)
   - _bmad-output/planning-artifacts/architecture.md (12 ADRs, 14 bounded contexts)
   - _bmad-output/planning-artifacts/adr/0011-compliance-package-hard-block-gateway.md
+mvpScope: >
+  ADR-0015 (startup-lean): LocalKMS only — no Azure Key Vault, no Redis, no
+  cloud KMS until Infrastructure Story lands. Scripts reflect this scope.
 ---
 
 # Goldsmith — Operations Runbook
@@ -365,7 +368,11 @@ Each vendor has a runbook entry. The pattern: **detect → reduce blast → comm
   --bis-license HAL/XX/1234
 
 # 2. Run tenant provisioning job (creates RLS policies, seeds category tree, creates admin user)
-./scripts/tenant-provision.sh anchor-ayodhya-01
+#    MVP note: uses LocalKMS placeholder KEK (ADR-0015); Azure Key Vault KEK lands in Infrastructure Story.
+./scripts/tenant-provision.sh \
+  --tenant anchor-ayodhya-01 \
+  --slug anchor-ayodhya-01 \
+  --display "Aanchal Jewellers"
 
 # 3. Create initial admin user (shop owner)
 ./scripts/user-create.sh \
@@ -375,7 +382,7 @@ Each vendor has a runbook entry. The pattern: **detect → reduce blast → comm
   --role shop_admin
 
 # 4. Verify tenant isolation — run smoke test against new tenant
-npm run test:tenant-isolation -- --tenant anchor-ayodhya-01
+pnpm test:tenant-isolation
 ```
 
 ### 7.3 Post-onboarding checklist

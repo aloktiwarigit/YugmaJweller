@@ -1,0 +1,32 @@
+import type { Pool } from 'pg';
+import { fixtureRegistry } from './registry';
+
+export const TENANT_B_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+
+fixtureRegistry.add({
+  id: TENANT_B_ID,
+  slug: 'fixture-b',
+  displayName: 'Fixture Tenant B',
+  seed: async (pool: Pool, id: string) => {
+    const c = await pool.connect();
+    try {
+      await c.query(`SET ROLE app_user`);
+      await c.query(`SET app.current_shop_id='${id}'`);
+      await c.query(
+        `INSERT INTO shop_users (shop_id, phone, display_name, role, status) VALUES
+          ($1,'+91BBB001','Bhavna B','shop_admin','ACTIVE'),
+          ($1,'+91BBB002','Bhim B','shop_manager','ACTIVE')`,
+        [id],
+      );
+      for (let i = 1; i <= 5; i++) {
+        await c.query(
+          `INSERT INTO audit_events (shop_id, action, subject_type) VALUES ($1, $2, 'seed')`,
+          [id, `seed.b.${i}`],
+        );
+      }
+    } finally {
+      await c.query('RESET ROLE').catch(() => undefined);
+      c.release();
+    }
+  },
+});

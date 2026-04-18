@@ -1,0 +1,18 @@
+rules:
+  - id: goldsmith.no-pii-in-logs
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: |
+      PII field names must not be logged via console.*. Use the logger from
+      @goldsmith/observability (which runs the PII redactor) or explicitly wrap with
+      redactPii(value). Keys covered: phone, pan, email, aadhaar, dob, address, otp,
+      customerName, ownerName, display_name, gstin, bankAccount, ifsc.
+    patterns:
+      - pattern-either:
+          - pattern: console.log($...ARGS)
+          - pattern: console.warn($...ARGS)
+          - pattern: console.error($...ARGS)
+      - metavariable-pattern:
+          metavariable: $...ARGS
+          patterns:
+            - pattern-regex: "\\b(phone|pan|email|aadhaar|dob|address|otp|customerName|ownerName|display_name|gstin|bankAccount|ifsc)\\b"

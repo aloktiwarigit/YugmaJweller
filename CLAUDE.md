@@ -1,6 +1,6 @@
 # Goldsmith — Claude Code Project Guide
 
-Project-level primer. Every Claude Code session should read this first. Updated 2026-04-17.
+Project-level primer. Every Claude Code session should read this first. Updated 2026-04-18 (stack corrected to Azure + Firebase; startup-lean infra deferred — see ADR-0015).
 
 ---
 
@@ -45,24 +45,24 @@ Always load these before making significant decisions. Do not re-derive what's a
 | Cache | Redis |
 | Queue | BullMQ |
 | Search | Meilisearch (Hindi-first) |
-| File storage | S3 (AWS Mumbai) + **ImageKit** CDN |
-| Auth | Phone OTP (Supabase Auth or Firebase Auth) |
+| File storage | **Azure Blob Storage** (Central India / South India) + **ImageKit** CDN |
+| Auth | **Firebase Auth** (phone OTP) — see ADR-0015 |
 | Monorepo | **Turborepo** |
-| Hosting | AWS Mumbai (ap-south-1) — data residency mandatory |
+| Hosting | **Azure Central India or South India** — data residency mandatory. Deferred until anchor SOW signed (see ADR-0015 + startup-economics feedback). |
 
 ## India vendor stack (locked)
 
 - **Gold rates:** IBJA (primary) + Metals.dev (fallback)
 - **Payments:** Razorpay (primary) + Cashfree (secondary)
-- **WhatsApp:** AiSensy BSP (Rs 1,500/mo, unlimited agents)
-- **SMS/OTP:** MSG91 (Rs 0.18-0.30/SMS)
+- **WhatsApp:** AiSensy BSP (Rs 1,500/mo, unlimited agents) — onboard when anchor MRR justifies
+- **SMS/OTP:** **Firebase Auth** handles phone OTP end-to-end (free Spark tier for MVP; pay-as-you-go $0.06/SMS when exceeded). MSG91 deferred unless Firebase Auth cannot fit a specific flow.
 - **KYC/eSign (Phase 4+):** Digio
 - **Maps:** Ola Maps (5M calls/month free)
 - **Push:** Firebase Cloud Messaging (free)
 - **Analytics:** PostHog (data-residency-compliant deployment)
 - **Errors:** Sentry
 - **Support:** Zoho Desk Standard (WhatsApp-native)
-- **Email:** Resend (MVP) → Amazon SES at scale
+- **Email:** Resend (MVP) → Azure Communication Services Email at scale
 - **HUID verification:** Surepass API wrapper (consumer-facing)
 
 All vendor integrations must use adapter pattern — swap = adapter rewrite only, not data migration.
@@ -180,12 +180,26 @@ Prepend this priming to any frontend-design session on a new feature.
 - Then: Create Architecture (CA) with Winston
 - Then: Create Epics & Stories (CE) → Sprint Planning → Dev cycle
 
+## Startup economics (startup-lean, revenue-first)
+
+Pre-revenue, engineering choices minimize recurring cost. Enterprise hardening waits until first paying tenant. See ADR-0015 + `memory/feedback_startup_economics_first.md`.
+
+Floor-cost MVP target: **≤ $20/month** (Firebase Auth free tier, Azure Postgres Flexible Burstable B1ms ~$12/mo once deployed, Azure Container Apps consumption scale-to-zero, Blob Storage pennies, Key Vault ~$1, GitHub + Sentry + PostHog free tiers).
+
+**Graduation triggers (ONLY then add enterprise infra):**
+- First paying anchor signs SOW + MRR confirmed
+- Regulatory audit demands Multi-AZ / per-tenant KEK / cross-region DR
+- Observable tenant-count or traffic destabilises current stack
+
+Everything in the original "Enterprise Floor" (Sentry + OTel + feature flags + Storybook + ADRs + threat model + runbook + PostHog + TS strict + 80% coverage) stays day-1 — **those are free**. The **infrastructure** graduations (Multi-AZ, 3 NAT, per-tenant KMS, Redis clusters, staging environments) wait.
+
 ## External blockers to unblock before coding begins
 
 1. 🚨 **Anchor SOW** — scope, fee, timeline, branding rights, IP ownership, change management, milestone payments. #1 dependency per PRFAQ verdict.
 2. Legal review — platform terms, jeweller-as-merchant classification, DPA for DPDPA.
 3. Apple/Google developer account decision — platform-owned vs per-tenant.
 4. Anchor policy decisions (4 items flagged in PRFAQ/PRD): "app price = committed price" policy, custom order refund/rework/deposit/cancellation policy, warranty insurance commitment, shipping scope.
+5. **Azure subscription** — reachable when the anchor SOW is signed, not before. Until then, all dev is local Docker + validated-only Terraform/azd configs.
 
 ## Working rules
 

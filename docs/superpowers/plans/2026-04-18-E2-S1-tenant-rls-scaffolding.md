@@ -2,11 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship the multi-tenant platform substrate (RLS + ALS + CI + Terraform + isolation harness) on which every later feature story stands, making zero cross-tenant data leakage structurally impossible.
+> **🔄 2026-04-18 SCOPE CORRECTION (ADR-0015):** Tasks 4-6 (AWS Terraform infrastructure) are **REMOVED from E2-S1 scope**. Infrastructure provisioning is deferred to a new "Infrastructure Story" landed after anchor SOW is signed, at which point we will use Azure + Firebase (not AWS) and `azd` (Azure Developer CLI). Task 23 (`packages/crypto-envelope`) swaps `@aws-sdk/client-kms` → `@azure/keyvault-keys` + `@azure/identity`. Task 28 scripts use `az` CLI. Task 29 CI drops the `terraform-validate` gate. All **cloud-neutral** tasks (1-3, 7-27 minus noted swaps, plus 30) stay as-written. The total E2-S1 task count drops from 30 to 27. See ADR-0015 for rationale.
+
+**Goal:** Ship the multi-tenant platform substrate (RLS + ALS + CI + isolation harness) on which every later feature story stands, making zero cross-tenant data leakage structurally impossible. (Cloud infrastructure is NOT part of this story per ADR-0015.)
 
 **Architecture:** Four-layer defense-in-depth (compile-time via Semgrep+ESLint; runtime via NestJS interceptor + AsyncLocalStorage; DB-session via `SET LOCAL` inside `withTenantTx`; DB-storage via PostgreSQL RLS with poison-default fallback). Drizzle marker functions (`tenantScopedTable` / `platformGlobalTable`) drive code-generated RLS policies, and a 3-tenant behavioral harness runs on every CI merge.
 
-**Tech Stack:** pnpm workspace + Turborepo, NestJS 10, Drizzle ORM, PostgreSQL 15 (via Testcontainers in tests, RDS in prod), Redis (ioredis), BullMQ, Pino, Sentry, OpenTelemetry, Vitest, Testcontainers, Semgrep, ESLint, Terraform (AWS ap-south-1), GitHub Actions + Codex CLI.
+**Tech Stack:** pnpm workspace + Turborepo, NestJS 10, Drizzle ORM, PostgreSQL 15 (via Testcontainers for tests; Azure Postgres Flexible Server when deployed — deferred), Pino, Sentry, OpenTelemetry, Vitest, Testcontainers, Semgrep, ESLint, GitHub Actions + Codex CLI. Redis + BullMQ deferred to post-MVP per startup-economics principle.
 
 **Plan references:**
 - Design spec: `docs/superpowers/specs/2026-04-18-E2-S1-tenant-rls-scaffolding-design.md`
@@ -30,7 +32,7 @@
 10. **BullMQ ctx serialization:** Job payload is `{ meta: { tenantId: string }; data: T }`. `TenantQueue.add(ctx, data)` auto-extracts; `BaseProcessor` re-validates + re-hydrates + wraps in `runWith`.
 11. **Harness fixtures:** 3 tenants A/B/C, each with 1 `shops` row + 2 `shop_users` + 5 `audit_events`. Registry at `packages/testing/tenant-isolation/fixtures/registry.ts`; later stories append without editing the harness.
 
-**CI discipline:** Terraform work in E2-S1 is `validate` + `plan` only. No `apply` to any AWS environment in this story — apply gate opens in Story 1.1 once auth + monitoring are in place.
+**CI discipline:** No cloud infrastructure in this story per ADR-0015. CI runs typecheck + lint + unit + integration + tenant-isolation + semgrep + codex-review + build. The `terraform-validate` job in Task 29 is removed from the ship.yml pipeline for this story; it returns in the Infrastructure Story.
 
 **Commit cadence:** Every task ends with a commit. After each commit, rerun `pnpm typecheck` + `pnpm lint` at repo root before moving on.
 
@@ -41,29 +43,19 @@
 ## File structure overview
 
 ```
-.github/workflows/ship.yml              # 10-gate CI pipeline
+.github/workflows/ship.yml              # CI pipeline (no terraform-validate in E2-S1)
 infra/
-  docker-compose.dev.yml                # postgres 15 + redis + localstack
-  terraform/
-    backend.tf                          # S3 + DynamoDB lock
-    providers.tf                        # AWS ap-south-1 lock
-    modules/
-      network/                          # VPC + subnets + NAT
-      database/                         # RDS Postgres 15
-      cache/                            # ElastiCache Redis
-      secrets/                          # Secrets Manager + KMS
-      ci-roles/                         # GH Actions OIDC role
-    envs/dev/                           # dev stack
+  docker-compose.dev.yml                # postgres 15 + (deferred Redis/localstack)
+  # terraform/ — DEFERRED to Infrastructure Story (post-SOW), Azure + azd
 ops/
   semgrep/
     require-tenant-transaction.yaml
     no-tenant-id-from-request-input.yaml
     als-boundary-preserved.yaml
-    no-raw-ioredis-import.yaml
-    no-raw-bullmq-import.yaml
-    no-raw-kms-import.yaml
+    no-raw-ioredis-import.yaml          # kept; ioredis ships in Task 20 when Redis is added
+    no-raw-bullmq-import.yaml           # kept; BullMQ ships in Task 21
+    no-raw-keyvault-import.yaml         # replaces no-raw-kms-import (Azure SDK naming)
     no-pii-in-logs.yaml
-    terraform-no-public-s3.yaml
   eslint-rules/
     no-raw-shop-id-param/
       index.js
@@ -333,6 +325,7 @@ Create `package.json`:
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.57.0",
+    "eslint-import-resolver-typescript": "^3.6.1",
     "eslint-plugin-import": "^2.29.1",
     "prettier": "^3.2.5",
     "tsx": "^4.7.0",
@@ -365,7 +358,7 @@ Create `turbo.json`:
     "typecheck":            { "dependsOn": ["^typecheck"], "outputs": [] },
     "lint":                 { "outputs": [] },
     "test":                 { "dependsOn": ["^build"], "outputs": [] },
-    "test:unit":            { "dependsOn": ["^build"], "outputs": [] },
+    "test:unit":            { "dependsOn": [], "outputs": [] },
     "test:integration":     { "dependsOn": ["^build"], "outputs": [] },
     "test:tenant-isolation": { "dependsOn": ["^build"], "outputs": [] },
     "build":                { "dependsOn": ["^build"], "outputs": ["dist/**"] }
@@ -389,8 +382,8 @@ Create `tsconfig.base.json`:
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
     "lib": ["ES2022"],
     "strict": true,
     "noImplicitAny": true,
@@ -444,9 +437,9 @@ module.exports = {
     'goldsmith/no-raw-shop-id-param': 'error',
     'no-restricted-imports': ['error', {
       patterns: [
-        { group: ['ioredis'], message: 'Import ioredis only from packages/cache.' },
-        { group: ['bullmq'], message: 'Import bullmq only from packages/queue.' },
-        { group: ['@aws-sdk/client-kms'], message: 'Import @aws-sdk/client-kms only from packages/crypto-envelope.' },
+        { group: ['ioredis', 'ioredis/*'], message: 'Import ioredis only from packages/cache.' },
+        { group: ['bullmq', 'bullmq/*'], message: 'Import bullmq only from packages/queue.' },
+        { group: ['@aws-sdk/client-kms', '@aws-sdk/client-kms/*'], message: 'Import @aws-sdk/client-kms only from packages/crypto-envelope.' },
       ],
     }],
   },
@@ -621,6 +614,51 @@ describe('redactPii', () => {
   it('leaves non-PII keys alone', () => {
     expect(redactPii({ shopId: 'abc', total: 123 })).toEqual({ shopId: 'abc', total: 123 });
   });
+
+  it('redacts display_name (shop_users column)', () => {
+    expect(redactPii({ display_name: 'Rajesh Ji' })).toEqual({
+      display_name: '[REDACTED:display_name]',
+    });
+  });
+
+  it('redacts PII inside arrays of objects', () => {
+    expect(redactPii([{ phone: '+91a' }, { email: 'b@x' }])).toEqual([
+      { phone: '[REDACTED:phone]' },
+      { email: '[REDACTED:email]' },
+    ]);
+  });
+
+  it('preserves Error instances (stack + message intact)', () => {
+    const err = new Error('db connection refused');
+    const out = redactPii({ err });
+    expect(out.err).toBe(err); // same reference — Error passes through
+    expect((out.err as Error).message).toBe('db connection refused');
+  });
+
+  it('preserves Date instances (timestamp intact)', () => {
+    const ts = new Date('2026-04-18T00:00:00Z');
+    const out = redactPii({ ts });
+    expect(out.ts).toBe(ts);
+  });
+
+  it('preserves Buffer instances (byte content intact)', () => {
+    const buf = Buffer.from('hello', 'utf8');
+    const out = redactPii({ buf });
+    expect(out.buf).toBe(buf);
+    expect((out.buf as Buffer).toString('utf8')).toBe('hello');
+  });
+
+  it('handles circular references without stack overflow', () => {
+    const a: Record<string, unknown> = { phone: '+91' };
+    a.self = a;
+    const out = redactPii(a) as Record<string, unknown>;
+    expect(out.phone).toBe('[REDACTED:phone]');
+    expect(out.self).toBe('[Circular]');
+  });
+
+  it('redacts null value under PII key (key-based, not value-based)', () => {
+    expect(redactPii({ phone: null })).toEqual({ phone: '[REDACTED:phone]' });
+  });
 });
 ```
 
@@ -639,24 +677,33 @@ Create `packages/observability/src/pii-redactor.ts`:
 ```ts
 const PII_KEYS = new Set([
   'phone', 'pan', 'email', 'aadhaar', 'dob',
-  'address', 'name', 'customerName', 'ownerName',
+  'address', 'customerName', 'ownerName', 'display_name',
   'gstin', 'bankAccount', 'ifsc', 'otp',
 ]);
 
-export function redactPii<T>(input: T): T {
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  if (v === null || typeof v !== 'object') return false;
+  const proto = Object.getPrototypeOf(v) as unknown;
+  return proto === Object.prototype || proto === null;
+}
+
+export function redactPii<T>(input: T, seen: WeakSet<object> = new WeakSet()): T {
   if (input === null || input === undefined) return input;
-  if (Array.isArray(input)) return input.map((item) => redactPii(item)) as unknown as T;
-  if (typeof input === 'object') {
+  if (Array.isArray(input)) {
+    if (seen.has(input)) return '[Circular]' as unknown as T;
+    seen.add(input);
+    return input.map((item) => redactPii(item, seen)) as unknown as T;
+  }
+  if (isPlainObject(input)) {
+    if (seen.has(input)) return '[Circular]' as unknown as T;
+    seen.add(input);
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
-      if (PII_KEYS.has(k)) {
-        out[k] = `[REDACTED:${k}]`;
-      } else {
-        out[k] = redactPii(v);
-      }
+    for (const [k, v] of Object.entries(input)) {
+      out[k] = PII_KEYS.has(k) ? `[REDACTED:${k}]` : redactPii(v, seen);
     }
     return out as unknown as T;
   }
+  // Error, Date, Buffer, class instances, Map, Set, Symbol — preserve as-is.
   return input;
 }
 ```
@@ -687,14 +734,37 @@ Create `packages/observability/src/sentry.ts`:
 import * as Sentry from '@sentry/node';
 import { redactPii } from './pii-redactor';
 
+let _initialized = false;
+
 export function initSentry(): void {
-  const dsn = process.env.SENTRY_DSN;
+  if (_initialized) return;
+  const dsn = process.env['SENTRY_DSN'];
   if (!dsn) return;
+  _initialized = true;
   Sentry.init({
     dsn,
-    environment: process.env.NODE_ENV ?? 'development',
-    tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? '0.1'),
-    beforeSend: (event) => ({ ...event, extra: redactPii(event.extra ?? {}) }),
+    environment: process.env['NODE_ENV'] ?? 'development',
+    tracesSampleRate: Number(process.env['SENTRY_TRACES_SAMPLE_RATE'] ?? '0.1'),
+    beforeSend: (event) => {
+      if (event.request?.data && typeof event.request.data === 'object') {
+        event.request.data = redactPii(event.request.data);
+      }
+      if (event.request?.headers) {
+        const { authorization: _a, cookie: _c, 'x-tenant-id': _t, ...safeHeaders } =
+          event.request.headers as Record<string, string>;
+        event.request.headers = safeHeaders;
+      }
+      if (event.user) {
+        event.user = event.user.id ? { id: event.user.id } : {};
+      }
+      if (event.breadcrumbs) {
+        event.breadcrumbs = (event.breadcrumbs as Sentry.Breadcrumb[]).map((b) => {
+          if (!b.data) return b;
+          return { ...b, data: redactPii(b.data) as { [key: string]: unknown } };
+        });
+      }
+      return { ...event, extra: redactPii(event.extra ?? {}) };
+    },
   });
 }
 ```
@@ -705,16 +775,21 @@ Create `packages/observability/src/otel.ts`:
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 
+let _sdk: NodeSDK | undefined;
+
 export function initOtel(serviceName: string): NodeSDK | undefined {
-  if (!process.env.OTEL_EXPORTER_OTLP_ENDPOINT) return undefined;
-  const sdk = new NodeSDK({
+  if (_sdk) return _sdk;
+  if (!process.env['OTEL_EXPORTER_OTLP_ENDPOINT']) return undefined;
+  _sdk = new NodeSDK({
     serviceName,
     instrumentations: [getNodeAutoInstrumentations()],
   });
-  sdk.start();
-  return sdk;
+  _sdk.start();
+  return _sdk;
 }
 ```
+
+> **Note:** SIGTERM shutdown hook deferred to Story 1.1 when `main.ts` lands.
 
 Create `packages/observability/src/index.ts`:
 
@@ -743,9 +818,10 @@ rules:
     languages: [typescript, javascript]
     severity: ERROR
     message: |
-      PII field names must not be logged. Use `logger.info({ ... })` where values pass through the
-      PII redactor, or explicitly wrap with `redactPii(value)`. Do NOT inline PII-named keys into
-      console.log or templated strings.
+      PII field names must not be logged via console.*. Use the logger from
+      @goldsmith/observability (which runs the PII redactor) or explicitly wrap with
+      redactPii(value). Keys covered: phone, pan, email, aadhaar, dob, address, otp,
+      customerName, ownerName, display_name, gstin, bankAccount, ifsc.
     patterns:
       - pattern-either:
           - pattern: console.log($...ARGS)
@@ -754,7 +830,7 @@ rules:
       - metavariable-pattern:
           metavariable: $...ARGS
           patterns:
-            - pattern-regex: "(phone|pan|email|aadhaar|otp|customerName|gstin)"
+            - pattern-regex: "\\b(phone|pan|email|aadhaar|dob|address|otp|customerName|ownerName|display_name|gstin|bankAccount|ifsc)\\b"
 ```
 
 - [ ] **Step 7: Commit**
@@ -766,492 +842,25 @@ git commit -m "feat(observability): pino+sentry+otel with PII redactor (S1-M8)"
 
 ---
 
-## Task 4: Terraform backend + network module
+## Tasks 4-6: REMOVED from E2-S1 scope per ADR-0015
 
-**Files:**
-- Create: `infra/terraform/backend.tf`, `providers.tf`, `versions.tf`
-- Create: `infra/terraform/modules/network/{main,variables,outputs}.tf`
-- Create: `infra/docker-compose.dev.yml`
+The original Tasks 4 (Terraform backend + network module), 5 (database + cache + secrets/KMS modules), and 6 (envs/dev + terraform-no-public-s3 semgrep rule) targeted AWS ap-south-1.
 
-- [ ] **Step 1: Backend + providers**
+Per ADR-0015 (2026-04-18 stack correction), infrastructure provisioning is:
 
-Create `infra/terraform/versions.tf`:
+1. **Not in E2-S1 scope** — no `terraform apply`, no AWS resources, no Azure resources created during this story.
+2. **Re-platformed to Azure + Firebase** when it does land — see ADR-0015 for the full target stack (Azure Container Apps + Postgres Flexible Server + Key Vault + Blob Storage + Entra ID; Firebase Auth + FCM).
+3. **Scheduled for a new "Infrastructure Story"** that runs after anchor SOW is signed. That story will use `azd` (Azure Developer CLI) as the primary front-end, Terraform `azurerm` provider only for custom topologies.
 
-```hcl
-terraform {
-  required_version = ">= 1.7.0"
-  required_providers {
-    aws = { source = "hashicorp/aws", version = "~> 5.40" }
-  }
-}
-```
+**Startup-economics floor** (from ADR-0015 + `memory/feedback_startup_economics_first.md`): MVP target infra cost is ≤ $20/month. Nothing is spun up until revenue is contracted.
 
-Create `infra/terraform/backend.tf`:
+**What E2-S1 still ships** (cloud-neutral):
+- The full tenant-RLS substrate (Tasks 1-3, 7-27, 30).
+- `withTenantTx`, ALS tenant-context, NestJS interceptor, 3-tenant behavioral harness.
+- All enforcement rails (Semgrep + ESLint) for multi-tenant safety.
+- Postgres runs locally via Testcontainers during tests, Docker Compose for dev — both $0.
 
-```hcl
-terraform {
-  backend "s3" {
-    bucket         = "goldsmith-tfstate-ap-south-1"
-    key            = "envs/dev/terraform.tfstate"
-    region         = "ap-south-1"
-    dynamodb_table = "goldsmith-tfstate-lock"
-    encrypt        = true
-  }
-}
-```
-
-Create `infra/terraform/providers.tf`:
-
-```hcl
-provider "aws" {
-  region = "ap-south-1"
-  allowed_account_ids = var.allowed_account_ids
-  default_tags {
-    tags = {
-      Project          = "goldsmith"
-      ManagedBy        = "terraform"
-      DataResidency    = "ap-south-1"
-    }
-  }
-}
-
-variable "allowed_account_ids" {
-  type        = list(string)
-  description = "AWS account IDs allowed to run this config. Enforces residency at the provider level."
-}
-```
-
-- [ ] **Step 2: Network module**
-
-Create `infra/terraform/modules/network/variables.tf`:
-
-```hcl
-variable "env"        { type = string }
-variable "cidr_block" { type = string, default = "10.10.0.0/16" }
-variable "base_tags"  { type = map(string), default = {} }
-```
-
-Create `infra/terraform/modules/network/main.tf`:
-
-```hcl
-locals {
-  azs = ["ap-south-1a", "ap-south-1b", "ap-south-1c"]
-  tags = merge(var.base_tags, {
-    Module        = "network"
-    DataResidency = "ap-south-1"
-  })
-}
-
-resource "aws_vpc" "main" {
-  cidr_block           = var.cidr_block
-  enable_dns_support   = true
-  enable_dns_hostnames = true
-  tags                 = merge(local.tags, { Name = "${var.env}-goldsmith-vpc" })
-}
-
-resource "aws_subnet" "public" {
-  count                   = 3
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = cidrsubnet(var.cidr_block, 4, count.index)
-  availability_zone       = local.azs[count.index]
-  map_public_ip_on_launch = false
-  tags = merge(local.tags, {
-    Name = "${var.env}-goldsmith-public-${local.azs[count.index]}"
-    Tier = "public"
-  })
-}
-
-resource "aws_subnet" "private" {
-  count             = 3
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = cidrsubnet(var.cidr_block, 4, count.index + 3)
-  availability_zone = local.azs[count.index]
-  tags = merge(local.tags, {
-    Name = "${var.env}-goldsmith-private-${local.azs[count.index]}"
-    Tier = "private"
-  })
-}
-
-resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
-  tags   = merge(local.tags, { Name = "${var.env}-goldsmith-igw" })
-}
-
-resource "aws_eip" "nat" {
-  count  = 3
-  domain = "vpc"
-  tags   = merge(local.tags, { Name = "${var.env}-goldsmith-natgw-eip-${count.index}" })
-}
-
-resource "aws_nat_gateway" "main" {
-  count         = 3
-  subnet_id     = aws_subnet.public[count.index].id
-  allocation_id = aws_eip.nat[count.index].id
-  tags          = merge(local.tags, { Name = "${var.env}-goldsmith-natgw-${count.index}" })
-}
-```
-
-Create `infra/terraform/modules/network/outputs.tf`:
-
-```hcl
-output "vpc_id"             { value = aws_vpc.main.id }
-output "public_subnet_ids"  { value = aws_subnet.public[*].id }
-output "private_subnet_ids" { value = aws_subnet.private[*].id }
-```
-
-- [ ] **Step 3: Local dev stack (docker-compose)**
-
-Create `infra/docker-compose.dev.yml`:
-
-```yaml
-services:
-  postgres:
-    image: postgres:15.6
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: goldsmith_dev
-    ports: ["5432:5432"]
-    volumes: [goldsmith_pg:/var/lib/postgresql/data]
-  redis:
-    image: redis:7.2-alpine
-    ports: ["6379:6379"]
-  localstack:
-    image: localstack/localstack-pro:3.4
-    ports: ["4566:4566"]
-    environment:
-      SERVICES: kms,secretsmanager,s3
-      LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
-volumes:
-  goldsmith_pg:
-```
-
-- [ ] **Step 4: Validate Terraform**
-
-```bash
-cd infra/terraform && terraform init -backend=false && terraform validate
-```
-
-Expected: `Success! The configuration is valid.`
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add infra/
-git commit -m "feat(infra): terraform backend + network module + docker-compose dev stack"
-```
-
----
-
-## Task 5: Terraform database + cache + secrets/KMS modules
-
-**Files:**
-- Create: `infra/terraform/modules/database/{main,variables,outputs}.tf`
-- Create: `infra/terraform/modules/cache/{main,variables,outputs}.tf`
-- Create: `infra/terraform/modules/secrets/{main,variables,outputs}.tf`
-
-- [ ] **Step 1: Database module (RDS Postgres 15 Multi-AZ)**
-
-Create `infra/terraform/modules/database/variables.tf`:
-
-```hcl
-variable "env"                { type = string }
-variable "vpc_id"             { type = string }
-variable "private_subnet_ids" { type = list(string) }
-variable "instance_class"     { type = string, default = "db.t4g.medium" }
-variable "allocated_storage"  { type = number, default = 50 }
-variable "base_tags"          { type = map(string), default = {} }
-```
-
-Create `infra/terraform/modules/database/main.tf`:
-
-```hcl
-resource "aws_db_subnet_group" "main" {
-  name       = "${var.env}-goldsmith-postgres"
-  subnet_ids = var.private_subnet_ids
-  tags       = merge(var.base_tags, { Name = "${var.env}-goldsmith-postgres" })
-}
-
-resource "aws_security_group" "rds" {
-  name        = "${var.env}-goldsmith-rds"
-  description = "Postgres access from VPC only"
-  vpc_id      = var.vpc_id
-  ingress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = ["10.10.0.0/16"]
-  }
-  tags = var.base_tags
-}
-
-resource "aws_kms_key" "rds" {
-  description             = "KMS for ${var.env} Goldsmith RDS at-rest encryption"
-  deletion_window_in_days = 30
-  enable_key_rotation     = true
-  tags                    = var.base_tags
-}
-
-resource "aws_db_parameter_group" "main" {
-  name   = "${var.env}-goldsmith-postgres-15"
-  family = "postgres15"
-  parameter { name = "log_min_duration_statement", value = "500" }
-  parameter { name = "shared_preload_libraries",    value = "pg_stat_statements", apply_method = "pending-reboot" }
-}
-
-resource "aws_db_instance" "main" {
-  identifier                 = "${var.env}-goldsmith-postgres"
-  engine                     = "postgres"
-  engine_version             = "15.6"
-  instance_class             = var.instance_class
-  allocated_storage          = var.allocated_storage
-  max_allocated_storage      = var.allocated_storage * 4
-  multi_az                   = var.env == "prod"
-  storage_encrypted          = true
-  kms_key_id                 = aws_kms_key.rds.arn
-  backup_retention_period    = 7
-  deletion_protection        = var.env == "prod"
-  db_subnet_group_name       = aws_db_subnet_group.main.name
-  vpc_security_group_ids     = [aws_security_group.rds.id]
-  parameter_group_name       = aws_db_parameter_group.main.name
-  performance_insights_enabled = true
-  enabled_cloudwatch_logs_exports = ["postgresql"]
-  tags = merge(var.base_tags, {
-    Name                = "${var.env}-goldsmith-postgres"
-    DataClassification  = "tenant-pii"
-    DataResidency       = "ap-south-1"
-  })
-}
-```
-
-Create `infra/terraform/modules/database/outputs.tf`:
-
-```hcl
-output "endpoint"       { value = aws_db_instance.main.endpoint }
-output "kms_key_arn"    { value = aws_kms_key.rds.arn }
-output "security_group" { value = aws_security_group.rds.id }
-```
-
-- [ ] **Step 2: Cache module (ElastiCache Redis)**
-
-Create `infra/terraform/modules/cache/variables.tf`:
-
-```hcl
-variable "env"                { type = string }
-variable "vpc_id"             { type = string }
-variable "private_subnet_ids" { type = list(string) }
-variable "node_type"          { type = string, default = "cache.t4g.small" }
-variable "base_tags"          { type = map(string), default = {} }
-```
-
-Create `infra/terraform/modules/cache/main.tf`:
-
-```hcl
-resource "aws_elasticache_subnet_group" "main" {
-  name       = "${var.env}-goldsmith-redis"
-  subnet_ids = var.private_subnet_ids
-}
-
-resource "aws_security_group" "redis" {
-  name   = "${var.env}-goldsmith-redis"
-  vpc_id = var.vpc_id
-  ingress {
-    from_port   = 6379
-    to_port     = 6379
-    protocol    = "tcp"
-    cidr_blocks = ["10.10.0.0/16"]
-  }
-  tags = var.base_tags
-}
-
-resource "aws_elasticache_replication_group" "main" {
-  replication_group_id       = "${var.env}-goldsmith-redis"
-  description                = "Goldsmith cache + BullMQ backing"
-  node_type                  = var.node_type
-  num_cache_clusters         = var.env == "prod" ? 2 : 1
-  automatic_failover_enabled = var.env == "prod"
-  engine_version             = "7.1"
-  port                       = 6379
-  parameter_group_name       = "default.redis7"
-  subnet_group_name          = aws_elasticache_subnet_group.main.name
-  security_group_ids         = [aws_security_group.redis.id]
-  at_rest_encryption_enabled = true
-  transit_encryption_enabled = true
-  tags = merge(var.base_tags, { DataResidency = "ap-south-1" })
-}
-```
-
-Create `infra/terraform/modules/cache/outputs.tf`:
-
-```hcl
-output "endpoint" { value = aws_elasticache_replication_group.main.primary_endpoint_address }
-```
-
-- [ ] **Step 3: Secrets/KMS module**
-
-Create `infra/terraform/modules/secrets/variables.tf`:
-
-```hcl
-variable "env"       { type = string }
-variable "base_tags" { type = map(string), default = {} }
-```
-
-Create `infra/terraform/modules/secrets/main.tf`:
-
-```hcl
-resource "aws_kms_key" "platform" {
-  description             = "Platform-level KMS for ${var.env} app secrets"
-  deletion_window_in_days = 30
-  enable_key_rotation     = true
-  tags                    = merge(var.base_tags, { Purpose = "platform-secrets" })
-}
-
-resource "aws_secretsmanager_secret" "db_app_user" {
-  name       = "${var.env}/goldsmith/db/app_user"
-  kms_key_id = aws_kms_key.platform.id
-  tags       = var.base_tags
-}
-
-resource "aws_secretsmanager_secret" "db_migrator" {
-  name       = "${var.env}/goldsmith/db/migrator"
-  kms_key_id = aws_kms_key.platform.id
-  tags       = var.base_tags
-}
-
-resource "aws_secretsmanager_secret" "db_platform_admin" {
-  name       = "${var.env}/goldsmith/db/platform_admin"
-  kms_key_id = aws_kms_key.platform.id
-  tags       = var.base_tags
-}
-```
-
-Create `infra/terraform/modules/secrets/outputs.tf`:
-
-```hcl
-output "platform_kms_key_arn" { value = aws_kms_key.platform.arn }
-output "db_app_user_secret"   { value = aws_secretsmanager_secret.db_app_user.arn }
-output "db_migrator_secret"   { value = aws_secretsmanager_secret.db_migrator.arn }
-```
-
-- [ ] **Step 4: Validate**
-
-```bash
-cd infra/terraform && terraform validate
-```
-
-Expected: `Success! The configuration is valid.`
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add infra/terraform/modules/
-git commit -m "feat(infra): terraform modules database + cache + secrets/KMS"
-```
-
----
-
-## Task 6: Terraform envs/dev + data-residency Semgrep rule
-
-**Files:**
-- Create: `infra/terraform/envs/dev/{main,variables,outputs}.tf`
-- Create: `infra/terraform/envs/dev/terraform.tfvars.example`
-- Create: `ops/semgrep/terraform-no-public-s3.yaml`
-
-- [ ] **Step 1: Dev environment stack**
-
-Create `infra/terraform/envs/dev/main.tf`:
-
-```hcl
-locals {
-  env       = "dev"
-  base_tags = { Environment = local.env }
-}
-
-module "network" {
-  source    = "../../modules/network"
-  env       = local.env
-  base_tags = local.base_tags
-}
-
-module "database" {
-  source             = "../../modules/database"
-  env                = local.env
-  vpc_id             = module.network.vpc_id
-  private_subnet_ids = module.network.private_subnet_ids
-  base_tags          = local.base_tags
-}
-
-module "cache" {
-  source             = "../../modules/cache"
-  env                = local.env
-  vpc_id             = module.network.vpc_id
-  private_subnet_ids = module.network.private_subnet_ids
-  base_tags          = local.base_tags
-}
-
-module "secrets" {
-  source    = "../../modules/secrets"
-  env       = local.env
-  base_tags = local.base_tags
-}
-```
-
-Create `infra/terraform/envs/dev/variables.tf`:
-
-```hcl
-variable "allowed_account_ids" { type = list(string) }
-```
-
-Create `infra/terraform/envs/dev/terraform.tfvars.example`:
-
-```hcl
-allowed_account_ids = ["111111111111"]
-```
-
-- [ ] **Step 2: Semgrep rule — no public S3**
-
-Create `ops/semgrep/terraform-no-public-s3.yaml`:
-
-```yaml
-rules:
-  - id: goldsmith.terraform-no-public-s3
-    languages: [hcl]
-    severity: ERROR
-    message: |
-      S3 buckets must not be public. No `acl = "public-read"`, no `acl = "public-read-write"`,
-      and no bucket-policy principal "*" without strict conditions. Use CloudFront OAC instead.
-    patterns:
-      - pattern-either:
-          - pattern: |
-              resource "aws_s3_bucket" $NAME { ... acl = "public-read" ... }
-          - pattern: |
-              resource "aws_s3_bucket" $NAME { ... acl = "public-read-write" ... }
-          - pattern: |
-              resource "aws_s3_bucket_acl" $NAME { ... acl = "public-read" ... }
-```
-
-- [ ] **Step 3: Validate dev env**
-
-```bash
-cd infra/terraform/envs/dev && terraform init -backend=false && terraform validate
-```
-
-Expected: `Success! The configuration is valid.`
-
-- [ ] **Step 4: Run Semgrep**
-
-```bash
-semgrep --config ops/semgrep/terraform-no-public-s3.yaml infra/
-```
-
-Expected: 0 findings.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add infra/terraform/envs ops/semgrep/terraform-no-public-s3.yaml
-git commit -m "feat(infra): dev env stack + semgrep terraform-no-public-s3 (S1-M11)"
-```
+Proceed directly to Task 7.
 
 ---
 
@@ -3345,11 +2954,21 @@ git commit -m "feat(audit): auditLog() as sole path into audit_events"
 
 ## Task 23: `packages/crypto-envelope` — LocalKMS + envelope hooks + semgrep
 
+> **🔄 ADR-0015 adaptation (at execution time):**
+> - Rename `src/aws-kms.ts` → `src/azure-keyvault.ts`. Class `AwsKms` → `AzureKeyVault`.
+> - package.json dep: `@aws-sdk/client-kms` → `@azure/keyvault-keys ^4.8.0` + `@azure/identity ^4.0.0`.
+> - `ops/semgrep/no-raw-kms-import.yaml` → `ops/semgrep/no-raw-keyvault-import.yaml` with pattern `import $...X from '@azure/keyvault-keys'` and `import $...X from '@azure/keyvault-secrets'`.
+> - `LocalKMS` adapter stays identical (cloud-neutral in-memory implementation for tests).
+> - `KmsAdapter` interface stays identical (`createKeyForTenant`, `generateDataKey`, `decryptDataKey`, `scheduleKeyDeletion`).
+> - `scheduleKeyDeletion` in AzureKeyVault uses `beginDeleteKey` + Key Vault soft-delete + purge protection (default 90-day retention in Azure vs 30-day AWS grace).
+> - For MVP (startup-lean), a single platform Key Vault with ONE KEK is acceptable (per ADR-0015). Per-tenant keys land when compliance audit demands.
+> - Code blocks below show the AWS version — swap the names + SDK at implementation time.
+
 **Files:**
 - Create: `packages/crypto-envelope/{package.json,tsconfig.json}`
-- Create: `packages/crypto-envelope/src/{kms-adapter,local-kms,aws-kms,envelope,index}.ts`
+- Create: `packages/crypto-envelope/src/{kms-adapter,local-kms,azure-keyvault,envelope,index}.ts` (renamed from aws-kms)
 - Create: `packages/crypto-envelope/test/envelope.test.ts`
-- Create: `ops/semgrep/no-raw-kms-import.yaml`
+- Create: `ops/semgrep/no-raw-keyvault-import.yaml` (renamed from no-raw-kms-import)
 
 - [ ] **Step 1: Package + failing test**
 
@@ -4350,6 +3969,12 @@ git commit -m "feat(testing): endpoint-walker scaffold exercising /healthz (LIT-
 
 ## Task 28: Scripts — db-reset + tenant-provision + tenant-delete
 
+> **🔄 ADR-0015 adaptation (at execution time):**
+> - MVP scope (no cloud yet): scripts operate against local Docker Postgres + the `LocalKMS` in-memory adapter. No `aws` or `az` CLI calls.
+> - `tenant-provision.sh` inserts `shops` row + calls a Node helper that uses `LocalKMS.createKeyForTenant`. Result: a fake ARN string stored in `shops.kek_key_arn`. Real Azure Key Vault integration lands in the Infrastructure Story.
+> - `tenant-delete.sh` deletes rows + marks the LocalKMS key deleted. No real KMS API calls.
+> - When Infrastructure Story lands: helper is swapped from LocalKMS → AzureKeyVault, CLI gate becomes `az account show && az keyvault key create/delete ...`. Script shape stays the same.
+
 **Files:**
 - Create: `scripts/db-reset.sh`
 - Create: `scripts/tenant-provision.sh`
@@ -4495,6 +4120,12 @@ git commit -m "feat(scripts): db-reset + tenant-provision + tenant-delete (runbo
 ---
 
 ## Task 29: CI `ship.yml` with 10 gated jobs + Codex
+
+> **🔄 ADR-0015 adaptation (at execution time):**
+> - **Drop the `terraform-validate` job** — no cloud IaC in this story. That leaves 9 gates: install, typecheck, lint, unit, integration, tenant-isolation, semgrep, codex-review, build.
+> - The Semgrep rule file name changes: `no-raw-kms-import.yaml` → `no-raw-keyvault-import.yaml`.
+> - Node version pin stays 20.11.0. pnpm 9.12.0 via corepack.
+> - Infrastructure Story will add `azd-validate` or equivalent when it lands.
 
 **Files:**
 - Create: `.github/workflows/ship.yml`

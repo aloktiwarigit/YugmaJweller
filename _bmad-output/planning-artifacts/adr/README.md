@@ -10,7 +10,7 @@ This directory holds the authoritative ADRs for the Goldsmith platform. Each ADR
 
 | # | Title | Status | Date |
 |---|-------|--------|------|
-| 0001 | Auth provider — Supabase Auth (Mumbai) for phone OTP | Accepted | 2026-04-17 |
+| 0001 | Auth provider — Supabase Auth (Mumbai) for phone OTP | Superseded in part by 0015 | 2026-04-17 |
 | 0002 | Multi-tenant isolation — single DB + RLS + interceptor (defense-in-depth) | Accepted | 2026-04-17 |
 | 0003 | Money + weight primitives — DECIMAL-only, never FLOAT | Accepted | 2026-04-17 |
 | 0004 | Offline sync — pull-then-push with per-aggregate conflict policy | Accepted | 2026-04-17 |
@@ -21,4 +21,7 @@ This directory holds the authoritative ADRs for the Goldsmith platform. Each ADR
 | 0009 | Backend topology — modular monolith NestJS; microservices deferred with extraction plan | Accepted | 2026-04-17 |
 | 0010 | Tenant provisioning — scripted end-to-end with Terraform orchestration | Accepted | 2026-04-17 |
 | 0011 | Compliance — dedicated package with pure-function hard-block gateway | Accepted | 2026-04-17 |
-| 0012 | IaC — Terraform over AWS CDK for MVP | Accepted | 2026-04-17 |
+| 0012 | IaC — Terraform over AWS CDK for MVP | Superseded in part by 0015 | 2026-04-17 |
+| 0013 | Per-Tenant KEK + Envelope Encryption for Sensitive Columns | Superseded in part by 0015 | 2026-04-18 |
+| 0014 | PITR Retention vs DPDPA Erasure — Documented Residual | Superseded in part by 0015 | 2026-04-18 |
+| 0015 | Stack correction — Azure + Firebase, startup-lean infra (revenue-first) | Accepted | 2026-04-18 |

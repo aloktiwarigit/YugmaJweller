@@ -1,0 +1,13 @@
+{
+  "name": "@goldsmith/crypto-envelope",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run"
+  },
+  "dependencies": {},
+  "devDependencies": { "vitest": "^1.4.0", "typescript": "^5.4.0" }
+}

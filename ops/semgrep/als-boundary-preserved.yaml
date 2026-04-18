@@ -1,0 +1,23 @@
+rules:
+  - id: goldsmith.als-boundary-preserved
+    languages: [typescript]
+    severity: WARNING
+    message: |
+      Detaching from the current microtask (setImmediate/process.nextTick/setTimeout) or spawning
+      workers inside service code can drop the AsyncLocalStorage tenant context. If this is
+      intentional, add `// als-ok: <reason>` on the prior line (reviewer sign-off required per
+      ADR-0005 amendment).
+    patterns:
+      - pattern-either:
+          - pattern: setImmediate($...X)
+          - pattern: process.nextTick($...X)
+          - pattern: setTimeout($...X)
+          - pattern: new Worker($...X)
+      - pattern-not-regex: 'als-ok:'
+    paths:
+      include: ["apps/api/**", "packages/**"]
+      exclude:
+        - "packages/tenant-context/**"
+        - "packages/queue/**"
+        - "packages/testing/**"
+        - "**/*.test.ts"
