@@ -1,0 +1,32 @@
+{
+  "name": "goldsmith",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "engines": { "node": ">=20.11.0 <21" },
+  "scripts": {
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:integration": "turbo run test:integration",
+    "test:tenant-isolation": "turbo run test:tenant-isolation",
+    "build": "turbo run build",
+    "db:reset": "bash scripts/db-reset.sh",
+    "db:generate-rls": "tsx packages/db/src/codegen/generate-rls.ts",
+    "db:assert-marked": "tsx packages/db/src/codegen/assert-all-tables-marked.ts",
+    "semgrep": "semgrep --config ops/semgrep/ --error"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-import": "^2.29.1",
+    "prettier": "^3.2.5",
+    "tsx": "^4.7.0",
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  }
+}
