@@ -4,3 +4,4 @@ export { fixtureRegistry } from '../fixtures/registry';
 export { TENANT_A_ID } from '../fixtures/tenant-a';
 export { TENANT_B_ID } from '../fixtures/tenant-b';
 export { TENANT_C_ID } from '../fixtures/tenant-c';
+export { startFirebaseAuthEmulator, stopFirebaseAuthEmulator } from '../fixtures/firebase-emulator';
