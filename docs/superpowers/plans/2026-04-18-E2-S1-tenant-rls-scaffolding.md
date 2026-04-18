@@ -333,6 +333,7 @@ Create `package.json`:
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.57.0",
+    "eslint-import-resolver-typescript": "^3.6.1",
     "eslint-plugin-import": "^2.29.1",
     "prettier": "^3.2.5",
     "tsx": "^4.7.0",
@@ -365,7 +366,7 @@ Create `turbo.json`:
     "typecheck":            { "dependsOn": ["^typecheck"], "outputs": [] },
     "lint":                 { "outputs": [] },
     "test":                 { "dependsOn": ["^build"], "outputs": [] },
-    "test:unit":            { "dependsOn": ["^build"], "outputs": [] },
+    "test:unit":            { "dependsOn": [], "outputs": [] },
     "test:integration":     { "dependsOn": ["^build"], "outputs": [] },
     "test:tenant-isolation": { "dependsOn": ["^build"], "outputs": [] },
     "build":                { "dependsOn": ["^build"], "outputs": ["dist/**"] }
@@ -389,8 +390,8 @@ Create `tsconfig.base.json`:
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
     "lib": ["ES2022"],
     "strict": true,
     "noImplicitAny": true,
@@ -444,9 +445,9 @@ module.exports = {
     'goldsmith/no-raw-shop-id-param': 'error',
     'no-restricted-imports': ['error', {
       patterns: [
-        { group: ['ioredis'], message: 'Import ioredis only from packages/cache.' },
-        { group: ['bullmq'], message: 'Import bullmq only from packages/queue.' },
-        { group: ['@aws-sdk/client-kms'], message: 'Import @aws-sdk/client-kms only from packages/crypto-envelope.' },
+        { group: ['ioredis', 'ioredis/*'], message: 'Import ioredis only from packages/cache.' },
+        { group: ['bullmq', 'bullmq/*'], message: 'Import bullmq only from packages/queue.' },
+        { group: ['@aws-sdk/client-kms', '@aws-sdk/client-kms/*'], message: 'Import @aws-sdk/client-kms only from packages/crypto-envelope.' },
       ],
     }],
   },

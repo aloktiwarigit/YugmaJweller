@@ -16,9 +16,9 @@ module.exports = {
     'goldsmith/no-raw-shop-id-param': 'error',
     'no-restricted-imports': ['error', {
       patterns: [
-        { group: ['ioredis'], message: 'Import ioredis only from packages/cache.' },
-        { group: ['bullmq'], message: 'Import bullmq only from packages/queue.' },
-        { group: ['@aws-sdk/client-kms'], message: 'Import @aws-sdk/client-kms only from packages/crypto-envelope.' },
+        { group: ['ioredis', 'ioredis/*'], message: 'Import ioredis only from packages/cache.' },
+        { group: ['bullmq', 'bullmq/*'], message: 'Import bullmq only from packages/queue.' },
+        { group: ['@aws-sdk/client-kms', '@aws-sdk/client-kms/*'], message: 'Import @aws-sdk/client-kms only from packages/crypto-envelope.' },
       ],
     }],
   },

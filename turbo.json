@@ -5,7 +5,7 @@
     "typecheck":            { "dependsOn": ["^typecheck"], "outputs": [] },
     "lint":                 { "outputs": [] },
     "test":                 { "dependsOn": ["^build"], "outputs": [] },
-    "test:unit":            { "dependsOn": ["^build"], "outputs": [] },
+    "test:unit":            { "dependsOn": [], "outputs": [] },
     "test:integration":     { "dependsOn": ["^build"], "outputs": [] },
     "test:tenant-isolation": { "dependsOn": ["^build"], "outputs": [] },
     "build":                { "dependsOn": ["^build"], "outputs": ["dist/**"] }
