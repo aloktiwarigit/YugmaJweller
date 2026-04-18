@@ -1,7 +1,8 @@
 import { Module, type ExecutionContext, type CallHandler, Injectable, type NestInterceptor } from '@nestjs/common';
 import { APP_FILTER, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
-import { HealthController, SKIP_TENANT } from './health.controller';
+import { HealthController } from './health.controller';
+import { SKIP_TENANT } from './common/decorators/skip-tenant.decorator';
 import { HttpTenantResolver } from './tenant-resolver';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { TenantInterceptor, type TenantLookup, type Tenant } from '@goldsmith/tenant-context';
