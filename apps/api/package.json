@@ -25,10 +25,15 @@
     "@goldsmith/observability": "workspace:*"
   },
   "devDependencies": {
+    "@goldsmith/db": "workspace:*",
     "@nestjs/testing": "^10.3.0",
+    "@testcontainers/postgresql": "^10.8.0",
     "@types/express": "^4.17.0",
+    "@types/pg": "^8.11.0",
     "@types/supertest": "^6.0.0",
+    "pg": "^8.11.0",
     "supertest": "^7.0.0",
+    "testcontainers": "^10.8.0",
     "vitest": "^1.4.0",
     "typescript": "^5.4.0"
   }
