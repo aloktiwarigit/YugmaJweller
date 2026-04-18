@@ -1,0 +1,17 @@
+rules:
+  - id: goldsmith.no-raw-ioredis-import
+    languages: [typescript]
+    severity: ERROR
+    message: |
+      Direct import of `ioredis` is forbidden outside packages/cache. Use TenantScopedCache so
+      every key is tenant-prefixed (threat-model S1-M10).
+    patterns:
+      - pattern-either:
+          - pattern: import $...X from 'ioredis'
+          - pattern: import { $...X } from 'ioredis'
+          - pattern: require('ioredis')
+    paths:
+      exclude:
+        - "packages/cache/**"
+        - "packages/tenant-context/**"
+        - "packages/queue/**"
