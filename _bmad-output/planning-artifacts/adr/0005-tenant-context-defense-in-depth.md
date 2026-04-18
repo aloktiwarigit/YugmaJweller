@@ -1,6 +1,6 @@
 # 0005 — Tenant Context Propagation: Two-Layer Guard + RLS Enforcement
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-04-18)
 **Date:** 2026-04-17
 **Deciders:** Winston (Architect), Murat (Test Architect)
 
@@ -72,7 +72,7 @@ interface TenantContext {
 
 | Option | Rejected because |
 |--------|------------------|
-| **AsyncLocalStorage for implicit context** | Implicit = forgettable; harder to test; stack-trace confusion; we want explicit `ctx` param as a discipline |
+| **AsyncLocalStorage for implicit context** | Rejected-for-primary-path because Implicit = forgettable; harder to test; stack-trace confusion; we want explicit `ctx` param as a discipline [SUPERSEDED — see Amendment 2026-04-18] |
 | **Global middleware state (request.scope.tenantId)** | Same problem as ALS; no compile-time guarantee |
 | **Tenant set via thread-local** | Node is single-threaded async; would need ALS (see above) |
 | **Let controllers pass shopId manually** | Easy to forget; no compile-time guard |
@@ -129,3 +129,28 @@ export class BaseProcessor extends WorkerHost {
 - ADR-0002 (isolation strategy this builds on)
 - Architecture §Patterns Tenant-context, Audit
 - PRD FR1–7 + FR123 (platform-admin impersonation)
+
+---
+
+## Amendment — 2026-04-18 (E2-S1 plan session)
+
+**Status:** Accepted amendment. Supersedes "AsyncLocalStorage rejected" row above.
+**Context:** Services in libraries (cache, queue, outbound HTTP adapters) cannot practically thread `ctx` through every call site. Forcing explicit-only propagation creates a choice between (a) verbose threading that pollutes adapter code, or (b) per-call `shopId: string` params, which defeats the discipline. Hybrid model resolves this.
+
+**Amended decision:**
+- **Primary carrier:** `AsyncLocalStorage<TenantContext>` instance in `packages/tenant-context`. `tenantContext.runWith(ctx, fn)` seeds the ALS for the remainder of the promise chain.
+- **Explicit param retained:** Services and repositories still declare `ctx: TenantContext` as their first parameter (ESLint `no-raw-shop-id-param` remains active). This is for discoverability and readability, not correctness — ALS is the backstop.
+- **Library code:** `packages/cache`, `packages/queue`, outbound adapters, and `withTenantTx` read `ctx` from ALS directly. They MUST NOT accept `shopId: string` params.
+- **Propagation Semgrep:** Rule `goldsmith/als-boundary-preserved` (ops/semgrep/als-boundary-preserved.yaml) flags `async`/`await`/`Promise.all`/`setImmediate`/`process.nextTick` patterns inside service methods that could drop the ALS context. Pragma `// als-ok: <reason>` allows reviewer-signed exceptions. This rule augments, not replaces, `goldsmith/require-tenant-transaction` from the original decision.
+- **BullMQ workers:** Job payload shape is `{ meta: { tenantId: string }; data: T }`. `BaseProcessor.process(job)` re-validates tenant ACTIVE, re-constructs `TenantContext`, wraps handler in `runWith`.
+- **Outbound HTTP:** Adapter base class reads ctx from ALS and attaches `X-Tenant-Id` header + audit.
+
+**Rationale:**
+- Explicit-only: broke down at library boundaries (cache, queue) forcing verbose-or-unsafe choices.
+- ALS-only: no compile-time discoverability; new engineers would miss the tenancy contract.
+- Hybrid: explicit at service surfaces (readable, lint-enforced), ALS at library surfaces (ergonomic, Semgrep-enforced).
+
+**Consequences:**
+- One additional runtime dependency: Node's built-in `async_hooks` (no npm addition).
+- Testing: any async code path run outside `runWith` that touches ALS throws `tenant.context_not_set`. Tests use a `withTestCtx(ctx, fn)` helper that wraps `runWith`.
+- RLS remains the backstop. Even if both ALS and explicit param fail, `withTenantTx` → `SET LOCAL` → RLS policy filters against the poison UUID.

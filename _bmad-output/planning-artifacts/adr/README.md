@@ -22,3 +22,5 @@ This directory holds the authoritative ADRs for the Goldsmith platform. Each ADR
 | 0010 | Tenant provisioning — scripted end-to-end with Terraform orchestration | Accepted | 2026-04-17 |
 | 0011 | Compliance — dedicated package with pure-function hard-block gateway | Accepted | 2026-04-17 |
 | 0012 | IaC — Terraform over AWS CDK for MVP | Accepted | 2026-04-17 |
+| 0013 | Per-Tenant KEK + Envelope Encryption for Sensitive Columns | Accepted | 2026-04-18 |
+| 0014 | PITR Retention vs DPDPA Erasure — Documented Residual | Accepted with DPO sign-off required before first paying tenant | 2026-04-18 |
