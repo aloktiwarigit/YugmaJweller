@@ -28,9 +28,15 @@ const tenantId = process.env.TENANT_ID;
   try {
     await c.query('BEGIN');
     await c.query('SET ROLE platform_admin');
+    // platform_admin is NOBYPASSRLS + FORCE RLS applies, so we MUST seed the
+    // tenant GUC so the policies USING (shop_id = current_setting(...)::uuid)
+    // match the rows we are deleting. Without this the DELETE loop is a no-op
+    // and the final DELETE FROM shops then fails on ON DELETE RESTRICT.
+    await c.query(\`SET LOCAL app.current_shop_id = '\${tenantId}'\`);
     for (const m of tableRegistry.list().filter((x) => x.kind === 'tenant')) {
       await c.query(\`DELETE FROM \${m.name} WHERE shop_id=\$1\`, [tenantId]);
     }
+    // shops is platformGlobalTable (no RLS). Safe to delete after children are gone.
     await c.query('DELETE FROM shops WHERE id=\$1', [tenantId]);
     await c.query('RESET ROLE');
     await c.query('COMMIT');
