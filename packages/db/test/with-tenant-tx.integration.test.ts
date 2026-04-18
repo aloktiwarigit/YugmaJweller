@@ -5,12 +5,14 @@ import { join } from 'node:path';
 import { Pool } from 'pg';
 import { createPool } from '../src/provider';
 import { withTenantTx } from '../src/tx';
-import { tenantContext } from '@goldsmith/tenant-context';
+import { tenantContext, type Tenant, type UnauthenticatedTenantContext } from '@goldsmith/tenant-context';
 
 let container: StartedPostgreSqlContainer;
 let pool: Pool;
 const SHOP_A = '11111111-1111-1111-1111-111111111111';
 const SHOP_B = '22222222-2222-2222-2222-222222222222';
+const tenantShopA: Tenant = { id: SHOP_A, slug: 'a', display_name: 'Shop A', status: 'ACTIVE' };
+const ctxShopA: UnauthenticatedTenantContext = { shopId: SHOP_A, tenant: tenantShopA, authenticated: false };
 
 beforeAll(async () => {
   container = await new PostgreSqlContainer('postgres:15.6').start();
@@ -39,7 +41,7 @@ afterAll(async () => { await pool?.end(); await container?.stop(); });
 
 describe('withTenantTx', () => {
   it('scopes SELECT to ALS tenant', async () => {
-    const rows = await tenantContext.runWith({ shopId: SHOP_A } as never, () =>
+    const rows = await tenantContext.runWith(ctxShopA, () =>
       withTenantTx(pool, async (tx) => (await tx.query('SELECT * FROM shop_users')).rows),
     );
     expect(rows).toHaveLength(1);
@@ -53,7 +55,7 @@ describe('withTenantTx', () => {
   });
 
   it('rolls back on error + leaves SET LOCAL unleaked', async () => {
-    await tenantContext.runWith({ shopId: SHOP_A } as never, async () => {
+    await tenantContext.runWith(ctxShopA, async () => {
       await expect(
         withTenantTx(pool, async (tx) => {
           await tx.query('INSERT INTO shop_users (shop_id, phone, display_name, role, status) VALUES ($1,$2,$3,$4,$5)',

@@ -9,7 +9,7 @@ import {
 import { from, Observable } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { tenantContext } from './als';
-import type { TenantContext, Tenant } from './context';
+import type { TenantContext, ShopUserRole } from './context';
 import type { TenantLookup } from './tenant-cache';
 
 export interface RequestLike {
@@ -47,16 +47,24 @@ export class TenantInterceptor implements NestInterceptor {
   }
 
   private async resolve(ctx: ExecutionContext): Promise<TenantContext> {
-    const req = ctx.switchToHttp().getRequest<RequestLike>();
-    let shopId: string | undefined;
-    if (req.hostname) shopId = await this.resolver.fromHost(req.hostname);
+    const req = ctx.switchToHttp().getRequest<RequestLike & { user?: { shop_id?: string; uid?: string; role?: ShopUserRole } }>();
+
+    // JWT → Host → Header priority.
+    let shopId: string | undefined = this.resolver.fromJwt(req);
+    if (!shopId && req.hostname) shopId = await this.resolver.fromHost(req.hostname);
     shopId ??= this.resolver.fromHeader(req);
-    shopId ??= this.resolver.fromJwt(req);
 
     if (!shopId) throw new UnauthorizedException('tenant.resolution_failed');
-    const tenant: Tenant | undefined = await this.tenants.byId(shopId);
+    const tenant = await this.tenants.byId(shopId);
     if (!tenant) throw new UnauthorizedException('tenant.not_found');
     if (tenant.status !== 'ACTIVE') throw new ForbiddenException('tenant.inactive');
-    return { shopId: tenant.id, tenant };
+
+    if (req.user?.uid && req.user.role && req.user.shop_id === shopId) {
+      return {
+        shopId: tenant.id, tenant,
+        authenticated: true, userId: req.user.uid, role: req.user.role,
+      };
+    }
+    return { shopId: tenant.id, tenant, authenticated: false };
   }
 }

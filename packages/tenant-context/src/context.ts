@@ -3,17 +3,26 @@ export interface Tenant {
   slug: string;
   display_name: string;
   status: 'PROVISIONING' | 'ACTIVE' | 'SUSPENDED' | 'TERMINATED';
+  config?: Record<string, unknown>;
 }
 
-export interface TenantContext {
+export type ShopUserRole = 'shop_admin' | 'shop_manager' | 'shop_staff' | 'platform_admin';
+
+interface BaseTenantContext {
   readonly shopId: string;
   readonly tenant: Tenant;
-  /** @sinceStory 1.1 — populated by JWT verification in auth module */
-  readonly userId?: string;
-  /** @sinceStory 1.1 */
-  readonly role?: 'shop_admin' | 'shop_manager' | 'shop_staff' | 'platform_admin';
-  /** @sinceStory 1.5 — platform-admin impersonation */
+}
+
+export interface AuthenticatedTenantContext extends BaseTenantContext {
+  readonly authenticated: true;
+  readonly userId: string;
+  readonly role: ShopUserRole;
   readonly isImpersonating?: boolean;
-  /** @sinceStory 1.5 */
   readonly impersonationAuditId?: string;
 }
+
+export interface UnauthenticatedTenantContext extends BaseTenantContext {
+  readonly authenticated: false;
+}
+
+export type TenantContext = AuthenticatedTenantContext | UnauthenticatedTenantContext;
