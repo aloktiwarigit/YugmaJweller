@@ -13,8 +13,8 @@ export function generateRlsSql(): string {
     parts.push(
       `CREATE POLICY rls_${meta.name}_tenant_isolation ON ${meta.name}\n` +
       `  FOR ALL\n` +
-      `  USING (shop_id = current_setting('app.current_shop_id', true)::uuid)\n` +
-      `  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);`,
+      `  USING (shop_id = current_setting('app.current_shop_id')::uuid)\n` +
+      `  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);`,
     );
     parts.push('');
   }
