@@ -52,6 +52,34 @@ importers:
         specifier: ^7.0.0
         version: 7.18.0(eslint@8.57.1)(typescript@5.9.3)
 
+  packages/audit:
+    dependencies:
+      '@goldsmith/db':
+        specifier: workspace:*
+        version: link:../db
+      '@goldsmith/tenant-context':
+        specifier: workspace:*
+        version: link:../tenant-context
+      pg:
+        specifier: ^8.11.0
+        version: 8.20.0
+    devDependencies:
+      '@testcontainers/postgresql':
+        specifier: ^10.8.0
+        version: 10.28.0
+      '@types/pg':
+        specifier: ^8.11.0
+        version: 8.20.0
+      testcontainers:
+        specifier: ^10.8.0
+        version: 10.28.0
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.4.0
+        version: 1.6.1(@types/node@20.19.39)
+
   packages/cache:
     dependencies:
       '@goldsmith/tenant-context':
