@@ -1,0 +1,1 @@
+{ "extends": "./tsconfig.json", "exclude": ["**/*.test.ts", "**/*.e2e.test.ts", "test/**/*"] }
