@@ -622,6 +622,12 @@ describe('redactPii', () => {
   it('leaves non-PII keys alone', () => {
     expect(redactPii({ shopId: 'abc', total: 123 })).toEqual({ shopId: 'abc', total: 123 });
   });
+
+  it('redacts display_name (shop_users column)', () => {
+    expect(redactPii({ display_name: 'Rajesh Ji' })).toEqual({
+      display_name: '[REDACTED:display_name]',
+    });
+  });
 });
 ```
 
@@ -640,7 +646,7 @@ Create `packages/observability/src/pii-redactor.ts`:
 ```ts
 const PII_KEYS = new Set([
   'phone', 'pan', 'email', 'aadhaar', 'dob',
-  'address', 'name', 'customerName', 'ownerName',
+  'address', 'customerName', 'ownerName', 'display_name',
   'gstin', 'bankAccount', 'ifsc', 'otp',
 ]);
 

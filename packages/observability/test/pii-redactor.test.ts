@@ -27,4 +27,10 @@ describe('redactPii', () => {
   it('leaves non-PII keys alone', () => {
     expect(redactPii({ shopId: 'abc', total: 123 })).toEqual({ shopId: 'abc', total: 123 });
   });
+
+  it('redacts display_name (shop_users column)', () => {
+    expect(redactPii({ display_name: 'Rajesh Ji' })).toEqual({
+      display_name: '[REDACTED:display_name]',
+    });
+  });
 });

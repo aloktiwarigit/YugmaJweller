@@ -1,6 +1,6 @@
 const PII_KEYS = new Set([
   'phone', 'pan', 'email', 'aadhaar', 'dob',
-  'address', 'customerName', 'ownerName',
+  'address', 'customerName', 'ownerName', 'display_name',
   'gstin', 'bankAccount', 'ifsc', 'otp',
 ]);
 
