@@ -1,0 +1,23 @@
+rules:
+  - id: goldsmith.require-tenant-transaction
+    languages: [typescript]
+    severity: ERROR
+    message: |
+      Raw DB execution is forbidden. Wrap queries in `withTenantTx` (packages/db) so the
+      tenant SET LOCAL is always applied. If this call is intentionally platform-global, use the
+      `platformGlobalExecute()` helper + reviewer sign-off.
+    paths:
+      exclude:
+        - "packages/db/**"
+        - "packages/testing/**"
+        - "**/*.test.ts"
+        - "**/*.integration.test.ts"
+    patterns:
+      - pattern-either:
+          - pattern: $DB.execute($...X)
+          - pattern: $DB.query($...X)
+          - pattern: $POOL.connect()
+      - pattern-not-inside: |
+          withTenantTx(...) { ... }
+      - pattern-not-inside: |
+          withTenantTx($POOL, async ($TX) => { ... })
