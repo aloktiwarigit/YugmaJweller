@@ -1,0 +1,9 @@
+{
+  "name": "eslint-plugin-goldsmith",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./index.js",
+  "scripts": { "test": "node --test tests/*.test.js" },
+  "peerDependencies": { "eslint": "^8.57.0" },
+  "devDependencies": { "@typescript-eslint/parser": "^7.0.0" }
+}
