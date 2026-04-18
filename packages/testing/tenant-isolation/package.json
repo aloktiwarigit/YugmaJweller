@@ -10,6 +10,7 @@
     "test:tenant-isolation": "vitest run"
   },
   "dependencies": {
+    "@goldsmith/api": "workspace:*",
     "@goldsmith/db": "workspace:*",
     "@goldsmith/tenant-context": "workspace:*",
     "pg": "^8.11.0"
@@ -18,6 +19,9 @@
     "vitest": "^1.4.0",
     "testcontainers": "^10.8.0",
     "@testcontainers/postgresql": "^10.8.0",
+    "@nestjs/testing": "^10.3.0",
+    "supertest": "^7.0.0",
+    "@types/supertest": "^6.0.0",
     "typescript": "^5.4.0"
   }
 }
