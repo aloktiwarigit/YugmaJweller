@@ -90,20 +90,9 @@ jobs:
       - uses: actions/checkout@v4
       - run: semgrep --config ops/semgrep/ --error .
 
-  codex-review:
-    needs: install
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - uses: actions/setup-node@v4
-        with: { node-version: "${{ env.NODE_VERSION }}" }
-      - name: Install Codex CLI
-        run: npm i -g @openai/codex-cli
-      - name: Codex review
-        env: { OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}" }
-        run: codex review --diff "origin/${{ github.base_ref }}...HEAD" --fail-on high
+  # Codex review is a LOCAL pre-push gate per CLAUDE.md, not a CI job.
+  # Run `codex review --diff HEAD~1` (or the `codex-review-gate` Claude Code plugin)
+  # before opening / merging a PR. CI handles the objective gates only.
 
   build:
     needs: [typecheck, lint, unit, integration, tenant-isolation, semgrep]
