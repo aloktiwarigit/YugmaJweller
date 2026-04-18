@@ -13,9 +13,10 @@
     "db:assert-marked": "tsx src/codegen/assert-all-tables-marked.ts"
   },
   "dependencies": {
+    "@goldsmith/observability": "workspace:*",
+    "@goldsmith/tenant-context": "workspace:*",
     "drizzle-orm": "^0.30.0",
-    "pg": "^8.11.0",
-    "@goldsmith/observability": "workspace:*"
+    "pg": "^8.11.0"
   },
   "devDependencies": {
     "@types/pg": "^8.11.0",
