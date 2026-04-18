@@ -1,0 +1,16 @@
+rules:
+  - id: goldsmith.no-raw-keyvault-import
+    languages: [typescript]
+    severity: ERROR
+    message: |
+      Direct import of @azure/keyvault-keys or @azure/keyvault-secrets is forbidden outside
+      packages/crypto-envelope. Use the envelope helpers so column-level encryption consistently
+      uses per-tenant KEKs (ADR-0013, ADR-0015).
+    patterns:
+      - pattern-either:
+          - pattern: import $...X from '@azure/keyvault-keys'
+          - pattern: import { $...X } from '@azure/keyvault-keys'
+          - pattern: import $...X from '@azure/keyvault-secrets'
+          - pattern: import { $...X } from '@azure/keyvault-secrets'
+    paths:
+      exclude: ["packages/crypto-envelope/**"]
