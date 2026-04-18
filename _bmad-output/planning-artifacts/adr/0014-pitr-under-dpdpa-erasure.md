@@ -1,6 +1,6 @@
 # 0014 — PITR Retention vs DPDPA Erasure — Documented Residual
 
-**Status:** Accepted with DPO sign-off required before first paying tenant
+**Status:** Superseded in part by ADR-0015 (2026-04-18). Principle stands (documented residual + DPO sign-off). AWS RDS PITR specifics swap to **Azure Postgres Flexible Server PITR** (configurable 1-35 days) + Azure Activity Log audit. Full Azure rewrite deferred to infrastructure story.
 **Date:** 2026-04-18
 **Deciders:** Winston (Architect), Alok (Agency), Mary (BA, DPDPA compliance)
 

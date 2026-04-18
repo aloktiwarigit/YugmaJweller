@@ -1,6 +1,6 @@
 # 0001 — Auth Provider: Supabase Auth (Mumbai) for Phone OTP
 
-**Status:** Accepted
+**Status:** Superseded in part by ADR-0015 (2026-04-18) — primary auth provider swapped to Firebase Auth for startup-lean MVP. Supabase Auth moves to "alternatives considered" in ADR-0015. Full rewrite deferred to Story 1.1 (auth) when infrastructure story lands.
 **Date:** 2026-04-17
 **Deciders:** Winston (Architect), John (PM), Alok (Agency)
 **Consulted:** Murat (Test Architect on OTP rate-limit semantics), Mary (BA on legal/residency)

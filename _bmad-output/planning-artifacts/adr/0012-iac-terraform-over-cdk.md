@@ -1,6 +1,6 @@
 # 0012 — IaC: Terraform over AWS CDK for MVP
 
-**Status:** Accepted
+**Status:** Superseded in part by ADR-0015 (2026-04-18). Terraform stays as the IaC tool of choice; provider swaps from `hashicorp/aws` to `hashicorp/azurerm`. `azd` (Azure Developer CLI) introduced as preferred front-end for app-centric infra; Terraform retained for complex custom topologies. AWS-specific rationale (SCP examples, CloudTrail) superseded. Full rewrite deferred until infrastructure story.
 **Date:** 2026-04-17
 **Deciders:** Winston (Architect), Amelia (Dev), Alok (Agency)
 

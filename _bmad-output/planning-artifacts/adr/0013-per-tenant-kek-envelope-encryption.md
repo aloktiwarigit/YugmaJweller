@@ -1,6 +1,6 @@
 # 0013 — Per-Tenant KEK + Envelope Encryption for Sensitive Columns
 
-**Status:** Accepted
+**Status:** Superseded in part by ADR-0015 (2026-04-18). Principle stands (per-tenant KEK + envelope encryption). AWS KMS CMK implementation swaps to **Azure Key Vault key per tenant** (RBAC-scoped, `ScheduleKeyDeletion` → soft-delete + purge protection). **For MVP, a single platform-level KEK is acceptable** — per-tenant keys deferred until compliance audit or first tenant contract demands. Full Azure rewrite deferred to infrastructure story.
 **Date:** 2026-04-18
 **Deciders:** Winston (Architect), Alok (Agency), Murat (Test Architect)
 
