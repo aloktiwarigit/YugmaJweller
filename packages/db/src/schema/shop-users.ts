@@ -12,6 +12,8 @@ export const shopUsers = tenantScopedTable(
     display_name: text('display_name').notNull(),
     role: shopUserRoleEnum('role').notNull(),
     status: shopUserStatusEnum('status').notNull().default('INVITED'),
+    firebase_uid: text('firebase_uid'),
+    activated_at: timestamp('activated_at', { withTimezone: true }),
     created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
