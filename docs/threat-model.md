@@ -279,6 +279,29 @@ These are pulled from the tables above — the mitigations that MUST ship before
 | S1-M23 | PMLA manual audit tool | Epic 9 | M |
 | S1-M24 | DPDPA request tracker | Epic 15 | M |
 
+### 7.1 New mitigations (Story 1.1)
+
+> **Note on numbering:** Story 1.1's plan referenced "S1-M13" and "S1-M14" for these two
+> Firebase-auth mitigations, but those IDs were already taken in v1 (WhatsApp template audit
+> log and Rate-integrity gate respectively). To avoid collision the Story 1.1 mitigations are
+> assigned the next free IDs **S1-M25** and **S1-M26**. ADR-0016 references "S1-M13" in its
+> threat-model note — readers should follow it to S1-M25 here.
+
+| ID | Mitigation | Epic | Estimate |
+|----|------------|------|----------|
+| S1-M25 | Firebase custom-claim integrity — server-only `setCustomUserClaims`; every verify uses `checkRevoked=true` | Epic 1 (auth) | S |
+| S1-M26 | Phone-hash audit — no raw phone in audit_events.metadata / platform_audit_events.phone_hash; Semgrep `goldsmith/no-phone-in-audit-metadata` + runtime PII scrubber | Epic 1 (auth) / Epic 2 (tenant foundations) | S |
+
+- **S1-M25 (Firebase custom-claim integrity):** Only the server writes custom claims via Admin
+  SDK `setCustomUserClaims`; clients cannot forge them. Every request verifies via Admin SDK
+  `verifyIdToken(token, checkRevoked=true)` — revocations propagate within the
+  `tokensValidAfterTime` check window.
+
+- **S1-M26 (phone-hash audit):** audit_events.metadata and platform_audit_events.phone_hash
+  never contain raw phone numbers — only SHA-256(phone_e164). Enforced by Semgrep
+  `goldsmith/no-phone-in-audit-metadata` (AST scan for `phone:` / `phone_number:` keys in
+  `auditLog()` / `platformAuditLog()` calls) + runtime PII scrubber fallback.
+
 ## 8. Accepted Residual Risks (v1)
 
 The following are explicitly accepted, with monitoring:

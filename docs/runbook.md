@@ -35,6 +35,8 @@ mvpScope: >
 | [§8 Tenant offboarding](#8-tenant-offboarding) | Jeweller terminates contract |
 | [§9 Break-glass credentials](#9-break-glass-credentials) | Normal access paths are unavailable |
 | [§10 Recovery objectives](#10-recovery-objectives-rto--rpo) | RTO / RPO targets |
+| [§12 Anchor seeding](#12-anchor-seeding-dev--prod) | Dev-time + prod anchor tenant bootstrap |
+| [§13 Firebase service-account rotation](#13-firebase-service-account-rotation-90-day-cadence) | 90-day secret rotation |
 
 ---
 
@@ -454,6 +456,37 @@ pnpm test:tenant-isolation
 - **Quarterly:** full runbook + threat-model joint review
 - **On every new trust boundary:** runbook + threat-model update required before deploy
 - **On every incident severity P0/P1:** post-incident review adds to this runbook
+
+---
+
+## 12. Anchor seeding (dev + prod)
+
+Use `scripts/seed-anchor.ts` (pnpm seed:anchor). Inputs from `.env.local` (never commit):
+
+- SEED_ANCHOR_SLUG (default: anchor-dev)
+- SEED_ANCHOR_DISPLAY_NAME (default: अयोध्या स्वर्णकार)
+- SEED_ANCHOR_PHONE_E164 (required, +CC format)
+- FIREBASE_SERVICE_ACCOUNT_JSON_B64 (required)
+
+Running the script is idempotent: it UPSERTs the shops row by slug, UPSERTs shop_users by
+(shop_id, phone) with status='INVITED', and prints the Firebase emulator console URL so you
+can pick up the dev OTP. On first login via Expo, status flips to ACTIVE + firebase_uid is
+populated.
+
+When the anchor SOW signs, re-run this same script against the real Firebase project
+(FIREBASE_PROJECT_ID=goldsmith-prod) with the anchor's real phone number.
+
+## 13. Firebase service-account rotation (90-day cadence)
+
+Firebase Admin service-account JSON rotates every 90 days per our secrets-hygiene policy.
+
+1. Firebase Console → Project settings → Service accounts → Generate new private key.
+2. Base64-encode the downloaded JSON: `base64 -i service-account.json | tr -d '\n'`.
+3. Update Azure Key Vault secret `firebase-service-account-json` (prod) or `.env.local` (dev).
+4. Redeploy Container App (prod) or restart dev server. Verify with a test OTP.
+5. Delete old key in Firebase Console only after the new key is confirmed live (>=30min
+   overlap).
+6. Log the rotation in `docs/security-log.md` (create if absent).
 
 ---
 
