@@ -1,0 +1,25 @@
+rules:
+  - id: goldsmith.no-tenant-id-from-request-input
+    languages: [typescript]
+    severity: ERROR
+    message: |
+      Tenant ID must never be taken from request input. Use JWT claim (via TenantInterceptor) or
+      host CNAME. Violates threat-model S1-M2.
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $X.query.shopId
+          - pattern: |
+              $X.body.shopId
+          - pattern: |
+              $X.params.shopId
+          - pattern: |
+              $X.query.shop_id
+          - pattern: |
+              $X.body.tenant_id
+          - pattern: |
+              $X.params.tenant_id
+    paths:
+      exclude:
+        - "packages/tenant-context/**"
+        - "**/*.test.ts"
