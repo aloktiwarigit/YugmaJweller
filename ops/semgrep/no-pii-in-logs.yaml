@@ -1,0 +1,17 @@
+rules:
+  - id: goldsmith.no-pii-in-logs
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: |
+      PII field names must not be logged. Use `logger.info({ ... })` where values pass through the
+      PII redactor, or explicitly wrap with `redactPii(value)`. Do NOT inline PII-named keys into
+      console.log or templated strings.
+    patterns:
+      - pattern-either:
+          - pattern: console.log($...ARGS)
+          - pattern: console.warn($...ARGS)
+          - pattern: console.error($...ARGS)
+      - metavariable-pattern:
+          metavariable: $...ARGS
+          patterns:
+            - pattern-regex: "(phone|pan|email|aadhaar|otp|customerName|gstin)"

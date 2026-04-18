@@ -1,0 +1,20 @@
+{
+  "name": "@goldsmith/observability",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.8.0",
+    "@opentelemetry/sdk-node": "^0.51.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.43.0",
+    "@sentry/node": "^7.109.0",
+    "pino": "^8.19.0"
+  },
+  "devDependencies": { "vitest": "^1.4.0", "typescript": "^5.4.0" }
+}
