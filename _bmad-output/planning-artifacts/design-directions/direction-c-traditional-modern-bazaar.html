@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>[Anchor Jewellers] — Traditional Modern Bazaar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..800;1,9..144,400..700&family=Hind+Siliguri:wght@300;400;500;600&family=Rozha+One&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --terracotta:        #C35C3C;
+    --terracotta-deep:   #8F3A22;
+    --terracotta-bright: #D66D45;
+    --terracotta-pale:   #E89373;
+    --gold:              #C49B3C;
+    --gold-bright:       #E3B84B;
+    --gold-deep:         #8F6E1F;
+    --cream:             #F5EBD9;
+    --cream-light:       #FAF4E8;
+    --cream-warm:        #F2E4CE;
+    --stone:             #D9CFB8;
+    --charcoal:          #2E2624;
+    --charcoal-soft:     #5D4E48;
+    --charcoal-mute:     #8A7A72;
+
+    --font-hi-display: 'Rozha One', serif;
+    --font-hi-body:    'Hind Siliguri', sans-serif;
+    --font-en:         'Fraunces', serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-en);
+    background: var(--cream);
+    color: var(--charcoal);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: 'opsz' 14;
+  }
+  :lang(hi), [lang="hi"] { font-family: var(--font-hi-body); line-height: 1.65; }
+  .hi-display, [class*="hi-display"] { font-family: var(--font-hi-display); font-weight: 400; }
+
+  /* SVG pattern — sari-border inspired */
+  .sari-border {
+    height: 24px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 24'><g fill='%23C49B3C' opacity='0.55'><path d='M10 12 L15 4 L20 12 L15 20 Z'/><circle cx='30' cy='12' r='1.6'/><path d='M40 12 L45 4 L50 12 L45 20 Z'/></g><line x1='0' y1='22' x2='60' y2='22' stroke='%23C49B3C' stroke-width='0.5' opacity='0.4'/><line x1='0' y1='2' x2='60' y2='2' stroke='%23C49B3C' stroke-width='0.5' opacity='0.4'/></svg>");
+    background-repeat: repeat-x;
+    background-size: 60px 24px;
+  }
+
+  /* Top bar */
+  .top {
+    background: var(--charcoal);
+    color: var(--cream);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    padding: 0.5rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .top__rates { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+  .top__rate :lang(hi) { color: var(--gold-bright); font-size: 0.78rem; margin-right: 0.3rem; }
+  .top__rate strong { color: var(--cream); font-weight: 400; letter-spacing: 0.05em; }
+  .top__rate small { color: var(--terracotta-pale); margin-left: 0.3rem; font-size: 0.65rem; }
+  .top__lang { color: var(--gold-bright); cursor: pointer; }
+
+  /* Nav */
+  nav {
+    background: var(--cream-light);
+    padding: 1.2rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--stone);
+    position: relative;
+  }
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 0.8rem;
+  }
+  .brand__logo {
+    width: 40px;
+    height: 40px;
+    background: var(--terracotta);
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: var(--gold-bright);
+    font-family: var(--font-hi-display);
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+  .brand__name {
+    font-family: var(--font-hi-display);
+    font-size: 1.5rem;
+    color: var(--charcoal);
+    line-height: 1;
+  }
+  .brand__sub {
+    font-family: var(--font-en);
+    font-size: 0.75rem;
+    color: var(--charcoal-mute);
+    letter-spacing: 0.1em;
+    font-style: italic;
+  }
+  nav ul {
+    list-style: none;
+    display: none;
+    gap: 1.8rem;
+  }
+  @media (min-width: 768px) { nav ul { display: flex; } }
+  nav ul a {
+    color: var(--charcoal);
+    text-decoration: none;
+    font-family: var(--font-hi-body);
+    font-size: 1rem;
+    font-weight: 500;
+    transition: color 0.2s ease;
+  }
+  nav ul a:hover { color: var(--terracotta); }
+
+  /* Hero — warm terracotta band */
+  .hero {
+    background: linear-gradient(180deg, var(--terracotta) 0%, var(--terracotta-deep) 100%);
+    color: var(--cream);
+    position: relative;
+    padding: 4rem 1.5rem 6rem;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><g fill='none' stroke='%23E3B84B' stroke-width='0.8' opacity='0.08'><circle cx='60' cy='60' r='50'/><circle cx='60' cy='60' r='35'/><circle cx='60' cy='60' r='20'/></g></svg>");
+    background-size: 120px 120px;
+    background-repeat: repeat;
+    opacity: 0.7;
+    pointer-events: none;
+  }
+  .hero__inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 3rem;
+    align-items: center;
+    position: relative;
+  }
+  @media (min-width: 900px) {
+    .hero__inner { grid-template-columns: 6fr 5fr; gap: 4rem; }
+  }
+  .hero__kicker {
+    display: inline-block;
+    padding: 0.35rem 0.9rem;
+    background: rgba(228, 184, 75, 0.2);
+    border: 1px solid var(--gold-bright);
+    color: var(--gold-bright);
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    font-family: var(--font-en);
+  }
+  .hero__title {
+    font-family: var(--font-hi-display);
+    font-size: clamp(2.8rem, 7vw, 5.5rem);
+    line-height: 1.05;
+    margin-bottom: 1.8rem;
+    color: var(--cream);
+  }
+  .hero__title-en {
+    font-family: var(--font-en);
+    font-style: italic;
+    font-size: 1.1rem;
+    color: var(--gold-bright);
+    letter-spacing: 0.02em;
+    margin-bottom: 2.5rem;
+    max-width: 40ch;
+    font-weight: 300;
+    opacity: 0.95;
+  }
+  .hero__ctas { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+  .cta {
+    padding: 0.95rem 1.8rem;
+    font-family: var(--font-hi-body);
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.25s ease;
+    display: inline-block;
+    text-decoration: none;
+    letter-spacing: 0.01em;
+  }
+  .cta--gold {
+    background: var(--gold-bright);
+    color: var(--charcoal);
+  }
+  .cta--gold:hover { background: var(--gold); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.15); }
+  .cta--outline {
+    background: transparent;
+    color: var(--cream);
+    border: 1px solid var(--cream);
+  }
+  .cta--outline:hover { background: var(--cream); color: var(--terracotta-deep); }
+
+  .hero__image {
+    position: relative;
+    aspect-ratio: 4 / 5;
+    background: linear-gradient(165deg, #E3B84B 0%, #8F6E1F 100%);
+    border: 3px solid var(--gold-bright);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+  }
+  .hero__image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .hero__image::after {
+    content: 'प्रमाणित 22K';
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: var(--cream);
+    color: var(--terracotta-deep);
+    padding: 0.4rem 0.9rem;
+    font-family: var(--font-hi-body);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    border-radius: 2px;
+  }
+
+  .sari-hero { background-color: var(--cream); }
+
+  /* Categories — pills */
+  .categories {
+    padding: 3rem 1.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .categories__title {
+    font-family: var(--font-hi-display);
+    font-size: 2.2rem;
+    color: var(--charcoal);
+    margin-bottom: 0.3rem;
+  }
+  .categories__sub {
+    font-family: var(--font-en);
+    font-style: italic;
+    color: var(--charcoal-mute);
+    margin-bottom: 2.5rem;
+    font-size: 1rem;
+  }
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.7rem;
+  }
+  .pill {
+    padding: 0.6rem 1.3rem;
+    background: var(--cream-light);
+    border: 1px solid var(--stone);
+    color: var(--charcoal);
+    font-family: var(--font-hi-body);
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 999px;
+    transition: all 0.2s ease;
+  }
+  .pill:hover, .pill--active {
+    background: var(--terracotta);
+    color: var(--cream);
+    border-color: var(--terracotta);
+  }
+  .pill small {
+    display: inline-block;
+    margin-left: 0.4rem;
+    opacity: 0.7;
+    font-family: var(--font-en);
+    font-size: 0.75rem;
+  }
+
+  /* Products grid */
+  .products {
+    max-width: 1200px;
+    margin: 2rem auto 4rem;
+    padding: 0 1.5rem;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1.5rem;
+  }
+  .card {
+    background: var(--cream-light);
+    border: 1px solid var(--stone);
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s ease;
+  }
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px rgba(46, 38, 36, 0.12);
+    border-color: var(--gold);
+  }
+  .card__image {
+    aspect-ratio: 1 / 1.1;
+    background: linear-gradient(160deg, var(--stone), var(--cream-warm));
+    overflow: hidden;
+    position: relative;
+  }
+  .card__image img { width: 100%; height: 100%; object-fit: cover; }
+  .card__badge {
+    position: absolute;
+    top: 0.8rem;
+    left: 0.8rem;
+    background: var(--gold-bright);
+    color: var(--charcoal);
+    font-family: var(--font-hi-body);
+    font-size: 0.7rem;
+    padding: 0.2rem 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .card__wish {
+    position: absolute;
+    top: 0.8rem;
+    right: 0.8rem;
+    width: 36px;
+    height: 36px;
+    background: var(--cream);
+    border: none;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  }
+  .card__wish svg { width: 16px; height: 16px; stroke: var(--terracotta); fill: none; stroke-width: 1.6; }
+  .card__wish:hover svg { fill: var(--terracotta); }
+  .card__body { padding: 1rem 1.1rem 1.2rem; }
+  .card__name {
+    font-family: var(--font-hi-display);
+    font-size: 1.25rem;
+    color: var(--charcoal);
+    line-height: 1.2;
+    margin-bottom: 0.1rem;
+  }
+  .card__sub {
+    font-family: var(--font-en);
+    font-size: 0.78rem;
+    color: var(--charcoal-mute);
+    font-style: italic;
+    margin-bottom: 0.8rem;
+  }
+  .card__meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--font-hi-body);
+    font-size: 0.85rem;
+    color: var(--charcoal-soft);
+  }
+  .card__price {
+    font-family: var(--font-en);
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: var(--terracotta-deep);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Screen divider */
+  .screen-divider {
+    text-align: center;
+    padding: 2.5rem 1.5rem;
+    background: var(--charcoal);
+    color: var(--gold-bright);
+    font-family: var(--font-hi-display);
+    font-size: 1.3rem;
+    letter-spacing: 0.08em;
+  }
+  .screen-divider small {
+    display: block;
+    font-family: var(--font-en);
+    font-style: italic;
+    font-size: 0.8rem;
+    color: var(--cream);
+    margin-top: 0.3rem;
+    letter-spacing: 0.1em;
+  }
+
+  /* Product detail */
+  .detail {
+    max-width: 1200px;
+    margin: 4rem auto;
+    padding: 0 1.5rem;
+  }
+  .detail__inner {
+    background: var(--cream-light);
+    border: 1px solid var(--stone);
+    padding: 0;
+    overflow: hidden;
+  }
+  .detail__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 900px) {
+    .detail__grid { grid-template-columns: 6fr 5fr; }
+  }
+  .detail__images {
+    background: linear-gradient(165deg, var(--terracotta) 0%, var(--terracotta-deep) 100%);
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    position: relative;
+    min-height: 500px;
+  }
+  .detail__main-img {
+    aspect-ratio: 1 / 1.15;
+    background: var(--gold);
+    border: 4px solid var(--gold-bright);
+    overflow: hidden;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+  }
+  .detail__main-img img { width: 100%; height: 100%; object-fit: cover; }
+  .detail__thumbs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+  }
+  .detail__thumb {
+    aspect-ratio: 1 / 1;
+    background: var(--cream);
+    border: 2px solid var(--gold-bright);
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .detail__thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+  .detail__info { padding: 2.5rem 2rem; }
+  .detail__category {
+    font-family: var(--font-en);
+    font-size: 0.75rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--terracotta);
+    font-weight: 600;
+    margin-bottom: 1rem;
+  }
+  .detail__name {
+    font-family: var(--font-hi-display);
+    font-size: 2.4rem;
+    color: var(--charcoal);
+    line-height: 1.15;
+    margin-bottom: 0.4rem;
+  }
+  .detail__name-en {
+    font-family: var(--font-en);
+    font-style: italic;
+    font-size: 1.05rem;
+    color: var(--charcoal-mute);
+    margin-bottom: 1.5rem;
+  }
+
+  /* HUID Medallion */
+  .huid-medallion {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.9rem;
+    background: var(--cream-warm);
+    border: 2px solid var(--gold);
+    padding: 0.7rem 1.2rem 0.7rem 0.7rem;
+    border-radius: 999px 40px 40px 999px;
+    margin-bottom: 2rem;
+    box-shadow: 0 3px 8px rgba(143, 110, 31, 0.15);
+  }
+  .huid-seal {
+    width: 44px;
+    height: 44px;
+    background: radial-gradient(circle, var(--gold-bright), var(--gold-deep));
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: var(--cream);
+    flex-shrink: 0;
+    animation: gentle-rotate 12s linear infinite;
+  }
+  .huid-seal svg { width: 22px; height: 22px; stroke: var(--cream); stroke-width: 1.8; fill: none; }
+  @keyframes gentle-rotate { to { transform: rotate(360deg); } }
+  .huid-info { text-align: left; }
+  .huid-info :lang(hi) { font-size: 0.95rem; color: var(--charcoal); font-weight: 600; display: block; line-height: 1.2; }
+  .huid-info code {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: var(--gold-deep);
+    letter-spacing: 0.1em;
+    font-weight: 600;
+  }
+
+  /* Price card */
+  .price-card {
+    background: var(--cream-warm);
+    border: 1px solid var(--stone);
+    padding: 1.3rem 1.3rem 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .price-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.35rem 0;
+    font-size: 0.88rem;
+    color: var(--charcoal-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .price-row :lang(hi) { font-size: 0.9rem; }
+  .price-row--total {
+    border-top: 2px solid var(--terracotta);
+    margin-top: 0.6rem;
+    padding-top: 0.8rem;
+    font-family: var(--font-en);
+    font-size: 1.4rem;
+    color: var(--terracotta-deep);
+    font-weight: 700;
+  }
+
+  /* Actions grid */
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+  }
+  .actions__primary { grid-column: 1 / -1; }
+  .action-btn {
+    padding: 0.95rem 1rem;
+    font-family: var(--font-hi-body);
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.25s ease;
+    text-align: center;
+  }
+  .action-btn--primary {
+    background: var(--terracotta);
+    color: var(--cream-light);
+    font-size: 1.05rem;
+    padding: 1.1rem;
+    letter-spacing: 0.01em;
+  }
+  .action-btn--primary:hover { background: var(--terracotta-deep); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(143, 58, 34, 0.25); }
+  .action-btn--ghost {
+    background: transparent;
+    border: 1px solid var(--charcoal);
+    color: var(--charcoal);
+  }
+  .action-btn--ghost:hover { background: var(--charcoal); color: var(--cream-light); }
+
+  /* Reviews row */
+  .reviews-band {
+    background: var(--cream-warm);
+    padding: 3rem 1.5rem;
+    border-top: 1px solid var(--stone);
+    border-bottom: 1px solid var(--stone);
+  }
+  .reviews-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  @media (min-width: 768px) { .reviews-inner { grid-template-columns: repeat(3, 1fr); gap: 2rem; } }
+  .reviews-title {
+    grid-column: 1 / -1;
+    font-family: var(--font-hi-display);
+    font-size: 2rem;
+    color: var(--charcoal);
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+  .review {
+    background: var(--cream-light);
+    border: 1px solid var(--stone);
+    padding: 1.5rem;
+    position: relative;
+  }
+  .review__stars {
+    color: var(--gold-bright);
+    font-size: 0.9rem;
+    letter-spacing: 0.2em;
+    margin-bottom: 0.7rem;
+  }
+  .review__text {
+    font-family: var(--font-hi-body);
+    font-size: 0.95rem;
+    line-height: 1.65;
+    color: var(--charcoal-soft);
+    margin-bottom: 1rem;
+    font-weight: 400;
+  }
+  .review__author {
+    font-family: var(--font-en);
+    font-size: 0.78rem;
+    color: var(--charcoal-mute);
+    letter-spacing: 0.05em;
+    font-style: italic;
+  }
+
+  /* Footer */
+  footer {
+    background: var(--charcoal);
+    color: var(--cream);
+    padding: 3rem 1.5rem 2rem;
+    text-align: center;
+  }
+  footer .brand { justify-content: center; margin-bottom: 1rem; }
+  footer .brand__name { color: var(--gold-bright); }
+  footer p { color: var(--stone); font-size: 0.85rem; margin: 0.5rem 0; }
+  footer a { color: var(--gold-bright); text-decoration: none; margin: 0 0.8rem; font-family: var(--font-hi-body); font-weight: 500; }
+  footer a:hover { color: var(--cream); }
+
+  /* Fade-in */
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .hero__inner, .categories, .products, .detail, .reviews-band {
+    animation: slideUp 0.7s ease-out both;
+  }
+  .categories { animation-delay: 0.1s; }
+  .products { animation-delay: 0.15s; }
+</style>
+</head>
+<body>
+
+<!-- ================= SCREEN ONE: HOME ================= -->
+
+<div class="top">
+  <div class="top__rates">
+    <span class="top__rate"><span lang="hi">आज का भाव</span> 22K <strong>₹6,842</strong><small>▲ 16</small></span>
+    <span class="top__rate">24K <strong>₹7,465</strong></span>
+    <span class="top__rate"><span lang="hi">चांदी</span><strong>₹89/gm</strong></span>
+  </div>
+  <span class="top__lang" lang="hi">हिंदी · English</span>
+</div>
+
+<nav>
+  <div class="brand">
+    <div class="brand__logo">अ</div>
+    <div>
+      <div class="brand__name">Anchor Jewellers</div>
+      <div class="brand__sub">अयोध्या · Since 1962</div>
+    </div>
+  </div>
+  <ul>
+    <li><a href="#" lang="hi">दुल्हन</a></li>
+    <li><a href="#" lang="hi">सोने के गहने</a></li>
+    <li><a href="#" lang="hi">हीरे</a></li>
+    <li><a href="#" lang="hi">चांदी</a></li>
+    <li><a href="#" lang="hi">कस्टम</a></li>
+  </ul>
+</nav>
+
+<section class="hero">
+  <div class="hero__inner">
+    <div>
+      <span class="hero__kicker">Bridal Season · विवाह संग्रह</span>
+      <h1 class="hero__title" lang="hi">विरासत की चमक,<br/>आज के साथ।</h1>
+      <p class="hero__title-en">Sixty-four years of hand-crafted gold. Delivered in your language, on your phone, in your shop's name.</p>
+      <div class="hero__ctas">
+        <a href="#" class="cta cta--gold" lang="hi">संग्रह देखें</a>
+        <a href="#" class="cta cta--outline" lang="hi">आज का भाव लॉक करें</a>
+      </div>
+    </div>
+    <figure class="hero__image">
+      <img src="https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=900&q=85&auto=format" alt="" onerror="this.style.display='none'" />
+    </figure>
+  </div>
+</section>
+
+<div class="sari-border sari-hero"></div>
+
+<section class="categories">
+  <h2 class="categories__title" lang="hi">हर अवसर के लिए</h2>
+  <p class="categories__sub">Every occasion, every piece considered</p>
+  <div class="pills">
+    <button class="pill pill--active" lang="hi">दुल्हन <small>124</small></button>
+    <button class="pill" lang="hi">कुंदन <small>48</small></button>
+    <button class="pill" lang="hi">पोल्की <small>36</small></button>
+    <button class="pill" lang="hi">मंगलसूत्र <small>22</small></button>
+    <button class="pill" lang="hi">झुमके <small>67</small></button>
+    <button class="pill" lang="hi">चेन <small>89</small></button>
+    <button class="pill" lang="hi">अंगूठी <small>104</small></button>
+    <button class="pill" lang="hi">पायल <small>28</small></button>
+  </div>
+</section>
+
+<section class="products">
+  <div class="grid">
+    <article class="card">
+      <div class="card__image">
+        <img src="https://images.unsplash.com/photo-1611652022419-a9419f74343d?w=600&q=85&auto=format" alt="" onerror="this.style.display='none'"/>
+        <span class="card__badge" lang="hi">नया</span>
+        <button class="card__wish" aria-label="Wishlist"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+      </div>
+      <div class="card__body">
+        <h3 class="card__name" lang="hi">श्रेया दुल्हन सेट</h3>
+        <p class="card__sub">The Shreya Bridal Set</p>
+        <div class="card__meta">
+          <span lang="hi">42.6 g · 22K · पोल्की</span>
+          <span class="card__price">₹3,68,062</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card__image">
+        <img src="https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=600&q=85&auto=format" alt="" onerror="this.style.display='none'"/>
+        <button class="card__wish" aria-label="Wishlist"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+      </div>
+      <div class="card__body">
+        <h3 class="card__name" lang="hi">कुंदन झुमके</h3>
+        <p class="card__sub">Kundan Earrings · Meenakari back</p>
+        <div class="card__meta">
+          <span lang="hi">14.2 g · 22K</span>
+          <span class="card__price">₹48,200</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card__image">
+        <img src="https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=600&q=85&auto=format" alt="" onerror="this.style.display='none'"/>
+        <span class="card__badge" style="background: var(--terracotta); color: var(--cream);" lang="hi">पसंदीदा</span>
+        <button class="card__wish" aria-label="Wishlist"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+      </div>
+      <div class="card__body">
+        <h3 class="card__name" lang="hi">सादा चेन</h3>
+        <p class="card__sub">Classic Chain · 20-inch</p>
+        <div class="card__meta">
+          <span lang="hi">9.2 g · 22K</span>
+          <span class="card__price">₹62,800</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card__image">
+        <img src="https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=600&q=85&auto=format" alt="" onerror="this.style.display='none'"/>
+        <button class="card__wish" aria-label="Wishlist"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+      </div>
+      <div class="card__body">
+        <h3 class="card__name" lang="hi">मंगलसूत्र</h3>
+        <p class="card__sub">Two-line Mangalsutra</p>
+        <div class="card__meta">
+          <span lang="hi">18.3 g · 22K</span>
+          <span class="card__price">₹98,400</span>
+        </div>
+      </div>
+    </article>
+  </div>
+</section>
+
+<div class="sari-border"></div>
+<div class="screen-divider">
+  <span lang="hi">उत्पाद विवरण</span>
+  <small>Product Detail</small>
+</div>
+<div class="sari-border"></div>
+
+<!-- ================= SCREEN TWO: PRODUCT DETAIL ================= -->
+
+<section class="detail">
+  <div class="detail__inner">
+    <div class="detail__grid">
+      <div class="detail__images">
+        <div class="detail__main-img">
+          <img src="https://images.unsplash.com/photo-1611652022419-a9419f74343d?w=900&q=85&auto=format" alt="" onerror="this.style.display='none'"/>
+        </div>
+        <div class="detail__thumbs">
+          <div class="detail__thumb"><img src="https://images.unsplash.com/photo-1611652022419-a9419f74343d?w=200&q=80&auto=format" alt="" onerror="this.style.display='none'"/></div>
+          <div class="detail__thumb"><img src="https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=200&q=80&auto=format" alt="" onerror="this.style.display='none'"/></div>
+          <div class="detail__thumb"><img src="https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=200&q=80&auto=format" alt="" onerror="this.style.display='none'"/></div>
+          <div class="detail__thumb"><img src="https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=200&q=80&auto=format" alt="" onerror="this.style.display='none'"/></div>
+        </div>
+      </div>
+
+      <div class="detail__info">
+        <p class="detail__category" lang="hi">विवाह संग्रह</p>
+        <h2 class="detail__name" lang="hi">श्रेया दुल्हन सेट</h2>
+        <p class="detail__name-en">Seven pieces · 42.6 g · 22K · Polki</p>
+
+        <div class="huid-medallion">
+          <div class="huid-seal">
+            <svg viewBox="0 0 24 24"><path d="M9 12 l2 2 l4 -4"/><circle cx="12" cy="12" r="9" stroke-width="1.5"/></svg>
+          </div>
+          <div class="huid-info">
+            <span lang="hi">हॉलमार्क प्रमाणित</span>
+            <code>BQ7M3A · BIS verified</code>
+          </div>
+        </div>
+
+        <div class="price-card">
+          <div class="price-row"><span lang="hi">सोना (42.6 g × ₹6,842)</span><span>₹ 2,91,469</span></div>
+          <div class="price-row"><span lang="hi">मेकिंग चार्ज (14%)</span><span>₹ 40,806</span></div>
+          <div class="price-row"><span lang="hi">पोल्की पत्थर (31 pcs)</span><span>₹ 24,800</span></div>
+          <div class="price-row"><span>GST (3% + 5%)</span><span>₹ 10,987</span></div>
+          <div class="price-row price-row--total"><span lang="hi">कुल</span><span>₹ 3,68,062</span></div>
+        </div>
+
+        <div class="actions">
+          <button class="action-btn action-btn--primary actions__primary" lang="hi">आज का भाव लॉक करें · ₹5,000 deposit</button>
+          <button class="action-btn action-btn--ghost" lang="hi">विशलिस्ट</button>
+          <button class="action-btn action-btn--ghost" lang="hi">परिवार संग साझा</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="reviews-band">
+  <div class="reviews-inner">
+    <h3 class="reviews-title" lang="hi">ग्राहक के शब्द</h3>
+    <div class="review">
+      <div class="review__stars">★★★★★</div>
+      <p class="review__text" lang="hi">बेटी की शादी में श्रेया सेट लिया। काम बहुत नाज़ुक है, karigar-bhai की मेहनत दिखती है। पूरी family को पसंद आया।</p>
+      <p class="review__author">— Anjali Verma · Lucknow · Nov '25</p>
+    </div>
+    <div class="review">
+      <div class="review__stars">★★★★★</div>
+      <p class="review__text">Came for a family wedding. Bought a silver chain for my mother. HUID scan worked on my phone inside the shop itself — verified in seconds. Took it home safely. Would recommend.</p>
+      <p class="review__author">— Vikram Mehta · Mumbai · Oct '25</p>
+    </div>
+    <div class="review">
+      <div class="review__stars">★★★★★</div>
+      <p class="review__text" lang="hi">तीन पीढ़ियों से हमारे परिवार का जेवर यहीं से बनता है। रेट ईमानदार, काम में कोई कमी नहीं।</p>
+      <p class="review__author">— Priya Tiwari · Varanasi · Sep '25</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="brand">
+    <div class="brand__logo">अ</div>
+    <div>
+      <div class="brand__name">Anchor Jewellers</div>
+      <div class="brand__sub" style="color: var(--stone);">अयोध्या · Since 1962</div>
+    </div>
+  </div>
+  <p lang="hi">रामकोट रोड, अयोध्या, उत्तर प्रदेश — 224123</p>
+  <p>Open 10 AM — 8.30 PM · Closed Mondays</p>
+  <div style="margin-top: 1.2rem;">
+    <a href="#" lang="hi">दुकान पर जाएँ</a>
+    <a href="#" lang="hi">फ़ोन</a>
+    <a href="#" lang="hi">व्हॉट्सऐप</a>
+  </div>
+</footer>
+
+</body>
+</html>

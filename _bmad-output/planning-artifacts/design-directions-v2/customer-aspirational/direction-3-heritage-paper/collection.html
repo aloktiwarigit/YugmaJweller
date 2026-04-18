@@ -1,0 +1,1833 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>दुल्हन संग्रह · शादियाँ 2026 | आँचल ज्वैलर्स</title>
+<meta name="description" content="दुल्हन संग्रह — शादियाँ 2026। कुंदन, पोल्की, जड़ाऊ। तीस वर्षों की विरासत, अयोध्या के मास्टर कारीगरों द्वारा हस्तनिर्मित।" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<!--
+ Typography rationale — Fraunces (Latin display), Tiro Devanagari Hindi
+ (Devanagari display), Karma (Latin body), Mukta (Devanagari UI body).
+ These four pair on a shared letterpress vocabulary: high-contrast serifs
+ with optical sizing (Fraunces + Tiro), paired with humanist running bodies
+ (Karma + Mukta) — the whole family has paper-press warmth.
+-->
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Karma:wght@300;400;500;600;700&family=Tiro+Devanagari+Hindi:ital@0;1&family=Mukta:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+/* ====================================================================
+ TENANT TOKENS (shared)
+ ==================================================================== */
+:root {
+  --tenant-primary: #7B3B33;
+  --tenant-accent:  #A8833F;
+  --tenant-deep:    #5A261F;
+
+  --linen:   #F6F1E5;
+  --linen-2: #ECE2CC;
+  --linen-3: #DDCFB0;
+  --ink:     #2A251E;
+  --ink-2:   #4D4436;
+  --ink-mute:#82755E;
+  --rule:    rgba(42, 37, 30, 0.18);
+  --rule-strong: rgba(42, 37, 30, 0.35);
+
+  --font-display-latin: "Fraunces", Georgia, serif;
+  --font-body-latin:    "Karma", Georgia, serif;
+  --font-display-hi:    "Tiro Devanagari Hindi", "Mukta", serif;
+  --font-body-hi:       "Mukta", "Karma", sans-serif;
+
+  --maxw: 1320px;
+  --gutter: clamp(20px, 4vw, 56px);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: var(--font-body-hi);
+  color: var(--ink);
+  background: var(--linen);
+  line-height: 1.65;
+  font-size: 17px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  position: relative;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.06;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 0.16 0 0 0 0 0.14 0 0 0 0 0.11 0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+[lang="hi"] { font-family: var(--font-body-hi); line-height: 1.65; }
+[lang="en"] { font-family: var(--font-body-latin); font-style: italic; }
+
+h1, h2, h3, h4 { margin: 0; font-weight: 400; color: var(--ink); }
+p { margin: 0 0 1em; color: var(--ink-2); }
+a { color: inherit; text-decoration: none; }
+img { display: block; max-width: 100%; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+/* ====================================================================
+ UTILITY BAR + NAV (shared styling minimised)
+ ==================================================================== */
+.utility-bar {
+  background: var(--ink);
+  color: var(--linen);
+  font-size: 13px;
+  padding: 10px 0;
+}
+.utility-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+.rate-group { display: flex; gap: 20px; flex-wrap: wrap; }
+.rate-item { display: inline-flex; align-items: baseline; gap: 6px; }
+.rate-item .label { color: rgba(246,241,229,0.6); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+.rate-item .value { color: var(--linen); font-family: var(--font-display-latin); font-weight: 500; font-size: 14px; }
+.rate-item .unit { color: rgba(246,241,229,0.5); font-size: 12px; }
+.freshness {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(246,241,229,0.7);
+  font-size: 12px;
+}
+.freshness .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #9CCBA0;
+  box-shadow: 0 0 0 3px rgba(156,203,160,0.18);
+  animation: pulse 2.6s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:0.85;} 50%{opacity:0.35;} }
+.lang-toggle {
+  display: inline-flex;
+  background: rgba(246,241,229,0.08);
+  border: 1px solid rgba(246,241,229,0.15);
+  padding: 2px;
+}
+.lang-toggle button {
+  padding: 4px 12px;
+  font-size: 12px;
+  color: rgba(246,241,229,0.6);
+  letter-spacing: 0.06em;
+}
+.lang-toggle button[aria-pressed="true"] { background: var(--linen); color: var(--ink); }
+
+.nav {
+  background: var(--linen);
+  position: sticky; top: 0; z-index: 50;
+  border-bottom: 1px solid var(--rule);
+}
+.nav-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 18px var(--gutter);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 32px;
+}
+.brand { display: flex; align-items: center; gap: 14px; }
+.brand .logomark {
+  width: 48px; height: 48px;
+  background: var(--tenant-primary);
+  color: var(--linen);
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  font-family: var(--font-display-hi);
+  font-size: 26px;
+  position: relative;
+}
+.brand .logomark::after { content: ""; position: absolute; inset: 4px; border: 1px solid rgba(246,241,229,0.2); }
+.brand-text .name-hi { font-family: var(--font-display-hi); font-size: 22px; line-height: 1; }
+.brand-text .name-en {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--ink-mute);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+.nav-links {
+  display: flex; justify-content: center; gap: 38px;
+  list-style: none; margin: 0; padding: 0;
+}
+.nav-links a {
+  position: relative;
+  font-family: var(--font-display-hi);
+  font-size: 16px;
+  padding: 4px 0;
+}
+.nav-links a.active { color: var(--tenant-primary); }
+.nav-links a.active::after {
+  content: "";
+  position: absolute;
+  left: -4px; right: -4px; bottom: -6px;
+  height: 2px;
+  background: var(--tenant-primary);
+  transform: skewX(-8deg);
+}
+.nav-links a .en {
+  display: block;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 10.5px;
+  color: var(--ink-mute);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.nav-actions { display: flex; align-items: center; gap: 18px; }
+.icon-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  position: relative;
+}
+.icon-btn:hover { background: var(--linen-2); }
+.icon-btn .badge {
+  position: absolute; top: 4px; right: 4px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  background: var(--tenant-primary); color: var(--linen);
+  font-family: var(--font-display-latin);
+  font-style: normal; font-size: 10px;
+  border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* ====================================================================
+ COLLECTION HERO — full-bleed cinematic
+ ==================================================================== */
+.coll-hero {
+  position: relative;
+  min-height: 86vh;
+  display: grid;
+  align-items: end;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--ink);
+}
+.coll-hero .bg {
+  position: absolute; inset: 0;
+  z-index: -2;
+  background: url("https://images.unsplash.com/photo-1600721391776-b5cd0e0048f9?w=2000&q=85&auto=format&fit=crop") center/cover;
+  transform: scale(1.08);
+  transition: transform 0.2s linear;
+  will-change: transform;
+}
+.coll-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(180deg, rgba(42,37,30,0) 0%, rgba(42,37,30,0.35) 45%, rgba(42,37,30,0.85) 100%);
+}
+.coll-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.1;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.coll-hero .content {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: clamp(90px, 13vw, 180px) var(--gutter) clamp(60px, 9vw, 110px);
+  color: var(--linen);
+  width: 100%;
+}
+.coll-hero .masthead {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 32px;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(246, 241, 229, 0.7);
+}
+.coll-hero .masthead .rule {
+  width: 60px; height: 1px;
+  background: rgba(246, 241, 229, 0.4);
+}
+.coll-hero .season-tag {
+  display: inline-block;
+  padding: 8px 16px;
+  border: 1px solid rgba(246, 241, 229, 0.35);
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 12px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--tenant-accent);
+  margin-bottom: 26px;
+}
+.coll-hero h1 {
+  font-family: var(--font-display-hi);
+  font-size: clamp(52px, 9vw, 132px);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--linen);
+  letter-spacing: -0.015em;
+  margin-bottom: 22px;
+  max-width: 1050px;
+}
+.coll-hero .subhead {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-weight: 300;
+  font-variation-settings: "opsz" 144;
+  font-size: clamp(20px, 2.2vw, 30px);
+  color: rgba(246, 241, 229, 0.78);
+  max-width: 640px;
+  margin-bottom: 40px;
+  line-height: 1.35;
+}
+.coll-hero .stats {
+  display: flex;
+  gap: 48px;
+  padding-top: 32px;
+  border-top: 1px solid rgba(246, 241, 229, 0.22);
+  max-width: 640px;
+}
+.coll-hero .stats .stat .num {
+  font-family: var(--font-display-latin);
+  font-weight: 400;
+  font-size: 36px;
+  color: var(--tenant-accent);
+  line-height: 1;
+}
+.coll-hero .stats .stat .lab {
+  font-family: var(--font-display-hi);
+  font-size: 13px;
+  color: rgba(246, 241, 229, 0.7);
+  margin-top: 6px;
+}
+.coll-hero .stats .stat .lab .en {
+  display: block;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 11px;
+  color: rgba(246, 241, 229, 0.45);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.coll-hero .corner-tag {
+  position: absolute;
+  right: var(--gutter);
+  top: 50px;
+  z-index: 2;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 12px;
+  letter-spacing: 0.34em;
+  color: rgba(246, 241, 229, 0.4);
+  text-transform: uppercase;
+}
+
+/* ====================================================================
+ EDITORIAL ESSAY
+ ==================================================================== */
+.essay {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: clamp(70px, 10vw, 140px) var(--gutter);
+  position: relative;
+}
+.essay .eyebrow {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--tenant-primary);
+  margin-bottom: 20px;
+  text-align: center;
+}
+.essay h2 {
+  font-family: var(--font-display-hi);
+  font-size: clamp(30px, 4.2vw, 52px);
+  font-weight: 400;
+  line-height: 1.15;
+  color: var(--ink);
+  text-align: center;
+  margin-bottom: 18px;
+}
+.essay h2 .en {
+  display: block;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 0.42em;
+  color: var(--ink-mute);
+  margin-top: 12px;
+}
+.essay .essay-rule {
+  width: 60px;
+  height: 1px;
+  background: var(--tenant-primary);
+  margin: 28px auto 36px;
+  position: relative;
+}
+.essay .essay-rule::before {
+  content: "";
+  position: absolute;
+  left: -6px; top: -2px;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--tenant-primary);
+}
+.essay .essay-rule::after {
+  content: "";
+  position: absolute;
+  right: -6px; top: -2px;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--tenant-primary);
+}
+.essay p {
+  font-family: var(--font-body-hi);
+  font-size: 18px;
+  color: var(--ink-2);
+  line-height: 1.75;
+  margin-bottom: 22px;
+}
+.essay p.first {
+  position: relative;
+}
+.essay p.first .dropcap {
+  float: left;
+  font-family: var(--font-display-hi);
+  font-size: 72px;
+  line-height: 0.9;
+  color: var(--tenant-primary);
+  padding: 4px 14px 0 0;
+  margin-top: 4px;
+}
+.essay p.en-para {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 17px;
+  color: var(--ink-mute);
+  margin-top: 30px;
+  padding-top: 26px;
+  border-top: 1px dashed var(--rule);
+}
+.essay .byline {
+  text-align: center;
+  margin-top: 40px;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-mute);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* ====================================================================
+ CURATED PRODUCT BLOCKS
+ ==================================================================== */
+.curated {
+  padding: 0 0 60px;
+  background: var(--linen);
+}
+.section-head {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 60px var(--gutter) 40px;
+  position: sticky;
+  top: 0;
+  background: var(--linen);
+  z-index: 5;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.section-head .title {
+  font-family: var(--font-display-hi);
+  font-size: clamp(22px, 2.4vw, 32px);
+  color: var(--ink);
+}
+.section-head .title .en {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 0.56em;
+  color: var(--ink-mute);
+  margin-left: 14px;
+}
+.section-head .count {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-mute);
+  letter-spacing: 0.1em;
+}
+
+.product-spread {
+  max-width: var(--maxw);
+  margin: 80px auto;
+  padding: 0 var(--gutter);
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: clamp(32px, 5vw, 80px);
+  align-items: center;
+}
+.product-spread.reverse {
+  grid-template-columns: 1fr 1.2fr;
+}
+.product-spread.reverse .story { order: -1; }
+.product-spread .image {
+  position: relative;
+  aspect-ratio: 4/5;
+  overflow: hidden;
+}
+.product-spread .image img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.product-spread .image:hover img { transform: scale(1.05); }
+.product-spread .image .plate {
+  position: absolute;
+  left: 18px; top: 18px;
+  background: var(--linen);
+  padding: 6px 12px;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+.product-spread .story .index {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 13px;
+  color: var(--tenant-primary);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.product-spread .story h3 {
+  font-family: var(--font-display-hi);
+  font-size: clamp(28px, 3.6vw, 44px);
+  font-weight: 400;
+  line-height: 1.12;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.product-spread .story h3 .en {
+  display: block;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 0.48em;
+  color: var(--ink-mute);
+  margin-top: 8px;
+}
+.product-spread .story .context {
+  font-family: var(--font-body-hi);
+  font-size: 16px;
+  color: var(--ink-2);
+  line-height: 1.7;
+  margin-bottom: 22px;
+}
+.product-spread .story .specs {
+  display: flex;
+  gap: 24px;
+  padding: 14px 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 22px;
+}
+.product-spread .story .specs .sp {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-mute);
+  letter-spacing: 0.06em;
+}
+.product-spread .story .specs .sp strong {
+  display: block;
+  font-family: var(--font-display-hi);
+  font-style: normal;
+  font-size: 16px;
+  color: var(--ink);
+  margin-top: 2px;
+  letter-spacing: 0;
+}
+.product-spread .story .cta-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.product-spread .story .price {
+  font-family: var(--font-display-latin);
+  font-weight: 500;
+  font-size: 28px;
+  color: var(--ink);
+  font-style: normal;
+}
+.product-spread .story .price .curr {
+  font-size: 0.6em;
+  color: var(--tenant-primary);
+  margin-right: 4px;
+}
+.product-spread .story .view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px;
+  border: 1px solid var(--ink);
+  font-family: var(--font-display-hi);
+  font-size: 14px;
+  color: var(--ink);
+  transition: all 0.3s ease;
+}
+.product-spread .story .view-btn:hover {
+  background: var(--ink);
+  color: var(--linen);
+  gap: 14px;
+}
+.product-spread .story .view-btn .en {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 11px;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+/* Full-bleed spread */
+.full-spread {
+  margin: 100px 0;
+  position: relative;
+  min-height: 75vh;
+  display: grid;
+  align-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--ink);
+}
+.full-spread .bg {
+  position: absolute; inset: 0;
+  z-index: -1;
+}
+.full-spread .bg img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transition: transform 1.5s ease;
+}
+.full-spread:hover .bg img { transform: scale(1.04); }
+.full-spread::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(100deg, rgba(42, 37, 30, 0.85) 0%, rgba(42, 37, 30, 0.3) 60%, transparent 100%);
+}
+.full-spread .content {
+  position: relative;
+  z-index: 1;
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 80px var(--gutter);
+  color: var(--linen);
+  max-width: 600px;
+  margin-left: max(var(--gutter), calc(50% - var(--maxw)/2 + var(--gutter)));
+}
+.full-spread .index {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--tenant-accent);
+  margin-bottom: 18px;
+}
+.full-spread h3 {
+  font-family: var(--font-display-hi);
+  font-size: clamp(36px, 5.5vw, 68px);
+  font-weight: 400;
+  line-height: 1.1;
+  color: var(--linen);
+  margin-bottom: 18px;
+}
+.full-spread h3 .en {
+  display: block;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 0.42em;
+  color: rgba(246, 241, 229, 0.7);
+  margin-top: 10px;
+}
+.full-spread .context {
+  color: rgba(246, 241, 229, 0.82);
+  font-size: 17px;
+  line-height: 1.65;
+  max-width: 500px;
+  margin-bottom: 30px;
+}
+.full-spread .footer-row {
+  display: flex;
+  gap: 24px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding-top: 22px;
+  border-top: 1px solid rgba(246, 241, 229, 0.22);
+}
+.full-spread .price {
+  font-family: var(--font-display-latin);
+  font-weight: 500;
+  font-size: 26px;
+  color: var(--tenant-accent);
+  font-style: normal;
+}
+.full-spread .view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px;
+  border: 1px solid rgba(246, 241, 229, 0.5);
+  color: var(--linen);
+  font-family: var(--font-display-hi);
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+.full-spread .view-btn:hover {
+  background: var(--linen);
+  color: var(--ink);
+  border-color: var(--linen);
+  gap: 14px;
+}
+
+/* 2-up grid */
+.two-up {
+  max-width: var(--maxw);
+  margin: 100px auto;
+  padding: 0 var(--gutter);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 36px;
+}
+.two-up .piece {
+  cursor: pointer;
+  position: relative;
+}
+.two-up .piece .image {
+  aspect-ratio: 4/5;
+  overflow: hidden;
+  margin-bottom: 20px;
+  background: var(--linen-3);
+}
+.two-up .piece .image img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.two-up .piece:hover .image img { transform: scale(1.05); }
+.two-up .piece .plate {
+  position: absolute;
+  left: 18px; top: 18px;
+  background: var(--linen);
+  padding: 6px 12px;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+.two-up .piece .body {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: baseline;
+}
+.two-up .piece .meta .index {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--tenant-primary);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.two-up .piece h3 {
+  font-family: var(--font-display-hi);
+  font-size: 24px;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.two-up .piece .name-en {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-mute);
+  margin-bottom: 10px;
+}
+.two-up .piece .context {
+  font-family: var(--font-body-hi);
+  font-size: 15px;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+.two-up .piece .price {
+  font-family: var(--font-display-latin);
+  font-weight: 500;
+  font-size: 20px;
+  color: var(--ink);
+  font-style: normal;
+  white-space: nowrap;
+}
+
+/* ====================================================================
+ KARIGAR FEATURE
+ ==================================================================== */
+.karigar-block {
+  background: var(--linen-2);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  margin: 80px 0;
+}
+.karigar-block .image {
+  position: relative;
+  min-height: 580px;
+  overflow: hidden;
+}
+.karigar-block .image img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  filter: saturate(0.88);
+  opacity: 0;
+  transform: scale(1.05);
+  transition: opacity 1.4s ease, transform 1.6s ease;
+}
+.karigar-block .image.in img {
+  opacity: 1;
+  transform: scale(1);
+}
+.karigar-block .image::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(42,37,30,0.1) 0%, rgba(42,37,30,0.5) 100%);
+}
+.karigar-block .image .cap {
+  position: absolute;
+  left: var(--gutter); bottom: 26px;
+  color: var(--linen);
+  z-index: 2;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+.karigar-block .copy {
+  padding: clamp(56px, 8vw, 110px) var(--gutter);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.karigar-block .eyebrow {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--tenant-primary);
+  margin-bottom: 18px;
+}
+.karigar-block h2 {
+  font-family: var(--font-display-hi);
+  font-size: clamp(30px, 4.4vw, 54px);
+  font-weight: 400;
+  line-height: 1.1;
+  color: var(--ink);
+  margin-bottom: 24px;
+}
+.karigar-block h2 .en {
+  display: block;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 0.42em;
+  color: var(--ink-mute);
+  margin-top: 8px;
+}
+.karigar-block .hindi-quote {
+  font-family: var(--font-display-hi);
+  font-size: 21px;
+  line-height: 1.6;
+  color: var(--ink);
+  padding: 22px 0 22px 26px;
+  border-left: 2px solid var(--tenant-primary);
+  margin: 16px 0;
+}
+.karigar-block .en-translate {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 15px;
+  color: var(--ink-mute);
+  padding-left: 26px;
+  margin-top: -8px;
+}
+.karigar-block .credits {
+  margin-top: 36px;
+  display: flex;
+  gap: 40px;
+  padding-top: 26px;
+  border-top: 1px solid var(--rule);
+}
+.karigar-block .credits > div .num {
+  font-family: var(--font-display-latin);
+  font-weight: 500;
+  font-size: 38px;
+  color: var(--tenant-primary);
+  line-height: 1;
+  font-style: normal;
+}
+.karigar-block .credits > div .lab {
+  font-family: var(--font-display-hi);
+  font-size: 13px;
+  color: var(--ink-mute);
+  margin-top: 4px;
+}
+
+/* ====================================================================
+ HOW TO WEAR
+ ==================================================================== */
+.how-to-wear {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 100px var(--gutter);
+}
+.how-to-wear .title {
+  text-align: center;
+  margin-bottom: 56px;
+}
+.how-to-wear .title .eyebrow {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--tenant-primary);
+  margin-bottom: 14px;
+  display: block;
+}
+.how-to-wear h2 {
+  font-family: var(--font-display-hi);
+  font-size: clamp(30px, 4vw, 48px);
+  font-weight: 400;
+  color: var(--ink);
+  line-height: 1.15;
+}
+.how-to-wear h2 .en {
+  display: block;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 0.44em;
+  color: var(--ink-mute);
+  margin-top: 10px;
+}
+.how-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+.how-card {
+  position: relative;
+}
+.how-card .img {
+  aspect-ratio: 3/4;
+  overflow: hidden;
+  background: var(--linen-3);
+  margin-bottom: 18px;
+}
+.how-card .img img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transition: transform 1s ease;
+}
+.how-card:hover .img img { transform: scale(1.06); }
+.how-card .n {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 13px;
+  color: var(--tenant-primary);
+  letter-spacing: 0.24em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.how-card h4 {
+  font-family: var(--font-display-hi);
+  font-size: 22px;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.how-card .sub {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--ink-mute);
+  margin-bottom: 10px;
+  letter-spacing: 0.08em;
+}
+.how-card p {
+  font-family: var(--font-body-hi);
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+
+/* ====================================================================
+ COLLECTION CTA STRIP
+ ==================================================================== */
+.cta-strip {
+  background: var(--tenant-primary);
+  color: var(--linen);
+  padding: clamp(56px, 8vw, 100px) var(--gutter);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.cta-strip::before {
+  content: "";
+  position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  opacity: 0.08;
+  mix-blend-mode: overlay;
+  z-index: -1;
+}
+.cta-strip-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  text-align: center;
+}
+.cta-strip h2 {
+  font-family: var(--font-display-hi);
+  font-size: clamp(30px, 4.4vw, 54px);
+  font-weight: 400;
+  color: var(--linen);
+  margin-bottom: 16px;
+  line-height: 1.15;
+}
+.cta-strip h2 .en {
+  display: block;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 0.44em;
+  color: rgba(246, 241, 229, 0.75);
+  margin-top: 10px;
+}
+.cta-strip p {
+  color: rgba(246, 241, 229, 0.85);
+  font-size: 18px;
+  max-width: 620px;
+  margin: 0 auto 36px;
+}
+.cta-strip .btns {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.cta-strip .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 28px;
+  font-family: var(--font-display-hi);
+  font-size: 15px;
+  border: 1px solid transparent;
+  transition: all 0.3s ease;
+}
+.cta-strip .btn .en {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 12px;
+  opacity: 0.8;
+  margin-left: 4px;
+}
+.cta-strip .btn-fill {
+  background: var(--linen);
+  color: var(--ink);
+}
+.cta-strip .btn-fill:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,0.2); }
+.cta-strip .btn-outline {
+  border-color: rgba(246, 241, 229, 0.5);
+  color: var(--linen);
+}
+.cta-strip .btn-outline:hover {
+  background: rgba(246, 241, 229, 0.12);
+  border-color: var(--linen);
+}
+
+/* ====================================================================
+ RELATED COLLECTIONS
+ ==================================================================== */
+.related-colls {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 100px var(--gutter);
+}
+.related-colls h2 {
+  font-family: var(--font-display-hi);
+  font-size: clamp(26px, 3vw, 38px);
+  font-weight: 400;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.related-colls h2 .en {
+  display: block;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 0.5em;
+  color: var(--ink-mute);
+  margin-top: 4px;
+}
+.related-colls .sub {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink-mute);
+  margin-bottom: 40px;
+}
+.related-colls .tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.coll-tile {
+  position: relative;
+  aspect-ratio: 3/4;
+  overflow: hidden;
+  cursor: pointer;
+  isolation: isolate;
+}
+.coll-tile img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.coll-tile:hover img { transform: scale(1.06); }
+.coll-tile::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent 40%, rgba(42, 37, 30, 0.8) 100%);
+  z-index: 1;
+}
+.coll-tile .body {
+  position: absolute;
+  z-index: 2;
+  left: 24px; right: 24px; bottom: 24px;
+  color: var(--linen);
+}
+.coll-tile .body .count {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(246, 241, 229, 0.75);
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(246, 241, 229, 0.35);
+}
+.coll-tile h3 {
+  font-family: var(--font-display-hi);
+  font-size: 26px;
+  font-weight: 400;
+  color: var(--linen);
+}
+.coll-tile h3 .en {
+  display: block;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 0.5em;
+  color: rgba(246, 241, 229, 0.7);
+  margin-top: 4px;
+}
+
+/* ====================================================================
+ FOOTER
+ ==================================================================== */
+footer {
+  background: var(--ink);
+  color: rgba(246, 241, 229, 0.75);
+  padding: 70px var(--gutter) 30px;
+  font-size: 14px;
+}
+.footer-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 60px;
+  padding-bottom: 40px;
+  border-bottom: 1px solid rgba(246, 241, 229, 0.12);
+}
+.footer-inner .brand h3 {
+  font-family: var(--font-display-hi);
+  font-size: 28px;
+  color: var(--linen);
+  margin-bottom: 4px;
+}
+.footer-inner .brand .sub {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 12px;
+  color: rgba(246, 241, 229, 0.55);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+.footer-inner h4 {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--tenant-accent);
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(246, 241, 229, 0.12);
+}
+.footer-inner .contact .row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 14px;
+}
+.footer-inner .contact .k {
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(246, 241, 229, 0.45);
+}
+.footer-inner .contact .v {
+  font-family: var(--font-display-hi);
+  font-size: 15px;
+  color: var(--linen);
+}
+.footer-bottom {
+  max-width: var(--maxw);
+  margin: 28px auto 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  font-family: var(--font-display-latin);
+  font-style: italic;
+  font-size: 12px;
+  color: rgba(246, 241, 229, 0.5);
+  letter-spacing: 0.12em;
+}
+
+/* ====================================================================
+ RESPONSIVE
+ ==================================================================== */
+@media (max-width: 960px) {
+  .nav-links { display: none; }
+  .product-spread, .product-spread.reverse { grid-template-columns: 1fr; gap: 30px; }
+  .product-spread.reverse .story { order: 0; }
+  .two-up { grid-template-columns: 1fr; gap: 50px; }
+  .karigar-block { grid-template-columns: 1fr; }
+  .karigar-block .image { min-height: 400px; }
+  .how-grid { grid-template-columns: repeat(2, 1fr); }
+  .related-colls .tiles { grid-template-columns: 1fr; }
+  .footer-inner { grid-template-columns: 1fr; gap: 40px; }
+}
+@media (max-width: 640px) {
+  .freshness { display: none; }
+  .coll-hero h1 { font-size: 52px; }
+  .coll-hero .stats { flex-direction: column; gap: 20px; }
+  .how-grid { grid-template-columns: 1fr; }
+}
+
+a:focus-visible, button:focus-visible {
+  outline: 2px solid var(--tenant-primary);
+  outline-offset: 3px;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.9s ease, transform 0.9s ease;
+}
+.reveal.in { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+
+<!-- ============= UTILITY BAR ============= -->
+<div class="utility-bar" role="region" aria-label="आज के भाव">
+  <div class="utility-inner">
+    <div class="rate-group">
+      <span class="rate-item"><span class="label" lang="hi">22K</span><span class="value">₹6,420</span><span class="unit">/g</span></span>
+      <span class="rate-item"><span class="label" lang="hi">24K</span><span class="value">₹7,002</span><span class="unit">/g</span></span>
+      <span class="rate-item"><span class="label" lang="hi">चाँदी</span><span class="value">₹82.40</span><span class="unit">/g</span></span>
+    </div>
+    <div class="freshness">
+      <span class="dot" aria-hidden="true"></span>
+      <span lang="hi">आज, 4:12 pm अपडेट</span>
+      <span lang="en">· IBJA Live</span>
+    </div>
+    <div class="lang-toggle" role="group" aria-label="भाषा">
+      <button aria-pressed="true">हिं</button>
+      <button aria-pressed="false">EN</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============= NAV ============= -->
+<header class="nav">
+  <div class="nav-inner">
+    <a href="home.html" class="brand" aria-label="आँचल ज्वैलर्स">
+      <span class="logomark" aria-hidden="true">आ</span>
+      <div class="brand-text">
+        <div class="name-hi" lang="hi">आँचल ज्वैलर्स</div>
+        <div class="name-en" lang="en">Aanchal · Ayodhya · Est. 1994</div>
+      </div>
+    </a>
+    <nav aria-label="मुख्य">
+      <ul class="nav-links">
+        <li><a href="#"><span lang="hi">संग्रह</span><span class="en" lang="en">Collections</span></a></li>
+        <li><a href="#"><span lang="hi">नया</span><span class="en" lang="en">New</span></a></li>
+        <li><a href="collection.html" class="active"><span lang="hi">दुल्हन</span><span class="en" lang="en">Bridal</span></a></li>
+        <li><a href="#"><span lang="hi">कारीगर</span><span class="en" lang="en">Karigar</span></a></li>
+        <li><a href="#"><span lang="hi">संपर्क</span><span class="en" lang="en">Contact</span></a></li>
+      </ul>
+    </nav>
+    <div class="nav-actions">
+      <button class="icon-btn" aria-label="खोजें"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg></button>
+      <button class="icon-btn" aria-label="पसंदीदा"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+      <button class="icon-btn" aria-label="खाता"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+      <button class="icon-btn" aria-label="झोला"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0"/></svg><span class="badge">2</span></button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ============= COLLECTION HERO ============= -->
+<section class="coll-hero" aria-label="दुल्हन संग्रह परिचय">
+  <div class="bg" id="heroBg" aria-hidden="true"></div>
+  <div class="corner-tag" aria-hidden="true">Vol. XXX · Plate I · Spring 2026</div>
+  <div class="content">
+    <div class="masthead">
+      <span class="rule"></span>
+      <span>The Aanchal Quarterly · Vol. XXX</span>
+    </div>
+    <div class="season-tag" lang="en">Seasonal Edit · Weddings 2026</div>
+    <h1>
+      <span lang="hi">दुल्हन संग्रह।</span>
+    </h1>
+    <p class="subhead" lang="en">Heirloom, carried forward. Kundan, polki, and jadau for the wedding season of 2026 — curated from thirty years at the Ayodhya workshop.</p>
+    <div class="stats">
+      <div class="stat">
+        <div class="num">58</div>
+        <div class="lab"><span lang="hi">चुने गए टुकड़े</span><span class="en" lang="en">Curated pieces</span></div>
+      </div>
+      <div class="stat">
+        <div class="num">22K</div>
+        <div class="lab"><span lang="hi">शुद्धता</span><span class="en" lang="en">Purity · BIS</span></div>
+      </div>
+      <div class="stat">
+        <div class="num">11</div>
+        <div class="lab"><span lang="hi">मास्टर कारीगर</span><span class="en" lang="en">Master karigars</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============= EDITORIAL ESSAY ============= -->
+<article class="essay reveal">
+  <div class="eyebrow" lang="en">Editor's Note · March 2026</div>
+  <h2>
+    <span lang="hi">शादी का सोना — वह जो पीढ़ियों से पहना जाता है।</span>
+    <span class="en" lang="en">Bridal gold — what is worn across generations.</span>
+  </h2>
+  <div class="essay-rule" aria-hidden="true"></div>
+
+  <p class="first" lang="hi"><span class="dropcap">उ</span>त्तर भारत की हर शादी में एक ऐसा क्षण आता है जब माँ अपनी बेटी को वह हार पहनाती है जो उसने अपनी शादी में पहना था। गहना बदलता नहीं, बस हाथ बदल जाते हैं। यही दुल्हन-सोने का असली अर्थ है — विरासत जो पहनी जाए, रखी न जाए।</p>
+
+  <p lang="hi">कुंदन-पोल्की की यह कला अवध, लखनऊ और जयपुर की कार्यशालाओं से निकली है। प्राकृतिक पत्थरों को बिना तराशे, 22 कैरेट सोने की तारों में बैठाया जाता है — जैसे पत्तों पर ओस बिखरी हो। हर टुकड़ा 45 से 90 दिन लेता है। एक कारीगर, एक हथौड़ा, एक धैर्य।</p>
+
+  <p lang="hi">यह संग्रह उन्हीं पारंपरिक तकनीकों से निकला है, पर आज की दुल्हनों के लिए — जो माँ का सोना पहनना भी चाहती हैं और अपनी पहचान भी बनाए रखना चाहती हैं। हर टुकड़े पर BIS हॉलमार्क, HUID कोड, और कारीगर का हस्ताक्षर। रसीद पर लिखा वज़न ही हाथ में आता है — पाईं तक ईमानदारी।</p>
+
+  <p class="en-para" lang="en">In every North Indian wedding, there comes a moment when a mother places around her daughter's neck the same necklace she wore at her own wedding. The jewel does not change — only the hands do. That is the true meaning of bridal gold: heritage that is worn, never locked away. This collection is drawn from the old kundan-polki traditions of Awadh and Jaipur — natural uncut stones set in threads of 22 karat gold. Each piece takes between 45 and 90 days in our Ayodhya workshop. Hallmarked, HUID-stamped, and signed by the master karigar.</p>
+
+  <div class="byline" lang="en">— Curated by the Aanchal Atelier</div>
+</article>
+
+<!-- ============= CURATED PRODUCTS ============= -->
+<div class="curated">
+  <div class="section-head">
+    <div class="title">
+      <span lang="hi">चुने गए टुकड़े</span>
+      <span class="en" lang="en">The Curated Pieces</span>
+    </div>
+    <div class="count" lang="en">01 — 08 of 58</div>
+  </div>
+
+  <!-- SPREAD 1 -->
+  <section class="product-spread reveal">
+    <div class="image">
+      <span class="plate" lang="en">Plate I</span>
+      <img src="https://images.unsplash.com/photo-1599643477877-530eb83abc8e?w=1400&q=85&auto=format&fit=crop" alt="Kundan rani-haar photographed as editorial still life" loading="lazy" />
+    </div>
+    <div class="story">
+      <div class="index" lang="en">No. 01 · Signature Set</div>
+      <h3>
+        <span lang="hi">कुंदन रानी-हार</span>
+        <span class="en" lang="en">The Kundan Rani-Haar</span>
+      </h3>
+      <p class="context" lang="hi">हमारे संग्रह का मुख्य आकर्षण। 86.4 ग्राम 22 कैरेट सोने में, 124 कुंदन पत्थरों से सजा यह हार अवध की पुरानी रानी-हार शैली पर आधारित है। माँ से बेटी को जाने वाला टुकड़ा।</p>
+      <div class="specs">
+        <div class="sp" lang="en">Weight<strong>86.4g</strong></div>
+        <div class="sp" lang="en">Purity<strong>22K · BIS</strong></div>
+        <div class="sp" lang="en">Stones<strong>124 kundan</strong></div>
+      </div>
+      <div class="cta-row">
+        <div class="price"><span class="curr">₹</span>7,86,400</div>
+        <a href="pdp.html" class="view-btn">
+          <span lang="hi">विस्तार</span>
+          <span class="en" lang="en">View piece</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FULL SPREAD -->
+  <section class="full-spread reveal">
+    <div class="bg"><img src="https://images.unsplash.com/photo-1600721391776-b5cd0e0048f9?w=1800&q=85&auto=format&fit=crop" alt="Bride wearing heritage jewellery, editorial full-bleed" /></div>
+    <div class="content">
+      <div class="index" lang="en">No. 02 · The Bridal Complete</div>
+      <h3>
+        <span lang="hi">विवाह-सम्पूर्ण</span>
+        <span class="en" lang="en">The Bridal Complete — Seven Pieces</span>
+      </h3>
+      <p class="context" lang="hi">हार, माँग-टीका, नथ, चूड़ियों का जोड़ा, कर्णफूल, हाथ-फूल, पायल — एक ही कार्यशाला से निकली, एक ही कारीगर द्वारा बनाई गई सात टुकड़ों की दुल्हन श्रृंखला। कुंदन-पोल्की-जड़ाऊ।</p>
+      <div class="footer-row">
+        <div class="price">₹14,82,000</div>
+        <a href="pdp.html" class="view-btn">
+          <span lang="hi">पूरा सेट</span>
+          <span class="en" lang="en">View the set</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- SPREAD REVERSE -->
+  <section class="product-spread reverse reveal">
+    <div class="image">
+      <span class="plate" lang="en">Plate II</span>
+      <img src="https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=1400&q=85&auto=format&fit=crop" alt="Polki choker detail on cream paper" loading="lazy" />
+    </div>
+    <div class="story">
+      <div class="index" lang="en">No. 03 · Choker</div>
+      <h3>
+        <span lang="hi">पोल्की चोकर</span>
+        <span class="en" lang="en">Polki Choker — Jaipur Line</span>
+      </h3>
+      <p class="context" lang="hi">जयपुर शैली में, बिना तराशे हुए प्राकृतिक पोल्की हीरे, 22 कैरेट सोने में बैठाए गए। पीछे मीनाकारी का काम — जो पहनने वाली को ही दिखे। संगीत और रिसेप्शन के लिए।</p>
+      <div class="specs">
+        <div class="sp" lang="en">Weight<strong>58.2g</strong></div>
+        <div class="sp" lang="en">Stones<strong>Natural polki</strong></div>
+        <div class="sp" lang="en">Back<strong>Meenakari</strong></div>
+      </div>
+      <div class="cta-row">
+        <div class="price"><span class="curr">₹</span>4,18,200</div>
+        <a href="pdp.html" class="view-btn">
+          <span lang="hi">विस्तार</span>
+          <span class="en" lang="en">View piece</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2-UP -->
+  <section class="two-up reveal">
+    <div class="piece">
+      <div class="image">
+        <span class="plate" lang="en">Plate III</span>
+        <img src="https://images.unsplash.com/photo-1535632066274-36f735c4a1a9?w=1200&q=85&auto=format&fit=crop" alt="Chandbaali earrings" />
+      </div>
+      <div class="body">
+        <div class="meta">
+          <div class="index" lang="en">No. 04 · Earrings</div>
+          <h3 lang="hi">चाँदबाली झुमका</h3>
+          <div class="name-en" lang="en">Chandbaali Jhumka</div>
+          <p class="context" lang="hi">चाँद के आकार में, घंटियों की झालर के साथ। संगीत के लिए आदर्श।</p>
+        </div>
+        <div class="price"><span class="curr" style="font-size:0.6em; color:var(--tenant-primary);">₹</span>1,42,800</div>
+      </div>
+    </div>
+    <div class="piece">
+      <div class="image">
+        <span class="plate" lang="en">Plate IV</span>
+        <img src="https://images.unsplash.com/photo-1610694955371-d4a3e0ce4b52?w=1200&q=85&auto=format&fit=crop" alt="Gold bangles" />
+      </div>
+      <div class="body">
+        <div class="meta">
+          <div class="index" lang="en">No. 05 · Bangles</div>
+          <h3 lang="hi">दुल्हन चूड़ा — 22K</h3>
+          <div class="name-en" lang="en">Bridal Chooda Set — 22K</div>
+          <p class="context" lang="hi">चार की जोड़ी, अलग-अलग बुनाई के साथ। माँ और बेटी दोनों के लिए।</p>
+        </div>
+        <div class="price"><span class="curr" style="font-size:0.6em; color:var(--tenant-primary);">₹</span>3,24,000</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FULL SPREAD 2 -->
+  <section class="full-spread reveal">
+    <div class="bg"><img src="https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=1800&q=85&auto=format&fit=crop" alt="Mangalsutra lifestyle editorial image" /></div>
+    <div class="content">
+      <div class="index" lang="en">No. 06 · Heritage Mangalsutra</div>
+      <h3>
+        <span lang="hi">कुंदन मंगलसूत्र — विरासत</span>
+        <span class="en" lang="en">Kundan Mangalsutra — Heritage Line</span>
+      </h3>
+      <p class="context" lang="hi">42.6 ग्राम, 36 हाथ-सेट कुंदन, काला-मूंगा धागा। विरासत श्रृंखला का केंद्र — जो सात फेरों के बाद पहनी जाती है और फिर हर दिन।</p>
+      <div class="footer-row">
+        <div class="price">₹3,84,500</div>
+        <a href="pdp.html" class="view-btn">
+          <span lang="hi">विस्तार</span>
+          <span class="en" lang="en">View piece</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2-UP 2 -->
+  <section class="two-up reveal">
+    <div class="piece">
+      <div class="image">
+        <span class="plate" lang="en">Plate V</span>
+        <img src="https://images.unsplash.com/photo-1608042314453-ae338d80c427?w=1200&q=85&auto=format&fit=crop" alt="Daily gold haram necklace" />
+      </div>
+      <div class="body">
+        <div class="meta">
+          <div class="index" lang="en">No. 07 · Haram</div>
+          <h3 lang="hi">गोल्डन हरम</h3>
+          <div class="name-en" lang="en">Gold Haram · Traditional</div>
+          <p class="context" lang="hi">दक्षिण-प्रेरित, उत्तर की कारीगरी। लंबा हार जो विदाई में पहना जाए।</p>
+        </div>
+        <div class="price"><span class="curr" style="font-size:0.6em; color:var(--tenant-primary);">₹</span>4,62,400</div>
+      </div>
+    </div>
+    <div class="piece">
+      <div class="image">
+        <span class="plate" lang="en">Plate VI</span>
+        <img src="https://images.unsplash.com/photo-1573408301185-9146fe634ad0?w=1200&q=85&auto=format&fit=crop" alt="Gold maang-tikka" />
+      </div>
+      <div class="body">
+        <div class="meta">
+          <div class="index" lang="en">No. 08 · Maang-tikka</div>
+          <h3 lang="hi">माँग-टीका · तीन पीस</h3>
+          <div class="name-en" lang="en">Maang-tikka · Three-piece</div>
+          <p class="context" lang="hi">माथे का टीका, दो पस्सा — सेट के रूप में। फेरों के लिए।</p>
+        </div>
+        <div class="price"><span class="curr" style="font-size:0.6em; color:var(--tenant-primary);">₹</span>98,600</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============= KARIGAR FEATURE ============= -->
+<section class="karigar-block" aria-label="कारीगर परिचय">
+  <div class="image" id="karigarImg">
+    <img src="https://images.unsplash.com/photo-1519748771451-a94c596fad67?w=1600&q=85&auto=format&fit=crop" alt="Karigar Radheshyam Yadav at work in the Ayodhya atelier" />
+    <div class="cap" lang="en">Portrait · Radheshyam Yadav · Ayodhya Atelier</div>
+  </div>
+  <div class="copy reveal">
+    <div class="eyebrow" lang="en">The Karigar · Master Portrait</div>
+    <h2>
+      <span lang="hi">राधेश्याम यादव।</span>
+      <span class="en" lang="en">Thirty years. One hammer. Three generations of learning.</span>
+    </h2>
+    <div class="hindi-quote" lang="hi">
+      "जो कुंदन अब मैं बैठाता हूँ, वही मेरे दादा बैठाते थे। हथौड़ा वही है, सोना वही है, पर हर दुल्हन नई है।"
+    </div>
+    <div class="en-translate" lang="en">
+      "The kundan I set today is the same my grandfather set. The hammer is the same, the gold is the same — but every bride is new."
+    </div>
+    <div class="credits">
+      <div>
+        <div class="num">30+</div>
+        <div class="lab" lang="hi">वर्षों का अनुभव</div>
+      </div>
+      <div>
+        <div class="num">1,200+</div>
+        <div class="lab" lang="hi">दुल्हन सेट तैयार</div>
+      </div>
+      <div>
+        <div class="num">03</div>
+        <div class="lab" lang="hi">पीढ़ियों की विरासत</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============= HOW TO WEAR ============= -->
+<section class="how-to-wear">
+  <div class="title reveal">
+    <span class="eyebrow" lang="en">Styling Notes · The Wearer's Guide</span>
+    <h2>
+      <span lang="hi">कैसे पहनें</span>
+      <span class="en" lang="en">How to wear · for every ritual</span>
+    </h2>
+  </div>
+  <div class="how-grid reveal">
+    <article class="how-card">
+      <div class="img"><img src="https://images.unsplash.com/photo-1608042314453-ae338d80c427?w=800&q=80&auto=format&fit=crop" alt="Sangeet styling" /></div>
+      <div class="n" lang="en">I · Sangeet</div>
+      <h4 lang="hi">संगीत</h4>
+      <div class="sub" lang="en">Light layering · movement-friendly</div>
+      <p lang="hi">चाँदबाली झुमके, हल्की चूड़ियाँ, और एक नथ। बहुत भारी मंगलसूत्र से बचें — नाचने में असुविधा होगी।</p>
+    </article>
+    <article class="how-card">
+      <div class="img"><img src="https://images.unsplash.com/photo-1535632066274-36f735c4a1a9?w=800&q=80&auto=format&fit=crop" alt="Mehendi styling" /></div>
+      <div class="n" lang="en">II · Mehendi</div>
+      <h4 lang="hi">मेहंदी</h4>
+      <div class="sub" lang="en">Minimal at hands · statement at ears</div>
+      <p lang="hi">हाथ खाली रखें (मेहंदी दिखे), पर कान और गले को बड़े टुकड़ों से सजाएँ। हरे-पीले लहंगे के साथ सोना।</p>
+    </article>
+    <article class="how-card">
+      <div class="img"><img src="https://images.unsplash.com/photo-1600721391776-b5cd0e0048f9?w=800&q=80&auto=format&fit=crop" alt="Pheras styling" /></div>
+      <div class="n" lang="en">III · Pheras</div>
+      <h4 lang="hi">सात फेरे</h4>
+      <div class="sub" lang="en">The full heritage · at its heaviest</div>
+      <p lang="hi">रानी-हार, माँग-टीका, नथ, चूड़ियाँ, पायल — पूरा सेट। लाल या गुलाबी लहंगे के साथ 22 कैरेट का भारीपन।</p>
+    </article>
+    <article class="how-card">
+      <div class="img"><img src="https://images.unsplash.com/photo-1544078751-58fee2d8a03b?w=800&q=80&auto=format&fit=crop" alt="Reception styling" /></div>
+      <div class="n" lang="en">IV · Reception</div>
+      <h4 lang="hi">रिसेप्शन</h4>
+      <div class="sub" lang="en">Contemporary cut · heritage core</div>
+      <p lang="hi">पोल्की चोकर, हीरे की बालियाँ, साड़ी के साथ। कम पर सटीक — आधुनिक छवि में विरासत की झलक।</p>
+    </article>
+  </div>
+</section>
+
+<!-- ============= CTA STRIP ============= -->
+<section class="cta-strip" aria-label="संग्रह के अगले चरण">
+  <div class="cta-strip-inner reveal">
+    <h2>
+      <span lang="hi">सही टुकड़ा चुनने में मदद चाहिए?</span>
+      <span class="en" lang="en">Need help choosing the right piece?</span>
+    </h2>
+    <p lang="hi">हमारे अनुभवी सलाहकार WhatsApp पर उपलब्ध हैं। या स्टोर विज़िट के लिए समय बुक करें — बिना दबाव, बिना भीड़।</p>
+    <div class="btns">
+      <a href="#" class="btn btn-fill">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/></svg>
+        <span lang="hi">WhatsApp सलाह</span>
+        <span class="en" lang="en">WhatsApp consult</span>
+      </a>
+      <a href="#" class="btn btn-outline">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span lang="hi">स्टोर विज़िट बुक करें</span>
+        <span class="en" lang="en">Book a visit</span>
+      </a>
+      <a href="#" class="btn btn-outline">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h18v18H3z"/><path d="M3 9h18M9 3v18"/></svg>
+        <span lang="hi">पूरा संग्रह देखें</span>
+        <span class="en" lang="en">View all 58</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============= RELATED COLLECTIONS ============= -->
+<section class="related-colls">
+  <h2>
+    <span lang="hi">अन्य संग्रह</span>
+    <span class="en" lang="en">More collections from the atelier</span>
+  </h2>
+  <div class="sub" lang="en">For every day, every ritual, every woman.</div>
+  <div class="tiles reveal">
+    <a class="coll-tile" href="#">
+      <img src="https://images.unsplash.com/photo-1608042314453-ae338d80c427?w=1200&q=80&auto=format&fit=crop" alt="Daily gold" />
+      <div class="body">
+        <div class="count" lang="en">96 pieces · from ₹18,000</div>
+        <h3>
+          <span lang="hi">रोज़ का सोना</span>
+          <span class="en" lang="en">Daily Gold</span>
+        </h3>
+      </div>
+    </a>
+    <a class="coll-tile" href="#">
+      <img src="https://images.unsplash.com/photo-1573408301185-9146fe634ad0?w=1200&q=80&auto=format&fit=crop" alt="Diamond everyday" />
+      <div class="body">
+        <div class="count" lang="en">48 pieces · from ₹42,000</div>
+        <h3>
+          <span lang="hi">हीरे — रोज़ के लिए</span>
+          <span class="en" lang="en">Diamond Everyday</span>
+        </h3>
+      </div>
+    </a>
+    <a class="coll-tile" href="#">
+      <img src="https://images.unsplash.com/photo-1519748771451-a94c596fad67?w=1200&q=80&auto=format&fit=crop" alt="Heritage silver" />
+      <div class="body">
+        <div class="count" lang="en">72 pieces · from ₹8,200</div>
+        <h3>
+          <span lang="hi">विरासत चाँदी</span>
+          <span class="en" lang="en">Heritage Silver</span>
+        </h3>
+      </div>
+    </a>
+  </div>
+</section>
+
+</main>
+
+<!-- ============= FOOTER ============= -->
+<footer>
+  <div class="footer-inner">
+    <div class="brand">
+      <div style="width:56px; height:56px; background:var(--tenant-primary); color:var(--linen); display:inline-flex; align-items:center; justify-content:center; font-family:var(--font-display-hi); font-size:30px; margin-bottom:20px; position:relative;">
+        आ
+        <span style="position:absolute; inset:5px; border:1px solid rgba(246,241,229,0.22);"></span>
+      </div>
+      <h3 lang="hi">आँचल ज्वैलर्स</h3>
+      <div class="sub" lang="en">Aanchal · Ayodhya · Est. 1994</div>
+      <p style="color:rgba(246,241,229,0.62); max-width:320px; line-height:1.65;" lang="hi">तीन पीढ़ियों से उत्तर भारत के परिवारों का सोना। BIS प्रमाणित हॉलमार्क, हर टुकड़े पर HUID।</p>
+    </div>
+    <div class="contact">
+      <h4>Visit</h4>
+      <div class="row">
+        <span class="k" lang="en">Address</span>
+        <span class="v" lang="hi">फैज़ाबाद रोड, निकट हनुमानगढ़ी, अयोध्या — 224123</span>
+      </div>
+      <div class="row">
+        <span class="k" lang="en">Phone / WhatsApp</span>
+        <span class="v">+91 94150 XX XXX</span>
+      </div>
+      <div class="row">
+        <span class="k" lang="en">Hours</span>
+        <span class="v" lang="hi">सोम – शनि · 10:30 – 8:30</span>
+      </div>
+    </div>
+    <div class="contact">
+      <h4>Compliance</h4>
+      <div class="row">
+        <span class="k" lang="en">GSTIN</span>
+        <span class="v">09AAACA1234F1Z5</span>
+      </div>
+      <div class="row">
+        <span class="k" lang="en">BIS Licence</span>
+        <span class="v">BIS-AHC-4321 · Valid till 2028</span>
+      </div>
+      <div class="row">
+        <span class="k" lang="en">Associations</span>
+        <span class="v" lang="en">IBJA · GJC · All India Gem &amp; Jewellery</span>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div>&copy; 2026 <span lang="hi">आँचल ज्वैलर्स</span> · <span lang="en">All rights reserved</span></div>
+    <div style="display:inline-flex; gap:12px;">
+      <a href="#" style="width:32px;height:32px;border-radius:50%;background:rgba(246,241,229,0.08);display:inline-flex;align-items:center;justify-content:center;color:var(--linen);" aria-label="WhatsApp"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/></svg></a>
+      <a href="#" style="width:32px;height:32px;border-radius:50%;background:rgba(246,241,229,0.08);display:inline-flex;align-items:center;justify-content:center;color:var(--linen);" aria-label="Instagram"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg></a>
+    </div>
+    <div lang="en">BIS Certified · GST Compliant · 100% Hallmarked</div>
+  </div>
+</footer>
+
+<script>
+// Language toggle
+document.querySelectorAll('.lang-toggle button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.lang-toggle button').forEach(b => b.setAttribute('aria-pressed', 'false'));
+    btn.setAttribute('aria-pressed', 'true');
+  });
+});
+
+// Hero parallax
+const heroBg = document.getElementById('heroBg');
+window.addEventListener('scroll', () => {
+  const s = window.scrollY;
+  if (s < 900 && heroBg) {
+    heroBg.style.transform = `scale(${1.08 + s * 0.00015}) translateY(${s * 0.18}px)`;
+  }
+}, { passive: true });
+
+// Reveal on scroll
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('in');
+      io.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.12 });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+// Karigar dissolve
+const karigarImg = document.getElementById('karigarImg');
+if (karigarImg) {
+  const kio = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('in'); kio.unobserve(e.target); }
+    });
+  }, { threshold: 0.3 });
+  kio.observe(karigarImg);
+}
+</script>
+
+</body>
+</html>

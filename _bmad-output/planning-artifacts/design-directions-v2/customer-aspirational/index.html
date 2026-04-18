@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Goldsmith — Customer Aspirational Design Directions (v2)</title>
+<meta name="description" content="Six customer-facing design directions for Goldsmith, the white-label jewellery platform for Hindi-belt Indian jewellers. Each direction is a fully committed aesthetic that must stand next to CaratLane, Tanishq, Kalyan." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Tiro+Devanagari+Hindi:ital@0;1&family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..500&family=Manrope:wght@300;400;500;600&family=Mukta:wght@300;400;500;600&family=Yatra+One&family=Jaldi:wght@400;700&family=Italiana&family=Karma:wght@300;400;500;600&family=Baloo+Bhaina+2:wght@400;500;600&family=Tenor+Sans&display=swap" rel="stylesheet" />
+<style>
+  /* =====================================================
+     GOLDSMITH · DESIGN DIRECTIONS INDEX
+     Restrained curator aesthetic — designed to frame the 6
+     directions without competing with them. Neutral ivory
+     surface, Cormorant + Tiro, long rule-lines, metadata
+     presented like museum wall-labels.
+     ===================================================== */
+  :root {
+    --paper:       #F4EFE2;
+    --paper-2:     #E9E2CF;
+    --paper-3:     #DDD3BA;
+    --ink:         #231E16;
+    --ink-2:       #4A4033;
+    --ink-mute:    #7A6E5A;
+    --ink-soft:    #A19684;
+    --rule:        rgba(35, 30, 22, 0.16);
+    --rule-strong: rgba(35, 30, 22, 0.32);
+    --brass:       #A68437;
+
+    --f-display:    'Cormorant Garamond', 'Times New Roman', serif;
+    --f-hi-display: 'Tiro Devanagari Hindi', serif;
+    --f-body:       'Karma', 'Manrope', -apple-system, sans-serif;
+    --f-hi-body:    'Mukta', sans-serif;
+    --f-mono:       'Karma', monospace;
+
+    --ease:        cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-weight: 400;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "kern" 1, "liga" 1;
+  }
+  /* subliminal paper grain */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.045;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.08 0 0 0 0 0.04 0 0 0 0.9 0'/></filter><rect width='220' height='220' filter='url(%23n)'/></svg>");
+  }
+
+  :lang(hi), [lang="hi"] { font-family: var(--f-hi-body); line-height: 1.65; }
+  .hi-display, [lang="hi"].display { font-family: var(--f-hi-display); }
+
+  img { max-width: 100%; display: block; }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; background: none; border: 0; cursor: pointer; color: inherit; }
+
+  .container {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 0 clamp(1.5rem, 4vw, 4rem);
+    position: relative; z-index: 2;
+  }
+
+  /* ====== Top meta bar ====== */
+  .meta-bar {
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--f-body);
+    font-size: 0.72rem;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    padding: 0.9rem 0;
+  }
+  .meta-bar .container { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+  .meta-bar strong { color: var(--ink); font-weight: 500; letter-spacing: 0.24em; }
+
+  /* ====== Masthead ====== */
+  .masthead { padding: clamp(4rem, 10vw, 9rem) 0 clamp(3rem, 7vw, 6rem); border-bottom: 1px solid var(--rule); }
+  .masthead .eyebrow {
+    font-family: var(--f-display);
+    font-style: italic;
+    font-size: 1.1rem;
+    color: var(--brass);
+    margin-bottom: 1.4rem;
+    letter-spacing: 0.04em;
+  }
+  .masthead h1 {
+    font-family: var(--f-hi-display);
+    font-size: clamp(3rem, 8vw, 7.6rem);
+    line-height: 1;
+    font-weight: 400;
+    color: var(--ink);
+    margin: 0 0 0.6rem;
+    letter-spacing: -0.01em;
+  }
+  .masthead h1 .en {
+    display: block;
+    font-family: var(--f-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(1.4rem, 2.6vw, 2.2rem);
+    color: var(--ink-2);
+    margin-top: 1.2rem;
+    letter-spacing: 0.01em;
+    line-height: 1.25;
+  }
+  .masthead .lede {
+    max-width: 52ch;
+    font-family: var(--f-display);
+    font-size: clamp(1.1rem, 1.6vw, 1.35rem);
+    color: var(--ink-2);
+    line-height: 1.55;
+    margin-top: 2.4rem;
+  }
+  .masthead .lede + .lede { margin-top: 1rem; }
+  .masthead .kpi {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 2rem;
+    margin-top: 3.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+  .kpi__item .n {
+    font-family: var(--f-display);
+    font-style: italic;
+    font-size: 2.6rem;
+    color: var(--brass);
+    line-height: 1;
+    display: block;
+  }
+  .kpi__item .l {
+    font-family: var(--f-body);
+    font-size: 0.72rem;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-top: 0.6rem;
+    display: block;
+  }
+
+  /* ====== Section title ====== */
+  .section-title { padding: clamp(3.5rem, 6vw, 5.5rem) 0 2.5rem; }
+  .section-title .num {
+    font-family: var(--f-display);
+    font-style: italic;
+    font-size: 0.9rem;
+    color: var(--brass);
+    letter-spacing: 0.04em;
+  }
+  .section-title h2 {
+    font-family: var(--f-hi-display);
+    font-size: clamp(2rem, 4.5vw, 3.6rem);
+    font-weight: 400;
+    line-height: 1.15;
+    color: var(--ink);
+    margin: 0.4rem 0 0.6rem;
+  }
+  .section-title h2 .en {
+    display: block;
+    font-family: var(--f-display);
+    font-style: italic;
+    font-size: clamp(1rem, 1.7vw, 1.4rem);
+    color: var(--ink-2);
+    margin-top: 0.4rem;
+    font-weight: 400;
+  }
+
+  /* ====== Direction grid ====== */
+  .directions {
+    padding-bottom: clamp(3rem, 5vw, 5rem);
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: clamp(2.5rem, 4vw, 4.5rem);
+  }
+  @media (min-width: 960px) {
+    .directions { grid-template-columns: 1fr 1fr; }
+  }
+
+  .card {
+    border: 1px solid var(--rule-strong);
+    background: var(--paper);
+    padding: clamp(1.8rem, 2.4vw, 2.6rem);
+    position: relative;
+    transition: transform 600ms var(--ease), box-shadow 600ms var(--ease);
+  }
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 22px 50px -24px rgba(35, 30, 22, 0.28);
+  }
+  .card__num {
+    font-family: var(--f-display);
+    font-style: italic;
+    color: var(--brass);
+    font-size: 0.9rem;
+    letter-spacing: 0.04em;
+  }
+  .card__title {
+    font-family: var(--f-hi-display);
+    font-size: clamp(1.9rem, 3vw, 2.6rem);
+    line-height: 1.05;
+    color: var(--ink);
+    margin: 0.3rem 0 0.3rem;
+    font-weight: 400;
+  }
+  .card__title .en {
+    display: block;
+    font-family: var(--f-display);
+    font-style: italic;
+    font-size: 1rem;
+    color: var(--ink-2);
+    margin-top: 0.35rem;
+    letter-spacing: 0.01em;
+  }
+  .card__philosophy {
+    font-family: var(--f-display);
+    font-style: italic;
+    font-size: 1.05rem;
+    color: var(--ink-2);
+    line-height: 1.55;
+    margin: 1rem 0 1.4rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--rule);
+  }
+  .card__meta {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.6rem 1.2rem;
+    font-size: 0.8rem;
+    color: var(--ink-mute);
+    padding: 1rem 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 1.4rem;
+  }
+  .card__meta dt {
+    font-family: var(--f-body);
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    padding-top: 0.08rem;
+  }
+  .card__meta dd {
+    margin: 0;
+    font-family: var(--f-body);
+    color: var(--ink);
+    font-size: 0.88rem;
+  }
+  .card__meta dd small { color: var(--ink-mute); display: block; font-size: 0.74rem; margin-top: 0.1rem; letter-spacing: 0.02em; }
+
+  .swatches { display: flex; gap: 0.35rem; align-items: center; }
+  .sw {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 1px solid rgba(35, 30, 22, 0.1);
+    box-shadow: inset 0 0 0 2px var(--paper);
+  }
+
+  /* Preview strip */
+  .previews {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.7rem;
+    margin-bottom: 1.3rem;
+  }
+  .preview {
+    position: relative;
+    aspect-ratio: 3 / 4;
+    background: var(--paper-2);
+    border: 1px solid var(--rule);
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 400ms var(--ease);
+  }
+  .preview:hover { border-color: var(--brass); }
+  .preview iframe {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1440px;
+    height: 1920px;
+    transform: scale(0.186);
+    transform-origin: top left;
+    border: 0;
+    pointer-events: none;
+  }
+  .preview__label {
+    position: absolute;
+    left: 0.55rem; bottom: 0.55rem;
+    background: rgba(244, 239, 226, 0.92);
+    backdrop-filter: blur(4px);
+    padding: 0.2rem 0.55rem;
+    font-family: var(--f-body);
+    font-size: 0.64rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    border: 1px solid var(--rule);
+    z-index: 2;
+  }
+
+  .card__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.9rem;
+    font-family: var(--f-body);
+    font-size: 0.78rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    border: 1px solid var(--rule-strong);
+    color: var(--ink);
+    transition: background 200ms var(--ease), color 200ms var(--ease), border-color 200ms var(--ease);
+  }
+  .btn:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .btn--primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .btn--primary:hover { background: var(--brass); border-color: var(--brass); color: var(--ink); }
+
+  /* ====== Tenant swap demo ====== */
+  .tenant-demo { padding: clamp(3rem, 6vw, 6rem) 0; border-top: 1px solid var(--rule); }
+  .tenant-demo__intro {
+    max-width: 58ch;
+    font-family: var(--f-display);
+    font-size: 1.1rem;
+    line-height: 1.55;
+    color: var(--ink-2);
+    margin-bottom: 2.5rem;
+  }
+  .tenant-demo__intro :lang(hi) { font-family: var(--f-hi-body); }
+  .swap-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  @media (min-width: 900px) {
+    .swap-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* Tenant swap card — each is a compact iframe of direction-4 home */
+  .swap {
+    position: relative;
+    border: 1px solid var(--rule-strong);
+    background: #0A1910;
+    overflow: hidden;
+    aspect-ratio: 4 / 5;
+  }
+  .swap iframe {
+    position: absolute; inset: 0;
+    width: 1440px; height: 1800px;
+    transform: scale(0.42);
+    transform-origin: top left;
+    border: 0;
+    pointer-events: none;
+  }
+  .swap__label {
+    position: absolute;
+    top: 1rem; right: 1rem;
+    background: rgba(244, 239, 226, 0.96);
+    padding: 0.6rem 0.9rem;
+    font-family: var(--f-body);
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink);
+    border: 1px solid var(--rule-strong);
+    z-index: 3;
+  }
+  .swap__label small {
+    display: block;
+    font-family: var(--f-hi-body);
+    font-size: 0.78rem;
+    text-transform: none;
+    color: var(--ink-2);
+    letter-spacing: 0;
+    margin-top: 0.2rem;
+  }
+  .swap-note {
+    font-family: var(--f-display);
+    font-style: italic;
+    color: var(--ink-mute);
+    font-size: 0.95rem;
+    margin-top: 1.6rem;
+    max-width: 70ch;
+  }
+
+  /* ====== Recommendation ====== */
+  .rec {
+    padding: clamp(3rem, 5vw, 5rem) 0;
+    border-top: 1px solid var(--rule);
+    background: linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+  }
+  .rec__grid { display: grid; grid-template-columns: 1fr; gap: 2rem; }
+  @media (min-width: 900px) { .rec__grid { grid-template-columns: 2fr 3fr; gap: 4rem; } }
+  .rec .label {
+    font-family: var(--f-body);
+    font-size: 0.7rem;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin-bottom: 0.9rem;
+  }
+  .rec h3 {
+    font-family: var(--f-hi-display);
+    font-size: clamp(1.8rem, 3vw, 2.8rem);
+    font-weight: 400;
+    line-height: 1.1;
+    color: var(--ink);
+    margin: 0 0 0.8rem;
+  }
+  .rec h3 .en {
+    display: block;
+    font-family: var(--f-display);
+    font-style: italic;
+    font-size: clamp(1rem, 1.5vw, 1.3rem);
+    color: var(--ink-2);
+    margin-top: 0.3rem;
+  }
+  .rec p {
+    font-family: var(--f-display);
+    font-size: 1.08rem;
+    line-height: 1.6;
+    color: var(--ink-2);
+    margin: 0 0 1rem;
+  }
+  .rec p:last-of-type { margin-bottom: 0; }
+  .rec .next-steps {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+  }
+  .rec .next-steps li {
+    font-family: var(--f-body);
+    font-size: 0.92rem;
+    color: var(--ink-2);
+    margin-bottom: 0.4rem;
+  }
+
+  /* ====== Footer ====== */
+  footer {
+    padding: 3rem 0 4rem;
+    border-top: 1px solid var(--rule);
+    font-family: var(--f-body);
+    font-size: 0.78rem;
+    color: var(--ink-mute);
+    letter-spacing: 0.06em;
+  }
+  footer .container { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+
+  /* ========= Focus ========= */
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--brass);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="meta-bar" role="complementary" aria-label="Document metadata">
+  <div class="container">
+    <span><strong>Goldsmith</strong> · Customer Aspirational Design · <span>v2</span></span>
+    <span>April 2026 · Internal review copy · <strong>6 directions</strong></span>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="container">
+    <div class="eyebrow">Volume II · Customer Aspirational</div>
+    <h1>
+      <span lang="hi">सौंदर्य की छह दिशाएँ</span>
+      <span class="en" lang="en">Six aesthetic directions for a platform that refuses to look like a platform.</span>
+    </h1>
+    <p class="lede">
+      Goldsmith is a white-label platform. On every customer surface, only the jeweller's brand appears — the platform itself is invisible. These six directions are each a fully-committed answer to the question: <em>what should a traditional Hindi-belt jeweller look like online to a 28-year-old software engineer in Lucknow shopping for her sister's wedding?</em>
+    </p>
+    <p class="lede">
+      Each direction ships as <strong>three production HTML files</strong> — <em>home</em>, <em>pdp</em>, <em>collection</em> — totalling <strong>20,810 lines</strong> of HTML + CSS + minimal JS. Photography, typography, motion, and motion-reduced fallbacks are all real. Tenant primary colour, accent, logo, name, domain, city are all CSS variables at <code>:root</code>, swappable per jeweller without touching markup.
+    </p>
+    <div class="kpi" role="list">
+      <div class="kpi__item" role="listitem"><span class="n">6</span><span class="l">Committed directions</span></div>
+      <div class="kpi__item" role="listitem"><span class="n">18</span><span class="l">Production HTML files</span></div>
+      <div class="kpi__item" role="listitem"><span class="n">20,810</span><span class="l">Total lines of code</span></div>
+      <div class="kpi__item" role="listitem"><span class="n">0</span><span class="l">Goldsmith brand leaks</span></div>
+    </div>
+  </div>
+</header>
+
+<section class="section-title">
+  <div class="container">
+    <div class="num">I · Directions</div>
+    <h2>
+      <span lang="hi">छह सम्पादकीय दिशाएँ</span>
+      <span class="en" lang="en">Each a fully committed aesthetic point-of-view.</span>
+    </h2>
+  </div>
+</section>
+
+<section class="directions container" aria-label="Design directions">
+
+  <!-- ============ 1 ============ -->
+  <article class="card">
+    <div class="card__num">Direction Nº 01</div>
+    <h3 class="card__title">
+      <span lang="hi">सम्पादकीय सिनेमा</span>
+      <span class="en" lang="en">Editorial Cinema</span>
+    </h3>
+    <p class="card__philosophy">"Dark cinematic — Tanishq Rivaah-scale. Jewellery emerges from shadow; craft is set on a pedestal of restraint. Gold as light, not surface."</p>
+    <dl class="card__meta">
+      <dt>Typography</dt>
+      <dd>Cormorant Garamond · Tiro Devanagari Hindi<br/><small>Manrope · Mukta — body</small></dd>
+      <dt>Surface</dt>
+      <dd>Near-black cinema (<code>#0B0A08</code>) · Burnished gold <code>#C9A961</code></dd>
+      <dt>Palette</dt>
+      <dd><span class="swatches" aria-hidden="true">
+        <span class="sw" style="background:#0B0A08"></span>
+        <span class="sw" style="background:#14120E"></span>
+        <span class="sw" style="background:#B8882D"></span>
+        <span class="sw" style="background:#C9A961"></span>
+        <span class="sw" style="background:#F5EFE4"></span>
+      </span></dd>
+    </dl>
+    <div class="previews">
+      <a class="preview" href="direction-1-editorial-cinema/home.html" aria-label="Editorial Cinema — Home"><iframe src="direction-1-editorial-cinema/home.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Home</span></a>
+      <a class="preview" href="direction-1-editorial-cinema/pdp.html" aria-label="Editorial Cinema — Product"><iframe src="direction-1-editorial-cinema/pdp.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Product</span></a>
+      <a class="preview" href="direction-1-editorial-cinema/collection.html" aria-label="Editorial Cinema — Collection"><iframe src="direction-1-editorial-cinema/collection.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Collection</span></a>
+    </div>
+    <div class="card__links">
+      <a class="btn btn--primary" href="direction-1-editorial-cinema/home.html">Open Home</a>
+      <a class="btn" href="direction-1-editorial-cinema/pdp.html">Product</a>
+      <a class="btn" href="direction-1-editorial-cinema/collection.html">Collection</a>
+    </div>
+  </article>
+
+  <!-- ============ 2 ============ -->
+  <article class="card">
+    <div class="card__num">Direction Nº 02</div>
+    <h3 class="card__title">
+      <span lang="hi">आधुनिक दीर्घा</span>
+      <span class="en" lang="en">Modern Gallery</span>
+    </h3>
+    <p class="card__philosophy">"White-bone gallery minimal — CaratLane at its most restrained. Photography carries the page; typography is detail work. Silence is the signature."</p>
+    <dl class="card__meta">
+      <dt>Typography</dt>
+      <dd>Italiana · Jaldi<br/><small>Tenor Sans · Hind — body</small></dd>
+      <dt>Surface</dt>
+      <dd>Bone white (<code>#FAF7F1</code>) · Burnished brass <code>#A87833</code></dd>
+      <dt>Palette</dt>
+      <dd><span class="swatches" aria-hidden="true">
+        <span class="sw" style="background:#FAF7F1"></span>
+        <span class="sw" style="background:#F2ECE0"></span>
+        <span class="sw" style="background:#A87833"></span>
+        <span class="sw" style="background:#3E3F3A"></span>
+        <span class="sw" style="background:#1B1D1A"></span>
+      </span></dd>
+    </dl>
+    <div class="previews">
+      <a class="preview" href="direction-2-modern-gallery/home.html" aria-label="Modern Gallery — Home"><iframe src="direction-2-modern-gallery/home.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Home</span></a>
+      <a class="preview" href="direction-2-modern-gallery/pdp.html" aria-label="Modern Gallery — Product"><iframe src="direction-2-modern-gallery/pdp.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Product</span></a>
+      <a class="preview" href="direction-2-modern-gallery/collection.html" aria-label="Modern Gallery — Collection"><iframe src="direction-2-modern-gallery/collection.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Collection</span></a>
+    </div>
+    <div class="card__links">
+      <a class="btn btn--primary" href="direction-2-modern-gallery/home.html">Open Home</a>
+      <a class="btn" href="direction-2-modern-gallery/pdp.html">Product</a>
+      <a class="btn" href="direction-2-modern-gallery/collection.html">Collection</a>
+    </div>
+  </article>
+
+  <!-- ============ 3 ============ -->
+  <article class="card">
+    <div class="card__num">Direction Nº 03</div>
+    <h3 class="card__title">
+      <span lang="hi">विरासत कागज़</span>
+      <span class="en" lang="en">Heritage Paper</span>
+    </h3>
+    <p class="card__philosophy">"Paper-archive editorial — letterpress serifs on linen-textured cream, ink-wet asymmetric rules, wax-seal HUID ceremony. Indian-ness through restraint and print-quality typography, never pasted-on ornament."</p>
+    <dl class="card__meta">
+      <dt>Typography</dt>
+      <dd>Fraunces (opsz + ital) · Tiro Devanagari Hindi<br/><small>Karma · Mukta — body</small></dd>
+      <dt>Surface</dt>
+      <dd>Linen <code>#F6F1E5</code> · Tamarind burgundy <code>#7B3B33</code> · Aged gold <code>#A8833F</code></dd>
+      <dt>Palette</dt>
+      <dd><span class="swatches" aria-hidden="true">
+        <span class="sw" style="background:#F6F1E5"></span>
+        <span class="sw" style="background:#ECE2CC"></span>
+        <span class="sw" style="background:#A8833F"></span>
+        <span class="sw" style="background:#7B3B33"></span>
+        <span class="sw" style="background:#2A251E"></span>
+      </span></dd>
+    </dl>
+    <div class="previews">
+      <a class="preview" href="direction-3-heritage-paper/home.html" aria-label="Heritage Paper — Home"><iframe src="direction-3-heritage-paper/home.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Home</span></a>
+      <a class="preview" href="direction-3-heritage-paper/pdp.html" aria-label="Heritage Paper — Product"><iframe src="direction-3-heritage-paper/pdp.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Product</span></a>
+      <a class="preview" href="direction-3-heritage-paper/collection.html" aria-label="Heritage Paper — Collection"><iframe src="direction-3-heritage-paper/collection.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Collection</span></a>
+    </div>
+    <div class="card__links">
+      <a class="btn btn--primary" href="direction-3-heritage-paper/home.html">Open Home</a>
+      <a class="btn" href="direction-3-heritage-paper/pdp.html">Product</a>
+      <a class="btn" href="direction-3-heritage-paper/collection.html">Collection</a>
+    </div>
+  </article>
+
+  <!-- ============ 4 ============ -->
+  <article class="card">
+    <div class="card__num">Direction Nº 04</div>
+    <h3 class="card__title">
+      <span lang="hi">स्वर्णपत्र</span>
+      <span class="en" lang="en">Gold Leaf Luxe</span>
+    </h3>
+    <p class="card__philosophy">"Deep forest couture — Cartier / Van Cleef restraint. Gold as precise punctuation, not surface. Tenant-primary is load-bearing elsewhere; swap-it-to-sapphire and the system still holds."</p>
+    <dl class="card__meta">
+      <dt>Typography</dt>
+      <dd>Playfair Display · Baloo Bhaina 2<br/><small>Manrope · Hind Vadodara — body</small></dd>
+      <dt>Surface</dt>
+      <dd>Forest <code>#14261C</code> · Champagne <code>#D4AF6B</code> · Ivory <code>#F4EADA</code></dd>
+      <dt>Palette</dt>
+      <dd><span class="swatches" aria-hidden="true">
+        <span class="sw" style="background:#082520"></span>
+        <span class="sw" style="background:#14261C"></span>
+        <span class="sw" style="background:#D4AF6B"></span>
+        <span class="sw" style="background:#E8CB8A"></span>
+        <span class="sw" style="background:#F4EADA"></span>
+      </span></dd>
+    </dl>
+    <div class="previews">
+      <a class="preview" href="direction-4-gold-leaf-luxe/home.html" aria-label="Gold Leaf Luxe — Home"><iframe src="direction-4-gold-leaf-luxe/home.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Home</span></a>
+      <a class="preview" href="direction-4-gold-leaf-luxe/pdp.html" aria-label="Gold Leaf Luxe — Product"><iframe src="direction-4-gold-leaf-luxe/pdp.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Product</span></a>
+      <a class="preview" href="direction-4-gold-leaf-luxe/collection.html" aria-label="Gold Leaf Luxe — Collection"><iframe src="direction-4-gold-leaf-luxe/collection.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Collection</span></a>
+    </div>
+    <div class="card__links">
+      <a class="btn btn--primary" href="direction-4-gold-leaf-luxe/home.html">Open Home</a>
+      <a class="btn" href="direction-4-gold-leaf-luxe/pdp.html">Product</a>
+      <a class="btn" href="direction-4-gold-leaf-luxe/collection.html">Collection</a>
+    </div>
+  </article>
+
+  <!-- ============ 5 ============ -->
+  <article class="card">
+    <div class="card__num">Direction Nº 05</div>
+    <h3 class="card__title">
+      <span lang="hi">हिंदी-प्रथम सम्पादकीय</span>
+      <span class="en" lang="en">Hindi-First Editorial</span>
+    </h3>
+    <p class="card__philosophy">"Devanagari is the art — not the translation. Yatra One at 14–18rem composes with imagery, breaks grid, overlaps photography. The one direction no Western agency could have produced."</p>
+    <dl class="card__meta">
+      <dt>Typography</dt>
+      <dd>Yatra One · Mukta Vaani · Tiro Devanagari Hindi<br/><small>Fraunces italic — footnote voice only</small></dd>
+      <dt>Surface</dt>
+      <dd>Warm cream <code>#F5EDDD</code> · Aged gold <code>#B58A3C</code> · Indigo ink <code>#1E2440</code></dd>
+      <dt>Palette</dt>
+      <dd><span class="swatches" aria-hidden="true">
+        <span class="sw" style="background:#F5EDDD"></span>
+        <span class="sw" style="background:#EADAB8"></span>
+        <span class="sw" style="background:#B58A3C"></span>
+        <span class="sw" style="background:#D4745A"></span>
+        <span class="sw" style="background:#1E2440"></span>
+      </span></dd>
+    </dl>
+    <div class="previews">
+      <a class="preview" href="direction-5-hindi-first-editorial/home.html" aria-label="Hindi-First Editorial — Home"><iframe src="direction-5-hindi-first-editorial/home.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Home</span></a>
+      <a class="preview" href="direction-5-hindi-first-editorial/pdp.html" aria-label="Hindi-First Editorial — Product"><iframe src="direction-5-hindi-first-editorial/pdp.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Product</span></a>
+      <a class="preview" href="direction-5-hindi-first-editorial/collection.html" aria-label="Hindi-First Editorial — Collection"><iframe src="direction-5-hindi-first-editorial/collection.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Collection</span></a>
+    </div>
+    <div class="card__links">
+      <a class="btn btn--primary" href="direction-5-hindi-first-editorial/home.html">Open Home</a>
+      <a class="btn" href="direction-5-hindi-first-editorial/pdp.html">Product</a>
+      <a class="btn" href="direction-5-hindi-first-editorial/collection.html">Collection</a>
+    </div>
+  </article>
+
+  <!-- ============ 6 ============ -->
+  <article class="card">
+    <div class="card__num">Direction Nº 06</div>
+    <h3 class="card__title">
+      <span lang="hi">दुल्हन अटेलियर</span>
+      <span class="en" lang="en">Bridal Atelier</span>
+    </h3>
+    <p class="card__philosophy">"Jewel-tone wedding couture — Sabyasachi × Manish Malhotra ceremonial opulence. Maroon + emerald + gold + ivory. Emotional storytelling through family ritual — never through pilgrim framing."</p>
+    <dl class="card__meta">
+      <dt>Typography</dt>
+      <dd>Cormorant Garamond italic · Baloo Bhaina 2<br/><small>Tenor Sans · Mukta — body</small></dd>
+      <dt>Surface</dt>
+      <dd>Maroon <code>#6B1A2A</code> · Emerald <code>#0F4C39</code> · Bridal gold <code>#BF9B44</code> · Ivory <code>#F5ECD7</code></dd>
+      <dt>Palette</dt>
+      <dd><span class="swatches" aria-hidden="true">
+        <span class="sw" style="background:#491019"></span>
+        <span class="sw" style="background:#6B1A2A"></span>
+        <span class="sw" style="background:#0F4C39"></span>
+        <span class="sw" style="background:#BF9B44"></span>
+        <span class="sw" style="background:#F5ECD7"></span>
+      </span></dd>
+    </dl>
+    <div class="previews">
+      <a class="preview" href="direction-6-bridal-atelier/home.html" aria-label="Bridal Atelier — Home"><iframe src="direction-6-bridal-atelier/home.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Home</span></a>
+      <a class="preview" href="direction-6-bridal-atelier/pdp.html" aria-label="Bridal Atelier — Product"><iframe src="direction-6-bridal-atelier/pdp.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Product</span></a>
+      <a class="preview" href="direction-6-bridal-atelier/collection.html" aria-label="Bridal Atelier — Collection"><iframe src="direction-6-bridal-atelier/collection.html" loading="lazy" title="Preview"></iframe><span class="preview__label">Collection</span></a>
+    </div>
+    <div class="card__links">
+      <a class="btn btn--primary" href="direction-6-bridal-atelier/home.html">Open Home</a>
+      <a class="btn" href="direction-6-bridal-atelier/pdp.html">Product</a>
+      <a class="btn" href="direction-6-bridal-atelier/collection.html">Collection</a>
+    </div>
+  </article>
+
+</section>
+
+<!-- ==================== TENANT SWAP DEMO ==================== -->
+<section class="tenant-demo" aria-labelledby="tenant-swap-title">
+  <div class="container">
+    <div class="section-title" style="padding-top: 0;">
+      <div class="num">II · White-label proof</div>
+      <h2 id="tenant-swap-title">
+        <span lang="hi">एक दिशा, दो ज्वैलर</span>
+        <span class="en" lang="en">One direction, two tenants — rendered live.</span>
+      </h2>
+    </div>
+    <p class="tenant-demo__intro">
+      Goldsmith's non-negotiable: on every customer surface, only the jeweller's brand appears. Tenant primary, accent, name, city, and domain are CSS variables at <code>:root</code>. Swapping a tenant should preserve the aesthetic, not break it. Below, <em>Direction Nº 04 · Gold Leaf Luxe</em> is rendered live in two tenants — the anchor jeweller <span lang="hi">आँचल ज्वैलर्स</span> of Ayodhya, and a mock second tenant <span lang="hi">राज ज्वैलर्स</span> of Kanpur. Same markup. Same aesthetic grammar. Different colour seed and logo-mark.
+    </p>
+
+    <div class="swap-grid">
+      <div class="swap">
+        <iframe src="direction-4-gold-leaf-luxe/home.html" title="Aanchal Jewellers — Ayodhya" loading="lazy"></iframe>
+        <div class="swap__label">
+          Tenant · Aanchal
+          <small lang="hi">आँचल ज्वैलर्स · अयोध्या</small>
+        </div>
+      </div>
+      <div class="swap">
+        <iframe src="direction-4-gold-leaf-luxe/home.html?tenant=raj" title="Raj Jewellers — Kanpur" loading="lazy" id="swap-raj"></iframe>
+        <div class="swap__label">
+          Tenant · Raj
+          <small lang="hi">राज ज्वैलर्स · कानपुर</small>
+        </div>
+      </div>
+    </div>
+
+    <p class="swap-note">
+      Because <code>--tenant-primary</code> is the load-bearing variable (gold-leaf accent stays fixed, doing most of the trust signalling), moving the seed from forest <code>#14261C</code> to sapphire <code>#0D1B2A</code> preserves hierarchy, contrast ratios, and the couture voice. The same exercise works on Directions 1, 3, 4, 6 identically. Directions 2, 5 swap differently — accent-led — which is documented in each file's <code>:root</code> header.
+    </p>
+    <p class="swap-note" id="swap-fallback" hidden>
+      <strong>Note:</strong> if you're viewing this from a <code>file://</code> URL in a browser that blocks cross-document iframe access, the sapphire override may not render here. Open <code>direction-4-gold-leaf-luxe/home.html</code> directly in devtools and change <code>--tenant-primary</code> on <code>:root</code> to see the swap live.
+    </p>
+  </div>
+</section>
+
+<script>
+  // Apply tenant-Raj overrides to the second iframe after it loads.
+  // Works on file:// in most browsers; silently falls back if blocked.
+  (function () {
+    var iframe = document.getElementById('swap-raj');
+    if (!iframe) return;
+    iframe.addEventListener('load', function () {
+      try {
+        var doc = iframe.contentDocument || iframe.contentWindow.document;
+        if (!doc) throw new Error('no-doc');
+        var root = doc.documentElement;
+        root.style.setProperty('--tenant-primary', '#0D1B2A');
+        root.style.setProperty('--tenant-accent',  '#D4AF6B');
+        root.style.setProperty('--tenant-deep',    '#07131E');
+        root.style.setProperty('--tenant-name',    '"राज ज्वैलर्स"');
+        root.style.setProperty('--tenant-city',    '"कानपुर · उत्तर प्रदेश"');
+        root.style.setProperty('--tenant-domain',  '"rajjewellers.in"');
+        // Also swap the forest-base ink for sapphire where the direction hard-codes it.
+        root.style.setProperty('--forest',         '#0D1B2A');
+        root.style.setProperty('--forest-2',       '#152842');
+        root.style.setProperty('--forest-3',       '#1F3A5E');
+        root.style.setProperty('--tenant-deep',    '#07131E');
+        // Best-effort: rewrite any visible tenant-name text to match the new tenant.
+        var textNodes = doc.querySelectorAll('[data-tenant-name], .brand__name, .tenant-name');
+        textNodes.forEach(function (n) {
+          if (n.lang === 'hi' || n.closest('[lang="hi"]')) n.textContent = 'राज ज्वैलर्स';
+          else n.textContent = 'Raj Jewellers';
+        });
+      } catch (err) {
+        // Cross-origin or file-access restriction — show the fallback note.
+        var fb = document.getElementById('swap-fallback');
+        if (fb) fb.hidden = false;
+      }
+    });
+  })();
+</script>
+
+<!-- ==================== RECOMMENDATION ==================== -->
+<section class="rec" aria-labelledby="rec-title">
+  <div class="container">
+    <div class="rec__grid">
+      <div>
+        <div class="label">Creative peer opinion</div>
+        <h3 id="rec-title">
+          <span lang="hi">मेरी सिफारिश</span>
+          <span class="en" lang="en">If you ask me which to take forward.</span>
+        </h3>
+      </div>
+      <div>
+        <p><strong>Primary: Direction Nº 05 · Hindi-First Editorial.</strong> It's the only direction here that could not have been produced by a Western agency brief-reshuffled for India. Yatra One at 14–18rem composing with imagery — overlapping, breaking grid, scale-on-scroll — is a genuine visual moat. CaratLane, Tanishq, and Kalyan all treat Hindi as translation; this treats Devanagari as art. That's a competitive asset, not a cosmetic choice.</p>
+        <p><strong>Close second: Direction Nº 03 · Heritage Paper.</strong> Paper-turbulence texture, letterpress Fraunces + Tiro pairing, wax-seal HUID ceremony. Earns craft-cult credibility for heritage jewellers specifically. At <strong>5,426 lines</strong>, it's also the most thoroughly executed of the six — every edge case considered.</p>
+        <p><strong>Commercial safety: Direction Nº 04 · Gold Leaf Luxe.</strong> If the anchor jeweller is nervous about "too arty," this is the Cartier-couture floor that swaps cleanly to other jewel tones without the direction breaking. Proven forest → sapphire swap.</p>
+        <ul class="next-steps" style="list-style: none; padding: 0;">
+          <li><strong>01</strong> &nbsp; Pick primary + backup with the anchor jeweller in person — show this index on an iPad, let them scroll.</li>
+          <li><strong>02</strong> &nbsp; Lock one direction; port its design tokens into the UX design-system file as the v2 `--tenant-*` baseline.</li>
+          <li><strong>03</strong> &nbsp; Build the React Native / Next.js component library against that direction only — avoid trying to keep multiple alive post-choice.</li>
+          <li><strong>04</strong> &nbsp; Re-commission the two weakest directions as rejected alternatives in the design archive (don't delete — reference material for future tenants).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <span>Goldsmith · <span lang="hi">सौंदर्य संस्करण दो</span> · Customer Aspirational Volume II · 2026-04-17</span>
+    <span>18 files · 20,810 lines · zero platform-brand leakage</span>
+  </div>
+</footer>
+
+</body>
+</html>

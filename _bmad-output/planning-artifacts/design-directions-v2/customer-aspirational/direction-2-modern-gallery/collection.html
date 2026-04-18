@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>दुल्हन संग्रह · शादियाँ 2026 — आँचल ज्वैलर्स</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Italiana&family=Jaldi:wght@400;700&family=Hind:wght@300;400;500;600;700&family=Tenor+Sans&display=swap" rel="stylesheet" />
+<style>
+/* =========================================================
+   DIRECTION 2 — MODERN GALLERY · COLLECTION / THE BRIDAL EDIT
+   Aesthetic locked to home.html. Photography is the page.
+   ========================================================= */
+:root {
+  --tenant-primary: #1B1D1A;
+  --tenant-accent:  #A87833;
+  --tenant-soft:    #E9E0CF;
+  --tenant-name:    "आँचल ज्वैलर्स";
+
+  --bone: #FAF7F1;
+  --bone-2: #F2ECE0;
+  --bone-3: #E6DECD;
+  --ink-900: #1B1D1A;
+  --ink-700: #3E3F3A;
+  --ink-500: #6E6E67;
+  --ink-300: #A5A59C;
+  --line: rgba(27, 29, 26, 0.1);
+  --line-strong: rgba(27, 29, 26, 0.22);
+
+  --f-en-display: 'Italiana', serif;
+  --f-en-alt: 'Tenor Sans', sans-serif;
+  --f-en-body: 'Tenor Sans', sans-serif;
+  --f-hi-display: 'Jaldi', sans-serif;
+  --f-hi-body: 'Hind', sans-serif;
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bone);
+  color: var(--ink-900);
+  font-family: var(--f-en-body);
+  font-weight: 400;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+:lang(hi), [lang="hi"] { font-family: var(--f-hi-body); line-height: 1.65; }
+img { max-width: 100%; display: block; }
+button { font: inherit; background: none; border: 0; color: inherit; cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+
+.container { max-width: 1440px; margin: 0 auto; padding: 0 clamp(1.5rem, 4vw, 4rem); }
+.container--tight { max-width: 960px; }
+
+.eyebrow { font-family: var(--f-en-alt); font-size: 0.72rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--ink-500); }
+.rule { display: inline-block; width: 28px; height: 1px; background: var(--ink-500); vertical-align: middle; margin-right: 0.75rem; }
+
+/* ========== TOP UTILITY BAR ========== */
+.top-bar { background: var(--ink-900); color: var(--bone); padding: 0.55rem 0; font-size: 0.72rem; }
+.top-bar__inner { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+.rates { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: center; }
+.rate { display: flex; align-items: baseline; gap: 0.5rem; letter-spacing: 0.05em; }
+.rate span:lang(hi) { font-family: var(--f-hi-body); color: var(--tenant-soft); font-weight: 400; font-size: 0.74rem; }
+.rate strong { font-weight: 400; letter-spacing: 0.03em; }
+.rate small { color: var(--ink-300); font-size: 0.66rem; letter-spacing: 0.1em; }
+.top-right { display: flex; gap: 1.5rem; align-items: center; color: var(--ink-300); }
+.lang-toggle { padding: 0.25rem 0.7rem; border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; letter-spacing: 0.15em; font-size: 0.7rem; }
+.lang-toggle .on { color: var(--tenant-soft); }
+
+/* ========== NAV ========== */
+.nav { position: sticky; top: 0; z-index: 80; background: rgba(250, 247, 241, 0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+.nav__inner { display: grid; grid-template-columns: auto 1fr auto; gap: 3rem; align-items: center; padding: 1.25rem 0; }
+.brand { display: flex; align-items: center; gap: 0.85rem; }
+.brand__mark { width: 38px; height: 38px; border: 1px solid var(--tenant-primary); border-radius: 50%; display: grid; place-items: center; font-family: var(--f-hi-display); font-size: 1.1rem; font-weight: 700; color: var(--tenant-primary); }
+.brand__name { font-family: var(--f-en-display); font-size: 1.35rem; color: var(--tenant-primary); letter-spacing: 0.02em; line-height: 1; }
+.brand__sub { font-family: var(--f-en-alt); font-size: 0.64rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--ink-500); margin-top: 3px; }
+.menu { list-style: none; padding: 0; margin: 0; display: none; gap: 2.5rem; justify-content: center; }
+@media (min-width: 960px) { .menu { display: flex; } }
+.menu a { font-family: var(--f-hi-body); font-weight: 400; font-size: 0.95rem; color: var(--ink-700); position: relative; padding-bottom: 4px; }
+.menu a::after { content: ''; position: absolute; left: 0; bottom: 0; width: 0; height: 1px; background: var(--tenant-accent); transition: width 0.4s var(--ease); }
+.menu a:hover, .menu a:focus-visible { color: var(--ink-900); }
+.menu a:hover::after, .menu a:focus-visible::after { width: 100%; }
+.menu a.is-active { color: var(--ink-900); }
+.menu a.is-active::after { width: 100%; }
+.nav-tools { display: flex; gap: 0.5rem; align-items: center; }
+.icon-btn { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; color: var(--ink-700); transition: background 0.22s var(--ease), color 0.22s var(--ease); }
+.icon-btn:hover { background: var(--bone-2); color: var(--ink-900); }
+.icon-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.4; }
+
+/* ========== CINEMATIC HERO ========== */
+.chero {
+  position: relative;
+  min-height: 86vh;
+  overflow: hidden;
+  background: var(--ink-900);
+  color: var(--bone);
+  display: grid;
+  align-items: end;
+}
+.chero__bg { position: absolute; inset: 0; overflow: hidden; }
+.chero__bg img {
+  width: 100%; height: 110%;
+  object-fit: cover;
+  object-position: center 30%;
+  animation: slowIn 2s var(--ease) both, heroParallax 18s var(--ease) 2s infinite alternate;
+}
+@keyframes slowIn { from { transform: scale(1.1); opacity: 0; } to { transform: scale(1.02); opacity: 1; } }
+@keyframes heroParallax { from { transform: scale(1.02) translateY(0); } to { transform: scale(1.06) translateY(-20px); } }
+
+.chero__scrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(27,29,26,0.2) 0%, rgba(27,29,26,0.12) 45%, rgba(27,29,26,0.85) 100%);
+}
+.chero__inner { position: relative; z-index: 2; padding: 6rem 0 5rem; }
+.chero__tag {
+  display: inline-flex; align-items: center; gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: rgba(168,120,51,0.2);
+  border: 1px solid rgba(233,224,207,0.35);
+  font-family: var(--f-en-alt);
+  font-size: 0.72rem; letter-spacing: 0.3em; text-transform: uppercase;
+  color: var(--tenant-soft);
+  margin-bottom: 2rem;
+}
+.chero__tag span:lang(hi) { font-family: var(--f-hi-body); letter-spacing: 0.02em; text-transform: none; font-size: 0.85rem; }
+
+.chero__h1 {
+  font-family: var(--f-hi-display);
+  font-weight: 700;
+  font-size: clamp(3rem, 9vw, 7.5rem);
+  line-height: 1.05;
+  margin: 0 0 0.4rem;
+  color: var(--bone);
+  letter-spacing: -0.005em;
+  max-width: 14ch;
+}
+.chero__sub {
+  font-family: var(--f-en-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1.4rem, 3vw, 2.1rem);
+  color: var(--tenant-soft);
+  margin: 0 0 2.25rem;
+  max-width: 22ch;
+  letter-spacing: 0.005em;
+}
+.chero__meta {
+  display: flex; gap: 2rem; flex-wrap: wrap; align-items: center;
+  padding-top: 1.75rem;
+  border-top: 1px solid rgba(233,224,207,0.28);
+  max-width: 640px;
+  font-family: var(--f-en-alt);
+  font-size: 0.76rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-300);
+}
+.chero__meta strong { color: var(--tenant-soft); font-weight: 400; }
+
+.chero__scroll {
+  position: absolute; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+  color: var(--bone-3);
+  font-family: var(--f-en-alt); font-size: 0.62rem; letter-spacing: 0.3em; text-transform: uppercase;
+  display: flex; flex-direction: column; align-items: center; gap: 0.55rem;
+  opacity: 0.75;
+  z-index: 2;
+}
+.chero__scroll::after {
+  content: ''; display: block; width: 1px; height: 32px;
+  background: var(--tenant-soft);
+  animation: scrollBob 2.2s var(--ease) infinite;
+  transform-origin: top;
+}
+@keyframes scrollBob { 0%, 100% { transform: scaleY(0.3); opacity: 0.4; } 50% { transform: scaleY(1); opacity: 1; } }
+
+/* ========== EDITORIAL ESSAY ========== */
+.essay-section { padding: 7rem 0; background: var(--bone); }
+.essay-grid { display: grid; grid-template-columns: 1fr; gap: 2.5rem; }
+@media (min-width: 960px) { .essay-grid { grid-template-columns: 0.55fr 0.95fr; gap: 5rem; align-items: start; } }
+.essay-side .eyebrow { display: block; margin-bottom: 1.25rem; }
+.essay-side h2 {
+  font-family: var(--f-en-display);
+  font-weight: 400;
+  font-size: clamp(2.2rem, 4.6vw, 3.6rem);
+  line-height: 1.05;
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.01em;
+}
+.essay-side .h-hi {
+  font-family: var(--f-hi-display); font-weight: 700;
+  color: var(--tenant-accent);
+  font-size: clamp(1.3rem, 2.6vw, 1.85rem);
+  margin: 0.5rem 0 0;
+}
+.essay-body p { margin: 0 0 1.5rem; font-family: var(--f-hi-body); font-size: 1.05rem; line-height: 1.95; color: var(--ink-700); font-weight: 300; }
+.essay-body p:first-child::first-letter {
+  font-family: var(--f-en-display);
+  font-size: 3.4rem;
+  float: left;
+  line-height: 0.85;
+  padding: 0.6rem 0.65rem 0 0;
+  color: var(--tenant-accent);
+}
+.essay-body .en-callout {
+  font-family: var(--f-en-display);
+  font-style: italic;
+  color: var(--ink-900);
+  font-size: 1.35rem;
+  line-height: 1.4;
+  padding: 1.5rem 0 1.5rem 1.5rem;
+  border-left: 2px solid var(--tenant-accent);
+  margin: 2rem 0;
+  max-width: 500px;
+  font-weight: 400;
+}
+
+/* ========== FULL-BLEED SPREAD ========== */
+.spread {
+  position: relative;
+  min-height: 90vh;
+  overflow: hidden;
+  display: grid; align-items: end;
+  color: var(--bone);
+  background: var(--ink-900);
+}
+.spread__bg { position: absolute; inset: 0; }
+.spread__bg img { width: 100%; height: 100%; object-fit: cover; transition: transform 2.5s var(--ease); }
+.spread:hover .spread__bg img { transform: scale(1.04); }
+.spread__scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(27,29,26,0.15) 0%, rgba(27,29,26,0.82) 100%); }
+.spread__inner { position: relative; z-index: 2; padding: 5rem 0; }
+.spread__eyebrow {
+  font-family: var(--f-en-alt); color: var(--tenant-soft);
+  font-size: 0.75rem; letter-spacing: 0.3em; text-transform: uppercase;
+  margin-bottom: 1.25rem; display: inline-flex; align-items: center; gap: 0.65rem;
+}
+.spread__eyebrow::before { content: ''; width: 28px; height: 1px; background: var(--tenant-accent); }
+.spread__h {
+  font-family: var(--f-en-display);
+  font-size: clamp(2.6rem, 6vw, 4.8rem);
+  font-weight: 400; line-height: 1.05;
+  margin: 0 0 0.4rem;
+  letter-spacing: -0.01em;
+  max-width: 16ch;
+}
+.spread__h-hi {
+  font-family: var(--f-hi-display); font-weight: 700;
+  color: var(--tenant-accent);
+  font-size: clamp(1.3rem, 2.8vw, 1.95rem);
+  margin: 0.5rem 0 1.75rem;
+}
+.spread__caption {
+  font-family: var(--f-hi-body);
+  font-size: 1.02rem; line-height: 1.9;
+  color: var(--bone-3);
+  font-weight: 300;
+  max-width: 520px;
+  margin: 0 0 2rem;
+}
+.spread__cta {
+  display: inline-flex; align-items: center; gap: 0.75rem;
+  padding: 1rem 2rem;
+  border: 1px solid var(--tenant-soft);
+  color: var(--bone);
+  font-family: var(--f-en-alt);
+  font-size: 0.78rem; letter-spacing: 0.22em; text-transform: uppercase;
+  transition: all 0.3s var(--ease);
+}
+.spread__cta:hover { background: var(--tenant-accent); border-color: var(--tenant-accent); color: var(--bone); }
+.spread__cta svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.spread__cta:lang(hi) { font-family: var(--f-hi-body); letter-spacing: 0.02em; text-transform: none; font-size: 0.95rem; }
+
+/* ========== 2-UP RAIL ========== */
+.two-up { padding: 6rem 0; background: var(--bone); }
+.two-up__grid { display: grid; grid-template-columns: 1fr; gap: 3rem; }
+@media (min-width: 820px) { .two-up__grid { grid-template-columns: 1fr 1fr; gap: 2.5rem; } }
+.tile { display: flex; flex-direction: column; gap: 1rem; }
+.tile__media { aspect-ratio: 4 / 5; overflow: hidden; background: var(--bone-2); position: relative; }
+.tile__media img { width: 100%; height: 100%; object-fit: cover; transition: transform 1.6s var(--ease); }
+.tile:hover .tile__media img { transform: scale(1.05); }
+.tile__num {
+  position: absolute; top: 1.25rem; left: 1.25rem;
+  font-family: var(--f-en-display); font-style: italic;
+  color: var(--bone);
+  font-size: 1.6rem;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.35);
+}
+.tile__eyebrow { font-family: var(--f-en-alt); font-size: 0.68rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--ink-500); }
+.tile__h { font-family: var(--f-en-display); font-weight: 400; font-size: 1.85rem; margin: 0.35rem 0 0.2rem; color: var(--ink-900); line-height: 1.15; letter-spacing: -0.005em; }
+.tile__h-hi { font-family: var(--f-hi-display); font-weight: 700; color: var(--tenant-accent); font-size: 1.1rem; margin: 0 0 0.8rem; }
+.tile__caption { font-family: var(--f-hi-body); font-size: 0.98rem; line-height: 1.85; color: var(--ink-700); font-weight: 300; max-width: 48ch; margin: 0 0 1rem; }
+.tile__price { font-family: var(--f-en-display); font-size: 1.2rem; color: var(--ink-900); display: inline-flex; align-items: center; gap: 0.85rem; }
+.tile__price small { font-family: var(--f-en-alt); font-size: 0.66rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--ink-500); }
+
+/* ========== TRIPTYCH (3-up) ========== */
+.triptych { padding: 6rem 0; background: var(--bone-2); }
+.triptych__grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+@media (min-width: 720px) { .triptych__grid { grid-template-columns: repeat(3, 1fr); gap: 1.25rem; } }
+.trip { position: relative; aspect-ratio: 3 / 4; overflow: hidden; }
+.trip img { width: 100%; height: 100%; object-fit: cover; transition: transform 1.4s var(--ease); }
+.trip:hover img { transform: scale(1.05); }
+.trip__info {
+  position: absolute; left: 1.25rem; right: 1.25rem; bottom: 1.25rem;
+  background: var(--bone);
+  padding: 1rem 1.25rem;
+}
+.trip__info h4 { font-family: var(--f-en-display); font-size: 1.2rem; font-weight: 400; margin: 0 0 0.1rem; line-height: 1.15; color: var(--ink-900); }
+.trip__info .h-hi { font-family: var(--f-hi-display); color: var(--tenant-accent); font-weight: 700; font-size: 0.95rem; margin: 0 0 0.35rem; }
+.trip__info small { font-family: var(--f-en-alt); font-size: 0.66rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--ink-500); }
+
+/* ========== KARIGAR FEATURE ========== */
+.karigar { padding: 9rem 0; background: var(--ink-900); color: var(--bone); overflow: hidden; position: relative; }
+.karigar__grid { display: grid; grid-template-columns: 1fr; gap: 3rem; align-items: center; }
+@media (min-width: 900px) { .karigar__grid { grid-template-columns: 1fr 1fr; gap: 5rem; } }
+.karigar__media { aspect-ratio: 4 / 5; overflow: hidden; position: relative; }
+.karigar__media img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transform: scale(1.1); transition: opacity 1.6s var(--ease), transform 1.8s var(--ease); }
+.karigar__media.is-in img { opacity: 1; transform: scale(1); }
+.karigar__copy h2 {
+  font-family: var(--f-en-display); font-weight: 400;
+  font-size: clamp(2.2rem, 4.5vw, 3.4rem);
+  line-height: 1.05;
+  margin: 1rem 0 0.5rem;
+  color: var(--bone);
+  letter-spacing: -0.01em;
+}
+.karigar__copy .h-hi {
+  font-family: var(--f-hi-display); font-weight: 700;
+  color: var(--tenant-accent);
+  font-size: clamp(1.2rem, 2.5vw, 1.65rem);
+  margin: 0.5rem 0 2rem;
+}
+.karigar__copy p { font-family: var(--f-hi-body); font-size: 1.05rem; line-height: 1.9; color: var(--bone-3); font-weight: 300; margin: 0 0 1.5rem; max-width: 48ch; }
+.karigar__quote {
+  font-family: var(--f-en-display); font-style: italic;
+  font-size: 1.35rem; line-height: 1.4;
+  color: var(--tenant-soft);
+  padding: 1.5rem 0 1.5rem 1.5rem;
+  border-left: 2px solid var(--tenant-accent);
+  margin: 2rem 0;
+  max-width: 440px;
+  font-weight: 400;
+}
+.karigar__sig { margin-top: 2rem; font-family: var(--f-en-alt); color: var(--ink-300); font-size: 0.88rem; letter-spacing: 0.05em; }
+.karigar__sig strong { color: var(--tenant-accent); font-weight: 400; display: block; font-size: 1rem; letter-spacing: 0.02em; }
+
+/* ========== STYLING GUIDE ========== */
+.styling { padding: 7rem 0; background: var(--bone); border-top: 1px solid var(--line); }
+.section-head { text-align: center; max-width: 620px; margin: 0 auto 4rem; }
+.section-head .eyebrow { display: inline-block; margin-bottom: 1.25rem; }
+.section-head h2 { font-family: var(--f-en-display); font-weight: 400; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.1; margin: 0 0 0.5rem; letter-spacing: -0.01em; }
+.section-head .h-hi { font-family: var(--f-hi-display); font-weight: 700; color: var(--tenant-accent); font-size: clamp(1.15rem, 2.4vw, 1.5rem); margin: 0.5rem 0 1rem; }
+.section-head p { font-family: var(--f-hi-body); color: var(--ink-500); font-size: 1rem; font-weight: 300; line-height: 1.65; }
+.style-grid { display: grid; grid-template-columns: 1fr; gap: 1.25rem; }
+@media (min-width: 720px) { .style-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1100px) { .style-grid { grid-template-columns: repeat(4, 1fr); } }
+.style-card {
+  padding: 2.25rem 1.85rem; background: var(--bone-2);
+  transition: transform 0.4s var(--ease), box-shadow 0.4s var(--ease);
+}
+.style-card:hover { transform: translateY(-4px); box-shadow: 0 22px 48px rgba(27,29,26,0.06); }
+.style-card__num { font-family: var(--f-en-display); font-style: italic; color: var(--tenant-accent); font-size: 1.4rem; margin-bottom: 0.85rem; }
+.style-card h4 { font-family: var(--f-en-display); font-size: 1.25rem; font-weight: 400; margin: 0 0 0.1rem; color: var(--ink-900); line-height: 1.2; }
+.style-card .h-hi { font-family: var(--f-hi-display); color: var(--tenant-accent); font-weight: 700; font-size: 0.95rem; margin: 0 0 0.85rem; }
+.style-card p { font-family: var(--f-hi-body); font-size: 0.92rem; line-height: 1.8; color: var(--ink-700); font-weight: 300; margin: 0; }
+
+/* ========== COLLECTION CTAS ========== */
+.cta-band { padding: 5rem 0; background: var(--bone-2); border-top: 1px solid var(--line); }
+.cta-band__grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+@media (min-width: 720px) { .cta-band__grid { grid-template-columns: repeat(3, 1fr); gap: 1.25rem; } }
+.cta-card {
+  padding: 2.5rem 2rem;
+  background: var(--bone);
+  border: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 0.8rem;
+  transition: all 0.3s var(--ease);
+}
+.cta-card:hover { background: var(--ink-900); color: var(--bone); border-color: var(--ink-900); transform: translateY(-3px); }
+.cta-card:hover h4, .cta-card:hover p, .cta-card:hover .h-hi { color: inherit; }
+.cta-card:hover .h-hi { color: var(--tenant-soft); }
+.cta-card svg { width: 28px; height: 28px; fill: none; stroke: var(--tenant-accent); stroke-width: 1.4; margin-bottom: 0.5rem; }
+.cta-card h4 { font-family: var(--f-en-display); font-weight: 400; font-size: 1.35rem; margin: 0 0 0.2rem; color: var(--ink-900); letter-spacing: -0.005em; }
+.cta-card .h-hi { font-family: var(--f-hi-display); font-weight: 700; color: var(--tenant-accent); font-size: 1rem; margin: 0 0 0.65rem; }
+.cta-card p { font-family: var(--f-hi-body); font-size: 0.9rem; color: var(--ink-500); font-weight: 300; line-height: 1.7; margin: 0 0 0.5rem; }
+.cta-card__link { font-family: var(--f-en-alt); font-size: 0.72rem; letter-spacing: 0.28em; text-transform: uppercase; display: inline-flex; align-items: center; gap: 0.5rem; margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--line); color: inherit; }
+.cta-card__link svg { width: 14px; height: 14px; stroke: currentColor; margin: 0; }
+.cta-card:hover .cta-card__link { border-color: rgba(250,247,241,0.25); }
+
+/* ========== RELATED COLLECTIONS ========== */
+.related-cols { padding: 7rem 0; background: var(--bone); border-top: 1px solid var(--line); }
+.rcol-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-top: 3.5rem; }
+@media (min-width: 820px) { .rcol-grid { grid-template-columns: repeat(3, 1fr); gap: 1.25rem; } }
+.rcol {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  display: block;
+}
+.rcol img { width: 100%; height: 100%; object-fit: cover; transition: transform 1.4s var(--ease); }
+.rcol:hover img { transform: scale(1.05); }
+.rcol__scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(27,29,26,0) 40%, rgba(27,29,26,0.8) 100%); }
+.rcol__info {
+  position: absolute; left: 1.5rem; right: 1.5rem; bottom: 1.5rem;
+  color: var(--bone);
+}
+.rcol__info .eyebrow { color: var(--tenant-soft); margin-bottom: 0.75rem; display: block; }
+.rcol__info h3 { font-family: var(--f-en-display); font-weight: 400; font-size: 1.85rem; margin: 0 0 0.15rem; line-height: 1.1; letter-spacing: -0.005em; }
+.rcol__info .h-hi { font-family: var(--f-hi-display); color: var(--tenant-accent); font-weight: 700; font-size: 1.02rem; margin: 0 0 0.85rem; }
+.rcol__info p { font-family: var(--f-hi-body); font-size: 0.92rem; color: var(--bone-3); font-weight: 300; margin: 0; max-width: 34ch; line-height: 1.7; }
+
+/* ========== FOOTER (locked to home) ========== */
+footer { background: var(--bone-2); padding: 5rem 0 2rem; border-top: 1px solid var(--line); }
+.footer-grid { display: grid; grid-template-columns: 1fr; gap: 3rem; margin-bottom: 3rem; }
+@media (min-width: 820px) { .footer-grid { grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 3rem; } }
+.f-brand h3 { font-family: var(--f-en-display); font-size: 1.6rem; font-weight: 400; color: var(--ink-900); margin: 0 0 0.25rem; letter-spacing: 0.01em; }
+.f-brand .h-hi { font-family: var(--f-hi-display); color: var(--tenant-accent); font-weight: 700; margin: 0 0 1rem; font-size: 1.1rem; }
+.f-brand p { font-family: var(--f-hi-body); font-size: 0.92rem; line-height: 1.75; color: var(--ink-500); font-weight: 300; max-width: 320px; margin-bottom: 1.5rem; }
+.f-social { display: flex; gap: 0.5rem; }
+.f-social a { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--ink-700); transition: all 0.22s var(--ease); }
+.f-social a:hover { background: var(--ink-900); color: var(--bone); border-color: var(--ink-900); }
+.f-col h4 { font-family: var(--f-en-alt); font-size: 0.7rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--ink-500); margin: 0 0 1.25rem; font-weight: 400; }
+.f-col ul { list-style: none; padding: 0; margin: 0; }
+.f-col li { margin-bottom: 0.75rem; }
+.f-col a { font-family: var(--f-hi-body); font-size: 0.92rem; color: var(--ink-700); }
+.f-col a:hover { color: var(--ink-900); }
+.f-bottom { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding-top: 2rem; border-top: 1px solid var(--line); font-size: 0.8rem; color: var(--ink-500); }
+
+/* Reveal */
+.reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.9s var(--ease), transform 0.9s var(--ease); }
+.reveal.is-in { opacity: 1; transform: translateY(0); }
+.reveal-left { opacity: 0; transform: translateX(-28px); transition: opacity 0.9s var(--ease), transform 0.9s var(--ease); }
+.reveal-left.is-in { opacity: 1; transform: translateX(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  .reveal, .reveal-left { opacity: 1; transform: none; }
+  .karigar__media img { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar" role="region" aria-label="आज के भाव">
+  <div class="container top-bar__inner">
+    <div class="rates">
+      <div class="rate"><span lang="hi">22 कैरट</span><strong>₹ 6,420</strong><small>/ GRAM</small></div>
+      <div class="rate"><span lang="hi">18 कैरट</span><strong>₹ 5,250</strong><small>/ GRAM</small></div>
+      <div class="rate"><span lang="hi">चाँदी</span><strong>₹ 79.20</strong><small>/ GRAM</small></div>
+    </div>
+    <div class="top-right">
+      <span lang="hi">अपडेट: 11:14 AM</span>
+      <div class="lang-toggle"><span class="on">HI</span> · EN</div>
+    </div>
+  </div>
+</div>
+
+<!-- NAV -->
+<header class="nav">
+  <div class="container nav__inner">
+    <a href="home.html" class="brand" aria-label="आँचल ज्वैलर्स, अयोध्या">
+      <div class="brand__mark" aria-hidden="true">आ</div>
+      <div>
+        <div class="brand__name">Aanchal</div>
+        <div class="brand__sub">Ayodhya · Est. 1947</div>
+      </div>
+    </a>
+    <nav aria-label="मुख्य">
+      <ul class="menu">
+        <li><a href="collection.html" class="is-active" lang="hi">विवाह</a></li>
+        <li><a href="#" lang="hi">सोना</a></li>
+        <li><a href="#" lang="hi">हीरा</a></li>
+        <li><a href="#" lang="hi">कुंदन</a></li>
+        <li><a href="collection.html" lang="hi">संग्रह</a></li>
+        <li><a href="#" lang="hi">करघा</a></li>
+      </ul>
+    </nav>
+    <div class="nav-tools">
+      <button class="icon-btn" aria-label="खोजें"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg></button>
+      <button class="icon-btn" aria-label="पसंदीदा"><svg viewBox="0 0 24 24"><path d="M12 20s-7.5-4.5-7.5-10A4.5 4.5 0 0 1 12 6a4.5 4.5 0 0 1 7.5 4c0 5.5-7.5 10-7.5 10z"/></svg></button>
+      <button class="icon-btn" aria-label="खाता"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></button>
+      <button class="icon-btn" aria-label="बैग"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 13H7L6 7z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<!-- CINEMATIC HERO -->
+<section class="chero" aria-label="दुल्हन संग्रह परिचय">
+  <div class="chero__bg" aria-hidden="true">
+    <img src="https://images.unsplash.com/photo-1600721391776-b5cd0e0048f9?w=2000&q=85&auto=format&fit=crop" alt="" />
+  </div>
+  <div class="chero__scrim" aria-hidden="true"></div>
+  <div class="container chero__inner">
+    <span class="chero__tag">
+      <span lang="en">Wedding Edit</span> · <span lang="hi">शादियाँ 2026</span>
+    </span>
+    <h1 class="chero__h1" lang="hi">दुल्हन संग्रह</h1>
+    <p class="chero__sub" lang="en">The Bridal Edit — hand-set for the season of vows.</p>
+    <div class="chero__meta">
+      <span><span lang="hi">पीस</span> <strong>48</strong></span>
+      <span><span lang="hi">कारीगर</span> <strong>14</strong></span>
+      <span><span lang="hi">महीने</span> <strong>11</strong></span>
+      <span><span lang="hi">कार्यशाला</span> <strong>अयोध्या</strong></span>
+    </div>
+  </div>
+  <div class="chero__scroll" aria-hidden="true">
+    <span lang="hi">पढ़िए</span>
+  </div>
+</section>
+
+<!-- EDITORIAL ESSAY -->
+<section class="essay-section">
+  <div class="container">
+    <div class="essay-grid">
+      <aside class="essay-side reveal-left">
+        <span class="eyebrow">Editor's Letter · संपादकीय</span>
+        <h2>A collection written in gold.</h2>
+        <div class="h-hi" lang="hi">सोने में लिखी कहानी</div>
+      </aside>
+      <div class="essay-body reveal">
+        <p lang="hi">
+          उत्तर भारत में शादी एक दिन की बात नहीं है — वह एक पीढ़ी से
+          दूसरी पीढ़ी तक चलने वाला वादा है। इस मौसम का हमारा दुल्हन
+          संग्रह उसी परंपरा पर तराशा गया है: अनकट कुंदन, हाथ से जड़ी
+          पोल्की, और बयालीस दिनों की कारीगरी।
+        </p>
+        <p class="en-callout" lang="en">
+          The finest pieces never shout. They whisper — and four generations hear.
+        </p>
+        <p lang="hi">
+          हमने कहानी को शुरू किया घर से — उन कहानियों से जो माँएँ अपनी
+          बेटियों को सुनाती हैं, उन हार से जो दादी के संदूक से निकलते
+          हैं। कुंदन, पोल्की, और जड़ाऊ — तीनों हुनर लखनऊ-जयपुर-बनारस
+          की कार्यशालाओं से अयोध्या तक एक लंबी यात्रा करके आते हैं।
+          राधेश्याम भाई और उनकी टीम ने हर टुकड़े को तीस से लेकर बयालीस
+          दिनों तक हाथ से गढ़ा।
+        </p>
+        <p lang="hi">
+          यह संग्रह शादी के लिए नहीं है — शादी के बाद के चालीस सालों के
+          लिए है। वह मंगलसूत्र जो बहू से सास तक पहुँचेगा। वह कड़ा जो
+          बेटी की बेटी की कलाई में पहुँचेगा। विरासत, आज की दुल्हन के
+          लिए।
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SPREAD 1 — FIRST GIFT / MANGALSUTRA -->
+<section class="spread" aria-label="पहला तोहफ़ा">
+  <div class="spread__bg" aria-hidden="true">
+    <img src="https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=2000&q=85&auto=format&fit=crop" alt="" />
+  </div>
+  <div class="spread__scrim" aria-hidden="true"></div>
+  <div class="container spread__inner reveal">
+    <div class="spread__eyebrow">Edit Nº 01 · <span lang="hi">पहला तोहफ़ा</span></div>
+    <h2 class="spread__h">The First Gift.</h2>
+    <div class="spread__h-hi" lang="hi">कुंदन मंगलसूत्र · विरासत संग्रह</div>
+    <p class="spread__caption" lang="hi">
+      मंगलसूत्र, जो चार पीढ़ियों की राधेश्याम कारीगरी को एक धागे में
+      पिरोता है। बयालीस दिनों में, हाथ से, एक-एक पत्थर।
+    </p>
+    <a href="pdp.html" class="spread__cta" lang="hi">
+      इसे देखिए
+      <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="14,6 20,12 14,18"/></svg>
+    </a>
+  </div>
+</section>
+
+<!-- 2-UP RAIL — POLKI NECKLACE + EARRINGS -->
+<section class="two-up">
+  <div class="container">
+    <div class="two-up__grid">
+      <article class="tile reveal">
+        <div class="tile__media">
+          <span class="tile__num">02</span>
+          <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=1400&q=85&auto=format&fit=crop" alt="पोल्की रानी हार मॉडल" />
+        </div>
+        <div class="tile__eyebrow">Polki · Rani-Haar</div>
+        <h3 class="tile__h">Radhika Rani-Haar</h3>
+        <div class="tile__h-hi" lang="hi">राधिका रानी हार</div>
+        <p class="tile__caption" lang="hi">
+          146 अनकट पोल्की, ग्यारह महीनों में जयपुर-अयोध्या की संयुक्त
+          कार्यशालाओं में हस्त-जड़ित। ग्यारह कारीगरों के हस्ताक्षर।
+        </p>
+        <div class="tile__price">₹ 6,24,000 <small>22K · 94g</small></div>
+      </article>
+
+      <article class="tile reveal">
+        <div class="tile__media">
+          <span class="tile__num">03</span>
+          <img src="https://images.unsplash.com/photo-1535632066274-36f735c4a1a9?w=1400&q=85&auto=format&fit=crop" alt="कुंदन झुमके" />
+        </div>
+        <div class="tile__eyebrow">Kundan · Earrings</div>
+        <h3 class="tile__h">Shubhra Jhumka</h3>
+        <div class="tile__h-hi" lang="hi">शुभ्रा झुमके</div>
+        <p class="tile__caption" lang="hi">
+          पाँच-परत की झुमका, रानी हार के साथ जोड़ा। मीनाकारी बनारस से,
+          कुंदन अयोध्या से। सोलह दिनों की बारीक कारीगरी।
+        </p>
+        <div class="tile__price">₹ 94,500 <small>22K · 18.4g</small></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- SPREAD 2 — MAANG-TIKKA -->
+<section class="spread" aria-label="माँग टीका">
+  <div class="spread__bg" aria-hidden="true">
+    <img src="https://images.unsplash.com/photo-1599643477877-530eb83abc8e?w=2000&q=85&auto=format&fit=crop" alt="" />
+  </div>
+  <div class="spread__scrim" aria-hidden="true"></div>
+  <div class="container spread__inner reveal">
+    <div class="spread__eyebrow">Edit Nº 04 · <span lang="hi">माँग का रत्न</span></div>
+    <h2 class="spread__h">The Centre Stone.</h2>
+    <div class="spread__h-hi" lang="hi">चाँदनी माँग टीका</div>
+    <p class="spread__caption" lang="hi">
+      सोलह सदी की कारीगरी, आज की दुल्हन के लिए। सेंटर कुंदन 2.4 कैरेट,
+      चारों ओर बयालीस अनकट पत्थर।
+    </p>
+    <a href="#" class="spread__cta" lang="hi">
+      खुलकर देखिए
+      <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="14,6 20,12 14,18"/></svg>
+    </a>
+  </div>
+</section>
+
+<!-- TRIPTYCH — BANGLES / NOSE-RING / ANKLET -->
+<section class="triptych">
+  <div class="container">
+    <header class="section-head reveal">
+      <span class="eyebrow">The Complete Bride · सम्पूर्ण दुल्हन</span>
+      <h2>Head to toe, hand-set.</h2>
+      <div class="h-hi" lang="hi">सिर से पैर तक, हस्त-निर्मित</div>
+    </header>
+    <div class="triptych__grid">
+      <a href="#" class="trip reveal">
+        <img src="https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=1200&q=85&auto=format&fit=crop" alt="कंगन" />
+        <div class="trip__info">
+          <h4>Kada · Sonagachi</h4>
+          <div class="h-hi" lang="hi">सोनागाछी कड़ा</div>
+          <small>₹ 1,48,000 · 22K</small>
+        </div>
+      </a>
+      <a href="#" class="trip reveal">
+        <img src="https://images.unsplash.com/photo-1608042314453-ae338d80c427?w=1200&q=85&auto=format&fit=crop" alt="नथ" />
+        <div class="trip__info">
+          <h4>Nath · Saanjh</h4>
+          <div class="h-hi" lang="hi">साँझ नथ</div>
+          <small>₹ 62,400 · 22K</small>
+        </div>
+      </a>
+      <a href="#" class="trip reveal">
+        <img src="https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=1200&q=85&auto=format&fit=crop" alt="पायल" />
+        <div class="trip__info">
+          <h4>Payal · Meera</h4>
+          <div class="h-hi" lang="hi">मीरा पायल</div>
+          <small>₹ 1,12,000 · चाँदी</small>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- KARIGAR FEATURE -->
+<section class="karigar">
+  <div class="container">
+    <div class="karigar__grid">
+      <figure class="karigar__media reveal">
+        <img src="https://images.unsplash.com/photo-1519748771451-a94c596fad67?w=1400&q=85&auto=format&fit=crop" alt="राधेश्याम यादव कारीगरी करते हुए" />
+      </figure>
+      <div class="karigar__copy reveal">
+        <span class="eyebrow" style="color: var(--tenant-soft);"><span class="rule" style="background: var(--tenant-accent);"></span>The Karigar · कारीगर</span>
+        <h2>Thirty years in a single thread.</h2>
+        <div class="h-hi" lang="hi">तीस वर्ष, एक धागे में</div>
+        <p lang="hi">
+          राधेश्याम यादव ने अपना पहला कुंदन टुकड़ा 1995 में, अयोध्या की
+          एक छोटी कार्यशाला में तराशा था। आज, तीस साल बाद, उनकी टीम
+          में चौदह कारीगर हैं — सब उन्हीं के शिष्य, और हर पीस पर उनका
+          हस्ताक्षर।
+        </p>
+        <blockquote class="karigar__quote" lang="en">
+          "A mangalsutra isn't crafted. It's listened to, then built."
+        </blockquote>
+        <p lang="hi">
+          इस संग्रह के अड़तालीस में से चौंतीस टुकड़े उनकी कार्यशाला से
+          निकले हैं। बाक़ी के चौदह बनारस और लखनऊ की साझेदार कार्यशालाओं
+          से — पर हर एक पर उनकी अंतिम जाँच।
+        </p>
+        <div class="karigar__sig">
+          — <strong lang="hi">राधेश्याम यादव</strong>
+          <span>Master Kundankaar · 30 years · Ayodhya</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STYLING GUIDE -->
+<section class="styling">
+  <div class="container">
+    <header class="section-head reveal">
+      <span class="eyebrow">Styling · पहनने की कला</span>
+      <h2>How to wear the edit.</h2>
+      <div class="h-hi" lang="hi">संग्रह को कैसे पहनें</div>
+      <p lang="hi">लहँगे पर अलग, साड़ी पर अलग — हर मौके की अपनी जड़ाई।</p>
+    </header>
+    <div class="style-grid">
+      <div class="style-card reveal">
+        <div class="style-card__num">01</div>
+        <h4>With a Lehenga</h4>
+        <div class="h-hi" lang="hi">लहँगे के साथ</div>
+        <p lang="hi">रानी हार + माँग टीका + भारी झुमके। कड़े एक-दो से अधिक नहीं। नेकलाइन जितनी गहरी, हार उतना छोटा।</p>
+      </div>
+      <div class="style-card reveal">
+        <div class="style-card__num">02</div>
+        <h4>With a Sari</h4>
+        <div class="h-hi" lang="hi">साड़ी के साथ</div>
+        <p lang="hi">मंगलसूत्र लंबा (24") + सादा चोकर। पल्लू भारी हो तो झुमके हल्के। नथ ऑप्शनल — बनारसी साड़ी के साथ ज़रूरी।</p>
+      </div>
+      <div class="style-card reveal">
+        <div class="style-card__num">03</div>
+        <h4>Sangeet &amp; Mehendi</h4>
+        <div class="h-hi" lang="hi">संगीत और मेहंदी</div>
+        <p lang="hi">हल्का संग्रह — चाँदी या लाइट 18K। कानों में झुमके, हाथों में दो कड़े, पायल ज़रूर। हाथ खाली नहीं।</p>
+      </div>
+      <div class="style-card reveal">
+        <div class="style-card__num">04</div>
+        <h4>Pheras &amp; Reception</h4>
+        <div class="h-hi" lang="hi">फेरे और रिसेप्शन</div>
+        <p lang="hi">पूरा संग्रह, लेकिन layered नहीं। हार एक, कड़े चार, पायल दोनों पैरों में। रिसेप्शन में कुछ उतारें — taste दिखाएँ।</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COLLECTION CTAS -->
+<section class="cta-band" aria-label="संग्रह कार्य">
+  <div class="container">
+    <div class="cta-band__grid">
+      <a href="#" class="cta-card reveal">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        <h4>View All 48 Pieces</h4>
+        <div class="h-hi" lang="hi">पूरा संग्रह देखें</div>
+        <p lang="hi">अड़तालीस पीस · कीमतें, उपलब्धता, कारीगर नाम।</p>
+        <span class="cta-card__link">Browse gallery <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="14,6 20,12 14,18"/></svg></span>
+      </a>
+      <a href="#" class="cta-card reveal">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="7"/><line x1="16" y1="2" x2="16" y2="7"/></svg>
+        <h4>Book a Store Visit</h4>
+        <div class="h-hi" lang="hi">स्टोर विज़िट बुक करें</div>
+        <p lang="hi">अयोध्या, फ़ैज़ाबाद रोड · नियत मुलाक़ात, निजी कमरा।</p>
+        <span class="cta-card__link">Schedule <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="14,6 20,12 14,18"/></svg></span>
+      </a>
+      <a href="#" class="cta-card reveal">
+        <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-14.9 4L4 20l4.1-1.1A8 8 0 0 1 20 12z"/></svg>
+        <h4>WhatsApp a Consultant</h4>
+        <div class="h-hi" lang="hi">WhatsApp से सलाह</div>
+        <p lang="hi">राधेश्याम भैया या उनकी टीम · हिन्दी में जवाब।</p>
+        <span class="cta-card__link">Start chat <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="14,6 20,12 14,18"/></svg></span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- RELATED COLLECTIONS -->
+<section class="related-cols" aria-label="संबंधित संग्रह">
+  <div class="container">
+    <header class="section-head reveal">
+      <span class="eyebrow">More Editions · अन्य संग्रह</span>
+      <h2>Other stories, same hands.</h2>
+      <div class="h-hi" lang="hi">अन्य कहानियाँ, वही हाथ</div>
+    </header>
+    <div class="rcol-grid">
+      <a href="#" class="rcol reveal">
+        <img src="https://images.unsplash.com/photo-1608042314453-ae338d80c427?w=1400&q=85&auto=format&fit=crop" alt="डेली गोल्ड एडिट" />
+        <div class="rcol__scrim" aria-hidden="true"></div>
+        <div class="rcol__info">
+          <span class="eyebrow">Edition Nº 02</span>
+          <h3>Daily Gold Edit</h3>
+          <div class="h-hi" lang="hi">रोज़ का सोना</div>
+          <p lang="hi">हल्के, पहनने में आसान · ऑफ़िस से त्योहार तक।</p>
+        </div>
+      </a>
+      <a href="#" class="rcol reveal">
+        <img src="https://images.unsplash.com/photo-1535632066274-36f735c4a1a9?w=1400&q=85&auto=format&fit=crop" alt="डायमंड रोज़मर्रा" />
+        <div class="rcol__scrim" aria-hidden="true"></div>
+        <div class="rcol__info">
+          <span class="eyebrow">Edition Nº 03</span>
+          <h3>Diamond Everyday</h3>
+          <div class="h-hi" lang="hi">हीरा रोज़मर्रा</div>
+          <p lang="hi">SI-grade solitaires · 0.2 से 1.5 कैरेट · BIS प्रमाणित।</p>
+        </div>
+      </a>
+      <a href="#" class="rcol reveal">
+        <img src="https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=1400&q=85&auto=format&fit=crop" alt="हेरिटेज सिल्वर लाइन" />
+        <div class="rcol__scrim" aria-hidden="true"></div>
+        <div class="rcol__info">
+          <span class="eyebrow">Edition Nº 05</span>
+          <h3>Heritage Silver Line</h3>
+          <div class="h-hi" lang="hi">विरासत चाँदी</div>
+          <p lang="hi">पायल, बिछुआ, कमरबंद · पारंपरिक ढाँचे, नए दामों पर।</p>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="f-brand">
+        <h3>Aanchal Jewellers</h3>
+        <div class="h-hi" lang="hi">आँचल ज्वैलर्स</div>
+        <p lang="hi">
+          1947 से अयोध्या की सेवा में। चार पीढ़ियाँ, एक ही परिवार, एक ही
+          वादा: शुद्धता, पारदर्शिता, और समय की कसौटी पर उतरा हुआ हुनर।
+        </p>
+        <div class="f-social">
+          <a href="#" aria-label="Instagram"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/></svg></a>
+          <a href="#" aria-label="WhatsApp"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M20 12a8 8 0 1 1-14.9 4L4 20l4.1-1.1A8 8 0 0 1 20 12z"/></svg></a>
+          <a href="#" aria-label="YouTube"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="5" width="20" height="14" rx="3"/><polygon points="10,9 16,12 10,15" fill="currentColor"/></svg></a>
+        </div>
+      </div>
+      <div class="f-col">
+        <h4>Shop</h4>
+        <ul>
+          <li><a href="collection.html" lang="hi">विवाह संग्रह</a></li>
+          <li><a href="#" lang="hi">कुंदन पोल्की</a></li>
+          <li><a href="#" lang="hi">रोज़मर्रा</a></li>
+          <li><a href="#" lang="hi">तोहफ़े</a></li>
+          <li><a href="#" lang="hi">चाँदी</a></li>
+        </ul>
+      </div>
+      <div class="f-col">
+        <h4>Trust</h4>
+        <ul>
+          <li><a href="#" lang="hi">BIS हॉलमार्क</a></li>
+          <li><a href="#" lang="hi">भाव लॉक</a></li>
+          <li><a href="#" lang="hi">ट्राई-एट-होम</a></li>
+          <li><a href="#" lang="hi">वापसी नीति</a></li>
+          <li><a href="#" lang="hi">EMI विकल्प</a></li>
+        </ul>
+      </div>
+      <div class="f-col">
+        <h4>Visit</h4>
+        <p style="margin:0; font-family: var(--f-hi-body); font-size: 0.9rem; color: var(--ink-700); line-height: 1.75;" lang="hi">
+          <strong style="color:var(--ink-900); font-weight: 500;">फ़ैज़ाबाद रोड</strong><br/>
+          अयोध्या, उत्तर प्रदेश<br/>
+          +91 98765 43210<br/>
+          care@aanchaljewellers.in
+        </p>
+      </div>
+    </div>
+    <div class="f-bottom">
+      <span lang="hi">© 2026 आँचल ज्वैलर्स · अयोध्या</span>
+      <div style="display:flex; gap:1.5rem;">
+        <a href="#" style="color:var(--ink-500);" lang="hi">निजता</a>
+        <a href="#" style="color:var(--ink-500);" lang="hi">शर्तें</a>
+        <a href="#" style="color:var(--ink-500);" lang="hi">शिपिंग</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('is-in'); io.unobserve(e.target); } });
+  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+  document.querySelectorAll('.reveal, .reveal-left, .karigar__media').forEach(el => io.observe(el));
+</script>
+</body>
+</html>

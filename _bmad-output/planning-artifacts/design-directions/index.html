@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Goldsmith · Design Directions Comparison</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --terracotta: #C35C3C;
+    --terracotta-deep: #8F3A22;
+    --gold: #C49B3C;
+    --cream: #F5EBD9;
+    --cream-light: #FAF4E8;
+    --stone: #D9CFB8;
+    --charcoal: #2E2624;
+    --charcoal-soft: #5D4E48;
+    --charcoal-mute: #8A7A72;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Manrope', sans-serif;
+    background: var(--cream-light);
+    color: var(--charcoal);
+    line-height: 1.55;
+  }
+  header {
+    background: var(--charcoal);
+    color: var(--cream);
+    padding: 2rem 2rem 1.5rem;
+    text-align: center;
+  }
+  header h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: 1.8rem;
+    letter-spacing: 0.02em;
+    margin-bottom: 0.4rem;
+  }
+  header p {
+    font-size: 0.85rem;
+    color: var(--stone);
+    font-style: italic;
+    font-family: 'Fraunces', serif;
+  }
+
+  .tabs {
+    position: sticky;
+    top: 0;
+    background: var(--cream);
+    border-bottom: 1px solid var(--stone);
+    padding: 1rem 2rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    justify-content: center;
+    z-index: 10;
+  }
+  .tab {
+    padding: 0.7rem 1.3rem;
+    background: transparent;
+    border: 1px solid var(--stone);
+    color: var(--charcoal-soft);
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    border-radius: 2px;
+  }
+  .tab strong {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--charcoal-mute);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 500;
+    margin-bottom: 0.2rem;
+  }
+  .tab.active {
+    background: var(--charcoal);
+    color: var(--cream);
+    border-color: var(--charcoal);
+  }
+  .tab.active strong { color: var(--gold); }
+  .tab:hover:not(.active) {
+    background: var(--cream-light);
+    border-color: var(--charcoal-mute);
+  }
+  .tab[data-dir="a"] { border-left: 3px solid #8F3A22; }
+  .tab[data-dir="b"] { border-left: 3px solid #C49B3C; }
+  .tab[data-dir="c"] { border-left: 3px solid #C35C3C; }
+  .tab.active[data-dir] { border-left-width: 3px; }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+
+  .meta {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    padding: 2rem 1rem 1rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  @media (min-width: 900px) {
+    .meta { grid-template-columns: 1.2fr 1fr 1fr 1fr; gap: 2rem; align-items: start; }
+  }
+  .meta__active {
+    background: var(--charcoal);
+    color: var(--cream);
+    padding: 1.5rem;
+    border-radius: 4px;
+  }
+  .meta__active h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: 1.3rem;
+    margin-bottom: 0.8rem;
+    color: var(--gold);
+  }
+  .meta__active p {
+    font-size: 0.88rem;
+    line-height: 1.65;
+    color: var(--stone);
+  }
+  .meta__card {
+    background: var(--cream);
+    border: 1px solid var(--stone);
+    padding: 1rem 1.2rem;
+    border-radius: 4px;
+  }
+  .meta__card h3 {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--charcoal-mute);
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+  .meta__card p {
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: var(--charcoal-soft);
+  }
+
+  .evaluation {
+    max-width: 1400px;
+    margin: 1rem auto 2rem;
+    padding: 1.5rem 2rem;
+    background: var(--cream);
+    border: 1px dashed var(--charcoal-mute);
+    border-radius: 4px;
+  }
+  .evaluation h3 {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: 1.1rem;
+    margin-bottom: 0.6rem;
+    color: var(--charcoal);
+  }
+  .evaluation ul { padding-left: 1.2rem; }
+  .evaluation li {
+    font-size: 0.85rem;
+    color: var(--charcoal-soft);
+    margin-bottom: 0.35rem;
+    line-height: 1.55;
+  }
+
+  .preview {
+    max-width: 1400px;
+    margin: 0 auto 3rem;
+    padding: 0 1rem;
+  }
+  .frame-wrap {
+    background: var(--charcoal);
+    border-radius: 12px;
+    padding: 1.2rem;
+    box-shadow: 0 20px 60px rgba(46, 38, 36, 0.15);
+  }
+  .frame-chrome {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 0.8rem;
+    padding-left: 0.3rem;
+  }
+  .frame-chrome span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--charcoal-mute);
+  }
+  .frame-chrome span:nth-child(1) { background: #e74c3c; }
+  .frame-chrome span:nth-child(2) { background: #f39c12; }
+  .frame-chrome span:nth-child(3) { background: #27ae60; }
+  iframe {
+    width: 100%;
+    height: 85vh;
+    min-height: 640px;
+    border: none;
+    background: #fff;
+    border-radius: 6px;
+    display: block;
+  }
+
+  .footnote {
+    text-align: center;
+    padding: 2rem 1.5rem 3rem;
+    font-size: 0.78rem;
+    color: var(--charcoal-mute);
+    font-style: italic;
+    font-family: 'Fraunces', serif;
+  }
+  .footnote a { color: var(--terracotta); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Goldsmith · Design Direction Prototypes</h1>
+  <p>Three aesthetics. One palette. Decide which voice is ours.</p>
+</header>
+
+<div class="tabs">
+  <button class="tab active" data-dir="a" data-src="direction-a-temple-heritage.html">
+    <strong>Direction A</strong>Temple Heritage Editorial
+  </button>
+  <button class="tab" data-dir="b" data-src="direction-b-warm-minimal.html">
+    <strong>Direction B</strong>Warm Minimal
+  </button>
+  <button class="tab" data-dir="c" data-src="direction-c-traditional-modern-bazaar.html">
+    <strong>Direction C</strong>Traditional-Modern Bazaar
+  </button>
+</div>
+
+<div class="meta">
+  <div class="meta__active" id="active-description">
+    <h2>A · Temple Heritage Editorial</h2>
+    <p>Magazine-paced, generous whitespace, serif-heavy Devanagari (Tiro) paired with Cormorant Garamond italics. Ornamental flourishes. Roman numerals. Product detail reads like an editorial feature — cream background with terracotta and gold as sparse accents. Feels like a premium jewellery heritage brand's journal.</p>
+  </div>
+  <div class="meta__card">
+    <h3>Tone</h3>
+    <p id="tone-text">Editorial. Heritage. Considered. Like reading a well-made magazine at a jeweller's counter over tea.</p>
+  </div>
+  <div class="meta__card">
+    <h3>Typography</h3>
+    <p id="typo-text">Tiro Devanagari Hindi (serif Hindi) + Cormorant Garamond (italic serif Latin) + Martel (body)</p>
+  </div>
+  <div class="meta__card">
+    <h3>Risk</h3>
+    <p id="risk-text">May feel too precious for Tier-2 customer browsing. Requires excellent product photography to hold up. Slow-paced, not for quick rate-checkers.</p>
+  </div>
+</div>
+
+<div class="evaluation">
+  <h3>How to evaluate each direction</h3>
+  <ul>
+    <li><strong>Does a 55-year-old Hindi-speaking shop owner find it familiar?</strong> (If it feels alien, it's wrong for Rajesh-ji.)</li>
+    <li><strong>Does a 28-year-old wedding buyer find it premium?</strong> (Must rival Tanishq-quality perception.)</li>
+    <li><strong>Does a pilgrim tourist find trust signals (HUID, BIS badge) visible without searching?</strong></li>
+    <li><strong>Does Hindi typography feel crafted, not translated?</strong></li>
+    <li><strong>Is the anchor's brand the hero, or is the design the hero?</strong> (Design should serve brand, not upstage.)</li>
+    <li><strong>How does it feel on a $100 Android mid-tier device?</strong> (Tier-2 network, 4G, smaller screen.)</li>
+  </ul>
+</div>
+
+<div class="preview">
+  <div class="frame-wrap">
+    <div class="frame-chrome"><span></span><span></span><span></span></div>
+    <iframe id="preview-frame" src="direction-a-temple-heritage.html" title="Design direction preview"></iframe>
+  </div>
+</div>
+
+<div class="footnote">
+  Generated as part of BMAD UX Design workflow · Step 9 · 2026-04-17<br/>
+  <a href="direction-a-temple-heritage.html" target="_blank">Open A fullscreen</a> ·
+  <a href="direction-b-warm-minimal.html" target="_blank">Open B fullscreen</a> ·
+  <a href="direction-c-traditional-modern-bazaar.html" target="_blank">Open C fullscreen</a>
+</div>
+
+<script>
+  const descriptions = {
+    a: {
+      title: 'A · Temple Heritage Editorial',
+      desc: "Magazine-paced, generous whitespace, serif-heavy Devanagari (Tiro) paired with Cormorant Garamond italics. Ornamental flourishes. Roman numerals. Product detail reads like an editorial feature — cream background with terracotta and gold as sparse accents. Feels like a premium jewellery heritage brand's journal.",
+      tone: 'Editorial. Heritage. Considered. Like reading a well-made magazine at a jeweller\'s counter over tea.',
+      typo: 'Tiro Devanagari Hindi (serif Hindi) + Cormorant Garamond (italic serif Latin) + Martel (body)',
+      risk: 'May feel too precious for Tier-2 customer browsing. Requires excellent product photography. Slow-paced, not for quick rate-checkers.'
+    },
+    b: {
+      title: 'B · Warm Minimal',
+      desc: "Muji-meets-India. 90%+ cream space. Typography does all the work — scale and weight substitute for color. Only one terracotta accent per screen; gold reserved for a single trust dot. Quietly confident product presentation. Products float. Hover interactions are whispered, not shouted.",
+      tone: 'Quiet confidence. Restraint. Precision. Like a high-end gallery where each piece has room to be itself.',
+      typo: 'Karma (humanist Hindi sans) + Manrope (geometric Latin sans)',
+      risk: 'Might feel too spare for a demographic that associates density with value. Needs perfect execution — minimal designs punish every imperfection.'
+    },
+    c: {
+      title: 'C · Traditional-Modern Bazaar',
+      desc: "Richer visual density. Warm terracotta hero band with confident large-scale Hindi display type (Rozha One). Subtle sari-border-inspired SVG patterns as accents. Gold trust medallions with gentle rotation. Celebratory but not loud. Feels like a well-designed traditional Indian shop translated to digital.",
+      tone: 'Confidently Indian. Warm. Present. Like the shop itself, dressed for its best day — but without shouting.',
+      typo: 'Rozha One (display Hindi) + Hind Siliguri (body Hindi) + Fraunces (Latin, warm serif)',
+      risk: 'Richest direction — most to go wrong. If heavy hand creeps in, tips toward "wedding card" territory. Execution must stay disciplined.'
+    }
+  };
+
+  const frame = document.getElementById('preview-frame');
+  const titleEl = document.querySelector('#active-description h2');
+  const descEl = document.querySelector('#active-description p');
+  const toneEl = document.getElementById('tone-text');
+  const typoEl = document.getElementById('typo-text');
+  const riskEl = document.getElementById('risk-text');
+
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const dir = tab.dataset.dir;
+      frame.src = tab.dataset.src;
+      const d = descriptions[dir];
+      titleEl.textContent = d.title;
+      descEl.textContent = d.desc;
+      toneEl.textContent = d.tone;
+      typoEl.textContent = d.typo;
+      riskEl.textContent = d.risk;
+    });
+  });
+</script>
+
+</body>
+</html>

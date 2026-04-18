@@ -1,0 +1,108 @@
+# BMAD Greenfield Readiness — Gate Passed
+
+status:           PASSED
+gate:             Greenfield Protocol (per C:/Users/alokt/.claude/CLAUDE.md)
+passedAt:         2026-04-17
+passedBy:         Alokt (Principal Architect) · facilitated via Claude
+project:          Goldsmith — white-label multi-tenant jewellery platform for Hindi-belt Indian jewellers
+
+
+## Cleared artifacts
+
+| # | Protocol requirement              | Location (actual)                                                                         | Status    |
+|---|-----------------------------------|-------------------------------------------------------------------------------------------|-----------|
+| 1 | PRD (BMAD Phase 2)                | _bmad-output/planning-artifacts/prd.md                                                    | ✓ PRESENT |
+| 2 | UX Design (Phase 3)               | _bmad-output/planning-artifacts/ux-design-specification.md                                | ✓ PRESENT |
+| 3 | Architecture (Phase 4)            | _bmad-output/planning-artifacts/architecture.md                                           | ✓ PRESENT |
+| 4 | Initial ADRs (0001–0012)          | _bmad-output/planning-artifacts/adr/0001..0012                                            | ✓ PRESENT |
+| 5 | Stories (Phase 5) — 138 stories   | _bmad-output/planning-artifacts/epics.md + epics-*.md                                     | ✓ PRESENT |
+| 6 | Threat Model (STRIDE)             | docs/threat-model.md                                                                      | ✓ PRESENT (326 lines, this gate) |
+| 7 | Operations Runbook                | docs/runbook.md                                                                           | ✓ PRESENT (453 lines, this gate) |
+
+
+## Path-convention note
+
+The global Greenfield Protocol (C:/Users/alokt/.claude/CLAUDE.md) describes these artifacts under `docs/`.
+BMAD writes to `_bmad-output/planning-artifacts/`. The gate accepts artifacts at either location
+as long as they are authoritative, committed, and referenced from this marker.
+
+Items #6 and #7 live under `docs/` because they are not BMAD-workflow artifacts; they are operational
+gate artifacts introduced by the Greenfield Protocol itself.
+
+
+## Design direction
+
+locked:           Direction 5 — Hindi-First Editorial
+lockedAt:         2026-04-17
+supersedes:       Direction C — Traditional-Modern Bazaar
+directionSource:  _bmad-output/planning-artifacts/design-directions-v2/customer-aspirational/direction-5-hindi-first-editorial/
+indexPreview:     _bmad-output/planning-artifacts/design-directions-v2/customer-aspirational/index.html
+typographyStack:  Yatra One (display) + Mukta Vaani (secondary) + Tiro Devanagari Hindi (body serif) + Fraunces italic (Latin secondary)
+paletteSeeds:
+  - --tenant-primary:  #B58A3C  (aged-gold / warm ochre)
+  - --tenant-accent:   #D4745A  (terracotta blush — sparingly)
+  - --cream:           #F5EDDD
+  - --indigo-ink:      #1E2440
+
+
+## Conditional clearances (gate passes DESPITE these)
+
+The following are acknowledged as OUTSTANDING but do not block code start.
+They DO block production tenant go-live — treat as release gates, not readiness gates.
+
+1. **Anchor SOW unsigned.** Ref PRFAQ verdict + CLAUDE.md §External blockers.
+   - BLOCKS: production tenant onboarding, billing, formal IP assignment
+   - DOES NOT BLOCK: internal development, staging deploys, component library build
+   - Owner: Alok + legal counsel
+   - Target: pre-Epic 7 (UI foundations) completion
+
+2. **Legal DPDPA review pending.** Platform terms, jeweller-as-merchant classification, DPA templates.
+   - BLOCKS: production tenant onboarding, public customer PII collection
+   - DOES NOT BLOCK: development with synthetic data
+   - Owner: legal counsel
+
+3. **Apple / Google developer account decision.** Platform-owned single account vs per-tenant accounts.
+   - BLOCKS: mobile app store submission
+   - DOES NOT BLOCK: development, Expo internal builds
+   - Owner: Alok
+
+4. **Anchor policy decisions (4 items flagged in PRD §Risks).**
+   - "App price = committed price" policy
+   - Custom-order refund / rework / deposit / cancellation policy
+   - Warranty insurance commitment
+   - Shipping scope
+   - BLOCKS: customer-facing policy copy finalization
+   - DOES NOT BLOCK: architecture, code, component library
+
+5. **External pentest.** Contractually required before 2nd-tenant onboarding per threat-model.md §9.
+   - BLOCKS: 2nd tenant onboarding
+   - DOES NOT BLOCK: 1st (anchor) tenant onboarding post-SOW
+
+
+## What this gate authorizes
+
+- Per-Story execution via the superpowers flow:
+  1. `/superpowers:brainstorming`
+  2. `/superpowers:writing-plans` → commit plans/<story-id>.md
+  3. **Fresh session** (context quarantine) → `/superpowers:executing-plans`
+  4. TDD enforced (Red → Green → Refactor)
+  5. `/superpowers:verification-before-completion`
+  6. 5-layer review gate (code-review + security-review + Codex CLI + bmad-code-review + requesting-code-review)
+  7. Only then `git push`
+
+- Beginning with Story E1-S1 (auth foundations) or Story E2-S1 (tenant RLS scaffolding) —
+  architectural dependency order should start with E2 (tenant foundation) before E1 (auth), since
+  auth JWT carries tenant_id and tenant_id RLS is the backstop.
+
+
+## Review triggers — this marker must be re-issued if:
+
+- Any non-additive schema change to a tenant-scoped table
+- Any new trust boundary introduced (vendor, admin role, client surface)
+- Any ADR in 0001–0012 is superseded
+- Any compliance-critical architectural component (RLS, AsyncLocalStorage, compliance hard-block gateway) is modified
+- Every 12 months regardless
+
+---
+Marker written: 2026-04-17
+Next expected review: 2027-04-17 or earlier per trigger above

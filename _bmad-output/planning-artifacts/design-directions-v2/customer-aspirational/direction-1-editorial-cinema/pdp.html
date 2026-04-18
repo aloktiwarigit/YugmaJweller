@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>राधिका कुंदन पोल्की नेकलेस सेट — आँचल ज्वैलर्स</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Tiro+Devanagari+Hindi:ital@0;1&family=Mukta:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --tenant-primary:   #B8882D;
+  --tenant-accent:    #C9A961;
+  --tenant-deep:      #6B4E15;
+
+  --ink-0: #0B0A08;
+  --ink-1: #14120E;
+  --ink-2: #1D1A15;
+  --ink-3: #2A251D;
+  --ink-4: #3A3327;
+  --paper: #F5EFE4;
+  --paper-dim: #E6DCC7;
+  --paper-mute: #B8AE9A;
+  --line: rgba(201, 169, 97, 0.18);
+  --line-strong: rgba(201, 169, 97, 0.35);
+
+  --f-en-display: 'Cormorant Garamond', serif;
+  --f-en-body: 'Manrope', sans-serif;
+  --f-hi-display: 'Tiro Devanagari Hindi', serif;
+  --f-hi-body: 'Mukta', sans-serif;
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ink-0);
+  color: var(--paper);
+  font-family: var(--f-en-body);
+  font-weight: 300;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+:lang(hi) { font-family: var(--f-hi-body); line-height: 1.65; }
+img { max-width: 100%; display: block; }
+button { font: inherit; background: none; border: 0; color: inherit; cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+
+.container { max-width: 1440px; margin: 0 auto; padding: 0 clamp(1.5rem, 3.5vw, 3.5rem); }
+.eyebrow {
+  font-size: 0.7rem; letter-spacing: 0.28em; text-transform: uppercase;
+  font-weight: 500; color: var(--tenant-accent);
+}
+.rule { display: inline-block; width: 32px; height: 1px; background: var(--tenant-accent); margin-right: 0.75rem; vertical-align: middle; }
+
+/* NAV (trimmed) */
+.nav {
+  position: sticky; top: 0; z-index: 80;
+  background: rgba(11,10,8,0.92);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+.nav__inner {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 1rem 0;
+}
+.brand { display: flex; align-items: center; gap: 0.9rem; }
+.brand__mark {
+  width: 40px; height: 40px;
+  border: 1px solid var(--tenant-accent); border-radius: 50%;
+  display: grid; place-items: center;
+  color: var(--tenant-accent); font-family: var(--f-hi-display); font-size: 1.2rem;
+}
+.brand__name { font-family: var(--f-hi-display); font-size: 1.2rem; }
+.brand__loc { font-size: 0.64rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--paper-mute); }
+.breadcrumbs {
+  padding: 1rem 0; border-bottom: 1px solid var(--line);
+  font-size: 0.78rem; color: var(--paper-mute);
+  letter-spacing: 0.03em;
+}
+.breadcrumbs a:hover { color: var(--tenant-accent); }
+.breadcrumbs span { color: var(--paper); }
+
+/* =============== PDP LAYOUT =============== */
+.pdp {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+  padding: 2.5rem 0;
+}
+@media (min-width: 1000px) {
+  .pdp { grid-template-columns: 1.15fr 0.85fr; gap: 4rem; align-items: start; }
+}
+
+/* Gallery */
+.gallery { position: sticky; top: 4.5rem; }
+.gallery__main {
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  background: var(--ink-2);
+  position: relative;
+  cursor: zoom-in;
+}
+.gallery__main img {
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform 1.4s var(--ease), opacity 0.4s var(--ease);
+}
+.gallery__main:hover img { transform: scale(1.08); }
+.gallery__actions {
+  position: absolute; bottom: 1.25rem; right: 1.25rem;
+  display: flex; gap: 0.5rem; z-index: 3;
+}
+.gal-btn {
+  padding: 0.55rem 0.9rem;
+  background: rgba(11,10,8,0.78);
+  border: 1px solid var(--line-strong);
+  color: var(--paper);
+  font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  transition: all 0.22s var(--ease);
+}
+.gal-btn:hover { background: var(--tenant-accent); color: var(--ink-0); border-color: var(--tenant-accent); }
+.gal-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+
+.gallery__thumbs {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.gallery__thumbs button {
+  aspect-ratio: 1; overflow: hidden;
+  border: 1px solid transparent;
+  transition: border-color 0.22s var(--ease);
+  padding: 0;
+}
+.gallery__thumbs button.is-active,
+.gallery__thumbs button:hover { border-color: var(--tenant-accent); }
+.gallery__thumbs img {
+  width: 100%; height: 100%; object-fit: cover;
+  filter: brightness(0.85);
+  transition: filter 0.22s var(--ease);
+}
+.gallery__thumbs button.is-active img { filter: brightness(1); }
+
+.gallery__video-badge {
+  position: absolute; top: 1.25rem; left: 1.25rem;
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  background: rgba(11,10,8,0.78);
+  border: 1px solid var(--line-strong);
+  font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--tenant-accent);
+  z-index: 3;
+}
+.gallery__video-badge .dot {
+  width: 6px; height: 6px; background: var(--tenant-accent); border-radius: 50%;
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink { 50% { opacity: 0.2; } }
+
+/* INFO */
+.info { padding: 0.5rem 0; }
+.info__edit {
+  display: inline-block;
+  font-size: 0.68rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--paper-mute);
+  border: 1px solid var(--line-strong);
+  padding: 0.35rem 0.8rem;
+  margin-bottom: 1.25rem;
+}
+.info__title {
+  font-family: var(--f-hi-display);
+  font-weight: 400;
+  font-size: clamp(2rem, 3.8vw, 2.85rem);
+  line-height: 1.15;
+  margin: 0 0 0.6rem;
+  color: var(--paper);
+}
+.info__subtitle {
+  font-family: var(--f-en-display);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 1.2rem;
+  color: var(--tenant-accent);
+  margin: 0 0 2rem;
+  letter-spacing: 0.01em;
+}
+.info__reviews {
+  display: flex; gap: 1rem; align-items: center;
+  margin-bottom: 2rem;
+  font-size: 0.82rem;
+  color: var(--paper-mute);
+}
+.info__stars { color: var(--tenant-accent); letter-spacing: 0.15em; }
+.info__stars::before { content: '★★★★★'; }
+.info__huid {
+  font-size: 0.72rem; color: var(--tenant-accent);
+  letter-spacing: 0.1em;
+  font-family: var(--f-en-body);
+  text-transform: uppercase;
+}
+.info__huid::before { content: ''; display: inline-block; width: 20px; height: 1px; background: var(--tenant-accent); margin-right: 0.6rem; vertical-align: middle; }
+
+/* PRICE */
+.price {
+  padding: 2rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.price__main {
+  display: flex; align-items: baseline; gap: 1rem;
+  margin-bottom: 1rem;
+}
+.price__value {
+  font-family: var(--f-en-display);
+  font-weight: 400;
+  font-size: 2.6rem;
+  color: var(--paper);
+  letter-spacing: -0.01em;
+}
+.price__was {
+  font-family: var(--f-en-display);
+  font-size: 1.15rem;
+  text-decoration: line-through;
+  color: var(--paper-mute);
+}
+.price__save {
+  font-size: 0.72rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  background: var(--tenant-accent); color: var(--ink-0);
+  padding: 0.25rem 0.6rem;
+  font-weight: 500;
+}
+.price__emi {
+  font-family: var(--f-hi-body);
+  font-size: 0.92rem;
+  color: var(--paper-dim);
+  margin-bottom: 0.3rem;
+}
+.price__emi strong { color: var(--tenant-accent); font-weight: 500; }
+.price__break {
+  margin-top: 1.25rem;
+  padding: 1.25rem;
+  background: var(--ink-2);
+  border-left: 2px solid var(--tenant-accent);
+}
+.price__break-toggle {
+  display: flex; justify-content: space-between; width: 100%;
+  font-size: 0.8rem; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--tenant-accent);
+}
+.price__break table {
+  width: 100%;
+  margin-top: 1rem;
+  font-size: 0.88rem;
+  border-collapse: collapse;
+}
+.price__break table td {
+  padding: 0.55rem 0;
+  color: var(--paper-dim);
+  font-family: var(--f-hi-body);
+  font-weight: 300;
+}
+.price__break table td:last-child {
+  text-align: right;
+  color: var(--paper);
+  font-family: var(--f-en-body);
+  font-variant-numeric: tabular-nums;
+}
+.price__break table tr.total td {
+  font-weight: 500;
+  border-top: 1px solid var(--line);
+  padding-top: 0.9rem;
+  color: var(--paper);
+  font-size: 1.05rem;
+}
+
+/* VARIANTS */
+.variants { margin: 2rem 0; }
+.variants__group { margin-bottom: 1.5rem; }
+.variants__label {
+  display: flex; justify-content: space-between;
+  font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--paper-mute);
+  margin-bottom: 0.8rem;
+}
+.variants__label strong { color: var(--paper); font-weight: 500; letter-spacing: 0.05em; text-transform: none; font-size: 0.88rem; }
+.variant-options {
+  display: flex; gap: 0.6rem; flex-wrap: wrap;
+}
+.variant-opt {
+  padding: 0.85rem 1.1rem;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--paper);
+  font-size: 0.85rem;
+  transition: all 0.22s var(--ease);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem;
+  min-width: 100px;
+}
+.variant-opt small {
+  font-size: 0.68rem; color: var(--paper-mute); letter-spacing: 0.08em;
+}
+.variant-opt.is-active {
+  background: var(--tenant-accent); color: var(--ink-0); border-color: var(--tenant-accent);
+}
+.variant-opt.is-active small { color: var(--ink-1); }
+.variant-opt:hover { border-color: var(--tenant-accent); }
+
+.size-helpers {
+  display: flex; gap: 1rem; margin-top: 0.5rem;
+  font-size: 0.78rem;
+}
+.size-helpers a {
+  color: var(--tenant-accent);
+  border-bottom: 1px solid var(--line-strong);
+  padding-bottom: 2px;
+}
+.size-helpers a:hover { color: var(--paper); }
+
+/* CTAs */
+.cta-stack { display: grid; gap: 0.75rem; margin: 2rem 0; }
+.btn {
+  padding: 1.1rem 1.5rem;
+  font-family: var(--f-hi-body);
+  font-size: 0.95rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.75rem;
+  transition: all 0.28s var(--ease);
+}
+.btn--primary {
+  background: var(--tenant-accent); color: var(--ink-0); border-color: var(--tenant-accent);
+}
+.btn--primary:hover { background: var(--paper); border-color: var(--paper); transform: translateY(-1px); }
+.btn--ghost {
+  background: transparent; color: var(--paper); border-color: var(--line-strong);
+}
+.btn--ghost:hover { border-color: var(--tenant-accent); color: var(--tenant-accent); }
+.btn--whatsapp {
+  background: #1F2A1F; color: #3DBB5B; border-color: #2E4431;
+}
+.btn--whatsapp:hover { border-color: #3DBB5B; }
+.btn svg { width: 16px; height: 16px; }
+
+.util-row {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.util-btn {
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  color: var(--paper-dim);
+  font-size: 0.78rem;
+  font-family: var(--f-hi-body);
+  display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+  transition: all 0.22s var(--ease);
+  text-align: center;
+}
+.util-btn:hover { border-color: var(--tenant-accent); color: var(--tenant-accent); }
+.util-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; flex-shrink: 0; }
+
+/* HUID MEDALLION */
+.huid-verify {
+  margin: 2.5rem 0;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(201,169,97,0.06), rgba(184,136,45,0.03));
+  border: 1px solid var(--line-strong);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 1.25rem;
+  align-items: center;
+}
+.huid-seal {
+  width: 72px; height: 72px;
+  border: 2px solid var(--tenant-accent);
+  border-radius: 50%;
+  display: grid; place-items: center;
+  color: var(--tenant-accent);
+  font-family: var(--f-hi-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  line-height: 1.15;
+  text-align: center;
+  position: relative;
+  flex-shrink: 0;
+}
+.huid-seal::before {
+  content: '';
+  position: absolute; inset: -6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+}
+.huid-seal.is-verifying::before {
+  animation: sealRotate 1.4s linear;
+}
+@keyframes sealRotate {
+  0% { transform: rotate(0); }
+  100% { transform: rotate(360deg); }
+}
+.huid-info strong {
+  display: block;
+  font-family: var(--f-hi-display);
+  font-weight: 400;
+  font-size: 1.1rem;
+  color: var(--paper);
+  margin-bottom: 0.15rem;
+}
+.huid-info small {
+  font-family: var(--f-en-body);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  color: var(--paper-mute);
+  text-transform: uppercase;
+}
+.huid-info p {
+  margin: 0.3rem 0 0;
+  font-family: var(--f-hi-body);
+  font-size: 0.82rem;
+  color: var(--paper-dim);
+}
+.huid-btn {
+  font-size: 0.78rem;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--tenant-accent);
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--tenant-accent);
+  transition: all 0.22s var(--ease);
+  white-space: nowrap;
+}
+.huid-btn:hover { background: var(--tenant-accent); color: var(--ink-0); }
+
+/* POLICIES */
+.policies {
+  margin-top: 2rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1.5rem;
+}
+.policies__list {
+  list-style: none; padding: 0; margin: 0;
+}
+.policies__list li {
+  display: flex; gap: 0.8rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--f-hi-body);
+  font-size: 0.88rem;
+  color: var(--paper-dim);
+  align-items: flex-start;
+}
+.policies__list li:last-child { border-bottom: 0; }
+.policies__list li svg { width: 16px; height: 16px; fill: none; stroke: var(--tenant-accent); stroke-width: 1.5; flex-shrink: 0; margin-top: 3px; }
+.policies__list li strong { color: var(--paper); font-weight: 500; display: inline; }
+
+/* DESCRIPTION BLOCK */
+.description-section { padding: 6rem 0; border-top: 1px solid var(--line); background: var(--ink-1); }
+.description {
+  max-width: 820px; margin: 0 auto;
+}
+.description .eyebrow { display: inline-block; margin-bottom: 1rem; }
+.description h2 {
+  font-family: var(--f-hi-display);
+  font-weight: 400;
+  font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+  margin: 0 0 1.5rem;
+  line-height: 1.2;
+}
+.description h2 em {
+  font-family: var(--f-en-display);
+  font-style: italic;
+  color: var(--tenant-accent);
+  font-weight: 300;
+  display: block;
+  font-size: 0.72em;
+  margin-top: 0.35em;
+}
+.description p {
+  font-family: var(--f-hi-body);
+  font-size: 1rem;
+  line-height: 1.95;
+  color: var(--paper-dim);
+  font-weight: 300;
+  margin-bottom: 1.25rem;
+}
+.description p:lang(en) {
+  font-family: var(--f-en-display);
+  font-style: italic;
+  color: var(--paper-mute);
+  font-size: 1.05rem;
+  line-height: 1.65;
+  margin: 2rem 0;
+  padding-left: 1.5rem;
+  border-left: 2px solid var(--tenant-accent);
+}
+
+.specs {
+  margin-top: 3rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.spec {
+  background: var(--ink-1);
+  padding: 1.25rem 1.5rem;
+}
+.spec small { font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--paper-mute); }
+.spec strong {
+  display: block; margin-top: 0.3rem;
+  font-family: var(--f-en-display);
+  font-weight: 400; font-size: 1.15rem;
+  color: var(--paper);
+}
+
+/* RELATED */
+.related { padding: 6rem 0; border-top: 1px solid var(--line); background: var(--ink-0); }
+.section-head {
+  text-align: center; max-width: 620px; margin: 0 auto 3.5rem;
+}
+.section-head h2 {
+  font-family: var(--f-hi-display);
+  font-weight: 400;
+  font-size: clamp(1.7rem, 3.2vw, 2.4rem);
+  margin: 1rem 0 0.5rem;
+}
+.section-head h2 em {
+  font-family: var(--f-en-display);
+  font-style: italic; color: var(--tenant-accent);
+  font-weight: 300; display: block;
+  font-size: 0.78em;
+}
+.rel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+@media (min-width: 780px) { .rel-grid { grid-template-columns: repeat(4, 1fr); } }
+.rel-card { display: block; }
+.rel-card__media {
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  background: var(--ink-2);
+}
+.rel-card__media img {
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform 1.2s var(--ease);
+}
+.rel-card:hover .rel-card__media img { transform: scale(1.08); }
+.rel-card__info { padding: 1rem 0; }
+.rel-card__info h3 {
+  font-family: var(--f-hi-body);
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: var(--paper);
+  margin: 0 0 0.25rem;
+}
+.rel-card__info small {
+  font-family: var(--f-en-display);
+  font-style: italic;
+  color: var(--paper-mute);
+  font-size: 0.88rem;
+}
+.rel-card__price {
+  display: block;
+  margin-top: 0.6rem;
+  font-family: var(--f-en-display);
+  font-size: 1rem;
+  color: var(--tenant-accent);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+/* REVIEWS */
+.reviews { padding: 6rem 0; background: var(--ink-1); border-top: 1px solid var(--line); }
+.review-grid {
+  display: grid; gap: 1.25rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 860px) { .review-grid { grid-template-columns: repeat(2, 1fr); } }
+.review {
+  padding: 1.75rem;
+  background: var(--ink-2);
+  border-left: 2px solid var(--tenant-accent);
+}
+.review__head { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.review__meta {
+  display: flex; gap: 0.75rem; align-items: center;
+}
+.review__avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--tenant-accent); color: var(--ink-0);
+  display: grid; place-items: center;
+  font-family: var(--f-hi-display); font-size: 1rem;
+}
+.review__name { font-family: var(--f-hi-body); font-weight: 500; color: var(--paper); font-size: 0.95rem; }
+.review__city { font-size: 0.72rem; color: var(--paper-mute); letter-spacing: 0.12em; text-transform: uppercase; }
+.review__verify { color: var(--tenant-accent); font-size: 0.7rem; letter-spacing: 0.15em; }
+.review__stars { color: var(--tenant-accent); font-size: 0.9rem; letter-spacing: 0.12em; margin-bottom: 0.5rem; }
+.review__stars::before { content: '★★★★★'; }
+.review p {
+  font-family: var(--f-hi-body);
+  font-size: 0.95rem; line-height: 1.75;
+  color: var(--paper-dim); font-weight: 300;
+  margin: 0;
+}
+
+/* HUID MODAL */
+.modal {
+  position: fixed; inset: 0;
+  background: rgba(11,10,8,0.88);
+  backdrop-filter: blur(6px);
+  display: none;
+  align-items: center; justify-content: center;
+  z-index: 200;
+  padding: 1.5rem;
+}
+.modal.is-open { display: flex; animation: modalIn 0.3s var(--ease); }
+@keyframes modalIn { from { opacity: 0; } to { opacity: 1; } }
+.modal__card {
+  background: var(--ink-1);
+  border: 1px solid var(--line-strong);
+  max-width: 560px; width: 100%;
+  padding: 2.5rem;
+  position: relative;
+  animation: cardIn 0.4s var(--ease);
+}
+@keyframes cardIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal__close {
+  position: absolute; top: 1rem; right: 1rem;
+  width: 32px; height: 32px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  color: var(--paper);
+  display: grid; place-items: center;
+}
+.modal__seal {
+  width: 100px; height: 100px;
+  margin: 0 auto 1.5rem;
+  border: 2px solid var(--tenant-accent); border-radius: 50%;
+  display: grid; place-items: center;
+  color: var(--tenant-accent);
+  font-family: var(--f-hi-display);
+  font-size: 0.88rem;
+  line-height: 1.2;
+  text-align: center;
+  animation: pulseSeal 2s ease-in-out infinite;
+}
+@keyframes pulseSeal {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201,169,97,0.4); }
+  50%      { box-shadow: 0 0 0 14px rgba(201,169,97,0); }
+}
+.modal h3 {
+  font-family: var(--f-hi-display);
+  font-size: 1.6rem; text-align: center;
+  margin: 0 0 0.5rem;
+  color: var(--paper);
+}
+.modal__huid-num {
+  text-align: center;
+  font-family: 'Courier New', monospace;
+  font-size: 1.3rem; letter-spacing: 0.3em;
+  color: var(--tenant-accent);
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border: 1px dashed var(--line-strong);
+}
+.modal table { width: 100%; margin-top: 1rem; font-size: 0.9rem; }
+.modal table td { padding: 0.55rem 0; color: var(--paper-dim); font-family: var(--f-hi-body); font-weight: 300; }
+.modal table td:last-child { text-align: right; color: var(--paper); font-family: var(--f-en-body); }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<header class="nav">
+  <div class="container nav__inner">
+    <a href="home.html" class="brand">
+      <div class="brand__mark" aria-hidden="true">आ</div>
+      <div>
+        <div class="brand__name" lang="hi">आँचल ज्वैलर्स</div>
+        <div class="brand__loc">Ayodhya · Est. 1947</div>
+      </div>
+    </a>
+    <nav><a href="home.html" lang="hi" style="font-size:0.9rem; color:var(--paper-mute);">← वापस होम पर</a></nav>
+  </div>
+</header>
+
+<!-- BREADCRUMBS -->
+<div class="breadcrumbs">
+  <div class="container">
+    <a lang="hi">होम</a> &nbsp;/&nbsp;
+    <a lang="hi">विवाह संग्रह</a> &nbsp;/&nbsp;
+    <a lang="hi">कुंदन · पोल्की</a> &nbsp;/&nbsp;
+    <span lang="hi">राधिका सेट</span>
+  </div>
+</div>
+
+<!-- PDP -->
+<main class="container pdp">
+  <!-- GALLERY -->
+  <section class="gallery" aria-label="उत्पाद चित्र">
+    <div class="gallery__main" id="galMain">
+      <img id="galImg" src="https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&w=1400&q=90"
+           alt="राधिका कुंदन पोल्की नेकलेस सेट — मुख्य दृश्य" />
+      <div class="gallery__video-badge">
+        <span class="dot"></span>
+        <span>Karigar Film</span>
+      </div>
+      <div class="gallery__actions">
+        <button class="gal-btn" aria-label="360 डिग्री रोटेशन">
+          <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3,4 3,9 8,9"/></svg>
+          360°
+        </button>
+        <button class="gal-btn" aria-label="ज़ूम-इन">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+          Zoom
+        </button>
+      </div>
+    </div>
+    <div class="gallery__thumbs" role="tablist">
+      <button class="is-active" aria-label="चित्र 1" onclick="pick(this,'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&w=1400&q=90')">
+        <img src="https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&w=300&q=70" alt="" />
+      </button>
+      <button aria-label="चित्र 2 — जीवनशैली" onclick="pick(this,'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=1400&q=90')">
+        <img src="https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=300&q=70" alt="" />
+      </button>
+      <button aria-label="चित्र 3 — विस्तृत" onclick="pick(this,'https://images.unsplash.com/photo-1602173574767-37ac01994b2a?auto=format&fit=crop&w=1400&q=90')">
+        <img src="https://images.unsplash.com/photo-1602173574767-37ac01994b2a?auto=format&fit=crop&w=300&q=70" alt="" />
+      </button>
+      <button aria-label="चित्र 4 — पृष्ठभाग" onclick="pick(this,'https://images.unsplash.com/photo-1535632066274-36f735c4a1a9?auto=format&fit=crop&w=1400&q=90')">
+        <img src="https://images.unsplash.com/photo-1535632066274-36f735c4a1a9?auto=format&fit=crop&w=300&q=70" alt="" />
+      </button>
+      <button aria-label="चित्र 5 — दुल्हन पर" onclick="pick(this,'https://images.unsplash.com/photo-1600721391776-b5cd0e0048f9?auto=format&fit=crop&w=1400&q=90')">
+        <img src="https://images.unsplash.com/photo-1600721391776-b5cd0e0048f9?auto=format&fit=crop&w=300&q=70" alt="" />
+      </button>
+    </div>
+  </section>
+
+  <!-- INFO -->
+  <section class="info">
+    <span class="info__edit" lang="hi">विवाह संग्रह 2026 · Limited</span>
+    <h1 class="info__title" lang="hi">राधिका कुंदन पोल्की सेट</h1>
+    <p class="info__subtitle" lang="en">Hand-set with 146 uncut stones · Jaipur-sourced polki</p>
+
+    <div class="info__reviews">
+      <span class="info__stars" aria-label="4.8 / 5"></span>
+      <span lang="hi">4.8 · <u>128 समीक्षाएँ</u></span>
+      <span class="info__huid">HUID · HS6A28F3</span>
+    </div>
+
+    <!-- PRICE -->
+    <div class="price">
+      <div class="price__main">
+        <div class="price__value">₹ 8,42,500</div>
+        <div class="price__was">₹ 9,10,000</div>
+        <div class="price__save" lang="hi">₹ 67,500 बचत</div>
+      </div>
+      <div class="price__emi" lang="hi">
+        <strong>₹ 70,208/माह</strong> से शुरू · 12-माह नो-कॉस्ट EMI पर
+      </div>
+      <div class="price__emi" lang="hi">
+        सभी GST, हॉलमार्किंग, और प्रमाणन सहित
+      </div>
+
+      <details class="price__break">
+        <summary class="price__break-toggle">
+          <span lang="hi">पारदर्शी मूल्य विवरण</span>
+          <span aria-hidden="true">+</span>
+        </summary>
+        <table>
+          <tr><td lang="hi">22K सोना · 42.6 ग्राम × ₹ 6,248/g</td><td>₹ 2,66,164</td></tr>
+          <tr><td lang="hi">पोल्की · 146 पीस</td><td>₹ 3,82,500</td></tr>
+          <tr><td lang="hi">मेकिंग चार्ज · 18%</td><td>₹ 1,16,840</td></tr>
+          <tr><td lang="hi">पत्थर सेटिंग · हस्तनिर्मित</td><td>₹ 38,400</td></tr>
+          <tr><td lang="hi">GST (3% + 5%)</td><td>₹ 38,596</td></tr>
+          <tr class="total"><td lang="hi">कुल</td><td>₹ 8,42,500</td></tr>
+        </table>
+      </details>
+    </div>
+
+    <!-- VARIANTS -->
+    <div class="variants">
+      <div class="variants__group">
+        <div class="variants__label">
+          <span lang="hi">शुद्धता</span><strong lang="hi">22K चुना गया</strong>
+        </div>
+        <div class="variant-options">
+          <button class="variant-opt is-active"><span lang="hi">22K</span><small lang="hi">42.6 ग्राम</small></button>
+          <button class="variant-opt"><span lang="hi">18K</span><small lang="hi">38.2 ग्राम</small></button>
+          <button class="variant-opt"><span lang="hi">14K</span><small lang="hi">उपलब्ध नहीं</small></button>
+        </div>
+      </div>
+      <div class="variants__group">
+        <div class="variants__label">
+          <span lang="hi">लंबाई</span><strong lang="hi">मध्यम चुनी गई</strong>
+        </div>
+        <div class="variant-options">
+          <button class="variant-opt"><span lang="hi">छोटा</span><small>14 in</small></button>
+          <button class="variant-opt is-active"><span lang="hi">मध्यम</span><small>16 in</small></button>
+          <button class="variant-opt"><span lang="hi">लंबा</span><small>18 in</small></button>
+        </div>
+        <div class="size-helpers">
+          <a href="#" lang="hi">गले का माप गाइड</a>
+          <a href="#" lang="hi">अनुकूलित आकार</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- HUID VERIFY -->
+    <div class="huid-verify" role="region" aria-label="HUID सत्यापन">
+      <div class="huid-seal" id="huidSeal" aria-hidden="true">
+        <span>BIS<br>HUID<br>916</span>
+      </div>
+      <div class="huid-info">
+        <strong lang="hi">BIS हॉलमार्क प्रमाणित</strong>
+        <small>HUID · HS6A28F3</small>
+        <p lang="hi">शुद्धता, कारीगर, एवं बनने की तिथि — पूर्णतया सत्यापित।</p>
+      </div>
+      <button class="huid-btn" onclick="verifyHuid()" lang="hi">सत्यापित करें</button>
+    </div>
+
+    <!-- CTA STACK -->
+    <div class="cta-stack">
+      <button class="btn btn--primary" lang="hi">
+        ₹ 5,000 में भाव लॉक करें
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="11" width="14" height="10" rx="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      </button>
+      <button class="btn btn--ghost" lang="hi">
+        घर पर आज़माइए — ₹ 2,000 रिफ़ंडेबल
+      </button>
+      <button class="btn btn--whatsapp" lang="hi">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 12a8 8 0 1 1-14.9 4L4 20l4.1-1.1A8 8 0 0 1 20 12z"/></svg>
+        परिवार के साथ साझा कीजिये
+      </button>
+    </div>
+
+    <div class="util-row">
+      <button class="util-btn" aria-label="पसंद में जोड़ें">
+        <svg viewBox="0 0 24 24"><path d="M12 20s-7.5-4.5-7.5-10A4.5 4.5 0 0 1 12 6a4.5 4.5 0 0 1 7.5 4c0 5.5-7.5 10-7.5 10z"/></svg>
+        <span lang="hi">पसंद</span>
+      </button>
+      <button class="util-btn" aria-label="AR try-on">
+        <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="12" rx="2"/><circle cx="12" cy="13" r="3"/><line x1="9" y1="3" x2="15" y2="3"/></svg>
+        <span>AR ट्राई-ऑन <em style="font-size:0.68em; color:var(--tenant-accent);">· जल्द</em></span>
+      </button>
+      <button class="util-btn" aria-label="तुलना करें">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="16"/><rect x="14" y="4" width="7" height="16"/></svg>
+        <span lang="hi">तुलना</span>
+      </button>
+    </div>
+
+    <!-- POLICIES -->
+    <div class="policies">
+      <ul class="policies__list">
+        <li>
+          <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M8 8V5a4 4 0 0 1 8 0v3"/></svg>
+          <span lang="hi"><strong>भाव लॉक:</strong> ₹5,000 जमा करें, 24 घंटे तक आज का भाव पक्का।</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24"><path d="M3 7h13l4 4v7a2 2 0 0 1-2 2H3V7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+          <span lang="hi"><strong>मुफ़्त होम-डिलीवरी:</strong> उत्तर प्रदेश में 24 घंटे, अखिल भारत 3-5 दिन।</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-16 0"/><polyline points="4,4 4,12 12,12"/></svg>
+          <span lang="hi"><strong>15-दिन बदलाव:</strong> पहनें तो नहीं, पर पसंद ना आए तो पूरी वापसी।</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg>
+          <span lang="hi"><strong>आजीवन बदलाव:</strong> पुराना गहना, नया बनवाइये — केवल मेकिंग चार्ज।</span>
+        </li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<!-- DESCRIPTION -->
+<section class="description-section">
+  <div class="container description">
+    <span class="eyebrow"><span class="rule"></span>The Making Of</span>
+    <h2 lang="hi">एक सेट, ग्यारह महीने, सात कारीगर
+      <em lang="en">One set. Eleven months. Seven hands.</em>
+    </h2>
+    <p lang="hi">
+      "राधिका" उस दुल्हन का नाम है जिसने 2023 में पहला प्रोटोटाइप पहना।
+      उनकी सहमति पर हमने इस डिज़ाइन को संग्रह में शामिल किया। हर पोल्की
+      पत्थर जयपुर के चंद्रपोल बाज़ार से आया, जहाँ तीन पीढ़ियों के
+      पत्थर-बेचने वाले परिवार से हमारा रिश्ता है।
+    </p>
+    <p lang="en">
+      The setting technique — kundan-meena on 22K gold base — has
+      survived four centuries in North India. We refuse to shortcut it
+      with machine-casting, because what gives kundan its warmth is the
+      imperfection of the human hand.
+    </p>
+    <p lang="hi">
+      यह सेट तीन टुकड़ों में आता है: मुख्य रानी हार, दो काँटों वाले
+      ईयरिंग्स, और एक माथापट्टी जो सिंदूर की रेखा के ठीक ऊपर बैठती है।
+      तीनों एक साथ, या अलग-अलग — दोनों तरह पहनिये।
+    </p>
+
+    <div class="specs">
+      <div class="spec">
+        <small lang="hi">कुल वज़न</small>
+        <strong>42.6 GRAM</strong>
+      </div>
+      <div class="spec">
+        <small lang="hi">शुद्धता</small>
+        <strong>22K · 916</strong>
+      </div>
+      <div class="spec">
+        <small lang="hi">पोल्की पत्थर</small>
+        <strong>146 पीस</strong>
+      </div>
+      <div class="spec">
+        <small lang="hi">मुख्य कारीगर</small>
+        <strong>महमूद अहमद</strong>
+      </div>
+      <div class="spec">
+        <small lang="hi">कार्यकाल</small>
+        <strong>11 महीने</strong>
+      </div>
+      <div class="spec">
+        <small lang="hi">HUID</small>
+        <strong>HS6A28F3</strong>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RELATED -->
+<section class="related">
+  <div class="container">
+    <header class="section-head">
+      <span class="eyebrow">Crafted Alongside · साथ बने</span>
+      <h2 lang="hi">साथ पहनिये
+        <em lang="en">Wear them together.</em>
+      </h2>
+    </header>
+    <div class="rel-grid">
+      <a class="rel-card" href="#">
+        <div class="rel-card__media">
+          <img src="https://images.unsplash.com/photo-1506629082955-511b1aa562c8?auto=format&fit=crop&w=600&q=80" alt="" />
+        </div>
+        <div class="rel-card__info">
+          <h3 lang="hi">मीरा चंद्रहार</h3>
+          <small>Layered long necklace</small>
+          <span class="rel-card__price">₹ 4,28,000</span>
+        </div>
+      </a>
+      <a class="rel-card" href="#">
+        <div class="rel-card__media">
+          <img src="https://images.unsplash.com/photo-1588444837495-c6cfeb53f32d?auto=format&fit=crop&w=600&q=80" alt="" />
+        </div>
+        <div class="rel-card__info">
+          <h3 lang="hi">गौरी झुमके</h3>
+          <small>Kundan chandbali jhumka</small>
+          <span class="rel-card__price">₹ 1,84,500</span>
+        </div>
+      </a>
+      <a class="rel-card" href="#">
+        <div class="rel-card__media">
+          <img src="https://images.unsplash.com/photo-1611085583191-a3b181a88401?auto=format&fit=crop&w=600&q=80" alt="" />
+        </div>
+        <div class="rel-card__info">
+          <h3 lang="hi">जानकी मांग टीका</h3>
+          <small>Maang-tikka · forehead</small>
+          <span class="rel-card__price">₹ 92,000</span>
+        </div>
+      </a>
+      <a class="rel-card" href="#">
+        <div class="rel-card__media">
+          <img src="https://images.unsplash.com/photo-1617038260897-41a1f14a8ca0?auto=format&fit=crop&w=600&q=80" alt="" />
+        </div>
+        <div class="rel-card__info">
+          <h3 lang="hi">तारा कंगन जोड़ी</h3>
+          <small>Paired kadas · pair of two</small>
+          <span class="rel-card__price">₹ 3,15,000</span>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- REVIEWS -->
+<section class="reviews" aria-label="समीक्षाएँ">
+  <div class="container">
+    <header class="section-head">
+      <span class="eyebrow">Verified buyers · सत्यापित</span>
+      <h2 lang="hi">उनकी बात <em lang="en">In their own words.</em></h2>
+    </header>
+    <div class="review-grid">
+      <article class="review">
+        <div class="review__head">
+          <div class="review__meta">
+            <div class="review__avatar" aria-hidden="true">अ</div>
+            <div>
+              <div class="review__name" lang="hi">अनन्या सिंह</div>
+              <div class="review__city">Lucknow · April 2024</div>
+            </div>
+          </div>
+          <span class="review__verify">VERIFIED</span>
+        </div>
+        <div class="review__stars"></div>
+        <p lang="hi">यह सेट मेरी शादी के दिन सबसे ज़्यादा तारीफ़ पाया।
+        फ़ोटो में जो सुनहरी चमक है, वो असली में और भी सुन्दर दिखती है।
+        पोल्की हर टुकड़ा हाथ से सेट किया गया है — यह साफ़ दिखता है।</p>
+      </article>
+      <article class="review">
+        <div class="review__head">
+          <div class="review__meta">
+            <div class="review__avatar" aria-hidden="true">स</div>
+            <div>
+              <div class="review__name" lang="hi">सुरभि चतुर्वेदी</div>
+              <div class="review__city">Varanasi · Dec 2023</div>
+            </div>
+          </div>
+          <span class="review__verify">VERIFIED</span>
+        </div>
+        <div class="review__stars"></div>
+        <p lang="hi">मेरी बड़ी बहन की शादी पर यही सेट लिया था। अब मेरी
+        शादी में मैंने थोड़ा अलग लंबाई माँगी — उन्होंने बनाकर दिया,
+        बिना अतिरिक्त शुल्क। यहाँ की ईमानदारी दिल छू लेती है।</p>
+      </article>
+      <article class="review">
+        <div class="review__head">
+          <div class="review__meta">
+            <div class="review__avatar" aria-hidden="true">र</div>
+            <div>
+              <div class="review__name" lang="hi">राशि अग्रवाल</div>
+              <div class="review__city">Kanpur · Jan 2025</div>
+            </div>
+          </div>
+          <span class="review__verify">VERIFIED</span>
+        </div>
+        <div class="review__stars"></div>
+        <p lang="hi">HUID QR स्कैन किया तो पूरी जानकारी मिली — कारीगर का
+        नाम, बनने की तारीख़, सब कुछ। यह पारदर्शिता अब तक किसी और
+        ज्वैलर के पास नहीं देखी।</p>
+      </article>
+      <article class="review">
+        <div class="review__head">
+          <div class="review__meta">
+            <div class="review__avatar" aria-hidden="true">प</div>
+            <div>
+              <div class="review__name" lang="hi">पूजा मिश्रा</div>
+              <div class="review__city">Delhi NCR · Oct 2024</div>
+            </div>
+          </div>
+          <span class="review__verify">VERIFIED</span>
+        </div>
+        <div class="review__stars"></div>
+        <p lang="hi">"घर पर आज़माइए" वाली सुविधा इस्तेमाल की — तीन
+        सेट मंगवाए, दो वापस किए, यह रखा। कोई पूछताछ नहीं, कोई दबाव
+        नहीं। प्रीमियम अनुभव।</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- HUID MODAL -->
+<div class="modal" id="huidModal" role="dialog" aria-modal="true" aria-labelledby="huidModalTitle">
+  <div class="modal__card">
+    <button class="modal__close" onclick="closeModal()" aria-label="बंद करें">×</button>
+    <div class="modal__seal" aria-hidden="true"><span>BIS<br>VERIFIED<br>916</span></div>
+    <h3 id="huidModalTitle" lang="hi">हॉलमार्क सत्यापित</h3>
+    <div class="modal__huid-num">HS6A28F3</div>
+    <table>
+      <tr><td lang="hi">शुद्धता</td><td>22K · 916 parts/1000</td></tr>
+      <tr><td lang="hi">कुल वज़न</td><td>42.6 gram</td></tr>
+      <tr><td lang="hi">कारीगर</td><td lang="hi">महमूद अहमद</td></tr>
+      <tr><td lang="hi">AHC केंद्र</td><td lang="hi">लखनऊ AHC-17</td></tr>
+      <tr><td lang="hi">जाँच की तिथि</td><td>11 March 2026</td></tr>
+      <tr><td lang="hi">सर्टिफ़िकेट</td><td><a style="color:var(--tenant-accent);" href="#">डाउनलोड ↓</a></td></tr>
+    </table>
+  </div>
+</div>
+
+<script>
+  function pick(btn, src) {
+    document.querySelectorAll('.gallery__thumbs button').forEach(b => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+    const img = document.getElementById('galImg');
+    img.style.opacity = '0';
+    setTimeout(() => {
+      img.src = src;
+      img.style.opacity = '1';
+    }, 180);
+  }
+  function verifyHuid() {
+    const seal = document.getElementById('huidSeal');
+    seal.classList.add('is-verifying');
+    setTimeout(() => {
+      seal.classList.remove('is-verifying');
+      document.getElementById('huidModal').classList.add('is-open');
+    }, 1400);
+  }
+  function closeModal() {
+    document.getElementById('huidModal').classList.remove('is-open');
+  }
+  document.getElementById('huidModal').addEventListener('click', (e) => {
+    if (e.target.id === 'huidModal') closeModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+  });
+</script>
+</body>
+</html>
