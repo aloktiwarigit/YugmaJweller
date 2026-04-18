@@ -3,9 +3,10 @@ rules:
     languages: [typescript, javascript]
     severity: ERROR
     message: |
-      PII field names must not be logged. Use `logger.info({ ... })` where values pass through the
-      PII redactor, or explicitly wrap with `redactPii(value)`. Do NOT inline PII-named keys into
-      console.log or templated strings.
+      PII field names must not be logged via console.*. Use the logger from
+      @goldsmith/observability (which runs the PII redactor) or explicitly wrap with
+      redactPii(value). Keys covered: phone, pan, email, aadhaar, dob, address, otp,
+      customerName, ownerName, display_name, gstin, bankAccount, ifsc.
     patterns:
       - pattern-either:
           - pattern: console.log($...ARGS)
@@ -14,4 +15,4 @@ rules:
       - metavariable-pattern:
           metavariable: $...ARGS
           patterns:
-            - pattern-regex: "(phone|pan|email|aadhaar|otp|customerName|gstin)"
+            - pattern-regex: "\\b(phone|pan|email|aadhaar|dob|address|otp|customerName|ownerName|display_name|gstin|bankAccount|ifsc)\\b"

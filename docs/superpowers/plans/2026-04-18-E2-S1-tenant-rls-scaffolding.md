@@ -628,6 +628,45 @@ describe('redactPii', () => {
       display_name: '[REDACTED:display_name]',
     });
   });
+
+  it('redacts PII inside arrays of objects', () => {
+    expect(redactPii([{ phone: '+91a' }, { email: 'b@x' }])).toEqual([
+      { phone: '[REDACTED:phone]' },
+      { email: '[REDACTED:email]' },
+    ]);
+  });
+
+  it('preserves Error instances (stack + message intact)', () => {
+    const err = new Error('db connection refused');
+    const out = redactPii({ err });
+    expect(out.err).toBe(err); // same reference — Error passes through
+    expect((out.err as Error).message).toBe('db connection refused');
+  });
+
+  it('preserves Date instances (timestamp intact)', () => {
+    const ts = new Date('2026-04-18T00:00:00Z');
+    const out = redactPii({ ts });
+    expect(out.ts).toBe(ts);
+  });
+
+  it('preserves Buffer instances (byte content intact)', () => {
+    const buf = Buffer.from('hello', 'utf8');
+    const out = redactPii({ buf });
+    expect(out.buf).toBe(buf);
+    expect((out.buf as Buffer).toString('utf8')).toBe('hello');
+  });
+
+  it('handles circular references without stack overflow', () => {
+    const a: Record<string, unknown> = { phone: '+91' };
+    a.self = a;
+    const out = redactPii(a) as Record<string, unknown>;
+    expect(out.phone).toBe('[REDACTED:phone]');
+    expect(out.self).toBe('[Circular]');
+  });
+
+  it('redacts null value under PII key (key-based, not value-based)', () => {
+    expect(redactPii({ phone: null })).toEqual({ phone: '[REDACTED:phone]' });
+  });
 });
 ```
 
@@ -650,20 +689,29 @@ const PII_KEYS = new Set([
   'gstin', 'bankAccount', 'ifsc', 'otp',
 ]);
 
-export function redactPii<T>(input: T): T {
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  if (v === null || typeof v !== 'object') return false;
+  const proto = Object.getPrototypeOf(v) as unknown;
+  return proto === Object.prototype || proto === null;
+}
+
+export function redactPii<T>(input: T, seen: WeakSet<object> = new WeakSet()): T {
   if (input === null || input === undefined) return input;
-  if (Array.isArray(input)) return input.map((item) => redactPii(item)) as unknown as T;
-  if (typeof input === 'object') {
+  if (Array.isArray(input)) {
+    if (seen.has(input)) return '[Circular]' as unknown as T;
+    seen.add(input);
+    return input.map((item) => redactPii(item, seen)) as unknown as T;
+  }
+  if (isPlainObject(input)) {
+    if (seen.has(input)) return '[Circular]' as unknown as T;
+    seen.add(input);
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
-      if (PII_KEYS.has(k)) {
-        out[k] = `[REDACTED:${k}]`;
-      } else {
-        out[k] = redactPii(v);
-      }
+    for (const [k, v] of Object.entries(input)) {
+      out[k] = PII_KEYS.has(k) ? `[REDACTED:${k}]` : redactPii(v, seen);
     }
     return out as unknown as T;
   }
+  // Error, Date, Buffer, class instances, Map, Set, Symbol — preserve as-is.
   return input;
 }
 ```
@@ -694,14 +742,37 @@ Create `packages/observability/src/sentry.ts`:
 import * as Sentry from '@sentry/node';
 import { redactPii } from './pii-redactor';
 
+let _initialized = false;
+
 export function initSentry(): void {
-  const dsn = process.env.SENTRY_DSN;
+  if (_initialized) return;
+  const dsn = process.env['SENTRY_DSN'];
   if (!dsn) return;
+  _initialized = true;
   Sentry.init({
     dsn,
-    environment: process.env.NODE_ENV ?? 'development',
-    tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? '0.1'),
-    beforeSend: (event) => ({ ...event, extra: redactPii(event.extra ?? {}) }),
+    environment: process.env['NODE_ENV'] ?? 'development',
+    tracesSampleRate: Number(process.env['SENTRY_TRACES_SAMPLE_RATE'] ?? '0.1'),
+    beforeSend: (event) => {
+      if (event.request?.data && typeof event.request.data === 'object') {
+        event.request.data = redactPii(event.request.data);
+      }
+      if (event.request?.headers) {
+        const { authorization: _a, cookie: _c, 'x-tenant-id': _t, ...safeHeaders } =
+          event.request.headers as Record<string, string>;
+        event.request.headers = safeHeaders;
+      }
+      if (event.user) {
+        event.user = event.user.id ? { id: event.user.id } : {};
+      }
+      if (event.breadcrumbs) {
+        event.breadcrumbs = (event.breadcrumbs as Sentry.Breadcrumb[]).map((b) => {
+          if (!b.data) return b;
+          return { ...b, data: redactPii(b.data) as { [key: string]: unknown } };
+        });
+      }
+      return { ...event, extra: redactPii(event.extra ?? {}) };
+    },
   });
 }
 ```
@@ -712,16 +783,21 @@ Create `packages/observability/src/otel.ts`:
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 
+let _sdk: NodeSDK | undefined;
+
 export function initOtel(serviceName: string): NodeSDK | undefined {
-  if (!process.env.OTEL_EXPORTER_OTLP_ENDPOINT) return undefined;
-  const sdk = new NodeSDK({
+  if (_sdk) return _sdk;
+  if (!process.env['OTEL_EXPORTER_OTLP_ENDPOINT']) return undefined;
+  _sdk = new NodeSDK({
     serviceName,
     instrumentations: [getNodeAutoInstrumentations()],
   });
-  sdk.start();
-  return sdk;
+  _sdk.start();
+  return _sdk;
 }
 ```
+
+> **Note:** SIGTERM shutdown hook deferred to Story 1.1 when `main.ts` lands.
 
 Create `packages/observability/src/index.ts`:
 
@@ -750,9 +826,10 @@ rules:
     languages: [typescript, javascript]
     severity: ERROR
     message: |
-      PII field names must not be logged. Use `logger.info({ ... })` where values pass through the
-      PII redactor, or explicitly wrap with `redactPii(value)`. Do NOT inline PII-named keys into
-      console.log or templated strings.
+      PII field names must not be logged via console.*. Use the logger from
+      @goldsmith/observability (which runs the PII redactor) or explicitly wrap with
+      redactPii(value). Keys covered: phone, pan, email, aadhaar, dob, address, otp,
+      customerName, ownerName, display_name, gstin, bankAccount, ifsc.
     patterns:
       - pattern-either:
           - pattern: console.log($...ARGS)
@@ -761,7 +838,7 @@ rules:
       - metavariable-pattern:
           metavariable: $...ARGS
           patterns:
-            - pattern-regex: "(phone|pan|email|aadhaar|otp|customerName|gstin)"
+            - pattern-regex: "\\b(phone|pan|email|aadhaar|dob|address|otp|customerName|ownerName|display_name|gstin|bankAccount|ifsc)\\b"
 ```
 
 - [ ] **Step 7: Commit**
