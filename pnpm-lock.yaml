@@ -263,6 +263,31 @@ importers:
         specifier: ^1.4.0
         version: 1.6.1(@types/node@20.19.39)
 
+  packages/testing/tenant-isolation:
+    dependencies:
+      '@goldsmith/db':
+        specifier: workspace:*
+        version: link:../../db
+      '@goldsmith/tenant-context':
+        specifier: workspace:*
+        version: link:../../tenant-context
+      pg:
+        specifier: ^8.11.0
+        version: 8.20.0
+    devDependencies:
+      '@testcontainers/postgresql':
+        specifier: ^10.8.0
+        version: 10.28.0
+      testcontainers:
+        specifier: ^10.8.0
+        version: 10.28.0
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.4.0
+        version: 1.6.1(@types/node@20.19.39)
+
 packages:
 
   '@balena/dockerignore@1.0.2':

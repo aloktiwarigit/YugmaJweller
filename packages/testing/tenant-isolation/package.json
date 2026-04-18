@@ -1,0 +1,23 @@
+{
+  "name": "@goldsmith/testing-tenant-isolation",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run",
+    "test:tenant-isolation": "vitest run"
+  },
+  "dependencies": {
+    "@goldsmith/db": "workspace:*",
+    "@goldsmith/tenant-context": "workspace:*",
+    "pg": "^8.11.0"
+  },
+  "devDependencies": {
+    "vitest": "^1.4.0",
+    "testcontainers": "^10.8.0",
+    "@testcontainers/postgresql": "^10.8.0",
+    "typescript": "^5.4.0"
+  }
+}
