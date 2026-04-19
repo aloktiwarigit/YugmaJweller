@@ -1,3 +1,7 @@
+// Note: Using @testing-library/react with JSDOM (not react-native) — consistent with
+// existing shopkeeper test setup. fireEvent.click maps to press handlers in JSDOM context.
+// react-native is aliased to test/react-native.mock.ts (see vitest.config.ts), which
+// already exports Share: { share: vi.fn() } — no additional Share mock needed here.
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';

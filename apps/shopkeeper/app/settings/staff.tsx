@@ -89,7 +89,11 @@ export default function StaffScreen(): React.ReactElement {
         visible={sheetVisible}
         animationType="slide"
         transparent
-        onRequestClose={() => setSheetVisible(false)}
+        onRequestClose={() => {
+          setSheetVisible(false);
+          setForm({ display_name: '', phone: '', role: 'shop_staff' });
+          setPhoneError(null);
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.sheet}>
