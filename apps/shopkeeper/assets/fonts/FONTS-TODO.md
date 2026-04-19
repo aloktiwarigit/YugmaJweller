@@ -1,19 +1,20 @@
-# Font delivery — Direction 5 typography
+# Direction 5 typography — bundled
 
-The Expo shopkeeper app bundles four font families per spec §5 + ADR-0016.
-**Before the first Dev Client build, place the following files here:**
+Fonts downloaded from Google Fonts via the `gwfh.mranftl.com` helper API (post-PR-1.1b). All eight `.ttf` files are committed to this directory and loaded at boot via `expo-font` in `apps/shopkeeper/app/_layout.tsx`.
 
-- `YatraOne-Regular.ttf` — Google Fonts → Yatra One (display; Devanagari)
-- `MuktaVaani-400.ttf` — Indian Type Foundry → Mukta Vaani 400
-- `MuktaVaani-500.ttf` — Indian Type Foundry → Mukta Vaani 500
-- `MuktaVaani-600.ttf` — Indian Type Foundry → Mukta Vaani 600
-- `MuktaVaani-700.ttf` — Indian Type Foundry → Mukta Vaani 700
-- `TiroDevanagariHindi-Regular.ttf` — Google Fonts → Tiro Devanagari Hindi Regular
-- `TiroDevanagariHindi-Italic.ttf` — Google Fonts → Tiro Devanagari Hindi Italic
-- `Fraunces-VariableItalic.ttf` — Google Fonts → Fraunces Variable (italic axis)
+- `YatraOne-Regular.ttf` — Yatra One (display; Devanagari) — SIL Open Font License
+- `MuktaVaani-{400,500,600,700}.ttf` — Mukta Vaani (body) — SIL Open Font License
+- `TiroDevanagariHindi-{Regular,Italic}.ttf` — Tiro Devanagari Hindi (serif) — SIL Open Font License
+- `Fraunces-VariableItalic.ttf` — Fraunces (Latin display italic, sparingly) — SIL Open Font License
 
-All fonts are SIL Open Font License. Bundle them via `expo-font` (NOT Google Fonts CDN — see spec invariant 24).
+## Updating fonts
 
-Empty `.ttf` placeholders are committed here as markers until the real files land.
-Font loading code in `app/_layout.tsx` is scaffolded but commented until files are populated —
-re-enable the `useFonts` call once the real `.ttf` files are in place.
+If a family needs refreshing (e.g., Google Fonts ships a new version):
+
+```bash
+# Hit the gwfh API, pick the variant, curl the .ttf URL:
+curl -s "https://gwfh.mranftl.com/api/fonts/<slug>" | jq '.variants[] | {id, ttf}'
+# Then curl the ttf URL into this directory with the existing filename.
+```
+
+Keep filenames stable — they're referenced by `useFonts` in `app/_layout.tsx`.
