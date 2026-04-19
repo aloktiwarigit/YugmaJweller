@@ -9,12 +9,12 @@ export interface AuthSessionResponse {
 }
 
 export async function postAuthSession(idToken: string): Promise<AuthSessionResponse> {
-  const res = await api.post<AuthSessionResponse>('/auth/session', { idToken });
+  const res = await api.post<AuthSessionResponse>('/api/v1/auth/session', { idToken });
   return res.data;
 }
 
 export async function getAuthMe(): Promise<AuthenticatedUser> {
-  const res = await api.get<{ user: AuthenticatedUser }>('/auth/me');
+  const res = await api.get<{ user: AuthenticatedUser }>('/api/v1/auth/me');
   return res.data.user;
 }
 

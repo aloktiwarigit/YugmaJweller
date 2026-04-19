@@ -129,11 +129,10 @@ jobs:
   # before opening / merging a PR. CI handles the objective gates only.
 
   build-shopkeeper:
-    # Validates Expo config + plugin resolution without running the full web
-    # export. Real mobile builds happen via EAS post-anchor-SOW (same deferral
-    # pattern as e2e-shopkeeper). Web export is not a shipped surface; gating
-    # PR on it would require resolving metro+pnpm monorepo hoisting quirks
-    # that aren't blocking the actual mobile build path.
+    # Real Metro bundle via `expo export --platform web`. With node-linker=hoisted
+    # in .npmrc, pnpm produces flat node_modules — Metro resolver and Windows
+    # 260-char path issues no longer apply. This catches pnpm hoisting + transitive
+    # dep issues at PR time. Native (Android/iOS) builds remain via EAS post-anchor-SOW.
     needs: install
     runs-on: ubuntu-latest
     steps:
@@ -143,9 +142,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "${{ env.NODE_VERSION }}", cache: "pnpm" }
       - run: pnpm install --frozen-lockfile
-      - name: Validate Expo config + plugin resolution
-        working-directory: apps/shopkeeper
-        run: pnpm exec expo config --type public > /dev/null
+      - name: Metro bundle (web export)
+        run: pnpm --filter @goldsmith/shopkeeper export
       - name: Typecheck shopkeeper
         run: pnpm --filter @goldsmith/shopkeeper typecheck
 

@@ -92,6 +92,12 @@ All per-jeweller values must be shopkeeper-configurable via in-app admin UI. Pla
 
 Compliance values (GST %, HUID format, PAN threshold, Section 269ST cap) are platform-controlled, NOT editable by shopkeeper.
 
+### Story AC gate (runtime smoke test)
+Story AC is not closed until the changed surface has been smoke-tested on its intended runtime. A passing test suite + clean code review does not substitute for running the actual artifact the story promised. Layered code inspection catches surface bugs; runtime integration catches system bugs. Without the runtime gate, system bugs leak straight to the demo.
+- **Shopkeeper stories:** physical device or emulator — Metro boot confirmed, golden-path flow exercised.
+- **API-only stories:** `curl` round-trip against the running service.
+- **Web stories:** browser render of the affected page, golden-path flow exercised.
+
 ## Design constraints (every frontend task must honour these)
 
 ### Language & typography
