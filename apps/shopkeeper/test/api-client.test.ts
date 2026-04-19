@@ -1,10 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock @goldsmith/auth-client before any import of client.ts
-const getIdTokenMock = vi.fn();
+// Mock @goldsmith/auth-client before any import of client.ts.
+// IMPORTANT: vi.mock is hoisted to top of file by vitest, so factory cannot
+// reference variables declared in the outer scope (they are not yet initialised
+// at the time the hoisted factory runs). Use a module-level spy that we reset
+// in beforeEach instead of referencing an outer `const getIdTokenMock` inside
+// the factory.
 vi.mock('@goldsmith/auth-client', () => ({
-  getIdToken: getIdTokenMock,
+  getIdToken: vi.fn().mockResolvedValue(null),
 }));
+
+import * as authClient from '@goldsmith/auth-client';
+// Convenience alias typed as a spy for use in test assertions
+const getIdTokenMock = vi.mocked(authClient.getIdToken);
 
 import MockAdapter from 'axios-mock-adapter';
 import { api } from '../src/api/client';
