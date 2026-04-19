@@ -3,34 +3,32 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { setLocale } from '@goldsmith/i18n';
 
-// Mock auth-client.sendOtp
+// Mock auth-client.sendOtp — factory must not reference outer variables (vi.mock is hoisted)
 const sendOtpMock = vi.fn();
 vi.mock('@goldsmith/auth-client', () => ({
-  sendOtp: sendOtpMock,
+  sendOtp: (...args: unknown[]): unknown => sendOtpMock(...args),
   getIdToken: vi.fn().mockResolvedValue(null),
   auth: (): unknown => ({}),
 }));
 
-// Mock expo-router
-const replaceMock = vi.fn();
-const pushMock = vi.fn();
+// Mock expo-router — same hoisting constraint; use module-level spies patched in beforeEach
 vi.mock('expo-router', () => ({
-  router: { replace: replaceMock, push: pushMock },
-  useRouter: (): { replace: typeof replaceMock; push: typeof pushMock } => ({
-    replace: replaceMock,
-    push: pushMock,
-  }),
+  router: { replace: vi.fn(), push: vi.fn() },
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   Redirect: (): null => null,
 }));
 
+// Import after mocks are declared
+// eslint-disable-next-line import/first -- must come after vi.mock declarations
+import * as expoRouter from 'expo-router';
 import Phone from '../app/(auth)/phone';
 import { useOtpStore } from '../src/stores/otpStore';
 
 beforeEach(() => {
   setLocale('hi-IN');
   sendOtpMock.mockReset();
-  pushMock.mockReset();
-  replaceMock.mockReset();
+  vi.mocked(expoRouter.router.push).mockReset();
+  vi.mocked(expoRouter.router.replace).mockReset();
   useOtpStore.setState({ confirmation: null, phoneE164: null });
 });
 
@@ -57,7 +55,7 @@ describe('(auth)/phone.tsx', () => {
     const cta = getByTestId('phone-cta');
     fireEvent.click(cta);
     await waitFor(() => expect(sendOtpMock).toHaveBeenCalledWith('+919876543210'));
-    expect(pushMock).toHaveBeenCalledWith('/(auth)/otp');
+    expect(expoRouter.router.push).toHaveBeenCalledWith('/(auth)/otp');
   });
 
   it('shows Toast on sendOtp failure', async () => {

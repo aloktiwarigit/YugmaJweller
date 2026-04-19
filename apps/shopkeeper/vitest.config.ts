@@ -2,6 +2,19 @@ import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
+  esbuild: {
+    // Use the vitest tsconfig which does not extend expo/tsconfig.base
+    // so vite's esbuild transform does not fail on the missing expo package.
+    tsconfigRaw: {
+      compilerOptions: {
+        target: 'ES2022',
+        jsx: 'react-jsx',
+        strict: true,
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./test/setup.ts'],
@@ -18,6 +31,9 @@ export default defineConfig({
       ),
       'expo-constants': fileURLToPath(
         new URL('./test/expo-constants.mock.ts', import.meta.url),
+      ),
+      'expo-router': fileURLToPath(
+        new URL('./test/expo-router.mock.ts', import.meta.url),
       ),
     },
   },
