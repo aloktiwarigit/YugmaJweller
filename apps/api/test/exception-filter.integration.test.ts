@@ -9,19 +9,19 @@ import { GlobalExceptionFilter } from '../src/common/filters/global-exception.fi
 @Controller('/fixture')
 class FixtureController {
   @Get('/http')
-  throwHttp() { throw new HttpException({ code: 'test.http_error', extra: 'context' }, HttpStatus.BAD_REQUEST); }
+  throwHttp(): never { throw new HttpException({ code: 'test.http_error', extra: 'context' }, HttpStatus.BAD_REQUEST); }
 
   @Get('/native')
   throwNative(): never { throw new TypeError('phone=+919000000001 should not leak'); }
 
   @Get('/pg-unique')
-  throwPgUnique() { const e = new Error('duplicate key value violates unique constraint "shops_slug_key"'); (e as Error & {code?:string}).code = '23505'; throw e; }
+  throwPgUnique(): never { const e = new Error('duplicate key value violates unique constraint "shops_slug_key"'); (e as Error & {code?:string}).code = '23505'; throw e; }
 
   @Get('/pg-fk')
-  throwPgFk() { const e = new Error('foreign key violation'); (e as Error & {code?:string}).code = '23503'; throw e; }
+  throwPgFk(): never { const e = new Error('foreign key violation'); (e as Error & {code?:string}).code = '23503'; throw e; }
 
   @Get('/pg-check')
-  throwPgCheck() { const e = new Error('check constraint violation'); (e as Error & {code?:string}).code = '23514'; throw e; }
+  throwPgCheck(): never { const e = new Error('check constraint violation'); (e as Error & {code?:string}).code = '23514'; throw e; }
 }
 
 @Module({ controllers: [FixtureController], providers: [{ provide: APP_FILTER, useClass: GlobalExceptionFilter }, Reflector] })
