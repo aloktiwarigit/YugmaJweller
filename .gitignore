@@ -23,6 +23,13 @@ coverage/
 *-adminsdk*.json
 firebase-admin-sdk-*.json
 
+# Firebase client config (public-by-design per Firebase's security model but
+# still not committed — contains the project-specific Android/iOS GCP client
+# IDs which we prefer to regenerate on-demand via `firebase apps:sdkconfig`).
+# Also covered by apps/shopkeeper/.gitignore; root rule is defense-in-depth.
+google-services.json
+GoogleService-Info.plist
+
 # Editor + OS
 .DS_Store
 Thumbs.db
