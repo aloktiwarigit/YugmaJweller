@@ -27,6 +27,7 @@
     "@goldsmith/tenant-context": "workspace:*",
     "@goldsmith/observability": "workspace:*",
     "@goldsmith/secrets": "workspace:*",
+    "@goldsmith/tenant-config": "workspace:*",
     "@azure/storage-blob": "^12.17.0",
     "firebase-admin": "^12.0.0",
     "@nestjs/passport": "^10.0.0",
