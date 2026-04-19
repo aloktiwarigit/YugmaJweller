@@ -62,16 +62,29 @@ export class AuthService {
       throw new ForbiddenException({ code: 'auth.uid_mismatch' });
     }
 
-    // 4. Load tenant + link firebase_uid if first-time
+    // 4. Load tenant + link firebase_uid if first-time (atomic UPDATE guards against TOCTOU race)
     const tenant = await this.loadTenantById(row.shopId);
     const firstTime = !row.firebaseUid;
     if (firstTime) {
-      await this.repo.linkFirebaseUid({ shopId: row.shopId, userId: row.userId, firebaseUid: args.uid, tenant });
+      const { linked } = await this.repo.linkFirebaseUid({ shopId: row.shopId, userId: row.userId, firebaseUid: args.uid, tenant });
+      if (!linked) {
+        // A concurrent /session with a different UID won the race and wrote its UID first.
+        await platformAuditLog(this.pool, {
+          action: AuditAction.AUTH_UID_MISMATCH,
+          phoneE164: args.phoneE164, metadata: { incoming: args.uid, reason: 'race' },
+          ipAddress: args.ip, userAgent: args.userAgent, requestId: args.requestId,
+        });
+        throw new ForbiddenException({ code: 'auth.uid_mismatch' });
+      }
       await this.auditProvisioned({ tenant, userId: row.userId, role: row.role, requestId: args.requestId });
     }
 
-    // 5. Set Firebase custom claims so subsequent ID tokens carry shop_id + role
-    await this.firebase.admin().auth().setCustomUserClaims(args.uid, { shop_id: row.shopId, role: row.role });
+    // 5. Set Firebase custom claims so subsequent ID tokens carry shop_id + role + user_id (DB UUID)
+    await this.firebase.admin().auth().setCustomUserClaims(args.uid, {
+      shop_id: row.shopId,
+      role: row.role,
+      user_id: row.userId,  // DB UUID — enables TenantInterceptor to propagate userId without extra query
+    });
 
     // 6. Record success, audit verify-success
     await this.rateLimit.recordSuccess(args.phoneE164);

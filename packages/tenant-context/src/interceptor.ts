@@ -17,6 +17,14 @@ export interface RequestLike {
   headers: Record<string, string | string[] | undefined>;
   hostname?: string;
   path?: string;
+  /** Populated by FirebaseJwtStrategy after token verification */
+  user?: {
+    uid?: string;
+    shop_id?: string;
+    role?: ShopUserRole;
+    /** DB UUID from the user_id custom claim; undefined on very first /session call */
+    user_id?: string;
+  };
 }
 
 export interface TenantResolver {
@@ -54,7 +62,7 @@ export class TenantInterceptor implements NestInterceptor {
   }
 
   private async resolve(ctx: ExecutionContext): Promise<TenantContext> {
-    const req = ctx.switchToHttp().getRequest<RequestLike & { user?: { shop_id?: string; uid?: string; role?: ShopUserRole } }>();
+    const req = ctx.switchToHttp().getRequest<RequestLike>();
 
     const jwtShopId    = this.resolver.fromJwt(req);
     const headerShopId = this.resolver.fromHeader(req);
@@ -82,10 +90,14 @@ export class TenantInterceptor implements NestInterceptor {
     if (!tenant) throw new UnauthorizedException('tenant.not_found');
     if (tenant.status !== 'ACTIVE') throw new ForbiddenException('tenant.inactive');
 
-    if (req.user?.uid && req.user.role && req.user.shop_id === shopId) {
+    // req.user.user_id is the DB UUID from the Firebase custom claim.
+    // On the very first /session call the token has no custom claims yet — user_id is undefined,
+    // so we fall through to UnauthenticatedTenantContext. /session responds requires_token_refresh: true;
+    // the client force-refreshes and subsequent calls carry user_id.
+    if (req.user?.uid && req.user.role && req.user.shop_id === shopId && req.user.user_id) {
       return {
         shopId: tenant.id, tenant,
-        authenticated: true, userId: req.user.uid, role: req.user.role,
+        authenticated: true, userId: req.user.user_id, role: req.user.role,
       };
     }
     return { shopId: tenant.id, tenant, authenticated: false };

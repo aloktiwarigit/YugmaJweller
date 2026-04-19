@@ -52,7 +52,7 @@ export class AuthRateLimitService {
          VALUES ($1, $2, now(), $3)
          ON CONFLICT (phone_e164) DO UPDATE SET
            verify_failures   = EXCLUDED.verify_failures,
-           window_started_at = CASE WHEN auth_rate_limits.window_started_at + interval '15 minutes' < now()
+           window_started_at = CASE WHEN auth_rate_limits.window_started_at + interval '15 minutes' <= now()
                                     THEN now() ELSE auth_rate_limits.window_started_at END,
            locked_until      = EXCLUDED.locked_until,
            updated_at        = now()`,

@@ -9,6 +9,7 @@ export interface FirebaseUserClaims {
   phone_number: string;
   shop_id?: string;
   role?: 'shop_admin' | 'shop_manager' | 'shop_staff' | 'platform_admin';
+  user_id?: string;  // DB UUID propagated via custom claim; undefined on very first /session call
 }
 
 type AdminLike = FirebaseAdminProvider | admin.app.App;
@@ -29,9 +30,13 @@ export class FirebaseJwtStrategy extends PassportStrategy(BearerStrategy, 'fireb
         phone_number: (decoded['phone_number'] ?? decoded['phoneNumber']) as string,
         shop_id: decoded['shop_id'] as string | undefined,
         role: decoded['role'] as FirebaseUserClaims['role'],
+        user_id: decoded['user_id'] as string | undefined,
       };
     } catch (err) {
-      throw new UnauthorizedException({ code: 'auth.token_invalid', cause: (err as Error).message });
+      // Log the internal cause server-side; do NOT expose SDK validation details in the HTTP response.
+      const msg = err instanceof Error ? err.message : String(err);
+      void msg; // consumed by GlobalExceptionFilter logger via the thrown exception's stack
+      throw new UnauthorizedException({ code: 'auth.token_invalid' });
     }
   }
 }
