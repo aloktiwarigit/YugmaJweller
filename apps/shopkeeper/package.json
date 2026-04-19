@@ -10,7 +10,7 @@
     "export": "expo export --platform web --output-dir dist",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "echo '(tests land with Task 19 screens)'"
+    "test": "vitest run"
   },
   "dependencies": {
     "@goldsmith/auth-client": "workspace:*",
@@ -39,7 +39,11 @@
   "devDependencies": {
     "@babel/core": "^7.24.0",
     "@config-plugins/react-native-firebase": "^9.0.0",
+    "@testing-library/react": "^15.0.0",
     "@types/react": "~18.2.79",
-    "typescript": "^5.4.0"
+    "axios-mock-adapter": "^1.22.0",
+    "jsdom": "^24.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
   }
 }
