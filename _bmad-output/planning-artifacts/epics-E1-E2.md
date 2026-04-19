@@ -46,6 +46,15 @@ notes:
 
 ### Story 1.1: Shop Owner reaches the empty shop dashboard in the app
 
+> **⚠ 2026-04-18 supersede:** This Story 1.1 text predates ADR-0015 + ADR-0016. The authoritative
+> spec is `docs/superpowers/specs/2026-04-18-story-1.1-auth-and-dashboard-design.md` and the plan
+> is `docs/superpowers/plans/2026-04-18-story-1.1-auth-and-dashboard.md`. Stack corrections:
+> Firebase Auth replaces Supabase Auth; Firebase phone OTP replaces MSG91; Firebase ID token
+> directly replaces own-JWT + Redis-refresh pair (NFR-S5 amended via ADR-0016); Direction 5
+> typography replaces Hind Siliguri (NFR-A6); Azure Central/South India replaces ap-south-1
+> (NFR-C7); Maestro replaces Detox. Use this section as an epic index only, not as a source
+> of truth.
+
 **Class:** A (grandfathered — uniform ceremony) — Story 1.1 is locked on pre-tiering full-ceremony rules per policy.
 
 **As a Shop Owner (Rajesh-ji, anchor jeweller, onboarding for the first time)**,
