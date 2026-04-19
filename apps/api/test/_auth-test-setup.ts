@@ -19,8 +19,7 @@ export interface AuthTestHarness {
 
 export async function setupAuthTestHarness(): Promise<AuthTestHarness> {
   const projectId = 'goldsmith-test';
-  const emulatorPort = 9099;
-  await startFirebaseAuthEmulator({ port: emulatorPort, projectId });
+  const { port: emulatorPort } = await startFirebaseAuthEmulator({ projectId });
   const container = await new PostgreSqlContainer('postgres:15.6').start();
   const pool = createPool({ connectionString: container.getConnectionUri() });
   await runMigrations(pool, resolve(__dirname, '../../../packages/db/src/migrations'));

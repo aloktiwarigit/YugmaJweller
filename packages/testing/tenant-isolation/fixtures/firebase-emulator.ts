@@ -15,23 +15,41 @@ function isPortOpen(host: string, port: number): Promise<boolean> {
   });
 }
 
-export async function startFirebaseAuthEmulator(options: { port: number; projectId: string }): Promise<void> {
-  process.env['FIREBASE_AUTH_EMULATOR_HOST'] = `127.0.0.1:${options.port}`;
+/**
+ * Start the Firebase Auth emulator on a per-worker port to avoid singleton collisions
+ * when Vitest runs parallel workers.
+ *
+ * @param options.port  Explicit port override. If omitted, derived from VITEST_WORKER_ID
+ *                      (range 9099–9198) so parallel workers never share a port.
+ * @param options.projectId  Firebase project ID.
+ * @returns  The resolved port number (callers should use this instead of hardcoding 9099).
+ */
+export async function startFirebaseAuthEmulator(options: { port?: number; projectId: string }): Promise<{ port: number }> {
+  // Per-worker port: VITEST_WORKER_ID is set for each parallel worker (1-based).
+  const workerId = Number(process.env['VITEST_WORKER_ID'] ?? process.env['VITEST_POOL_ID'] ?? '0');
+  const port = options.port ?? (9099 + (workerId % 100));
+
+  process.env['FIREBASE_AUTH_EMULATOR_HOST'] = `127.0.0.1:${port}`;
   process.env['GCLOUD_PROJECT'] = options.projectId;
   process.env['FIREBASE_PROJECT_ID'] = options.projectId;
 
-  // If another worker already started the emulator on this port, skip startup.
-  const alreadyUp = await isPortOpen('127.0.0.1', options.port);
+  // If another worker already started the emulator on this port, reuse it.
+  const alreadyUp = await isPortOpen('127.0.0.1', port);
   if (alreadyUp) {
-    console.log(`[firebase-emulator] port ${options.port} already open — skipping startup`);
-    return;
+    console.log(`[firebase-emulator] port ${port} already open — reusing`);
+    return { port };
   }
 
   proc = spawn('firebase', [
     'emulators:start',
     '--only', 'auth',
     '--project', options.projectId,
-  ], { stdio: 'pipe', shell: true });
+    '--port', String(port),
+  ], {
+    stdio: 'pipe',
+    shell: true,
+    env: { ...process.env, AUTH_EMULATOR_PORT: String(port) },
+  });
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('firebase emulator startup timeout')), STARTUP_WAIT_MS);
     proc?.stdout?.on('data', (chunk: Buffer) => {
@@ -52,6 +70,8 @@ export async function startFirebaseAuthEmulator(options: { port: number; project
       if (code !== null && code !== 0) reject(new Error(`firebase emulator exited ${code}`));
     });
   });
+
+  return { port };
 }
 
 export async function stopFirebaseAuthEmulator(): Promise<void> {

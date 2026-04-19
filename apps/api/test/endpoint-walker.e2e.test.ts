@@ -15,16 +15,16 @@ describe('endpoint-walker — real tenant-scoped assertions (E2-S1 deferral #4)'
   let pool: Pool;
   let app: INestApplication;
   const projectId = 'goldsmith-walker-test';
-  const emulatorPort = 9099;
+  let emulatorPort = 9099;
   const seeded: SeededTenantToken[] = [];
 
   beforeAll(async () => {
-    await startFirebaseAuthEmulator({ port: emulatorPort, projectId });
+    ({ port: emulatorPort } = await startFirebaseAuthEmulator({ projectId }));
     container = await new PostgreSqlContainer('postgres:15.6').start();
     pool = createPool({ connectionString: container.getConnectionUri() });
     await runMigrations(pool, resolve(__dirname, '../../../packages/db/src/migrations'));
     process.env['DATABASE_URL'] = container.getConnectionUri();
-    process.env['FIREBASE_AUTH_EMULATOR_HOST'] = `127.0.0.1:${emulatorPort}`;
+    process.env['FIREBASE_AUTH_EMULATOR_HOST'] = `127.0.0.1:${emulatorPort}`; // already set by startFirebaseAuthEmulator; kept for explicitness
     process.env['FIREBASE_PROJECT_ID'] = projectId;
     await provisionFixtures(pool);
 
