@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { ShopUserRole } from '@goldsmith/tenant-context';
@@ -16,7 +16,7 @@ export class RolesGuard implements CanActivate {
     ]);
     if (!required || required.length === 0) return true;
     const tc = tenantContext.current();
-    if (!tc?.authenticated) throw new ForbiddenException({ code: 'auth.not_authenticated' });
+    if (!tc?.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     if (!required.includes(tc.role)) throw new ForbiddenException({ code: 'auth.insufficient_role' });
     return true;
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ForbiddenException, type ExecutionContext } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RolesGuard } from './roles.guard';
 import { tenantContext } from '@goldsmith/tenant-context';
@@ -44,10 +44,10 @@ describe('RolesGuard', () => {
     ).toThrow(ForbiddenException);
   });
 
-  it('throws 403 when not authenticated', () => {
+  it('throws 401 when not authenticated', () => {
     const { reflector, execCtx } = makeExecCtx(['shop_admin']);
     const guard = new RolesGuard(reflector);
-    expect(() => guard.canActivate(execCtx)).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(execCtx)).toThrow(UnauthorizedException);
   });
 
   it('passes shop_manager for read role', () => {

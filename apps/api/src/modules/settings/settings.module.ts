@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, OnModuleDestroy, Inject } from '@nestjs/common';
 import Redis from 'ioredis';
 import { AuthModule } from '../auth/auth.module';
 import { TenantLookupModule } from '../tenant-lookup/tenant-lookup.module';
@@ -16,13 +16,20 @@ import { SettingsCache } from '@goldsmith/tenant-config';
     SettingsRepository,
     BlobStorageService,
     {
+      provide: 'SETTINGS_REDIS',
+      useFactory: () => new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379'),
+    },
+    {
       provide: SettingsCache,
-      useFactory: () =>
-        new SettingsCache(
-          new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379'),
-          60,
-        ),
+      useFactory: (redis: Redis) => new SettingsCache(redis, 60),
+      inject: ['SETTINGS_REDIS'],
     },
   ],
 })
-export class SettingsModule {}
+export class SettingsModule implements OnModuleDestroy {
+  constructor(@Inject('SETTINGS_REDIS') private readonly redis: Redis) {}
+
+  async onModuleDestroy(): Promise<void> {
+    await this.redis.quit();
+  }
+}

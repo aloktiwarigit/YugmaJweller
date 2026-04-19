@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   HttpCode,
-  Inject,
   Patch,
   Post,
   Res,
@@ -26,8 +25,8 @@ import type { PatchShopProfileDto } from '@goldsmith/shared';
 @UseGuards(new RolesGuard(new Reflector()))
 export class SettingsController {
   constructor(
-    @Inject(SettingsService) private readonly svc: SettingsService,
-    @Inject(BlobStorageService) private readonly blob: BlobStorageService,
+    private readonly svc: SettingsService,
+    private readonly blob: BlobStorageService,
   ) {}
 
   @Get('/profile')
