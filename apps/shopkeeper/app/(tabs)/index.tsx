@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text } from 'react-native';
+import { useRouter } from 'expo-router';
 import { t } from '@goldsmith/i18n';
 import { Button, Skeleton, Toast } from '@goldsmith/ui-mobile';
 import { colors, typography, spacing } from '@goldsmith/ui-tokens';
 import { useTenantStore } from '../../src/stores/tenantStore';
 
 export default function DashboardScreen(): React.ReactElement {
+  const router = useRouter();
   const tenant = useTenantStore((s) => s.tenant);
   const loading = useTenantStore((s) => s.loading);
   const [stubMsg, setStubMsg] = useState<string | null>(null);
@@ -132,7 +134,7 @@ export default function DashboardScreen(): React.ReactElement {
           <Button
             label={t('dashboard.cta_staff')}
             variant="primary"
-            onPress={showStub}
+            onPress={() => router.push('/settings/staff')}
             testID="dashboard-cta-staff"
           />
           <View style={{ height: 16 }} />

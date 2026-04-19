@@ -1,4 +1,5 @@
 import React from 'react';
+import { vi } from 'vitest';
 
 // Minimal React Native mock for vitest/jsdom + @testing-library/react testing.
 // Self-contained copy (not imported from packages/ui-mobile/test) to avoid
@@ -43,10 +44,55 @@ const TextInputMock = React.forwardRef<unknown, AnyProps>(
   },
 );
 
+// TouchableOpacity behaves like Pressable: onPress → onClick
+const TouchableOpacityMock = React.forwardRef<unknown, AnyProps>(
+  ({ testID, onPress, disabled, ...rest }, ref) => {
+    const extraProps: AnyProps = {};
+    if (testID !== undefined) extraProps['data-testid'] = testID;
+    if (typeof onPress === 'function' && !disabled) {
+      extraProps['onClick'] = onPress;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock shim @why
+    return React.createElement('touchableopacity', { ...(rest as any), disabled, ...extraProps, ref });
+  },
+);
+
+// FlatList: renders all data items inline via renderItem
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock shim @why generic data
+const FlatListMock = ({ data, renderItem, keyExtractor, testID, ...rest }: AnyProps): React.ReactElement => {
+  const items = Array.isArray(data) ? data : [];
+  const extraProps = testID !== undefined ? { 'data-testid': testID } : {};
+  return React.createElement(
+    'flatlist',
+    { ...(rest as AnyProps), ...extraProps },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock shim @why
+    ...items.map((item: any, index: number) => {
+      const key = typeof keyExtractor === 'function' ? keyExtractor(item, index) : String(index);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock shim @why
+      return typeof renderItem === 'function' ? React.cloneElement(renderItem({ item, index }) as React.ReactElement, { key }) : null;
+    }),
+  );
+};
+
+// Modal: renders children when visible
+const ModalMock = ({ visible, children, testID, ...rest }: AnyProps): React.ReactElement | null => {
+  if (!visible) return null;
+  const extraProps = testID !== undefined ? { 'data-testid': testID } : {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock shim @why
+  return React.createElement('modal', { ...(rest as any), ...extraProps }, children as React.ReactNode);
+};
+
+export const Share = {
+  share: vi.fn().mockResolvedValue({ action: 'sharedAction' }),
+};
+
 export const View = passthrough('view');
 export const Text = passthrough('text');
 export const Pressable = PressableMock;
+export const TouchableOpacity = TouchableOpacityMock;
 export const TextInput = TextInputMock;
+export const FlatList = FlatListMock;
+export const Modal = ModalMock;
 export const StyleSheet = {
   create: <T>(s: T): T => s,
   flatten: (s: unknown): Record<string, unknown> =>
