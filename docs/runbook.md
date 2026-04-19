@@ -481,13 +481,32 @@ When the anchor SOW signs, re-run this same script against the real Firebase pro
 
 Firebase Admin service-account JSON rotates every 90 days per our secrets-hygiene policy.
 
+### Current dev project (provisioned 2026-04-19)
+
+| Field | Value |
+|---|---|
+| Project ID | `goldsmith-dev` |
+| Display name | Goldsmith Dev |
+| Plan | Blaze (pay-as-you-go; Auth free ≤ 10K/mo) |
+| Android app ID | `1:528920018833:android:0c79882996c8299ce3e430` |
+| Android package | `com.goldsmith.shopkeeper.dev` |
+| Enabled providers | Phone, Email/Password, Google (google.com) |
+| Admin service account | `firebase-adminsdk-fbsvc@goldsmith-dev.iam.gserviceaccount.com` |
+| Admin key ID | `661b54dcee689b084392482e0e80676d03488b49` (rotate by 2026-07-18) |
+| Local key path | `.secrets/firebase-admin-sdk-goldsmith-dev.json` (gitignored) |
+| iOS | Deferred (not needed pre-anchor-SOW) |
+| Client config | `apps/shopkeeper/google-services.json` (gitignored — regenerate via `firebase apps:sdkconfig ANDROID <appId> --project goldsmith-dev --out apps/shopkeeper/google-services.json`) |
+
+### Rotation steps
+
 1. Firebase Console → Project settings → Service accounts → Generate new private key.
-2. Base64-encode the downloaded JSON: `base64 -i service-account.json | tr -d '\n'`.
-3. Update Azure Key Vault secret `firebase-service-account-json` (prod) or `.env.local` (dev).
+   Alternative CLI: `gcloud iam service-accounts keys create .secrets/firebase-admin-sdk-goldsmith-dev.json --iam-account=firebase-adminsdk-fbsvc@goldsmith-dev.iam.gserviceaccount.com --project=goldsmith-dev`.
+2. Base64-encode the downloaded JSON: `base64 -w0 .secrets/firebase-admin-sdk-goldsmith-dev.json` (or macOS: `base64 -i … | tr -d '\n'`).
+3. Update Azure Key Vault secret `firebase-service-account-json` (prod) or `apps/api/.env.local` (dev).
 4. Redeploy Container App (prod) or restart dev server. Verify with a test OTP.
-5. Delete old key in Firebase Console only after the new key is confirmed live (>=30min
-   overlap).
-6. Log the rotation in `docs/security-log.md` (create if absent).
+5. Delete old key in Firebase Console only after the new key is confirmed live (≥30min overlap).
+6. List old keys: `gcloud iam service-accounts keys list --iam-account=firebase-adminsdk-fbsvc@goldsmith-dev.iam.gserviceaccount.com`. Delete: `gcloud iam service-accounts keys delete <KEY_ID> --iam-account=<acct>`.
+7. Log the rotation in `docs/security-log.md` (create if absent).
 
 ---
 

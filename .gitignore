@@ -16,6 +16,13 @@ coverage/
 *.pem
 *.key
 
+# Service account JSON keys (Firebase Admin SDK, GCP service accounts).
+# Pattern covers .secrets/ root plus filename conventions from gcloud/firebase.
+.secrets/
+*-service-account*.json
+*-adminsdk*.json
+firebase-admin-sdk-*.json
+
 # Editor + OS
 .DS_Store
 Thumbs.db
