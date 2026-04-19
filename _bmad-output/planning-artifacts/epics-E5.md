@@ -34,6 +34,8 @@ notes:
 
 ### Story 5.1: Shopkeeper generates a first B2C invoice with GST 3+5 + HUID per line + hardcoded 12% making charge
 
+**Class:** A — Touches packages/compliance (GST split + HUID validate hard-blocks) + packages/money + new billing module + RLS on invoices + audit write path.
+
 **As a Shopkeeper (Ravi at the billing counter)**,
 I want to create a simple B2C invoice for a gold chain — one line, one customer, hardcoded making charge, compliant GST split — that prints and saves to the customer record,
 So that the first production invoice goes out on Day 1 of anchor launch, even before Epic 2 settings wire up.
@@ -89,6 +91,8 @@ So that the first production invoice goes out on Day 1 of anchor launch, even be
 
 ### Story 5.2: Shopkeeper invoice reads making-charge defaults from `shop_settings` (integrates Epic 2 Story 2.2)
 
+**Class:** B — Extends billing.service to read making-charge defaults from tenant-config; no new compliance gates.
+
 **As a Shopkeeper (Rajesh-ji)**,
 I want the invoice to auto-apply my configured making charge for the product category — 14% for bridal, 12% for daily-wear, 10% for wholesale — instead of the hardcoded 12%,
 So that my margins are consistent and I don't have to type a percentage into every invoice.
@@ -122,6 +126,8 @@ So that my margins are consistent and I don't have to type a percentage into eve
 ---
 
 ### Story 5.3: Invoice hard-blocks completion at Rs 2 lakh total without PAN or Form 60
+
+**Class:** A — Touches packages/compliance (PAN Rule 114B hard-block) + packages/security encryptPII for PAN with KMS.
 
 **As the Goldsmith System**,
 I need to block any invoice ≥ Rs 2 lakh from saving without PAN or Form 60 captured — per Income Tax Rule 114B — so the jeweller is never liable for regulatory penalties.
@@ -171,6 +177,8 @@ I need to block any invoice ≥ Rs 2 lakh from saving without PAN or Form 60 cap
 
 ### Story 5.4: Invoice hard-blocks cash payment at Rs 1,99,999 per customer/day with supervisor audit-logged override
 
+**Class:** A — Touches packages/compliance (Section 269ST cash-cap hard-block) + compliance-override supervisor audit.
+
 **As the Goldsmith System**,
 I need to block any cash payment line that would cause total cash received in a single transaction/day/event to reach or exceed Rs 2 lakh — per Income Tax Section 269ST — because the penalty (100% of amount) falls on the jeweller.
 
@@ -217,6 +225,8 @@ I need to block any cash payment line that would cause total cash received in a 
 
 ### Story 5.5: System tracks customer cumulative monthly cash and warns at Rs 8 lakh
 
+**Class:** A — Touches packages/compliance (PMLA cumulative tracker) + pmla_aggregates table + compliance-gate suite.
+
 **As the Goldsmith System**,
 I need to track cumulative cash received per customer per calendar month and alert the shopkeeper when a customer approaches the PMLA reporting threshold (Rs 10 lakh), so CTR preparation is timely.
 
@@ -256,6 +266,8 @@ I need to track cumulative cash received per customer per calendar month and ale
 ---
 
 ### Story 5.6: PMLA cumulative cash hard-blocks at Rs 10 lakh with CTR template auto-generation
+
+**Class:** A — Touches packages/compliance (PMLA hard-block at Rs 10L + CTR auto-gen).
 
 **As the Goldsmith System**,
 I need to hard-block any additional cash that would cross Rs 10 lakh monthly per customer and automatically generate a pre-filled Cash Transaction Report (CTR) template for the shopkeeper to file within 15 days of month-end.
@@ -297,6 +309,8 @@ I need to hard-block any additional cash that would cross Rs 10 lakh monthly per
 ---
 
 ### Story 5.7: Shopkeeper records split payment (cash + UPI + card + net-banking + old-gold-adjust + scheme-redeem)
+
+**Class:** A — Razorpay adapter + webhook signature verification + packages/compliance gates for cash portion (269ST).
 
 **As a Shopkeeper (Ravi during Dhanteras)**,
 I want to record multi-method payment on a single invoice — ₹1,50,000 cash + ₹80,000 UPI + old-gold ₹20,000 adjustment — with Razorpay webhook confirmation,
@@ -346,6 +360,8 @@ So that the customer walks out with one bill reflecting the real payment mix.
 
 ### Story 5.8: Shopkeeper generates B2B wholesale invoice with correct GST treatment and vendor GSTIN
 
+**Class:** A — Billing B2B branch + compliance GST treatment (B2B-specific) on RLS-sensitive invoice path.
+
 **As a Shopkeeper (Ravi)**,
 I want to generate a wholesale invoice for a vendor with their GSTIN captured, different making-charge tier, and B2B GST treatment,
 So that wholesale customers get tax-compliant invoices matching their input-credit claims.
@@ -379,6 +395,8 @@ So that wholesale customers get tax-compliant invoices matching their input-cred
 ---
 
 ### Story 5.9: Shopkeeper records URD (old-gold) purchase with auto self-invoice under RCM 3%
+
+**Class:** A — Touches packages/compliance (URD/RCM self-invoice 3% hard-block) + invoice state-machine.
 
 **As a Shopkeeper (Rajesh-ji)**,
 I want to buy back a customer's old gold at today's rate, auto-generate a self-invoice under Reverse Charge Mechanism, and adjust it against their new purchase,
@@ -414,6 +432,8 @@ So that URD/RCM compliance is automatic and I don't owe GST twice on the same me
 
 ### Story 5.10: Shopkeeper shares invoice as PDF via WhatsApp / SMS / email
 
+**Class:** B — Billing invoice-pdf + share service + WhatsApp integration; non-compliance invoice output.
+
 **As a Shopkeeper (Ravi)**,
 I want to tap one button to send the invoice on WhatsApp right after the customer pays — with the designed-moment celebration (haptic + toast + PDF-slide-to-WhatsApp animation),
 So that the customer leaves with the bill already in their chat.
@@ -448,6 +468,8 @@ So that the customer leaves with the bill already in their chat.
 ---
 
 ### Story 5.11: Shopkeeper voids or modifies invoice within 24-hour window (owner-only); after window, credit-note flow only
+
+**Class:** A — Invoice state-machine (ISSUED → VOIDED) + audit compensating events for inventory/loyalty/PMLA.
 
 **As a Shop Owner (Rajesh-ji)**,
 I want to correct a mistake on an invoice I made this morning — before it's too late — but after the window, force me through credit-note flow so audit trail stays clean.
@@ -489,6 +511,8 @@ I want to correct a mistake on an invoice I made this morning — before it's to
 
 ### Story 5.12: Shopkeeper exports transaction data as GSTR-1 and GSTR-3B CSV
 
+**Class:** B — GSTR-1/3B CSV export reads compliance-gated data without introducing new hard-blocks.
+
 **As a Shopkeeper's Accountant (consuming exports monthly)**,
 I need GSTR-1 and GSTR-3B-compatible CSVs covering the month's transactions so I can upload to the GST portal without manual re-keying.
 
@@ -519,6 +543,8 @@ I need GSTR-1 and GSTR-3B-compatible CSVs covering the month's transactions so I
 ---
 
 ### Story 5.13: Anchor jeweller completes first real invoice within 48 hours of onboarding (end-to-end integration)
+
+**Class:** A — E2E integration story covering every Epic 5 compliance gate + payment + offline sync + audit trail.
 
 **As the Anchor Jeweller (Rajesh-ji, Day 1 of shop operations on the app)**,
 I want to complete my first real customer invoice on the app — not a demo — within 48 hours of the platform team's onboarding visit,

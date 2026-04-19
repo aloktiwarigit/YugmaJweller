@@ -32,6 +32,8 @@ notes:
 
 ### Story 3.1: Shopkeeper creates a single product record with category, metal, purity, weight, stone details, and HUID
 
+**Class:** A — Touches packages/compliance (HUID validate) + packages/audit write path + RLS migration.
+
 **As a Shopkeeper (Ravi, anchor staff handling inventory onboarding)**,
 I want to enter one product at a time with all the attributes — category, metal, purity, gross/net/stone weight, HUID — along with images,
 So that the piece is searchable, priceable, and ready to publish to the customer app.
@@ -105,6 +107,8 @@ So that the piece is searchable, priceable, and ready to publish to the customer
 
 ### Story 3.2: Shopkeeper bulk-imports inventory via CSV with template matching the product schema
 
+**Class:** B — Inventory module CSV import endpoint on a safe product surface.
+
 **As a Shopkeeper (Rajesh-ji during anchor onboarding)**,
 I want to import 240 existing pieces from a CSV file I prepared with my accountant,
 So that I don't have to hand-enter each piece through the mobile form.
@@ -152,6 +156,8 @@ So that I don't have to hand-enter each piece through the mobile form.
 
 ### Story 3.3: Shopkeeper prints barcode labels for physical pieces
 
+**Class:** B — Barcode generation + print UI; no money/auth/compliance.
+
 **As a Shopkeeper (Ravi)**,
 I want to print a barcode sticker for each product that I can affix to the jewelry pouch,
 So that during billing I can scan the barcode and the product loads instantly.
@@ -187,6 +193,8 @@ So that during billing I can scan the barcode and the product loads instantly.
 ---
 
 ### Story 3.4: Shopkeeper marks a product status as in-stock, sold, reserved, on-approval, or with-karigar
+
+**Class:** B — Product status state machine, audit-logged; safe inventory CRUD.
 
 **As a Shop Staff (Ravi)**,
 I want to change a product's status when physical reality changes (piece sent to karigar for repair, customer has it on approval),
@@ -230,6 +238,8 @@ So that inventory reflects what's actually in the safe versus out.
 
 ### Story 3.5: Shopkeeper publishes or unpublishes a product to the customer app
 
+**Class:** B — Publication toggle + event bus; RLS via withTenantTx on safe product surface.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to toggle visibility of a product on the customer-facing app,
 So that pieces still being photographed or under karigar work aren't visible until ready.
@@ -271,6 +281,8 @@ So that pieces still being photographed or under karigar work aren't visible unt
 ---
 
 ### Story 3.6: Shopkeeper-side publishes propagate to customer app within 30 seconds via offline-sync infrastructure
+
+**Class:** A — Foundational sync protocol (WatermelonDB + cursor + conflict resolution) carrying customer/invoice/product mutations across tenants.
 
 **As a Shop Owner (Rajesh-ji)**,
 I want my inventory changes (publish, status update, stock movement) to reflect on the customer app within 30 seconds — even when my shop has spotty internet,
@@ -346,6 +358,8 @@ So that my customers always see accurate availability and I trust the system.
 
 ### Story 3.7: Shopkeeper views live stock valuation at today's market rate, cost price, and selling price
 
+**Class:** B — Valuation dashboard reads money + rates on a safe reporting surface.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to see my total inventory value right now at (a) today's gold rate, (b) my original cost, and (c) my expected selling price — broken down by category,
 So that I know my shop's net worth and margin at a glance.
@@ -387,6 +401,8 @@ So that I know my shop's net worth and margin at a glance.
 
 ### Story 3.8: Shopkeeper records stock movements (purchase, sale, adjustment, transfer)
 
+**Class:** A — Compliance PMLA 5-year immutable audit + pessimistic locking on stock ledger.
+
 **As a Shopkeeper (Ravi)**,
 I want to log every stock change with reason — new purchase from karigar, sale, physical-count adjustment, transfer-to-custom-order,
 So that the audit trail supports accountant reconciliation and PMLA scrutiny.
@@ -427,6 +443,8 @@ So that the audit trail supports accountant reconciliation and PMLA scrutiny.
 ---
 
 ### Story 3.9: Shopkeeper searches and filters inventory by category, metal, purity, weight range, HUID, status, published flag
+
+**Class:** B — Meilisearch per-tenant indexing for inventory; safe product search.
 
 **As a Shopkeeper (Ravi during a Dhanteras rush)**,
 I want to find the 22K 30-40g mangalsutra with HUID scanning in 2 seconds,
@@ -472,6 +490,8 @@ So that I can show the customer exactly what they asked for without opening ever
 ---
 
 ### Story 3.10: Shopkeeper identifies dead stock (products unsold beyond configurable threshold in days)
+
+**Class:** B — Read-only dead-stock reporting dashboard; no compliance/auth.
 
 **As a Shop Owner (Rajesh-ji)**,
 I want a dashboard flagging pieces that haven't sold in 180 days,
@@ -519,6 +539,8 @@ So that I can plan a festive discount or send them back to karigar for redesign.
 
 ### Story 4.1: System auto-fetches IBJA gold rates every 15 minutes with Metals.dev fallback and cached-last-known-good
 
+**Class:** A — Foundational rates adapter + circuit breaker + fallback chain feeding all downstream pricing/invoices/compliance GST.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want today's gold rate to update automatically at reasonable intervals without me refreshing anything — and if IBJA is down, the system falls back silently,
 So that every invoice, valuation, and customer-facing price reflects reality.
@@ -564,6 +586,8 @@ So that every invoice, valuation, and customer-facing price reflects reality.
 
 ### Story 4.2: Shopkeeper manually overrides today's gold rate when IBJA feed is unavailable or disputed
 
+**Class:** B — Shop-scoped rate override with audit log; safe setting.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to set today's 22K rate manually to ₹6,842 when my trusted source differs from IBJA,
 So that my pricing is always honest and no customer argues with a stale number.
@@ -600,6 +624,8 @@ So that my pricing is always honest and no customer argues with a stale number.
 
 ### Story 4.3: Shopkeeper views historical gold rate chart for 30/90/365 days
 
+**Class:** C — Read-only rate history chart; no behavior change.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to look at the last 90 days of gold rate history before advising a customer on rate-lock timing,
 So that I give credible advice backed by real data.
@@ -634,6 +660,8 @@ So that I give credible advice backed by real data.
 ---
 
 ### Story 4.4: Customer app home screen displays today's live gold rate
+
+**Class:** B — Public customer-app rate-widget endpoint; safe customer-facing display.
 
 **As a Customer (Priya browsing at 9pm before wedding shopping)**,
 I want to see today's 22K and 24K rate on the home screen the moment I open the app,
@@ -677,6 +705,8 @@ So that I know whether to buy today or wait for tomorrow.
 
 ### Story 4.5: System auto-calculates product price from the canonical formula (weight × rate + making + stones + GST 3+5 + hallmark fee)
 
+**Class:** A — packages/money pricing formula + packages/compliance GST split + weight-precision harness validation.
+
 **As the Billing System**,
 I need to compute product price deterministically from a single source of truth — `packages/money` + `packages/compliance/gst` — so every invoice, PDP, and valuation uses the same math,
 So that paise-level precision is guaranteed across 10,000+ transactions.
@@ -719,6 +749,8 @@ So that paise-level precision is guaranteed across 10,000+ transactions.
 ---
 
 ### Story 4.6: Shopkeeper sees a RateUpdateToast when their manual override saves or an IBJA refresh completes
+
+**Class:** C — Designed-moment rate-update toast animation; UI-only, no business logic.
 
 **As a Shopkeeper (Ravi)**,
 I want a subtle, 1-second confirmation toast when the rate changes — "आज का भाव अद्यतन" — so I know my tap landed,

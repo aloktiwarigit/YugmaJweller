@@ -46,6 +46,8 @@ notes:
 
 ### Story 1.1: Shop Owner reaches the empty shop dashboard in the app
 
+**Class:** A (grandfathered — uniform ceremony) — Story 1.1 is locked on pre-tiering full-ceremony rules per policy.
+
 **As a Shop Owner (Rajesh-ji, anchor jeweller, onboarding for the first time)**,
 I want to open the shopkeeper app, verify my phone via OTP, and land on my shop's branded dashboard in Hindi,
 So that I can start running my shop on the app instead of the paper daybook.
@@ -178,6 +180,8 @@ So that I can start running my shop on the app instead of the paper daybook.
 
 ### Story 1.2: Shop Owner invites a staff member by phone and assigns a role
 
+**Class:** A — Touches apps/api/src/modules/auth + packages/audit write path + RLS on shop_users.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to invite my son Amit by entering his phone number and assigning him the "Staff" role,
 So that Amit can log in and handle billing while I'm away from the counter.
@@ -247,6 +251,8 @@ So that Amit can log in and handle billing while I'm away from the counter.
 
 ### Story 1.3: Staff member logs in and sees a role-limited dashboard
 
+**Class:** A — Extends auth module + role-based access control enforcement + RLS + audit trail.
+
 **As a Staff member (Amit, 28, Rajesh-ji's son)**,
 I want to open the shopkeeper app with my invited phone number, complete OTP verification, and land on a dashboard that shows only the features my Owner has given me access to,
 So that I can do my job without accidentally touching restricted shop settings.
@@ -310,6 +316,8 @@ So that I can do my job without accidentally touching restricted shop settings.
 ---
 
 ### Story 1.4: Shop Owner configures permissions for each role
+
+**Class:** A — Introduces role-permissions table + RLS + policy-gate read path + role.guard enforcement.
 
 **As a Shop Owner (Rajesh-ji)**,
 I want to open Settings → Staff & Permissions and customize what each role (Staff, Manager) can and cannot do — for example, allow Staff to create invoices but not void them, and allow Manager to view reports,
@@ -375,6 +383,8 @@ So that I maintain control without micromanaging every action.
 
 ### Story 1.5: Shop Owner revokes a staff member's access
 
+**Class:** A — Touches packages/security (JWT revocation + Redis token invalidation) + auth module + audit.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to remove a staff member from my shop — for example, if a staff member leaves — and have their session immediately invalidated so they cannot access shop data,
 So that I maintain tight control over who can see and act on my business data.
@@ -438,6 +448,8 @@ So that I maintain tight control over who can see and act on my business data.
 
 ### Story 1.6: Every authentication and permission event is captured in the immutable audit trail
 
+**Class:** A — Extends packages/audit write path + immutability enforcement (RLS REVOKE UPDATE/DELETE) + 5-year retention.
+
 **As a Shop Owner (Rajesh-ji) and as the Platform Team**,
 I want every auth event (login, logout, invite, revoke, permission-change, failed-attempt) to be immutably recorded so that in case of a dispute or compliance review I have a complete, tamper-proof log,
 So that I never face a "he said / she said" situation and the platform satisfies PMLA 5-year retention requirements.
@@ -499,6 +511,8 @@ So that I never face a "he said / she said" situation and the platform satisfies
 ---
 
 ### Story 1.7: Shop Owner signs out from all devices simultaneously
+
+**Class:** A — Touches packages/security (revokeAllSessionsForUser) + Redis revocation + auth module.
 
 **As a Shop Owner (Rajesh-ji)**,
 I want to log out from ALL devices at once — for example, if I suspect my phone was accessed by someone else — and have every active session immediately invalidated,
@@ -565,6 +579,8 @@ So that I can be certain no one else can access my shop data.
 ---
 
 ### Story 2.1: Shopkeeper edits their shop profile
+
+**Class:** B — New settings module endpoint + shop_settings table with RLS + audit logging on a safe shop-metadata surface.
 
 **As a Shop Owner (Rajesh-ji)**,
 I want to open Settings → Shop Profile and update my shop's name, address, GSTIN, BIS registration number, phone, operating hours, and about text in Hindi — and have my customer-facing storefront reflect the updated shop name and hours within 30 seconds,
@@ -647,6 +663,8 @@ So that my customers always see accurate, current information about my shop.
 
 ### Story 2.2: Shopkeeper configures default making charges per product category
 
+**Class:** B — Settings module pricing metadata on shop_settings; no compliance hard-blocks or auth surface touched.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to open Settings → Pricing & Policies → Making Charges and set my default making charge for each category (Rings, Chains, Bangles, Bridal, Silver, Wholesale) as either a percentage of gold value or a fixed rate per gram — and have billing auto-use these defaults when creating invoices,
 So that I never have to manually calculate making charges for every invoice.
@@ -716,6 +734,8 @@ So that I never have to manually calculate making charges for every invoice.
 
 ### Story 2.3: Shopkeeper configures default wastage percentages per product category
 
+**Class:** B — Settings module wastage-% metadata; pure pricing config, no compliance or money primitives in path.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to set the default wastage percentage for each product category so that when I create an invoice, the system automatically adds the wastage weight/charge to the billing calculation,
 So that I'm always compensated for metal lost during fabrication without manually calculating it per piece.
@@ -770,6 +790,8 @@ So that I'm always compensated for metal lost during fabrication without manuall
 ---
 
 ### Story 2.4: Shopkeeper configures loyalty program tiers and accrual/redemption rates
+
+**Class:** B — Settings module loyalty_json config; no compliance or auth-adjacent logic.
 
 **As a Shop Owner (Rajesh-ji)**,
 I want to define my loyalty program — give tiers memorable Hindi names (Silver/Gold/Diamond), set the spending thresholds that trigger each tier, set how many points a customer earns per rupee spent, and set the redemption rate — so that the loyalty program reflects my shop's unique relationship with customers,
@@ -835,6 +857,8 @@ So that I can run a loyalty program that feels personal and encourages repeat vi
 
 ### Story 2.5: Shopkeeper configures rate-lock duration
 
+**Class:** B — Settings module rate-lock-days config; simple shop setting, no compliance.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to set how many days a customer can lock today's gold rate — for example, "7 days" means if a customer pays a deposit today, they have 7 days to come in and buy at today's price — so that I can set a policy that balances customer trust with my gold-rate exposure risk,
 So that my rate-lock policy is consistent and automatic without my staff having to remember the rules.
@@ -891,6 +915,8 @@ So that my rate-lock policy is consistent and automatic without my staff having 
 ---
 
 ### Story 2.6: Shopkeeper toggles try-at-home and sets the piece-count limit
+
+**Class:** B — Settings + feature-flag subsystem for try-at-home toggle; non-auth shop policy control.
 
 **As a Shop Owner (Rajesh-ji)**,
 I want to enable or disable the try-at-home service for my shop and set the maximum number of pieces a customer can request per visit — so that I control whether this service is active and how much operational load it creates,
@@ -956,6 +982,8 @@ So that try-at-home is only available when I've decided to offer it and within m
 
 ### Story 2.7: Shopkeeper edits their custom order policy text
 
+**Class:** B — Settings module custom-order policy text + audit; pure UI settings on safe surface.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to write my own custom order policy in Hindi — covering my refund rules, how many rework rounds I allow, the deposit structure, and the cancellation window — so that customers understand my terms before placing a custom order,
 So that I never have disputes about policy because customers read and agree to my own words.
@@ -1020,6 +1048,8 @@ So that I never have disputes about policy because customers read and agree to m
 
 ### Story 2.8: Shopkeeper edits return and exchange policy text
 
+**Class:** B — Reuses PolicyTextEditor; extends settings for return policy text + audit.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to write my shop's return and exchange policy in Hindi — including which items are returnable, the window period, and the exchange terms — so that this text is displayed on every product page in my customer app,
 So that customers know my terms before they inquire, reducing disputes after purchase.
@@ -1077,6 +1107,8 @@ So that customers know my terms before they inquire, reducing disputes after pur
 ---
 
 ### Story 2.9: Shopkeeper configures notification preferences per event and channel
+
+**Class:** B — Settings module notification channel toggles + packages/tenant-config feature flags; no auth/compliance.
 
 **As a Shop Owner (Rajesh-ji)**,
 I want to control exactly which events trigger a notification and on which channels (WhatsApp, SMS, Push, Email) — for example, "send me a push when a new inquiry comes in, but don't send WhatsApp to myself for every invoice I generate" — so that I control my notification load and my customers get the right touchpoints from my shop,

@@ -27,6 +27,8 @@ notes:
 
 ### Story 15.1: Platform Admin logs in via MFA-gated login
 
+**Class:** A — Platform-admin MFA-gated auth module + platform_admin role.
+
 **As a Platform Admin (Alokt)**,
 I want to log in to the admin console with phone OTP + TOTP second factor,
 So that privileged platform access requires two-factor authentication.
@@ -59,6 +61,8 @@ So that privileged platform access requires two-factor authentication.
 ---
 
 ### Story 15.2: Platform Admin views tenant list + detail with filter by status
+
+**Class:** A — SECURITY DEFINER cross-tenant query for tenant list/detail + tenant-isolation test.
 
 **As a Platform Admin**,
 I want a sortable tenant list — filter by ACTIVE/SUSPENDED/TERMINATED/ONBOARDING + search by name/city/GSTIN — with quick-drill per tenant,
@@ -94,6 +98,8 @@ So that I can locate any tenant in seconds for support.
 
 ### Story 15.3: Platform Admin opens theme configurator wizard with HCT-validated WCAG AA seed colors
 
+**Class:** B — Theme configurator wizard UI; non-sensitive, safe surface.
+
 **As a Platform Admin onboarding a new jeweller**,
 I want a 5-step wizard: shop details → logo upload → primary seed color (auto-validated WCAG AA via HCT) → typography stack → domain,
 So that theme setup is 15 minutes, not 15 hours.
@@ -126,6 +132,8 @@ So that theme setup is 15 minutes, not 15 hours.
 
 ### Story 15.4: Platform Admin configures per-tenant feature flags (try-at-home, wholesale, gold-scheme, loyalty, viewing-analytics)
 
+**Class:** B — Per-tenant feature-flag CRUD; safe surface, non-sensitive.
+
 **As a Platform Admin configuring Varanasi Gold House (no try-at-home, custom chit-fund)**,
 I want toggles per-tenant for each major feature + per-plan defaults,
 So that Suresh-ji doesn't get features he didn't buy.
@@ -157,6 +165,8 @@ So that Suresh-ji doesn't get features he didn't buy.
 ---
 
 ### Story 15.5: Platform Admin provisions a new tenant end-to-end with zero custom code
+
+**Class:** A — Tenant-provisioning orchestrator + KMS CMK + multi-step infra + rollback + idempotency.
 
 **THE central provisioning story. Zero custom code per tenant.**
 
@@ -198,6 +208,8 @@ So that the 5th jeweller is onboarded in under 4 hours, not 4 days.
 
 ### Story 15.6: Provisioned tenant's owner receives WhatsApp/SMS invite; completes OTP verify; tenant transitions PROVISIONED → ONBOARDING
 
+**Class:** A — Provisioned-tenant invite + OTP verification completes a platform_admin flow.
+
 **As a new Shop Owner (Suresh-ji of Varanasi Gold House)**,
 I want to receive a WhatsApp + SMS invite with a single tap-to-verify link,
 So that I activate my tenant without confusing email/username setup.
@@ -228,6 +240,8 @@ So that I activate my tenant without confusing email/username setup.
 ---
 
 ### Story 15.7: Platform Admin impersonates tenant user with time-limit + MFA + audit-logged justification
+
+**Class:** A — Impersonation service per ADR-0005 + time-limited token + audit + RLS isolation test.
 
 **As a Platform Support agent troubleshooting a ticket**,
 I want to impersonate the affected shopkeeper user for 60 minutes (read-only default, write requires second-step approval) with all actions audit-logged,
@@ -266,6 +280,8 @@ So that I can diagnose without giving support agents standing write access.
 
 ### Story 15.8: Platform Admin suspends/reactivates/terminates a tenant with DPDPA-compliant retention
 
+**Class:** A — Tenant lifecycle state machine + DPDPA retention + KMS key deletion + soft/hard-delete.
+
 **As a Platform Admin**,
 I want to suspend a non-paying tenant (read-only), reactivate after payment, or terminate (30-day soft-delete → hard per DPDPA + PMLA retention),
 So that tenant lifecycle operations are clean and reversible.
@@ -302,6 +318,8 @@ So that tenant lifecycle operations are clean and reversible.
 
 ### Story 15.9: Platform Admin triggers tenant data export (full bundle) for portability
 
+**Class:** A — DPDPA portability export + KMS encryption + cross-tenant operation.
+
 **As a Platform Admin honouring tenant data-portability request**,
 I want to generate a complete export: invoices + customers + inventory + custom orders + reviews + images + settings — all in CSV + JSON + PDF,
 So that DPDPA portability rights are fulfilled within 30 days.
@@ -332,6 +350,8 @@ So that DPDPA portability rights are fulfilled within 30 days.
 ---
 
 ### Story 15.10: Platform Admin views cross-tenant metrics dashboard (active tenants, MAU, invoices, GMV)
+
+**Class:** A — Cross-tenant metrics dashboard reading all tenants + SECURITY DEFINER + audit-logged.
 
 **As a Platform Admin**,
 I want the platform health summary: active tenants, total MAU/WAU/DAU, total invoices, total GMV flowing through the platform, per-plan distribution,
@@ -365,6 +385,8 @@ So that I know the business's pulse at a glance.
 
 ### Story 15.11: Platform Admin manages subscription plans + assigns to tenants + overrides status (grace/trial extend)
 
+**Class:** A — Platform-global subscription plans + cross-tenant assignment + override grace period.
+
 **As a Platform Admin**,
 I want CRUD on plans (Starter / Pro / Enterprise) + per-tenant plan assignment + override tools for grace period or trial extension,
 So that commercial flexibility doesn't require DB surgery.
@@ -397,6 +419,8 @@ So that commercial flexibility doesn't require DB surgery.
 ---
 
 ### Story 15.12: Platform Admin configures global platform settings (vendor API creds, compliance-rule versioning) with MFA gate
+
+**Class:** A — Secrets Manager writes (vendor API keys) + compliance-rules versioning + MFA gate.
 
 **As a Platform Admin**,
 I want to rotate vendor API keys (IBJA, Razorpay, AiSensy, Surepass) + version compliance rules (GST rate change) without code deploy — all MFA-gated,
@@ -446,6 +470,8 @@ So that operational changes don't require engineering + no secrets in code.
 
 ### Story 16.1: Anchor survives Dhanteras 10× load sustained 72 hours
 
+**Class:** B — Load-testing scripts + performance verification; no code behavior change.
+
 **As the Anchor Jeweller (Rajesh-ji on Dhanteras day)**,
 I want the app to hold up when 40+ customers come through in 4 hours and keep that pace across Dhanteras week + Akshaya Tritiya week,
 So that my biggest sales days don't turn into operational disasters.
@@ -482,6 +508,8 @@ So that my biggest sales days don't turn into operational disasters.
 
 ### Story 16.2: Anchor data is always recoverable after outage
 
+**Class:** C — Disaster-recovery runbook + drill documentation; no code changes.
+
 **As the Anchor Jeweller**,
 I want confidence that if power goes out mid-day or internet drops during a custom-order photo upload, nothing is lost — drill-verified,
 So that I don't live in fear of cloud outages.
@@ -513,6 +541,8 @@ So that I don't live in fear of cloud outages.
 
 ### Story 16.3: Anchor's tenant isolation is independently verified by external pentest
 
+**Class:** C — External pentest scope + report docs; evidence-collection only.
+
 **As the Anchor Jeweller**,
 I want a third-party pentest signed off before any 2nd tenant is onboarded — to know my customer data is genuinely safe,
 So that the foundational trust is externally validated.
@@ -543,6 +573,8 @@ So that the foundational trust is externally validated.
 ---
 
 ### Story 16.4: Anchor can reach a human in 5 minutes for P1 support
+
+**Class:** B — P1 support SLA + Zoho Desk integration; operational outcome on safe surface.
 
 **As the Anchor Jeweller (Rajesh-ji on a problem day)**,
 I want a real human in 5 minutes via WhatsApp — not a chatbot — with 24h P1 resolution guarantee,
@@ -576,6 +608,8 @@ So that if my app breaks mid-Dhanteras, someone is actually answering.
 
 ### Story 16.5: Anchor's telemetry tells us if the customer app is working (pivot-trigger gate)
 
+**Class:** B — PostHog customer-app telemetry dashboard + events; observability only.
+
 **As the Platform Team**,
 I need DAU/WAU/MAU + engagement funnels visible from Day 0 of customer-app launch so the Month-6 pivot trigger per PRD §Success Criteria is actionable — not a scramble 30 days before the decision,
 So that if customer engagement falls short, we pivot to shopkeeper-only SaaS confidently.
@@ -607,6 +641,8 @@ So that if customer engagement falls short, we pivot to shopkeeper-only SaaS con
 ---
 
 ### Story 16.6: Anchor sign-off day — demo walkthrough, production approval, reference commitment
+
+**Class:** C — Anchor sign-off ceremony doc + checklist; governance doc only.
 
 **As the Anchor Jeweller (Rajesh-ji)**,
 I want a structured sign-off day where I walk through every capability, approve production launch, confirm zero unresolved P1 bugs, and commit to referring Goldsmith to at least one other jeweller,

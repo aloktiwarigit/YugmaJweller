@@ -45,6 +45,8 @@ collaborators: 'Amelia (dev) + Winston (architect) + Sally (UX) + Maya (design-t
 
 ### Story 9.1: Customer books a rate-lock with a Razorpay deposit
 
+**Class:** A — Razorpay webhook signature verification + money path (deposit) + idempotency.
+
 **As a** customer browsing a product,
 **I want to** lock today's gold rate by paying a refundable deposit via Razorpay,
 **so that** I can return within the configured validity window and buy at the price I saw today.
@@ -127,6 +129,8 @@ And the tenant-isolation test suite asserts this across all rate-lock endpoints
 
 ### Story 9.2: System stores locked rate and customer sees active rate-lock in profile
 
+**Class:** B — Customer UI surfacing locked-rate profile; non-money, safe polling read.
+
 **As a** customer who paid a rate-lock deposit,
 **I want to** see my active rate-lock clearly in my profile — with the locked rate, expiry countdown, and deposit amount —
 **so that** I know exactly what I locked and when I need to return.
@@ -194,6 +198,8 @@ And the shopkeeper can tap to see the rate-lock detail and use it in billing (St
 ---
 
 ### Story 9.3: System honours locked rate when customer purchases within validity
+
+**Class:** A — Honouring locked rate at invoice touches money path + PAN (compliance) gate.
 
 **As a** customer returning to purchase within my rate-lock validity,
 **I want** the invoice to automatically use my locked rate without any manual action,
@@ -264,6 +270,8 @@ And the billing UI does not show a rate-lock badge on that line item
 
 ### Story 9.4: Shopkeeper manually honours post-expiry rate-lock with audit-logged justification
 
+**Class:** A — Shopkeeper role-based post-expiry override with audit + compliance pattern.
+
 **As a** shop owner or manager,
 **I want to** manually honour a customer's expired rate-lock with a justified override,
 **so that** I can maintain customer trust when a legitimate delay caused the expiry, while every such exception is audit-logged.
@@ -332,6 +340,8 @@ And audit_events logs the failed attempt
 ---
 
 ### Story 9.5: Customer receives rate-lock confirmation and expiry reminder via WhatsApp and push
+
+**Class:** B — Rate-lock confirmation WhatsApp + push dispatch; no money/auth touched.
 
 **As a** customer who booked a rate-lock,
 **I want to** receive an immediate WhatsApp confirmation with the locked rate and expiry date, and a reminder 24 hours before expiry,
@@ -407,6 +417,8 @@ And notification_audit_log records channel: 'PUSH_ONLY' with reason: 'TENANT_PRE
 
 ### Story 10.1: Customer sees try-at-home option only when the tenant has the feature enabled
 
+**Class:** C — Feature-flag conditional render for try-at-home visibility; no behavior change.
+
 **As a** customer browsing a product,
 **I want to** see a "घर पर try करें" option only when the jeweller has enabled try-at-home,
 **so that** I'm never shown a feature that isn't available at my jeweller.
@@ -460,6 +472,8 @@ And the "घर पर try करें" button appears on product detail screen
 ---
 
 ### Story 10.2: Customer submits a try-at-home booking request
+
+**Class:** B — Try-at-home booking CRUD + state machine on a safe surface.
 
 **As a** customer with try-at-home enabled at my jeweller,
 **I want to** select up to N pieces, choose a preferred date and my address, and submit a booking request,
@@ -540,6 +554,8 @@ And if the API returns an error, onError removes the optimistic entry and shows:
 
 ### Story 10.3: Shopkeeper approves, reschedules, or dispatches a try-at-home booking
 
+**Class:** B — Shopkeeper booking state transitions; non-compliance, safe surface.
+
 **As a** shopkeeper,
 **I want to** confirm a try-at-home booking (with or without date change), mark pieces as dispatched, and have the customer notified at each step,
 **so that** the booking progresses smoothly through the lifecycle and both parties have clarity.
@@ -609,6 +625,8 @@ And customer WhatsApp: "क्षमा करें, इस बार try-at-ho
 ---
 
 ### Story 10.4: Shopkeeper records the outcome — returned or purchased — and triggers invoice on purchase
+
+**Class:** A — "Purchased" outcome triggers invoice creation (money path) + compliance gates (PAN / 269ST).
 
 **As a** shopkeeper,
 **I want to** record whether the customer returned the pieces or purchased some/all of them,
@@ -694,6 +712,8 @@ And the try-at-home booking shows in history as "Returned" for future reference
 
 ### Story 11.1: Customer submits design inspiration OR shopkeeper creates a custom order in the shop
 
+**Class:** A — Custom-order entry with DECIMAL weight + money-adjacent deposit flow downstream.
+
 **As a** customer wanting a custom bridal piece,
 **I want to** submit design inspiration photos and requirements through the app,
 **OR as a** shopkeeper,
@@ -765,6 +785,8 @@ And tenant-isolation test suite asserts zero cross-tenant read on custom-order e
 ---
 
 ### Story 11.2: Shopkeeper quotes weight, purity, stones, deposit, and delivery date; customer reviews in app
+
+**Class:** B — Non-binding quote + GST preview; no state change, no compliance enforcement.
 
 **As a** shopkeeper,
 **I want to** provide a formal quote (weight, purity, stones, deposit %, estimated delivery date) for a custom order,
@@ -838,6 +860,8 @@ And customer receives notification of revision: "आपके custom order क�
 ---
 
 ### Story 11.3: Customer approves the quote and pays deposit; custom order advances to Metal Cast
+
+**Class:** A — Razorpay deposit + webhook idempotency + state transition to METAL_CAST.
 
 **As a** customer,
 **I want to** approve my custom order quote and pay the deposit via Razorpay,
@@ -914,6 +938,8 @@ And if PAN is not on file, the customer is prompted to enter PAN before payment 
 
 ### Story 11.4: Shopkeeper uploads a progress photo at Metal Cast stage; customer receives WhatsApp and push
 
+**Class:** B — Stage photo upload via S3 + ImageKit + WhatsApp; non-money surface.
+
 **As a** shopkeeper,
 **I want to** upload a progress photo when the metal casting is complete,
 **so that** the customer is reassured their piece is progressing and receives a beautiful update on WhatsApp.
@@ -984,6 +1010,8 @@ And no Goldsmith brand is visible anywhere — only the anchor jeweller's brand 
 ---
 
 ### Story 11.5: State machine advances through Metal Cast → Stones Set → QC → Ready with photo side-effects at each stage
+
+**Class:** B — Custom-order stage state transitions; no money/compliance enforcement.
 
 **As a** shopkeeper,
 **I want to** advance the custom order through each production stage with a single tap (and optional photo upload),
@@ -1063,6 +1091,8 @@ And no double state transition occurs
 ---
 
 ### Story 11.6: Customer views stage progress, delivery estimate, and photos in the app
+
+**Class:** B — Customer stage-progress timeline UI; safe polling read.
 
 **As a** customer with an active custom order,
 **I want to** see a visual timeline of my order's progress, including stage photos,
@@ -1147,6 +1177,8 @@ And axe-core reports 0 violations
 
 ### Story 11.7: Customer requests a modification; shopkeeper approves or rejects with notes
 
+**Class:** B — Modification request CRUD + stage rollback annotation (audit only).
+
 **As a** customer whose custom order is in progress,
 **I want to** request a modification (e.g., change stone size or add engraving),
 **so that** I can adjust my order before it's too late, with the shopkeeper's decision recorded.
@@ -1217,6 +1249,8 @@ And each marker shows: "Modification requested", "Modification accepted/rejected
 ---
 
 ### Story 11.8: Shopkeeper converts the completed custom order to a final invoice with deposit pull-through
+
+**Class:** A — Final invoice with deposit pull-through (money path) + PAN/269ST compliance gates + immutability.
 
 **As a** shopkeeper,
 **I want to** generate the final invoice for a completed custom order with the deposit pre-applied,
@@ -1311,6 +1345,8 @@ And GSTR-1 export includes the invoice with correct GST amounts
 ---
 
 ### Story 12.1: Customer opts into viewing tracking at signup; opt-out retroactively anonymizes all past events [GATING STORY]
+
+**Class:** A — DPDPA viewing-consent gate before any FR64 processing + retroactive anonymization.
 
 **GATING STORY — Stories 12.2 through 12.6 CANNOT begin until this story has merged to main branch and all ACs are verified green.**
 
@@ -1411,6 +1447,8 @@ And the migration is idempotent (re-running does not create duplicate consent ro
 
 ### Story 12.2: System tracks logged-in product views when the customer has consented
 
+**Class:** B — Logged-in viewing analytics ingestion; consent already gated by 12.1.
+
 **BLOCKED until Story 12.1 merges. This story references the consent invariant as a hard gate.**
 
 **As a** shopkeeper,
@@ -1481,6 +1519,8 @@ And failed events are not retried (low-value data loss is acceptable; BullMQ ret
 
 ### Story 12.3: System tracks anonymous product views by session ID
 
+**Class:** C — Anonymous session-view tracking; no consent, no PII, no behavior change.
+
 **BLOCKED until Story 12.1 merges.**
 
 **As a** shopkeeper,
@@ -1538,6 +1578,8 @@ And no IP address, no device fingerprint beyond session_id is stored
 ---
 
 ### Story 12.4: Shopkeeper views per-product analytics — hot items, cold items, views, unique viewers
+
+**Class:** B — Per-product analytics aggregation; shopkeeper-safe surface.
 
 **BLOCKED until Story 12.1 merges.**
 
@@ -1615,6 +1657,8 @@ And the screen does not flash or fully reload — only changed values animate (n
 
 ### Story 12.5: Shopkeeper views per-customer browsing history in the CRM profile
 
+**Class:** B — CRM browsing-history display, consent-gated (read from 12.1).
+
 **BLOCKED until Story 12.1 merges.**
 
 **As a** shopkeeper,
@@ -1685,6 +1729,8 @@ And browsed-but-not-wishlisted items follow in descending time order
 ---
 
 ### Story 12.6: When a customer walks into the shop, staff sees CustomerContextCard within 3 seconds
+
+**Class:** B — Walk-in context card UI, consent-gated; non-sensitive.
 
 **BLOCKED until Story 12.1 merges.**
 

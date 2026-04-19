@@ -25,6 +25,8 @@ notes:
 
 ### Story 13.1: Customer receives WhatsApp invoice receipt within 30 seconds of billing
 
+**Class:** B — Outbound WhatsApp invoice receipt send from BullMQ (not inbound webhook); safe notification surface.
+
 **As a Customer (Priya right after checkout)**,
 I want the invoice PDF on my WhatsApp within 30 seconds of payment — with my name in Hindi, shop branding, full GST breakdown,
 So that I have proof of purchase without waiting for SMS or email.
@@ -70,6 +72,8 @@ So that I have proof of purchase without waiting for SMS or email.
 
 ### Story 13.2: Customer receives WhatsApp progress photos + push for custom orders
 
+**Class:** B — Outbound WhatsApp + push for custom-order progress photos; safe surface.
+
 **As a Customer (Priya tracking her bridal set)**,
 I want photos at Metal Cast + Stones Set + QC stages delivered to WhatsApp + app push within 5 minutes of shopkeeper upload,
 So that I feel informed without calling the shop.
@@ -102,6 +106,8 @@ So that I feel informed without calling the shop.
 
 ### Story 13.3: Customer receives WhatsApp rate-lock confirmation + expiry reminder with push
 
+**Class:** B — Outbound rate-lock expiry reminder; safe notification surface.
+
 **As a Customer (Priya who locked a rate 6 days ago)**,
 I want a WhatsApp + push reminder tomorrow saying "Your rate-lock expires in 24 hours",
 So that I don't let the rate-lock lapse accidentally.
@@ -131,6 +137,8 @@ So that I don't let the rate-lock lapse accidentally.
 ---
 
 ### Story 13.4: Customer receives WhatsApp try-at-home appointment confirmation + pre-visit push
+
+**Class:** B — Outbound try-at-home booking confirmation; safe notification surface.
 
 **As a Customer (Priya who booked Saturday try-at-home)**,
 I want immediate WhatsApp confirmation on booking + push reminder Saturday morning,
@@ -162,6 +170,8 @@ So that I remember the appointment and the shop remembers too.
 
 ### Story 13.5: Customer receives WhatsApp loyalty tier upgrade celebration
 
+**Class:** B — Outbound loyalty tier-upgrade celebration; safe notification surface.
+
 **As a Customer (Priya promoted to Platinum)**,
 I want a genuinely celebratory WhatsApp message with deep-link to in-app celebration (Epic 8 Story 8.5),
 So that the tier feels earned.
@@ -192,6 +202,8 @@ So that the tier feels earned.
 
 ### Story 13.6: Shopkeeper receives push alerts for low stock, PMLA warnings, new inquiries, new bookings, new reviews, overdue custom-order stages
 
+**Class:** A — Shopkeeper push on PMLA compliance threshold (touches compliance-alert event boundary).
+
 **As a Shop Owner (Rajesh-ji)**,
 I want timely push notifications for things I need to act on — low stock, PMLA warning, new customer inquiry, try-at-home booking, new review, custom-order stage overdue,
 So that nothing falls through the cracks.
@@ -221,6 +233,8 @@ So that nothing falls through the cracks.
 ---
 
 ### Story 13.7: Shopkeeper broadcasts WhatsApp to filtered customer segments
+
+**Class:** B — Broadcast WhatsApp to filtered segments with marketing opt-in respected.
 
 **As a Shop Owner (Rajesh-ji before Dhanteras)**,
 I want to send a Diwali festival offer to "all Silver+ loyalty customers" OR "all customers with last purchase > 6 months",
@@ -255,6 +269,8 @@ So that marketing is targeted, not spray-and-pray.
 
 ### Story 13.8: Customer opts in/out of marketing vs transactional notifications separately
 
+**Class:** B — Notification preference schema for marketing vs transactional; no auth/compliance.
+
 **As a Customer (Priya who wants invoices but not festival campaigns)**,
 I want to toggle marketing and transactional separately — one-tap each,
 So that I can stay informed without feeling marketed-to.
@@ -288,6 +304,8 @@ So that I can stay informed without feeling marketed-to.
 
 ### Story 13.9: System sends festival-campaign WhatsApp blast for Dhanteras + Akshaya Tritiya
 
+**Class:** B — Festival-campaign scheduled blast; safe outbound surface.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want a festival-campaign template scheduled for Dhanteras + Akshaya Tritiya weeks with my own copy + banner image,
 So that I reach customers at peak spending moments with minimal effort.
@@ -318,6 +336,8 @@ So that I reach customers at peak spending moments with minimal effort.
 ---
 
 ### Story 13.10: All outbound notifications logged per tenant for audit + quota tracking
+
+**Class:** B — Notification observability + quota logging infrastructure; no compliance write path.
 
 **As the Goldsmith Platform**,
 I need every outbound notification (WhatsApp, SMS, push, email) persisted with tenant_id + type + status + provider_msg_id for audit, quota, and billing,
@@ -360,6 +380,8 @@ So that compliance + cost attribution are both accurate.
 
 ### Story 14.1: RDS read replica provisioned + report queries routed to replica
 
+**Class:** B — Postgres read-replica provisioning + report routing; operational, safe surface.
+
 **As the Goldsmith Platform**,
 I need report queries executing against a dedicated read replica so primary DB isn't impacted by heavy aggregations,
 So that operational DB stays fast under reporting load.
@@ -391,6 +413,8 @@ So that operational DB stays fast under reporting load.
 ---
 
 ### Story 14.2: Shopkeeper views daily sales summary (invoices, value, GST collected, payment-method mix, exchanges)
+
+**Class:** B — Daily sales summary read via replica; no new compliance logic.
 
 **As a Shop Owner (Rajesh-ji at end of Dhanteras day)**,
 I want one screen showing today's: total invoices, total value, total GST collected, payment split (cash/UPI/card/exchange), custom-order starts,
@@ -424,6 +448,8 @@ So that I close the day with clarity.
 
 ### Story 14.3: Shopkeeper views stock valuation report at market rate, cost price, and selling price
 
+**Class:** B — Stock valuation via replica reusing Epic 3 logic; safe read-only surface.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to see total inventory value at (a) today's rate, (b) my cost, (c) expected selling — by category,
 So that I know my shop's net worth and margin.
@@ -453,6 +479,8 @@ So that I know my shop's net worth and margin.
 ---
 
 ### Story 14.4: Shopkeeper views outstanding-payment report (customers with credit balance or overdue dues)
+
+**Class:** B — Outstanding-payment balance reports via replica; no compliance logic.
 
 **As a Shop Owner (Rajesh-ji)**,
 I want a sorted list of customers who owe me money — amount + days outstanding + last-contact,
@@ -485,6 +513,8 @@ So that I know who to call today.
 
 ### Story 14.5: Shopkeeper views customer analytics (top customers by LTV, new customer rate, repeat rate)
 
+**Class:** B — Customer analytics (LTV / repeat rate) via replica; safe reporting.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to see who my top 10 customers are by lifetime value, how many new customers I'm adding monthly, and what my repeat-purchase rate is,
 So that I understand my customer economics.
@@ -516,6 +546,8 @@ So that I understand my customer economics.
 
 ### Story 14.6: Shopkeeper views inventory aging with dead-stock flag
 
+**Class:** B — Inventory-aging dead-stock report; read-only, no compliance/money.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to see pieces that haven't sold in 90+ days flagged prominently with suggested actions (discount/karigar/repurpose),
 So that capital isn't locked in dead stock.
@@ -546,6 +578,8 @@ So that capital isn't locked in dead stock.
 
 ### Story 14.7: Shopkeeper views loyalty program summary (members per tier, points accrued/redeemed)
 
+**Class:** B — Loyalty-program summary operational report; safe surface.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to see my loyalty program health — members per tier, total points outstanding, redemption rate,
 So that I know if the program is driving behavior.
@@ -575,6 +609,8 @@ So that I know if the program is driving behavior.
 ---
 
 ### Story 14.8: Shopkeeper exports any report as CSV + branded PDF with shop logo
+
+**Class:** B — CSV + tenant-branded PDF export UI; no auth/money/compliance.
 
 **As a Shopkeeper's Accountant (receiving monthly reports)**,
 I need CSV + branded PDF for every report — PDF uses tenant's logo + colors, CSV is spreadsheet-ready,
