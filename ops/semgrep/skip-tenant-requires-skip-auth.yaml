@@ -1,0 +1,20 @@
+rules:
+  - id: goldsmith.skip-tenant-requires-skip-auth
+    languages: [typescript]
+    severity: ERROR
+    message: |
+      @SkipTenant() endpoints run BEFORE tenant resolution, so an unauth'd
+      request with no tenant ctx could reach the handler. Always pair
+      @SkipTenant() with @SkipAuth() OR a stronger downstream guard
+      (explicit comment required).
+    patterns:
+      - pattern: '@SkipTenant()'
+      - pattern-not: |
+          @SkipTenant()
+          @SkipAuth()
+      - pattern-not: |
+          @SkipAuth()
+          @SkipTenant()
+    paths:
+      exclude:
+        - "ops/semgrep/tests/**"

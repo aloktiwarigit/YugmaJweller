@@ -1,0 +1,12 @@
+rules:
+  - id: goldsmith.no-firebase-client-outside-auth-client
+    languages: [typescript]
+    severity: ERROR
+    message: |
+      Direct import of @react-native-firebase/* or firebase/* (client SDK) is
+      forbidden outside packages/auth-client. Use the sendOtp/verifyOtp/getIdToken
+      wrappers exported from @goldsmith/auth-client (lands in PR 1.1b).
+    pattern-regex: "^import\\s+(\\w+|\\{[^}]+\\}|\\*\\s+as\\s+\\w+)\\s+from\\s+['\"](@react-native-firebase/auth|firebase/auth)['\"]"
+    paths:
+      exclude:
+        - "packages/auth-client/**"

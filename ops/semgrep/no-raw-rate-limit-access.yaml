@@ -1,0 +1,19 @@
+rules:
+  - id: goldsmith.no-raw-rate-limit-access
+    languages: [typescript]
+    severity: ERROR
+    message: |
+      Direct SQL access to auth_rate_limits is forbidden. Use AuthRateLimitService
+      so counter semantics + 15-min window + lockout stay consistent.
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $C.query(`$...auth_rate_limits$...`, ...)
+          - pattern: |
+              $C.query(`$...auth_rate_limits$...`)
+    paths:
+      exclude:
+        - "apps/api/src/modules/auth/auth-rate-limit.service.ts"
+        - "apps/api/test/**"
+        - "ops/semgrep/tests/**"
+        - "packages/db/src/migrations/**"

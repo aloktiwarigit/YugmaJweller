@@ -15,10 +15,12 @@
     "db:reset": "bash scripts/db-reset.sh",
     "db:generate-rls": "tsx packages/db/src/codegen/generate-rls.ts",
     "db:assert-marked": "tsx packages/db/src/codegen/assert-all-tables-marked.ts",
-    "semgrep": "semgrep --config ops/semgrep/ --error"
+    "semgrep": "semgrep --config ops/semgrep/ --error",
+    "seed:anchor": "tsx scripts/seed-anchor.ts"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "dotenv": "^16.4.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.57.0",

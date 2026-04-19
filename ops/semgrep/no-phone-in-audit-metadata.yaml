@@ -1,0 +1,25 @@
+rules:
+  - id: goldsmith.no-phone-in-audit-metadata
+    languages: [typescript]
+    severity: ERROR
+    message: |
+      Raw phone numbers must not appear in auditLog() or platformAuditLog()
+      metadata. Use the phoneE164 parameter — it's hashed to SHA-256 at
+      the audit writer. Threat-model S1-M26.
+    pattern-either:
+      - pattern: |
+          auditLog($POOL, { ..., metadata: { ..., phone: $V, ... }, ... })
+      - pattern: |
+          auditLog($POOL, { ..., metadata: { ..., phone_number: $V, ... }, ... })
+      - pattern: |
+          auditLog($POOL, { ..., metadata: { ..., phoneE164: $V, ... }, ... })
+      - pattern: |
+          platformAuditLog($POOL, { ..., metadata: { ..., phone: $V, ... }, ... })
+      - pattern: |
+          platformAuditLog($POOL, { ..., metadata: { ..., phone_number: $V, ... }, ... })
+      - pattern: |
+          platformAuditLog($POOL, { ..., metadata: { ..., phoneE164: $V, ... }, ... })
+    paths:
+      exclude:
+        - "ops/semgrep/tests/**"
+        - "packages/audit/test/**"
