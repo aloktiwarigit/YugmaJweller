@@ -14,7 +14,7 @@ export interface StaffListItemDto {
 export interface InviteResponseDto {
   staff: {
     id: string;
-    phone: string;
+    phone_last4: string;
     display_name: string;
     role: InviteRole;
     status: 'INVITED';

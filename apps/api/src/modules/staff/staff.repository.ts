@@ -75,6 +75,7 @@ export class StaffRepository {
               updated_at         = now()
         WHERE id = $1
           AND status = 'INVITED'
+          AND shop_id = current_setting('app.current_shop_id')::uuid
         RETURNING id, phone, display_name, role, status, invited_by_user_id, invited_at, activated_at`,
       [args.existingId, args.invitedByUserId],
     );

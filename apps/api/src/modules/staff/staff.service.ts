@@ -42,7 +42,7 @@ export class StaffService {
     return {
       staff: {
         id: row.id,
-        phone: row.phone,
+        phone_last4: row.phone.slice(-4),
         display_name: row.display_name,
         role: row.role as InviteRole,
         status: 'INVITED',
@@ -55,6 +55,9 @@ export class StaffService {
   }
 
   async list(ctx: AuthenticatedTenantContext): Promise<{ staff: StaffListItemDto[] }> {
+    if (ctx.role === 'shop_staff') {
+      throw new ForbiddenException({ code: 'auth.forbidden' });
+    }
     const staff = await tenantContext.runWith(ctx, () => this.repo.findAllByShop());
     return { staff };
   }

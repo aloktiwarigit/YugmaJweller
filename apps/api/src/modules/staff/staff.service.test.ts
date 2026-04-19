@@ -64,6 +64,8 @@ describe('StaffService.invite', () => {
 
     expect(result.staff.id).toBe('new-uuid');
     expect(result.staff.status).toBe('INVITED');
+    expect(result.staff.phone_last4).toBe('3210');
+    expect((result.staff as Record<string, unknown>)['phone']).toBeUndefined();
     expect(result.share.text).toContain('Rajesh Jewellers');
     expect(result.share.text).toContain('Amit');
     expect(result.share.text).toContain('Staff');
@@ -108,8 +110,16 @@ describe('StaffService.invite', () => {
   });
 });
 
+const STAFF_CTX = {
+  shopId: TENANT.id,
+  tenant: TENANT,
+  authenticated: true as const,
+  userId: 'staff-uuid',
+  role: 'shop_staff' as const,
+};
+
 describe('StaffService.list', () => {
-  it('returns all staff rows', async () => {
+  it('returns all staff rows for shop_admin', async () => {
     const rows = [
       {
         id: 'u1',
@@ -126,5 +136,12 @@ describe('StaffService.list', () => {
     const result = await svc.list(OWNER_CTX);
     expect(result.staff).toHaveLength(1);
     expect(result.staff[0]!.phone_last4).toBe('3210');
+  });
+
+  it('throws ForbiddenException if caller is shop_staff', async () => {
+    vi.clearAllMocks();
+    const svc = new StaffService(mockRepo, POOL);
+    await expect(svc.list(STAFF_CTX)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(mockRepo.findAllByShop).not.toHaveBeenCalled();
   });
 });
