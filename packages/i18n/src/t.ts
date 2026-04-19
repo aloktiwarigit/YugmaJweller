@@ -3,13 +3,15 @@ type Locale = 'hi-IN' | 'en-IN';
 import hiAuth from './locales/hi-IN/auth.json';
 import hiCommon from './locales/hi-IN/common.json';
 import hiDashboard from './locales/hi-IN/dashboard.json';
+import hiStaff from './locales/hi-IN/staff.json';
 import enAuth from './locales/en-IN/auth.json';
 import enCommon from './locales/en-IN/common.json';
 import enDashboard from './locales/en-IN/dashboard.json';
+import enStaff from './locales/en-IN/staff.json';
 
 const BUNDLES: Record<Locale, Record<string, unknown>> = {
-  'hi-IN': { auth: hiAuth, common: hiCommon, dashboard: hiDashboard },
-  'en-IN': { auth: enAuth, common: enCommon, dashboard: enDashboard },
+  'hi-IN': { auth: hiAuth, common: hiCommon, dashboard: hiDashboard, staff: hiStaff },
+  'en-IN': { auth: enAuth, common: enCommon, dashboard: enDashboard, staff: enStaff },
 };
 
 let current: Locale = 'hi-IN';

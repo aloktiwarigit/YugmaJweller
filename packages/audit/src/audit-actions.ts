@@ -8,4 +8,5 @@ export enum AuditAction {
   AUTH_TOKEN_INVALID      = 'AUTH_TOKEN_INVALID',
   TENANT_CLAIM_CONFLICT   = 'TENANT_CLAIM_CONFLICT',
   TENANT_BOOT             = 'TENANT_BOOT',
+  STAFF_INVITED           = 'STAFF_INVITED',
 }

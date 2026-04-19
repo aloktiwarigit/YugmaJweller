@@ -1,0 +1,20 @@
+{
+  "screen.title": "Your Staff",
+  "count": "Your Staff ({count})",
+  "empty_state": "No staff yet. Tap the button below to add your first staff member.",
+  "button.add": "+ Add Staff",
+  "sheet.title": "Invite Staff",
+  "field.name": "Name",
+  "field.name.placeholder": "e.g. Amit",
+  "field.phone": "Phone Number",
+  "field.role": "Role",
+  "role.shop_staff": "Staff",
+  "role.shop_manager": "Manager",
+  "status.ACTIVE": "Active",
+  "status.INVITED": "Invited",
+  "status.SUSPENDED": "Suspended",
+  "status.REVOKED": "Revoked",
+  "button.invite": "Send Invite",
+  "success.ready": "✓ Invite Ready",
+  "error.already_exists": "This number is already a staff member."
+}

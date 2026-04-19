@@ -1,0 +1,20 @@
+{
+  "screen.title": "आपके Staff",
+  "count": "आपके Staff ({count})",
+  "empty_state": "अभी कोई staff नहीं है। नीचे बटन दबाकर पहला staff जोड़ें।",
+  "button.add": "+ Staff जोड़ें",
+  "sheet.title": "Staff आमंत्रित करें",
+  "field.name": "नाम",
+  "field.name.placeholder": "जैसे: Amit",
+  "field.phone": "फ़ोन नंबर",
+  "field.role": "भूमिका",
+  "role.shop_staff": "स्टाफ",
+  "role.shop_manager": "मैनेजर",
+  "status.ACTIVE": "सक्रिय",
+  "status.INVITED": "आमंत्रित",
+  "status.SUSPENDED": "निलंबित",
+  "status.REVOKED": "निलंबित",
+  "button.invite": "आमंत्रण भेजें",
+  "success.ready": "✓ आमंत्रण तैयार है",
+  "error.already_exists": "यह नंबर पहले से staff में शामिल है।"
+}
