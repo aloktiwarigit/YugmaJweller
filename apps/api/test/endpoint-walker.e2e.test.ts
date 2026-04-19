@@ -33,13 +33,14 @@ describe('endpoint-walker — real tenant-scoped assertions (E2-S1 deferral #4)'
 
     // For each fixture, create the matching Firebase user and exchange a custom token for an ID token.
     for (const fixture of fixtureRegistry.list()) {
-      // Fetch the phone for this fixture's shop_admin row (first shop_user seeded).
+      // Fetch the phone and DB user_id for this fixture's shop_admin row (first shop_user seeded).
       const r = await pool.query(
-        `SELECT phone, firebase_uid FROM shop_users WHERE shop_id = $1 ORDER BY created_at LIMIT 1`,
+        `SELECT id, phone, firebase_uid FROM shop_users WHERE shop_id = $1 ORDER BY created_at LIMIT 1`,
         [fixture.id],
       );
       const phone = r.rows[0].phone as string;
       const expectedUid = r.rows[0].firebase_uid as string;
+      const dbUserId = r.rows[0].id as string; // required by TenantInterceptor (req.user.user_id)
       let user;
       try {
         user = await admin.auth(fbApp).createUser({ uid: expectedUid, phoneNumber: phone });
@@ -47,8 +48,12 @@ describe('endpoint-walker — real tenant-scoped assertions (E2-S1 deferral #4)'
         user = await admin.auth(fbApp).getUserByPhoneNumber(phone);
       }
 
-      // Set custom claims so the ID token carries shop_id + role
-      await admin.auth(fbApp).setCustomUserClaims(user.uid, { shop_id: fixture.id, role: 'shop_admin' });
+      // Set custom claims so the ID token carries shop_id + role + user_id (TenantInterceptor contract)
+      await admin.auth(fbApp).setCustomUserClaims(user.uid, {
+        shop_id: fixture.id,
+        role: 'shop_admin',
+        user_id: dbUserId,
+      });
 
       const custom = await admin.auth(fbApp).createCustomToken(user.uid);
       const resp = await fetch(`http://127.0.0.1:${emulatorPort}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake-api-key`, {
