@@ -14,7 +14,10 @@ describe('endpoint-walker — real tenant-scoped assertions (E2-S1 deferral #4)'
   let container: StartedPostgreSqlContainer;
   let pool: Pool;
   let app: INestApplication;
-  const projectId = 'goldsmith-walker-test';
+  // Use FIREBASE_PROJECT_ID from env if set (CI's ship.yml sets it to match the
+  // emulator + AppModule's FirebaseAdminProvider). Tokens minted under one projectId
+  // fail verifyIdToken's aud-claim check when the API uses a different projectId.
+  const projectId = process.env['FIREBASE_PROJECT_ID'] ?? 'goldsmith-walker-test';
   let emulatorPort = 9099;
   const seeded: SeededTenantToken[] = [];
 
