@@ -33,8 +33,9 @@ async function main() {
     [shopId, phone, 'Owner'],
   );
 
-  console.log(`✓ Seeded anchor shop "${slug}" (${shopId}) with owner phone ${phone}`);
-  console.log(`  Open Expo Dev Client, enter ${phone}, receive OTP, verify — you should land on the dashboard.`);
+  const masked = phone.slice(0, -4).replace(/./g, '*') + phone.slice(-4);
+  console.log(`✓ Seeded anchor shop "${slug}" (${shopId}) with owner phone ${masked}`);
+  console.log(`  Open Expo Dev Client, enter <your phone>, receive OTP, verify — you should land on the dashboard.`);
   console.log(`  Firebase emulator console: http://localhost:4000`);
   await pool.end();
 }
