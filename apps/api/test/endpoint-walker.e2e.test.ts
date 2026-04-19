@@ -34,6 +34,17 @@ describe('endpoint-walker — real tenant-scoped assertions (E2-S1 deferral #4)'
     const admin = (await import('firebase-admin')).default;
     const fbApp = admin.initializeApp({ projectId }, `walker-${Date.now()}`);
 
+    // Clear the emulator's user pool before seeding. Prior test files in the
+    // same CI run (auth-session, auth-me, auth-uid-mismatch, claim-conflict)
+    // create users on the shared emulator; if their uids/phones overlap with
+    // ours, tokens minted here may be revoked by a stale `tokensValidAfterTime`
+    // from those files, surfacing as `auth/id-token-expired` or
+    // `auth/argument-error` at verifyIdToken.
+    await fetch(
+      `http://127.0.0.1:${emulatorPort}/emulator/v1/projects/${projectId}/accounts`,
+      { method: 'DELETE' },
+    ).catch(() => undefined);
+
     // For each fixture, create the matching Firebase user and exchange a custom token for an ID token.
     for (const fixture of fixtureRegistry.list()) {
       // Fetch the phone and DB user_id for this fixture's shop_admin row (first shop_user seeded).
