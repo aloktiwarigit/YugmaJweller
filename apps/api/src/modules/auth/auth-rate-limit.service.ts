@@ -8,9 +8,7 @@ export interface RateLimitCheck {
   failures: number;
 }
 
-const WINDOW_MS    = 15 * 60 * 1000;
 const HARD_LOCKOUT = 10;
-const LOCKOUT_MS   = 15 * 60 * 1000;
 
 @Injectable()
 export class AuthRateLimitService {
@@ -36,33 +34,38 @@ export class AuthRateLimitService {
   async recordFailure(phoneE164: string): Promise<RateLimitCheck> {
     const c = await this.pool.connect();
     try {
-      await c.query('BEGIN');
-      const existing = await c.query<{ verify_failures: number; window_started_at: Date }>(
-        `SELECT verify_failures, window_started_at FROM auth_rate_limits WHERE phone_e164 = $1 FOR UPDATE`,
+      // DB-side atomic increment — eliminates TOCTOU concurrent-first-failure undercount.
+      // The UPSERT is atomic so no SELECT FOR UPDATE / BEGIN needed.
+      const res = await c.query<{ verify_failures: number; locked_until: Date | null }>(
+        `INSERT INTO auth_rate_limits (phone_e164, verify_failures, window_started_at, locked_until)
+         VALUES ($1, 1, now(), NULL)
+         ON CONFLICT (phone_e164) DO UPDATE SET
+           verify_failures   = CASE
+             WHEN auth_rate_limits.window_started_at + interval '15 minutes' <= now() THEN 1
+             ELSE auth_rate_limits.verify_failures + 1
+           END,
+           window_started_at = CASE
+             WHEN auth_rate_limits.window_started_at + interval '15 minutes' <= now() THEN now()
+             ELSE auth_rate_limits.window_started_at
+           END,
+           locked_until      = CASE
+             WHEN (CASE
+               WHEN auth_rate_limits.window_started_at + interval '15 minutes' <= now() THEN 1
+               ELSE auth_rate_limits.verify_failures + 1
+             END) >= 10
+             THEN now() + interval '15 minutes'
+             ELSE auth_rate_limits.locked_until
+           END,
+           updated_at        = now()
+         RETURNING verify_failures, locked_until`,
         [phoneE164],
       );
-      let failures = 1;
-      if (existing.rows[0]) {
-        const windowExpired = Date.now() - existing.rows[0].window_started_at.getTime() > WINDOW_MS;
-        failures = windowExpired ? 1 : existing.rows[0].verify_failures + 1;
-      }
-      const lockedUntil = failures >= HARD_LOCKOUT ? new Date(Date.now() + LOCKOUT_MS) : null;
-      await c.query(
-        `INSERT INTO auth_rate_limits (phone_e164, verify_failures, window_started_at, locked_until)
-         VALUES ($1, $2, now(), $3)
-         ON CONFLICT (phone_e164) DO UPDATE SET
-           verify_failures   = EXCLUDED.verify_failures,
-           window_started_at = CASE WHEN auth_rate_limits.window_started_at + interval '15 minutes' <= now()
-                                    THEN now() ELSE auth_rate_limits.window_started_at END,
-           locked_until      = EXCLUDED.locked_until,
-           updated_at        = now()`,
-        [phoneE164, failures, lockedUntil],
-      );
-      await c.query('COMMIT');
-      return { ok: failures < HARD_LOCKOUT, lockedUntil: lockedUntil ?? undefined, failures };
-    } catch (e) {
-      await c.query('ROLLBACK').catch(() => undefined);
-      throw e;
+      const row = res.rows[0];
+      return {
+        ok: row.verify_failures < HARD_LOCKOUT,
+        lockedUntil: row.locked_until ?? undefined,
+        failures: row.verify_failures,
+      };
     } finally { c.release(); }
   }
 
