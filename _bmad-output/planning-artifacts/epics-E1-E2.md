@@ -189,6 +189,8 @@ So that I can start running my shop on the app instead of the paper daybook.
 
 ### Story 1.2: Shop Owner invites a staff member by phone and assigns a role
 
+> **Superseded.** This story text was written pre-ADR-0015 against MSG91 + `/auth/invite`. The authoritative spec is `docs/superpowers/specs/2026-04-19-story-1.2-staff-invite-design.md`. Stack corrections: MSG91 → native `Share.share()`, `POST /api/v1/auth/invite` → `POST /api/v1/staff`, Detox → Maestro, Storybook deferred.
+
 **Class:** A — Touches apps/api/src/modules/auth + packages/audit write path + RLS on shop_users.
 
 **As a Shop Owner (Rajesh-ji)**,
