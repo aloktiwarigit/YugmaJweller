@@ -1,6 +1,9 @@
 import { IsEnum, IsNotEmpty, IsString, Matches, MaxLength } from 'class-validator';
+import type { ShopUserRole } from '@goldsmith/tenant-context';
 
-export type InviteRole = 'shop_manager' | 'shop_staff';
+export type InviteRole = Extract<ShopUserRole, 'shop_manager' | 'shop_staff'>;
+
+const INVITE_ROLES: InviteRole[] = ['shop_manager', 'shop_staff'];
 
 export class InviteStaffDto {
   @IsString()
@@ -12,6 +15,6 @@ export class InviteStaffDto {
   @MaxLength(100)
   display_name!: string;
 
-  @IsEnum(['shop_manager', 'shop_staff'], { message: 'role must be shop_manager or shop_staff' })
+  @IsEnum(INVITE_ROLES, { message: 'role must be shop_manager or shop_staff' })
   role!: InviteRole;
 }
