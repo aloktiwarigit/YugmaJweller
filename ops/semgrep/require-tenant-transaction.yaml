@@ -15,6 +15,7 @@ rules:
         - "apps/api/src/modules/auth/**"        # pre-tenant: auth lookup + rate-limit (see ADR-0016)
         - "apps/api/src/modules/tenant-boot/**" # pre-tenant: slug→tenant bootstrap
         - "ops/semgrep/tests/**"
+        - "scripts/**"                           # seed/migration scripts run as superuser, not in tenant context
     patterns:
       - pattern-either:
           - pattern: $DB.execute($...X)
