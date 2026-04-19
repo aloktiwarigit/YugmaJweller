@@ -9,7 +9,7 @@ const config: ExpoConfig = {
   version: '0.0.0',
   orientation: 'portrait',
   userInterfaceStyle: 'light',
-  platforms: ['ios', 'android'],
+  platforms: ['ios', 'android', 'web'],
   plugins: [
     '@react-native-firebase/app',
     '@react-native-firebase/auth',
