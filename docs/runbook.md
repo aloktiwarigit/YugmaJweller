@@ -37,6 +37,7 @@ mvpScope: >
 | [§10 Recovery objectives](#10-recovery-objectives-rto--rpo) | RTO / RPO targets |
 | [§12 Anchor seeding](#12-anchor-seeding-dev--prod) | Dev-time + prod anchor tenant bootstrap |
 | [§13 Firebase service-account rotation](#13-firebase-service-account-rotation-90-day-cadence) | 90-day secret rotation |
+| [§14 Role bootstrap prerequisites (BYPASSRLS)](#14-role-bootstrap-prerequisites-bypassrls) | Pre-migration superuser grant for platform_admin |
 
 ---
 
@@ -487,6 +488,48 @@ Firebase Admin service-account JSON rotates every 90 days per our secrets-hygien
 5. Delete old key in Firebase Console only after the new key is confirmed live (>=30min
    overlap).
 6. Log the rotation in `docs/security-log.md` (create if absent).
+
+---
+
+---
+
+## 14. Role bootstrap prerequisites (BYPASSRLS)
+
+`platform_admin` role needs the `BYPASSRLS` attribute for Story 1.1's SECURITY DEFINER auth
+functions (`auth_lookup_user_by_phone`, `tenant_boot_lookup`). Granting `BYPASSRLS` requires
+the PostgreSQL `SUPERUSER` privilege.
+
+### Dev / CI
+
+No action needed — Testcontainers + local Docker Postgres run the migrator as `postgres`
+(superuser), and migration 0003 applies `ALTER ROLE platform_admin BYPASSRLS;` in a DO block
+that handles the success case silently.
+
+### Production (Azure Database for PostgreSQL)
+
+The infrastructure operator MUST run the following command as the Postgres admin user BEFORE
+deploying migration 0003:
+
+```bash
+psql -h <host> -U <admin> -d <db> -c "ALTER ROLE platform_admin BYPASSRLS;"
+```
+
+If this step is skipped, migration 0003 will raise a clear exception with remediation
+instructions rather than silently failing. The error message reads:
+
+```
+migration 0003 requires platform_admin BYPASSRLS. Run as superuser:
+ALTER ROLE platform_admin BYPASSRLS; (see docs/runbook.md §14)
+```
+
+### Verification
+
+After the grant is applied, confirm with:
+
+```sql
+SELECT rolname, rolbypassrls FROM pg_roles WHERE rolname = 'platform_admin';
+-- Expected: rolbypassrls = true
+```
 
 ---
 

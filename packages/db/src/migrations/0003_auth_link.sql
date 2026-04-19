@@ -8,7 +8,23 @@
 -- Scope: platform_admin is NEVER used for general DML — only as the definer role for
 -- the two restricted functions below. Caller authorization is enforced by the function
 -- bodies (status filter + LIMIT 1) and by GRANT EXECUTE being limited to app_user.
-ALTER ROLE platform_admin BYPASSRLS;
+--
+-- PRODUCTION NOTE: granting BYPASSRLS requires SUPERUSER. If the migrator role is
+-- NOSUPERUSER, this statement must be pre-applied by infra (Terraform or manual
+-- `psql -U postgres -c "ALTER ROLE platform_admin BYPASSRLS;"`) before this migration
+-- runs. See docs/runbook.md §14. We attempt it here idempotently so dev/CI (superuser
+-- migrator) Just Works.
+DO $$
+BEGIN
+  BEGIN
+    ALTER ROLE platform_admin BYPASSRLS;
+  EXCEPTION WHEN insufficient_privilege THEN
+    -- Verify the attribute is already set; if so, continue silently.
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'platform_admin' AND rolbypassrls) THEN
+      RAISE EXCEPTION 'migration 0003 requires platform_admin BYPASSRLS. Run as superuser: ALTER ROLE platform_admin BYPASSRLS; (see docs/runbook.md §14)';
+    END IF;
+  END;
+END$$;
 
 -- Extend shop_users
 ALTER TABLE shop_users ADD COLUMN firebase_uid TEXT;
