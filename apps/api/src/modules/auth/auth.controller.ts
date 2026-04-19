@@ -12,6 +12,7 @@ export class AuthController {
 
   @Post('/session')
   @HttpCode(200)
+  // nosemgrep: goldsmith.skip-tenant-requires-skip-auth -- global FirebaseJwtGuard enforces auth; only tenant resolution is deferred until phone→shop lookup inside the handler
   @SkipTenant()
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   async session(@Req() req: Request, @Ip() ip: string) {
