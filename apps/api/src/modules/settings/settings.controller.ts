@@ -1,28 +1,24 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   Patch,
   Post,
   Res,
   UnauthorizedException,
-  UseGuards,
 } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
 import type { Response } from 'express';
 import { createHash } from 'node:crypto';
 import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext } from '@goldsmith/tenant-context';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { SettingsService } from './settings.service';
 import { BlobStorageService } from './blob-storage.service';
 import type { ShopProfileResponseDto, LogoUploadUrlResponseDto } from './settings.dto';
 import type { PatchShopProfileDto } from '@goldsmith/shared';
 
 @Controller('/api/v1/settings')
-@UseGuards(new RolesGuard(new Reflector()))
 export class SettingsController {
   constructor(
     private readonly svc: SettingsService,
@@ -30,12 +26,12 @@ export class SettingsController {
   ) {}
 
   @Get('/profile')
-  @Roles('shop_admin', 'shop_manager')
   async getProfile(
     @TenantContextDec() ctx: TenantContext,
     @Res({ passthrough: true }) res: Response,
   ): Promise<ShopProfileResponseDto> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (!['shop_admin', 'shop_manager'].includes(ctx.role)) throw new ForbiddenException({ code: 'auth.insufficient_role' });
     const profile = await this.svc.getProfile();
     const etag = `"${createHash('sha256').update(JSON.stringify(profile)).digest('hex').slice(0, 16)}"`;
     res.setHeader('ETag', etag);
@@ -43,13 +39,13 @@ export class SettingsController {
   }
 
   @Patch('/profile')
-  @Roles('shop_admin')
   async updateProfile(
     @TenantContextDec() ctx: TenantContext,
     @Body() body: PatchShopProfileDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<ShopProfileResponseDto> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (ctx.role !== 'shop_admin') throw new ForbiddenException({ code: 'auth.insufficient_role' });
     const profile = await this.svc.updateProfile(body);
     const etag = `"${createHash('sha256').update(JSON.stringify(profile)).digest('hex').slice(0, 16)}"`;
     res.setHeader('ETag', etag);
@@ -58,11 +54,11 @@ export class SettingsController {
 
   @Post('/profile/logo-upload-url')
   @HttpCode(200)
-  @Roles('shop_admin')
   async getLogoUploadUrl(
     @TenantContextDec() ctx: TenantContext,
   ): Promise<LogoUploadUrlResponseDto> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (ctx.role !== 'shop_admin') throw new ForbiddenException({ code: 'auth.insufficient_role' });
     return this.blob.generateLogoSasUrl();
   }
 }
