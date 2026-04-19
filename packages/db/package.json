@@ -2,14 +2,22 @@
   "name": "@goldsmith/db",
   "version": "0.0.0",
   "private": true,
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src test",
     "test": "vitest run",
     "test:unit": "vitest run --dir src",
     "test:integration": "vitest run --dir test",
-    "build": "pnpm db:assert-marked && tsc --noEmit",
     "db:assert-marked": "tsx src/codegen/assert-all-tables-marked.ts"
   },
   "dependencies": {

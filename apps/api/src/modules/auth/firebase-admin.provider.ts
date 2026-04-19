@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { EnvSecretProvider, type SecretProvider } from '@goldsmith/secrets';
 import admin from 'firebase-admin';
 
@@ -7,7 +7,7 @@ export class FirebaseAdminProvider implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(FirebaseAdminProvider.name);
   private app?: admin.app.App;
 
-  constructor(private readonly secrets: SecretProvider = new EnvSecretProvider()) {}
+  constructor(@Optional() private readonly secrets: SecretProvider = new EnvSecretProvider()) {}
 
   async onModuleInit(): Promise<void> {
     // When running against the Firebase Auth emulator, FIREBASE_AUTH_EMULATOR_HOST is set
