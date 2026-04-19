@@ -67,6 +67,12 @@ importers:
       '@goldsmith/secrets':
         specifier: workspace:*
         version: link:../../packages/secrets
+      '@goldsmith/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@goldsmith/tenant-config':
+        specifier: workspace:*
+        version: link:../../packages/tenant-config
       '@goldsmith/tenant-context':
         specifier: workspace:*
         version: link:../../packages/tenant-context
@@ -85,6 +91,9 @@ importers:
       firebase-admin:
         specifier: ^12.0.0
         version: 12.7.0
+      ioredis:
+        specifier: ^5.3.0
+        version: 5.10.1
       passport:
         specifier: ^0.7.0
         version: 0.7.0
