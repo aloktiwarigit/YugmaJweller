@@ -11,6 +11,7 @@
   "status_invited": "आमंत्रित",
   "status_active": "सक्रिय",
   "status_suspended": "निलंबित",
+  "status_revoked": "निरस्त",
   "submit_button": "आमंत्रण भेजें",
   "share_subject": "दुकान में शामिल हों",
   "share_message": "{shopName} में {name} को {role} के रूप में आमंत्रित किया गया है। ऐप डाउनलोड करें और {phone} से लॉगिन करें।",

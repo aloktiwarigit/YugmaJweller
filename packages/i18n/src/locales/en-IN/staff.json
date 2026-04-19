@@ -11,6 +11,7 @@
   "status_invited": "Invited",
   "status_active": "Active",
   "status_suspended": "Suspended",
+  "status_revoked": "Revoked",
   "submit_button": "Send Invite",
   "share_subject": "Join the shop",
   "share_message": "{name} has been invited to {shopName} as {role}. Download the app and log in with {phone}.",
