@@ -26,8 +26,8 @@ function makeTenant(id: string, slug: string, name: string): Tenant {
   return { id, slug, display_name: name, status: 'ACTIVE' };
 }
 
-function makeCtx(shopId: string, tenant: Tenant): UnauthenticatedTenantContext {
-  return { shopId, tenant, authenticated: false };
+function makeCtx(id: string, tenant: Tenant): UnauthenticatedTenantContext {
+  return { shopId: id, tenant, authenticated: false };
 }
 
 // ─── Test harness ─────────────────────────────────────────────────────────────

@@ -1,8 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SettingsCache } from '../src/settings-cache';
 import type { ShopProfileRow } from '@goldsmith/shared';
+import { tenantContext, type Tenant, type UnauthenticatedTenantContext } from '@goldsmith/tenant-context';
 
 const SHOP_A = '11111111-1111-1111-1111-111111111111';
+
+const tenantA: Tenant = { id: SHOP_A, slug: 'anchor-dev', display_name: 'Rajesh Jewellers', status: 'ACTIVE' };
+const ctxA: UnauthenticatedTenantContext = { shopId: SHOP_A, tenant: tenantA, authenticated: false };
 
 const mockRedis = {
   get: vi.fn(),
@@ -33,20 +37,20 @@ describe('SettingsCache', () => {
 
   it('returns null on cache miss', async () => {
     mockRedis.get.mockResolvedValueOnce(null);
-    const result = await cache.getProfile(SHOP_A);
+    const result = await tenantContext.runWith(ctxA, () => cache.getProfile());
     expect(result).toBeNull();
     expect(mockRedis.get).toHaveBeenCalledWith(`shop:${SHOP_A}:settings:profile`);
   });
 
   it('returns parsed value on cache hit', async () => {
     mockRedis.get.mockResolvedValueOnce(JSON.stringify(profile));
-    const result = await cache.getProfile(SHOP_A);
+    const result = await tenantContext.runWith(ctxA, () => cache.getProfile());
     expect(result).toEqual(profile);
   });
 
   it('sets value with correct key and TTL', async () => {
     mockRedis.set.mockResolvedValueOnce('OK');
-    await cache.setProfile(SHOP_A, profile);
+    await tenantContext.runWith(ctxA, () => cache.setProfile(profile));
     expect(mockRedis.set).toHaveBeenCalledWith(
       `shop:${SHOP_A}:settings:profile`,
       JSON.stringify(profile),
@@ -57,14 +61,14 @@ describe('SettingsCache', () => {
 
   it('deletes the key on invalidate', async () => {
     mockRedis.del.mockResolvedValueOnce(1);
-    await cache.invalidate(SHOP_A);
+    await tenantContext.runWith(ctxA, () => cache.invalidate());
     expect(mockRedis.del).toHaveBeenCalledWith(`shop:${SHOP_A}:settings:profile`);
   });
 
   it('returns null and deletes key on malformed JSON in cache', async () => {
     mockRedis.get.mockResolvedValueOnce('NOT_VALID_JSON');
     mockRedis.del.mockResolvedValueOnce(1);
-    const result = await cache.getProfile(SHOP_A);
+    const result = await tenantContext.runWith(ctxA, () => cache.getProfile());
     expect(result).toBeNull();
     expect(mockRedis.del).toHaveBeenCalledWith(`shop:${SHOP_A}:settings:profile`);
   });
@@ -72,7 +76,7 @@ describe('SettingsCache', () => {
   it('returns null and deletes key when cached shape fails Zod validation', async () => {
     mockRedis.get.mockResolvedValueOnce(JSON.stringify({ name: null, updated_at: '2026-04-19T00:00:00.000Z' }));
     mockRedis.del.mockResolvedValueOnce(1);
-    const result = await cache.getProfile(SHOP_A);
+    const result = await tenantContext.runWith(ctxA, () => cache.getProfile());
     expect(result).toBeNull();
     expect(mockRedis.del).toHaveBeenCalledWith(`shop:${SHOP_A}:settings:profile`);
   });
@@ -80,7 +84,7 @@ describe('SettingsCache', () => {
   it('propagates Redis error from getProfile as null (absorbed)', async () => {
     mockRedis.get.mockRejectedValueOnce(new Error('ECONNREFUSED'));
     mockRedis.del.mockResolvedValueOnce(1);
-    const result = await cache.getProfile(SHOP_A);
+    const result = await tenantContext.runWith(ctxA, () => cache.getProfile());
     expect(result).toBeNull();
   });
 });

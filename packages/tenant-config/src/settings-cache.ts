@@ -1,6 +1,7 @@
-import type Redis from 'ioredis';
+import type { Redis } from '@goldsmith/cache';
 import type { ShopProfileRow } from '@goldsmith/shared';
 import { ShopProfileRowSchema } from '@goldsmith/shared';
+import { tenantContext } from '@goldsmith/tenant-context';
 
 /**
  * Redis-backed cache for shop profile data.
@@ -18,32 +19,33 @@ export class SettingsCache {
     private readonly ttlSec = SettingsCache.DEFAULT_TTL_SEC,
   ) {}
 
-  async getProfile(shopId: string): Promise<ShopProfileRow | null> {
+  async getProfile(): Promise<ShopProfileRow | null> {
+    const key = this.profileKey();
     try {
-      const raw = await this.redis.get(this.profileKey(shopId));
+      const raw = await this.redis.get(key);
       if (!raw) return null;
       const parsed: unknown = JSON.parse(raw);
       const result = ShopProfileRowSchema.safeParse(parsed);
       if (!result.success) {
-        await this.redis.del(this.profileKey(shopId));
+        await this.redis.del(key);
         return null;
       }
       return result.data;
     } catch {
-      try { await this.redis.del(this.profileKey(shopId)); } catch { /* ignore del failure */ }
+      try { await this.redis.del(key); } catch { /* ignore del failure */ }
       return null;
     }
   }
 
-  async setProfile(shopId: string, data: ShopProfileRow): Promise<void> {
-    await this.redis.set(this.profileKey(shopId), JSON.stringify(data), 'EX', this.ttlSec);
+  async setProfile(data: ShopProfileRow): Promise<void> {
+    await this.redis.set(this.profileKey(), JSON.stringify(data), 'EX', this.ttlSec);
   }
 
-  async invalidate(shopId: string): Promise<void> {
-    await this.redis.del(this.profileKey(shopId));
+  async invalidate(): Promise<void> {
+    await this.redis.del(this.profileKey());
   }
 
-  private profileKey(shopId: string): string {
-    return `shop:${shopId}:settings:profile`;
+  private profileKey(): string {
+    return `shop:${tenantContext.requireCurrent().shopId}:settings:profile`;
   }
 }

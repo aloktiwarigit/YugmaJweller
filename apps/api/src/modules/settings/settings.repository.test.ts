@@ -54,7 +54,7 @@ describe('SettingsRepository', () => {
         }),
       } as unknown as Pool;
       repo = new SettingsRepository(pool);
-      const result = await repo.getShopProfile(SHOP_A);
+      const result = await tenantContext.runWith(ctxA, () => repo.getShopProfile());
       expect(result.name).toBe('Rajesh Jewellers');
       expect(result.updated_at).toBe(dbRow.updated_at.toISOString());
     });
@@ -67,14 +67,14 @@ describe('SettingsRepository', () => {
         }),
       } as unknown as Pool;
       repo = new SettingsRepository(pool);
-      await expect(repo.getShopProfile(SHOP_A)).rejects.toThrow();
+      await expect(tenantContext.runWith(ctxA, () => repo.getShopProfile())).rejects.toThrow();
     });
   });
 
   describe('updateShopProfile', () => {
     it('returns before and after', async () => {
       const patch: PatchShopProfileDto = { name: 'Rajesh Jewellers & Sons' };
-      const result = await tenantContext.runWith(ctxA, () => repo.updateShopProfile(SHOP_A, patch));
+      const result = await tenantContext.runWith(ctxA, () => repo.updateShopProfile(patch));
       expect(result.before.name).toBe('Rajesh Jewellers');
       expect(result.after.name).toBe('Rajesh Jewellers & Sons');
     });
@@ -90,7 +90,7 @@ describe('SettingsRepository', () => {
       });
       pool = { connect: vi.fn().mockResolvedValue({ query: querySpy, release: vi.fn() }) } as unknown as Pool;
       repo = new SettingsRepository(pool);
-      const result = await tenantContext.runWith(ctxA, () => repo.updateShopProfile(SHOP_A, {}));
+      const result = await tenantContext.runWith(ctxA, () => repo.updateShopProfile({}));
       const updateCalls = (querySpy.mock.calls as [string][]).filter(([sql]) => typeof sql === 'string' && sql.includes('UPDATE shops'));
       expect(updateCalls).toHaveLength(0);
       expect(result.before.name).toBe(result.after.name);

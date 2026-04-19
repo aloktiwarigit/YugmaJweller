@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { BlobServiceClient, BlobSASPermissions } from '@azure/storage-blob';
+import { tenantContext } from '@goldsmith/tenant-context';
 
 export interface SasUrlResult {
   upload_url: string;
@@ -10,7 +11,7 @@ export interface SasUrlResult {
 }
 
 export interface IBlobStorageService {
-  generateLogoSasUrl(shopId: string): Promise<SasUrlResult>;
+  generateLogoSasUrl(): Promise<SasUrlResult>;
 }
 
 export const BLOB_STORAGE_SERVICE = 'BLOB_STORAGE_SERVICE';
@@ -30,7 +31,8 @@ export class BlobStorageService implements IBlobStorageService {
     this.client = BlobServiceClient.fromConnectionString(connectionString);
   }
 
-  async generateLogoSasUrl(shopId: string): Promise<SasUrlResult> {
+  async generateLogoSasUrl(): Promise<SasUrlResult> {
+    const shopId = tenantContext.requireCurrent().shopId;
     const blobPath = `tenants/${shopId}/logo/${randomUUID()}.webp`;
     const expiresOn = new Date(Date.now() + 15 * 60 * 1000);
 

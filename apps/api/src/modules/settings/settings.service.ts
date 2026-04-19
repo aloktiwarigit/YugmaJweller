@@ -17,36 +17,36 @@ export class SettingsService {
     @Inject('PG_POOL')           private readonly pool: Pool,
   ) {}
 
-  async getProfile(shopId: string): Promise<ShopProfileRow> {
-    const hit = await this.cache.getProfile(shopId);
+  async getProfile(): Promise<ShopProfileRow> {
+    const hit = await this.cache.getProfile();
     if (hit) return hit;
-    const profile = await this.repo.getShopProfile(shopId);
-    await this.cache.setProfile(shopId, profile);
+    const profile = await this.repo.getShopProfile();
+    await this.cache.setProfile(profile);
     return profile;
   }
 
-  async updateProfile(shopId: string, dto: PatchShopProfileDto): Promise<ShopProfileRow> {
+  async updateProfile(dto: PatchShopProfileDto): Promise<ShopProfileRow> {
     const parsed = PatchShopProfileSchema.safeParse(dto);
     if (!parsed.success) {
       const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), code: i.message }));
       throw new BadRequestException({ code: 'validation.failed', errors });
     }
 
-    const { before, after } = await this.repo.updateShopProfile(shopId, parsed.data);
+    const { before, after } = await this.repo.updateShopProfile(parsed.data);
 
-    await this.cache.invalidate(shopId);
+    await this.cache.invalidate();
 
+    const shopId = tenantContext.requireCurrent().shopId;
     if (before.name !== after.name) {
       this.tenantLookup.invalidate(shopId);
     }
 
-    void this.auditProfileUpdate(shopId, before, after).catch(() => undefined);
+    void this.auditProfileUpdate(before, after).catch(() => undefined);
 
     return after;
   }
 
   private async auditProfileUpdate(
-    shopId: string,
     before: ShopProfileRow,
     after: ShopProfileRow,
   ): Promise<void> {
@@ -55,7 +55,7 @@ export class SettingsService {
     await auditLog(this.pool, {
       action: AuditAction.SETTINGS_PROFILE_UPDATED,
       subjectType: 'shop',
-      subjectId: shopId,
+      subjectId: tc.shopId,
       actorUserId: tc.authenticated ? tc.userId : undefined,
       before,
       after,

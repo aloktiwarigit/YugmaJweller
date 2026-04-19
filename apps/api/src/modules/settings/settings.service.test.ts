@@ -21,7 +21,7 @@ const profileBefore: ShopProfileRow = {
 };
 const profileAfter: ShopProfileRow = { ...profileBefore, name: 'Rajesh Jewellers & Sons' };
 
-function makeSvc() {
+function makeSvc(): { svc: SettingsService; repo: SettingsRepository; cache: SettingsCache; tenantLookup: DrizzleTenantLookup } {
   const repo = {
     getShopProfile: vi.fn().mockResolvedValue(profileBefore),
     updateShopProfile: vi.fn().mockResolvedValue({ before: profileBefore, after: profileAfter }),
@@ -45,17 +45,17 @@ describe('SettingsService', () => {
     it('returns cached value on hit', async () => {
       const { svc, repo, cache } = makeSvc();
       (cache.getProfile as ReturnType<typeof vi.fn>).mockResolvedValueOnce(profileBefore);
-      const result = await tenantContext.runWith(ctx, () => svc.getProfile(SHOP_A));
+      const result = await tenantContext.runWith(ctx, () => svc.getProfile());
       expect(result).toEqual(profileBefore);
       expect(repo.getShopProfile).not.toHaveBeenCalled();
     });
 
     it('loads from DB on cache miss and populates cache', async () => {
       const { svc, repo, cache } = makeSvc();
-      const result = await tenantContext.runWith(ctx, () => svc.getProfile(SHOP_A));
+      const result = await tenantContext.runWith(ctx, () => svc.getProfile());
       expect(result).toEqual(profileBefore);
-      expect(repo.getShopProfile).toHaveBeenCalledWith(SHOP_A);
-      expect(cache.setProfile).toHaveBeenCalledWith(SHOP_A, profileBefore);
+      expect(repo.getShopProfile).toHaveBeenCalledWith();
+      expect(cache.setProfile).toHaveBeenCalledWith(profileBefore);
     });
   });
 
@@ -63,17 +63,17 @@ describe('SettingsService', () => {
     it('calls repo, invalidates cache, returns after', async () => {
       const { svc, repo, cache } = makeSvc();
       const result = await tenantContext.runWith(ctx, () =>
-        svc.updateProfile(SHOP_A, { name: 'Rajesh Jewellers & Sons' }),
+        svc.updateProfile({ name: 'Rajesh Jewellers & Sons' }),
       );
-      expect(repo.updateShopProfile).toHaveBeenCalledWith(SHOP_A, { name: 'Rajesh Jewellers & Sons' });
-      expect(cache.invalidate).toHaveBeenCalledWith(SHOP_A);
+      expect(repo.updateShopProfile).toHaveBeenCalledWith({ name: 'Rajesh Jewellers & Sons' });
+      expect(cache.invalidate).toHaveBeenCalledWith();
       expect(result).toEqual(profileAfter);
     });
 
     it('invalidates DrizzleTenantLookup when name changes', async () => {
       const { svc, tenantLookup } = makeSvc();
       await tenantContext.runWith(ctx, () =>
-        svc.updateProfile(SHOP_A, { name: 'New Name' }),
+        svc.updateProfile({ name: 'New Name' }),
       );
       expect(tenantLookup.invalidate).toHaveBeenCalledWith(SHOP_A);
     });
@@ -84,14 +84,14 @@ describe('SettingsService', () => {
         before: profileBefore,
         after: { ...profileBefore, gstin: '09AAACR5055K1Z5' },
       });
-      await tenantContext.runWith(ctx, () => svc.updateProfile(SHOP_A, { gstin: '09AAACR5055K1Z5' }));
+      await tenantContext.runWith(ctx, () => svc.updateProfile({ gstin: '09AAACR5055K1Z5' }));
       expect(tenantLookup.invalidate).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException for invalid GSTIN', async () => {
       const { svc, repo } = makeSvc();
       await expect(
-        tenantContext.runWith(ctx, () => svc.updateProfile(SHOP_A, { gstin: 'BAD' })),
+        tenantContext.runWith(ctx, () => svc.updateProfile({ gstin: 'BAD' })),
       ).rejects.toThrow(BadRequestException);
       expect(repo.updateShopProfile).not.toHaveBeenCalled();
     });
@@ -100,7 +100,7 @@ describe('SettingsService', () => {
       const { svc } = makeSvc();
       vi.spyOn(svc as unknown as { auditProfileUpdate: () => void }, 'auditProfileUpdate').mockRejectedValueOnce(new Error('audit down'));
       const result = await tenantContext.runWith(ctx, () =>
-        svc.updateProfile(SHOP_A, { name: 'Rajesh Jewellers & Sons' }),
+        svc.updateProfile({ name: 'Rajesh Jewellers & Sons' }),
       );
       expect(result).toEqual(profileAfter);
     });

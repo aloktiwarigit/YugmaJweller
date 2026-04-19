@@ -36,7 +36,7 @@ export class SettingsController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<ShopProfileResponseDto> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
-    const profile = await this.svc.getProfile(ctx.shopId);
+    const profile = await this.svc.getProfile();
     const etag = `"${createHash('sha256').update(JSON.stringify(profile)).digest('hex').slice(0, 16)}"`;
     res.setHeader('ETag', etag);
     return { ...profile, etag };
@@ -50,7 +50,7 @@ export class SettingsController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<ShopProfileResponseDto> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
-    const profile = await this.svc.updateProfile(ctx.shopId, body);
+    const profile = await this.svc.updateProfile(body);
     const etag = `"${createHash('sha256').update(JSON.stringify(profile)).digest('hex').slice(0, 16)}"`;
     res.setHeader('ETag', etag);
     return { ...profile, etag };
@@ -63,6 +63,6 @@ export class SettingsController {
     @TenantContextDec() ctx: TenantContext,
   ): Promise<LogoUploadUrlResponseDto> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
-    return this.blob.generateLogoSasUrl(ctx.shopId);
+    return this.blob.generateLogoSasUrl();
   }
 }

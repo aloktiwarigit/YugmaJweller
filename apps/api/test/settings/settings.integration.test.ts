@@ -94,7 +94,7 @@ function makeCtx(role: 'shop_admin' | 'shop_manager' | 'shop_staff' = 'shop_admi
 describe('SettingsRepository + SettingsService integration', () => {
   it('getProfile returns name from DB and null for unfilled optional fields', async () => {
     const profile = await tenantContext.runWith(makeCtx(), () =>
-      svc.getProfile(SHOP_A),
+      svc.getProfile(),
     );
 
     expect(profile.name).toBe('Rajesh Jewellers');
@@ -106,7 +106,7 @@ describe('SettingsRepository + SettingsService integration', () => {
 
   it('updateProfile persists name change to DB', async () => {
     await tenantContext.runWith(makeCtx(), () =>
-      svc.updateProfile(SHOP_A, { name: 'Rajesh Jewellers & Sons' }),
+      svc.updateProfile( { name: 'Rajesh Jewellers & Sons' }),
     );
 
     const r = await pool.query<{ display_name: string }>(
@@ -129,19 +129,19 @@ describe('SettingsRepository + SettingsService integration', () => {
   it('rejects invalid GSTIN with BadRequestException', async () => {
     await expect(
       tenantContext.runWith(makeCtx(), () =>
-        svc.updateProfile(SHOP_A, { gstin: 'INVALID' }),
+        svc.updateProfile( { gstin: 'INVALID' }),
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('after update + cache miss, getProfile returns updated data from DB', async () => {
     await tenantContext.runWith(makeCtx(), () =>
-      svc.updateProfile(SHOP_A, { about_text: 'प्रीमियम सोना और आभूषण' }),
+      svc.updateProfile( { about_text: 'प्रीमियम सोना और आभूषण' }),
     );
 
     // Cache always returns null → forces DB read.
     const profile = await tenantContext.runWith(makeCtx(), () =>
-      svc.getProfile(SHOP_A),
+      svc.getProfile(),
     );
 
     expect(profile.about_text).toBe('प्रीमियम सोना और आभूषण');

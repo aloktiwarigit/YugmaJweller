@@ -1,5 +1,5 @@
 import { Module, OnModuleDestroy, Inject } from '@nestjs/common';
-import Redis from 'ioredis';
+import { Redis } from '@goldsmith/cache';
 import { AuthModule } from '../auth/auth.module';
 import { TenantLookupModule } from '../tenant-lookup/tenant-lookup.module';
 import { SettingsController } from './settings.controller';

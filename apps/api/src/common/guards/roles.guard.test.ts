@@ -7,14 +7,14 @@ import type { AuthenticatedTenantContext, Tenant } from '@goldsmith/tenant-conte
 
 const tenant: Tenant = { id: 'shop-1', slug: 'a', display_name: 'A', status: 'ACTIVE' };
 
-function makeCtx(role: string) {
+function makeCtx(role: string): AuthenticatedTenantContext {
   return {
     shopId: tenant.id, tenant,
     authenticated: true as const, userId: 'u1', role,
   } as AuthenticatedTenantContext;
 }
 
-function makeExecCtx(required: string[] | undefined) {
+function makeExecCtx(required: string[] | undefined): { reflector: Reflector; execCtx: ExecutionContext } {
   const reflector = { getAllAndOverride: vi.fn().mockReturnValue(required) } as unknown as Reflector;
   const execCtx = {
     getHandler: () => ({}),
