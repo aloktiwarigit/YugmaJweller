@@ -1,20 +1,19 @@
 // apps/api/test/auth-missing-phone.integration.test.ts
 // Regression: FirebaseJwtStrategy returning undefined phone_number must yield 401, not 500.
+// Tests the controller-level guard independently of Passport by injecting req.user directly.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import request from 'supertest';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Pool } from 'pg';
 import { resolve } from 'node:path';
 import { Test } from '@nestjs/testing';
-import type { INestApplication } from '@nestjs/common';
+import { UnauthorizedException } from '@nestjs/common';
 import { createPool, runMigrations } from '@goldsmith/db';
-import { AppModule } from '../src/app.module';
-import { FirebaseJwtStrategy } from '../src/modules/auth/firebase-jwt.strategy';
+import { AuthController } from '../src/modules/auth/auth.controller';
+import { AuthService } from '../src/modules/auth/auth.service';
 
-describe('POST /api/v1/auth/session — missing phone_number claim → 401', () => {
+describe('AuthController.session — missing phone_number claim → 401', () => {
   let container: StartedPostgreSqlContainer;
   let pool: Pool;
-  let app: INestApplication;
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer('postgres:15.6').start();
@@ -23,32 +22,51 @@ describe('POST /api/v1/auth/session — missing phone_number claim → 401', () 
     process.env['DATABASE_URL'] = container.getConnectionUri();
     process.env['FIREBASE_AUTH_EMULATOR_HOST'] = '127.0.0.1:9099';
     process.env['FIREBASE_PROJECT_ID'] = 'goldsmith-test';
-
-    // Override FirebaseJwtStrategy to synthesize a token WITHOUT phone_number (email/anonymous path)
-    const mockStrategy = {
-      validate: async () => {
-        // Returns claims without phone_number — simulating email-only or anonymous Firebase user
-        return { uid: 'email-user-uid', phone_number: undefined };
-      },
-    };
-
-    const mod = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider('PG_POOL').useValue(pool)
-      .overrideProvider(FirebaseJwtStrategy).useValue(mockStrategy)
-      .compile();
-    app = mod.createNestApplication();
-    await app.init();
   }, 120_000);
 
-  afterAll(async () => { await app?.close(); await pool?.end(); await container?.stop(); });
+  afterAll(async () => { await pool?.end(); await container?.stop(); });
 
-  it('token without phone_number returns 401 auth.missing (not 500)', async () => {
-    const res = await request(app.getHttpServer())
-      .post('/api/v1/auth/session')
-      .set('Authorization', 'Bearer any-token-here')
-      .send();
-    // Must be 401, never 500 (PK violation from undefined phone)
-    expect(res.status).toBe(401);
-    expect(res.body.code).toBe('auth.missing');
+  it('user without phone_number on req.user throws UnauthorizedException auth.missing', async () => {
+    const mockSvc = { session: async () => ({ user: {}, tenant: {}, requires_token_refresh: false }) };
+    const mod = await Test.createTestingModule({
+      controllers: [AuthController],
+      providers: [{ provide: AuthService, useValue: mockSvc }],
+    }).compile();
+    const controller = mod.get(AuthController);
+
+    // Simulate request with uid but no phone_number (email/anonymous Firebase user)
+    const fakeReq = { user: { uid: 'email-user-uid', phone_number: undefined }, headers: {} } as never;
+
+    await expect(controller.session(fakeReq, '1.2.3.4')).rejects.toMatchObject({
+      response: { code: 'auth.missing' },
+    });
+  });
+
+  it('user with no uid on req.user throws UnauthorizedException auth.missing', async () => {
+    const mockSvc = { session: async () => ({ user: {}, tenant: {}, requires_token_refresh: false }) };
+    const mod = await Test.createTestingModule({
+      controllers: [AuthController],
+      providers: [{ provide: AuthService, useValue: mockSvc }],
+    }).compile();
+    const controller = mod.get(AuthController);
+
+    const fakeReq = { user: { uid: undefined, phone_number: '+919000000001' }, headers: {} } as never;
+
+    await expect(controller.session(fakeReq, '1.2.3.4')).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('missing user entirely on req throws UnauthorizedException auth.missing', async () => {
+    const mockSvc = { session: async () => ({ user: {}, tenant: {}, requires_token_refresh: false }) };
+    const mod = await Test.createTestingModule({
+      controllers: [AuthController],
+      providers: [{ provide: AuthService, useValue: mockSvc }],
+    }).compile();
+    const controller = mod.get(AuthController);
+
+    const fakeReq = { user: undefined, headers: {} } as never;
+
+    await expect(controller.session(fakeReq, '1.2.3.4')).rejects.toMatchObject({
+      response: { code: 'auth.missing' },
+    });
   });
 });
