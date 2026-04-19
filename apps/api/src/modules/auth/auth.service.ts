@@ -79,18 +79,21 @@ export class AuthService {
       await this.auditProvisioned({ tenant, userId: row.userId, role: row.role, requestId: args.requestId });
     }
 
-    // 5. Set Firebase custom claims so subsequent ID tokens carry shop_id + role + user_id (DB UUID)
+    // 5. Record success — user is verified at this point; move before setCustomUserClaims so
+    //    a Firebase quota/network failure doesn't leave a stale rate-limit row.
+    await this.rateLimit.recordSuccess(args.phoneE164);
+
+    // 6. Set Firebase custom claims so subsequent ID tokens carry shop_id + role + user_id (DB UUID)
     await this.firebase.admin().auth().setCustomUserClaims(args.uid, {
       shop_id: row.shopId,
       role: row.role,
       user_id: row.userId,  // DB UUID — enables TenantInterceptor to propagate userId without extra query
     });
 
-    // 6. Record success, audit verify-success
-    await this.rateLimit.recordSuccess(args.phoneE164);
+    // 7. Audit verify-success
     await this.auditVerifySuccess({ tenant, userId: row.userId, role: row.role, ip: args.ip, userAgent: args.userAgent, requestId: args.requestId });
 
-    // 7. Load display_name under tenant ctx
+    // 8. Load display_name under tenant ctx
     const user = await this.loadUserDisplayName({ tenant, userId: row.userId, role: row.role });
 
     return {
@@ -105,7 +108,9 @@ export class AuthService {
     try {
       const r = await c.query(`SELECT id, slug, display_name, status, config FROM shops WHERE id = $1`, [id]);
       if (r.rows.length === 0) throw new UnauthorizedException({ code: 'tenant.not_found' });
-      return r.rows[0] as Tenant;
+      const tenant = r.rows[0] as Tenant;
+      if (tenant.status !== 'ACTIVE') throw new ForbiddenException({ code: 'tenant.inactive' });
+      return tenant;
     } finally { c.release(); }
   }
 
@@ -146,6 +151,7 @@ export class AuthService {
     return tenantContext.runWith(ctx, () =>
       withTenantTx(this.pool, async (tx) => {
         const r = await tx.query(`SELECT display_name FROM shop_users WHERE id = $1`, [args.userId]);
+        if (r.rows.length === 0) throw new UnauthorizedException({ code: 'auth.user_not_found' });
         return r.rows[0] as { display_name: string };
       }),
     );

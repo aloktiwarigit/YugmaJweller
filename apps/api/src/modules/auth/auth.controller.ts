@@ -16,8 +16,8 @@ export class AuthController {
   @SkipTenant()
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   async session(@Req() req: Request, @Ip() ip: string) {
-    const user = (req as Request & { user?: { uid: string; phone_number: string } }).user;
-    if (!user) throw new UnauthorizedException({ code: 'auth.missing' });
+    const user = (req as Request & { user?: { uid?: string; phone_number?: string } }).user;
+    if (!user?.uid || !user.phone_number) throw new UnauthorizedException({ code: 'auth.missing' });
     return this.svc.session({
       uid: user.uid,
       phoneE164: user.phone_number,

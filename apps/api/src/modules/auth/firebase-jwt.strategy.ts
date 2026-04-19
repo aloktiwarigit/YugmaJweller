@@ -6,7 +6,7 @@ import { FirebaseAdminProvider } from './firebase-admin.provider';
 
 export interface FirebaseUserClaims {
   uid: string;
-  phone_number: string;
+  phone_number: string | undefined;
   shop_id?: string;
   role?: 'shop_admin' | 'shop_manager' | 'shop_staff' | 'platform_admin';
   user_id?: string;  // DB UUID propagated via custom claim; undefined on very first /session call
