@@ -1,0 +1,19 @@
+{
+  "name": "@goldsmith/auth-client",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@react-native-firebase/auth": "^19.0.0 || ^20.0.0 || ^21.0.0",
+    "react-native": "0.74.x || 0.75.x || 0.76.x"
+  },
+  "devDependencies": {
+    "vitest": "^1.4.0",
+    "typescript": "^5.4.0"
+  }
+}
