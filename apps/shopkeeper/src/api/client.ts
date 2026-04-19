@@ -26,12 +26,16 @@ interface RetriableConfig extends InternalAxiosRequestConfig {
 api.interceptors.response.use(undefined, async (err: AxiosError<{ code?: string }>) => {
   const res = err.response;
   const original = err.config as RetriableConfig | undefined;
+  const method = (original?.method ?? 'get').toLowerCase();
+  const idempotent = method === 'get' || method === 'head';
   // Claim-missing (backend signals custom claims haven't propagated yet) — retry ONCE with forced refresh.
+  // Restrict retry to idempotent methods only to avoid double-posting mutations.
   if (
     res?.status === 401 &&
     res.data?.code === 'auth.claim_missing' &&
     original &&
-    original.__retriedForClaim !== true
+    original.__retriedForClaim !== true &&
+    idempotent
   ) {
     original.__retriedForClaim = true;
     const fresh = await getIdToken(true);

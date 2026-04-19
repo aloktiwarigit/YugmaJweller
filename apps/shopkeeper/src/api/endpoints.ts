@@ -22,7 +22,7 @@ export async function getTenantBoot(
   slug: string,
   etag?: string,
 ): Promise<{ tenant: Tenant; etag: string | null; notModified: boolean }> {
-  const res = await api.get(`/tenant/boot?slug=${encodeURIComponent(slug)}`, {
+  const res = await api.get(`/api/v1/tenant/boot?slug=${encodeURIComponent(slug)}`, {
     headers: etag ? { 'If-None-Match': etag } : undefined,
     validateStatus: (s: number) => s === 200 || s === 304,
   });

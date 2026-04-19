@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text } from 'react-native';
 import { router } from 'expo-router';
-import { verifyOtp, sendOtp } from '@goldsmith/auth-client';
+import { verifyOtp, sendOtp, getIdToken } from '@goldsmith/auth-client';
 import { t } from '@goldsmith/i18n';
 import { Button, Input, Toast } from '@goldsmith/ui-mobile';
 import { colors, typography, spacing } from '@goldsmith/ui-tokens';
@@ -30,10 +30,11 @@ export default function OtpScreen(): React.ReactElement {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const navigatedRef = useRef(false);
 
   // Defensive redirect if no confirmation in store
   useEffect(() => {
-    if (!confirmation) {
+    if (!confirmation && !navigatedRef.current) {
       router.replace('/(auth)/phone');
     }
   }, [confirmation]);
@@ -84,11 +85,17 @@ export default function OtpScreen(): React.ReactElement {
       const { idToken } = await verifyOtp(confirmation, code);
       const sess = await postAuthSession(idToken);
       setUser(sess.user);
+      // @spec §4.1(8) — pick up new custom claims synchronously before navigating
+      if (sess.requires_token_refresh) {
+        await getIdToken(true);
+      }
+      navigatedRef.current = true;
       clear();
       router.replace('/(tabs)');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '';
-      if (msg.includes('429') || msg.includes('locked')) {
+      const isLocked = msg.includes('429') || msg.includes('locked') || msg.includes('too-many-requests');
+      if (isLocked) {
         setErrorMsg(t('auth.otp.errors.locked'));
       } else {
         setErrorMsg(t('auth.otp.errors.wrong'));

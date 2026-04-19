@@ -32,8 +32,13 @@ export default function PhoneScreen(): React.ReactElement {
         '+91' + phone,
       );
       router.push('/(auth)/otp');
-    } catch {
-      setErrorMsg(t('auth.phone.errors.send_failed'));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      if (msg.includes('429') || msg.includes('too-many-requests')) {
+        setErrorMsg(t('auth.phone.errors.locked'));
+      } else {
+        setErrorMsg(t('auth.phone.errors.send_failed'));
+      }
     } finally {
       setLoading(false);
     }
@@ -159,7 +164,7 @@ export default function PhoneScreen(): React.ReactElement {
           marginTop: spacing.xl,
         }}
       >
-        {t('auth.meta.secure_login_firebase')}
+        {t('auth.meta.secure_login')}
       </Text>
     </View>
   );

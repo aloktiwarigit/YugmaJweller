@@ -126,4 +126,19 @@ describe('api client — response interceptor (claim-missing retry)', () => {
     // Exactly 2 requests (original + 1 retry), not 3+
     expect(mock.history.get).toHaveLength(2);
   });
+
+  it('does NOT retry on 401 auth.claim_missing for POST (non-idempotent)', async () => {
+    getIdTokenMock.mockResolvedValue('tok');
+    mock.onPost('/mutations').reply(401, { code: 'auth.claim_missing' });
+
+    await expect(api.post('/mutations', { data: 'x' })).rejects.toMatchObject({
+      response: { status: 401 },
+    });
+
+    // Only one request — no retry on POST
+    expect(mock.history.post).toHaveLength(1);
+    // getIdToken called once (request interceptor) — never for force-refresh
+    expect(getIdTokenMock).toHaveBeenCalledTimes(1);
+    expect(getIdTokenMock).not.toHaveBeenCalledWith(true);
+  });
 });

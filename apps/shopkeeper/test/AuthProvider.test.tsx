@@ -27,10 +27,11 @@ describe('AuthProvider', () => {
     expect(s.loading).toBe(false);
   });
 
-  it('clears firebaseUser + idToken when Firebase emits null', async () => {
+  it('clears firebaseUser + idToken + user when Firebase emits null', async () => {
     useAuthStore.setState({
       firebaseUser: { uid: 'u1', phoneNumber: null },
       idToken: 'x',
+      user: { id: 'u1', shopId: 's1', role: 'owner', displayName: 'Test User' },
       loading: false,
     });
     render(<AuthProvider>{null}</AuthProvider>);
@@ -39,6 +40,22 @@ describe('AuthProvider', () => {
     });
     const s = useAuthStore.getState();
     expect(s.firebaseUser).toBeNull();
+    expect(s.idToken).toBeNull();
+    expect(s.user).toBeNull();
+    expect(s.loading).toBe(false);
+  });
+
+  it('sets idToken to null and still clears loading when getIdToken throws', async () => {
+    render(<AuthProvider>{null}</AuthProvider>);
+    await act(async () => {
+      __setCurrentUser({
+        uid: 'u2',
+        phoneNumber: '+911234567890',
+        getIdToken: async () => { throw new Error('token fetch failed'); },
+      });
+    });
+    const s = useAuthStore.getState();
+    expect(s.firebaseUser).toEqual({ uid: 'u2', phoneNumber: '+911234567890' });
     expect(s.idToken).toBeNull();
     expect(s.loading).toBe(false);
   });

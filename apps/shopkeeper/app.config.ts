@@ -27,7 +27,7 @@ const config: ExpoConfig = {
     supportsTablet: false,
   },
   extra: {
-    apiBaseUrl: process.env['EXPO_PUBLIC_API_BASE_URL'] ?? 'http://localhost:3000',
+    apiBaseUrl: process.env['EXPO_PUBLIC_API_BASE_URL'] ?? 'http://10.0.2.2:3000',
     tenantSlug: process.env['EXPO_PUBLIC_TENANT_SLUG'] ?? 'anchor-dev',
     firebaseProjectId: process.env['EXPO_PUBLIC_FIREBASE_PROJECT_ID'] ?? 'goldsmith-dev',
     router: { origin: false },

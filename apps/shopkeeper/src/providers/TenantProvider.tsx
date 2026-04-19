@@ -30,7 +30,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }): Rea
           setLoading(true);
         }
         const headers = cached?.etag ? { 'If-None-Match': cached.etag } : undefined;
-        const res = await api.get(`/tenant/boot?slug=${encodeURIComponent(slug)}`, {
+        const res = await api.get(`/api/v1/tenant/boot?slug=${encodeURIComponent(slug)}`, {
           headers: headers as Record<string, string> | undefined,
           validateStatus: (s: number) => s === 200 || s === 304,
         });

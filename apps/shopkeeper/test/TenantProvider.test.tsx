@@ -51,6 +51,12 @@ describe('TenantProvider', () => {
     expect(s.loading).toBe(false);
     expect(s.error).toBeNull();
 
+    // Verify the correct versioned API path was called
+    expect(api.get).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/tenant/boot'),
+      expect.anything(),
+    );
+
     // Verify persisted to AsyncStorage
     const cached = await asyncStorageMock.getItem('tenant-boot:anchor-dev');
     expect(cached).not.toBeNull();
@@ -80,9 +86,9 @@ describe('TenantProvider', () => {
     // Cached tenant should be present; 304 means no update
     expect(s.tenant?.slug).toBe('anchor-dev');
     expect(s.loading).toBe(false);
-    // api.get called with If-None-Match header
+    // api.get called with /api/v1/tenant/boot path and If-None-Match header
     expect(api.get).toHaveBeenCalledWith(
-      expect.stringContaining('/tenant/boot'),
+      expect.stringContaining('/api/v1/tenant/boot'),
       expect.objectContaining({ headers: { 'If-None-Match': '"v1"' } }),
     );
   });

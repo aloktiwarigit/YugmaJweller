@@ -6,10 +6,11 @@ import { setLocale } from '@goldsmith/i18n';
 // Mock auth-client — factory cannot reference outer variables (hoisting)
 const verifyOtpMock = vi.fn();
 const postAuthSessionMock = vi.fn();
+const getIdTokenMock = vi.fn().mockResolvedValue(null);
 vi.mock('@goldsmith/auth-client', () => ({
   sendOtp: vi.fn(),
   verifyOtp: (...args: unknown[]): unknown => verifyOtpMock(...args),
-  getIdToken: vi.fn().mockResolvedValue(null),
+  getIdToken: (...args: unknown[]): unknown => getIdTokenMock(...args),
   auth: (): unknown => ({}),
 }));
 
@@ -38,6 +39,8 @@ beforeEach(() => {
   setLocale('hi-IN');
   verifyOtpMock.mockReset();
   postAuthSessionMock.mockReset();
+  getIdTokenMock.mockReset();
+  getIdTokenMock.mockResolvedValue(null);
   mockConfirm.mockReset();
   vi.mocked(expoRouter.router.replace).mockReset();
   vi.mocked(expoRouter.router.push).mockReset();
@@ -100,6 +103,69 @@ describe('(auth)/otp.tsx', () => {
     fireEvent.click(getByTestId('otp-cta'));
 
     const toast = await findByText(/गलत OTP/);
+    expect(toast).toBeTruthy();
+  });
+
+  it('calls getIdToken(true) before navigation when requires_token_refresh is true', async () => {
+    useOtpStore.setState({
+      confirmation: { confirm: mockConfirm },
+      phoneE164: '+919876543210',
+    });
+    verifyOtpMock.mockResolvedValue({ idToken: 'tok-123' });
+    postAuthSessionMock.mockResolvedValue({
+      user: { id: 'u1', shopId: 's1', role: 'owner', displayName: 'Test' },
+      tenant: { id: 't1', slug: 'test', displayName: 'Test Shop' },
+      requires_token_refresh: true,
+    });
+    getIdTokenMock.mockResolvedValue('fresh-tok');
+
+    const { getByTestId } = render(<Otp />);
+    const input = getByTestId('otp-input');
+    fireEvent.change(input, { target: { value: '123456' } });
+    fireEvent.click(getByTestId('otp-cta'));
+
+    await waitFor(() => expect(expoRouter.router.replace).toHaveBeenCalledWith('/(tabs)'));
+    // getIdToken(true) must have been called (force-refresh) before navigation
+    expect(getIdTokenMock).toHaveBeenCalledWith(true);
+    const callOrder = getIdTokenMock.mock.invocationCallOrder[0];
+    const navCallOrder = vi.mocked(expoRouter.router.replace).mock.invocationCallOrder[0];
+    expect(callOrder).toBeLessThan(navCallOrder!);
+  });
+
+  it('does NOT call getIdToken(true) when requires_token_refresh is false', async () => {
+    useOtpStore.setState({
+      confirmation: { confirm: mockConfirm },
+      phoneE164: '+919876543210',
+    });
+    verifyOtpMock.mockResolvedValue({ idToken: 'tok-123' });
+    postAuthSessionMock.mockResolvedValue({
+      user: { id: 'u1', shopId: 's1', role: 'owner', displayName: 'Test' },
+      tenant: { id: 't1', slug: 'test', displayName: 'Test Shop' },
+      requires_token_refresh: false,
+    });
+
+    const { getByTestId } = render(<Otp />);
+    const input = getByTestId('otp-input');
+    fireEvent.change(input, { target: { value: '123456' } });
+    fireEvent.click(getByTestId('otp-cta'));
+
+    await waitFor(() => expect(expoRouter.router.replace).toHaveBeenCalledWith('/(tabs)'));
+    expect(getIdTokenMock).not.toHaveBeenCalledWith(true);
+  });
+
+  it('on too-many-requests error: shows locked Toast', async () => {
+    useOtpStore.setState({
+      confirmation: { confirm: mockConfirm },
+      phoneE164: '+919876543210',
+    });
+    verifyOtpMock.mockRejectedValue(new Error('auth/too-many-requests'));
+
+    const { getByTestId, findByText } = render(<Otp />);
+    const input = getByTestId('otp-input');
+    fireEvent.change(input, { target: { value: '000000' } });
+    fireEvent.click(getByTestId('otp-cta'));
+
+    const toast = await findByText(/बहुत अधिक प्रयास/);
     expect(toast).toBeTruthy();
   });
 });
