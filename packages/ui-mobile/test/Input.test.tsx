@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent } from '@testing-library/react';
 import { Input } from '../src/primitives/Input';
 
 describe('Input', () => {
@@ -12,10 +12,11 @@ describe('Input', () => {
   });
 
   it('renders with provided value', () => {
-    const { getByDisplayValue } = render(
-      <Input value="हिंदी" onChangeText={vi.fn()} />,
+    const { getByTestId } = render(
+      <Input value="हिंदी" onChangeText={vi.fn()} testID="input" />,
     );
-    expect(getByDisplayValue('हिंदी')).toBeTruthy();
+    const el = getByTestId('input') as HTMLInputElement;
+    expect(el.getAttribute('value')).toBe('हिंदी');
   });
 
   it('calls onChangeText when text changes', () => {
@@ -23,7 +24,7 @@ describe('Input', () => {
     const { getByTestId } = render(
       <Input value="" onChangeText={handler} testID="input" />,
     );
-    fireEvent.changeText(getByTestId('input'), 'नया पाठ');
+    fireEvent.change(getByTestId('input'), { target: { value: 'नया पाठ' } });
     expect(handler).toHaveBeenCalledWith('नया पाठ');
   });
 
@@ -31,13 +32,15 @@ describe('Input', () => {
     const { getByTestId } = render(
       <Input value="" onChangeText={vi.fn()} keyboardType="numeric" testID="input" />,
     );
-    expect(getByTestId('input').props['keyboardType']).toBe('numeric');
+    const el = getByTestId('input');
+    expect(el.getAttribute('keyboardtype')).toBe('numeric');
   });
 
   it('passes accessibilityLabel through', () => {
     const { getByTestId } = render(
       <Input value="" onChangeText={vi.fn()} accessibilityLabel="फ़ोन नंबर" testID="input" />,
     );
-    expect(getByTestId('input').props['accessibilityLabel']).toBe('फ़ोन नंबर');
+    const el = getByTestId('input');
+    expect(el.getAttribute('accessibilitylabel')).toBe('फ़ोन नंबर');
   });
 });

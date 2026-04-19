@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent } from '@testing-library/react';
 import { Button } from '../src/primitives/Button';
 
 describe('Button', () => {
@@ -16,33 +16,29 @@ describe('Button', () => {
 
   it('primary variant uses aged-gold background', () => {
     const { getByTestId } = render(<Button label="X" testID="btn" variant="primary" />);
-    const el = getByTestId('btn');
-    const s = Array.isArray(el.props.style)
-      ? Object.assign({}, ...el.props.style)
-      : (el.props.style as Record<string, unknown>);
-    expect(s['backgroundColor']).toBe('#B58A3C');
+    const el = getByTestId('btn') as HTMLElement;
+    // React renders inline style as CSS; compare normalized value
+    expect(el.style.backgroundColor).toBe('rgb(181, 138, 60)'); // #B58A3C
   });
 
   it('secondary variant has transparent background', () => {
     const { getByTestId } = render(<Button label="X" testID="btn" variant="secondary" />);
-    const el = getByTestId('btn');
-    const s = Array.isArray(el.props.style)
-      ? Object.assign({}, ...el.props.style)
-      : (el.props.style as Record<string, unknown>);
-    expect(s['backgroundColor']).toBe('transparent');
+    const el = getByTestId('btn') as HTMLElement;
+    expect(el.style.backgroundColor).toBe('transparent');
   });
 
   it('disabled variant reduces opacity + blocks press', () => {
     const onPress = vi.fn();
     const { getByTestId } = render(<Button label="X" testID="btn" disabled onPress={onPress} />);
-    fireEvent.press(getByTestId('btn'));
+    fireEvent.click(getByTestId('btn'));
+    // onPress is not wired to onClick when disabled — mock wires onPress→onClick only when !disabled
     expect(onPress).not.toHaveBeenCalled();
   });
 
   it('loading variant blocks press', () => {
     const onPress = vi.fn();
     const { getByTestId } = render(<Button label="X" testID="btn" loading onPress={onPress} />);
-    fireEvent.press(getByTestId('btn'));
+    fireEvent.click(getByTestId('btn'));
     expect(onPress).not.toHaveBeenCalled();
   });
 });
