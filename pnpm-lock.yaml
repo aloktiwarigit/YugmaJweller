@@ -363,6 +363,15 @@ importers:
         specifier: ^1.4.0
         version: 1.6.1(@types/node@22.19.17)
 
+  packages/ui-tokens:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.4.0
+        version: 1.6.1(@types/node@22.19.17)
+
 packages:
 
   '@ampproject/remapping@2.3.0':
