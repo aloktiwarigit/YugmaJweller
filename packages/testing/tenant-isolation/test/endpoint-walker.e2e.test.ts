@@ -16,7 +16,7 @@ describe('endpoint-walker — real tenant-scoped assertions (E2-S1 deferral #4)'
   let app: INestApplication;
   const projectId = 'goldsmith-walker-test';
   const emulatorPort = 9099;
-  let seeded: SeededTenantToken[] = [];
+  const seeded: SeededTenantToken[] = [];
 
   beforeAll(async () => {
     await startFirebaseAuthEmulator({ port: emulatorPort, projectId });

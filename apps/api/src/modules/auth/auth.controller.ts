@@ -4,6 +4,7 @@ import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext, TenantContext } from '@goldsmith/tenant-context';
 import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
 import { AuthService } from './auth.service';
+import { TenantWalkerRoute } from '../../common/decorators/tenant-walker-route.decorator';
 
 @Controller('/api/v1/auth')
 export class AuthController {
@@ -26,6 +27,7 @@ export class AuthController {
   }
 
   @Get('/me')
+  @TenantWalkerRoute()
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   async me(@TenantContextDec() ctx: TenantContext) {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
