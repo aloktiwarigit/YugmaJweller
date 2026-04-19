@@ -1,0 +1,36 @@
+{
+  "profile": {
+    "title": "Shop Profile",
+    "fields": {
+      "name":              "Shop Name",
+      "address":           "Address",
+      "gstin":             "GSTIN",
+      "bis_registration":  "BIS Registration",
+      "contact_phone":     "Phone",
+      "operating_hours":   "Business Hours",
+      "about_text":        "About Us",
+      "logo":              "Logo",
+      "years_in_business": "Years in Business"
+    },
+    "save_success": "Changes saved ✓",
+    "errors": {
+      "GSTIN_INVALID":  "Invalid GSTIN format. Example: 09AAACR5055K1Z5",
+      "PIN_INVALID":    "PIN code must be 6 digits",
+      "PHONE_INVALID":  "Enter a valid Indian phone number",
+      "NAME_REQUIRED":  "Shop name cannot be empty",
+      "ABOUT_TOO_LONG": "Description cannot exceed 500 characters",
+      "TIME_INVALID":   "Time must be in HH:MM format (e.g. 10:00)",
+      "HOURS_REQUIRED_WHEN_ENABLED": "Open hours are required when day is enabled",
+      "HOURS_MUST_BE_NULL_WHEN_DISABLED": "Hours must be empty when day is closed"
+    },
+    "operating_hours": {
+      "days": {
+        "mon": "Monday", "tue": "Tuesday", "wed": "Wednesday",
+        "thu": "Thursday", "fri": "Friday", "sat": "Saturday", "sun": "Sunday"
+      },
+      "open_label":   "Opening time",
+      "close_label":  "Closing time",
+      "closed_label": "Closed"
+    }
+  }
+}
