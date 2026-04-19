@@ -1,4 +1,4 @@
-import { uuid, text, timestamp, jsonb, pgEnum } from 'drizzle-orm/pg-core';
+import { uuid, text, timestamp, jsonb, pgEnum, integer } from 'drizzle-orm/pg-core';
 import { platformGlobalTable } from './_helpers/platformGlobalTable';
 
 export const shopStatusEnum = pgEnum('shop_status', ['PROVISIONING', 'ACTIVE', 'SUSPENDED', 'TERMINATED']);
@@ -10,6 +10,14 @@ export const shops = platformGlobalTable('shops', {
   status: shopStatusEnum('status').notNull().default('PROVISIONING'),
   kek_key_arn: text('kek_key_arn'),
   config: jsonb('config').notNull().default({}),
+  address_json: jsonb('address_json'),
+  gstin: text('gstin'),
+  bis_registration: text('bis_registration'),
+  contact_phone: text('contact_phone'),
+  operating_hours_json: jsonb('operating_hours_json'),
+  about_text: text('about_text'),
+  logo_url: text('logo_url'),
+  years_in_business: integer('years_in_business'),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
