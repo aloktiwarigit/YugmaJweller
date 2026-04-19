@@ -6,9 +6,9 @@ import { resolve } from 'node:path';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { createPool, runMigrations } from '@goldsmith/db';
-import { AppModule } from '@goldsmith/api/src/app.module';
-import { startFirebaseAuthEmulator, stopFirebaseAuthEmulator, provisionFixtures, fixtureRegistry } from '../src';
-import { walkTenantScopedEndpoints, type SeededTenantToken } from '../src/endpoint-walker';
+import { AppModule } from '../src/app.module';
+import { startFirebaseAuthEmulator, stopFirebaseAuthEmulator, provisionFixtures, fixtureRegistry } from '@goldsmith/testing-tenant-isolation';
+import { walkTenantScopedEndpoints, type SeededTenantToken } from '@goldsmith/testing-tenant-isolation';
 
 describe('endpoint-walker — real tenant-scoped assertions (E2-S1 deferral #4)', () => {
   let container: StartedPostgreSqlContainer;
@@ -22,7 +22,7 @@ describe('endpoint-walker — real tenant-scoped assertions (E2-S1 deferral #4)'
     await startFirebaseAuthEmulator({ port: emulatorPort, projectId });
     container = await new PostgreSqlContainer('postgres:15.6').start();
     pool = createPool({ connectionString: container.getConnectionUri() });
-    await runMigrations(pool, resolve(__dirname, '../../../db/src/migrations'));
+    await runMigrations(pool, resolve(__dirname, '../../../packages/db/src/migrations'));
     process.env['DATABASE_URL'] = container.getConnectionUri();
     process.env['FIREBASE_AUTH_EMULATOR_HOST'] = `127.0.0.1:${emulatorPort}`;
     process.env['FIREBASE_PROJECT_ID'] = projectId;

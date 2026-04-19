@@ -319,9 +319,6 @@ importers:
 
   packages/testing/tenant-isolation:
     dependencies:
-      '@goldsmith/api':
-        specifier: workspace:*
-        version: link:../../../apps/api
       '@goldsmith/db':
         specifier: workspace:*
         version: link:../../db
