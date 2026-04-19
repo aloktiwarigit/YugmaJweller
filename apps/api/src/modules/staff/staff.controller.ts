@@ -19,6 +19,7 @@ export class StaffController {
   }
 
   @Get()
+  @HttpCode(200)
   @TenantWalkerRoute()
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   async list(@TenantContextDec() ctx: TenantContext) {

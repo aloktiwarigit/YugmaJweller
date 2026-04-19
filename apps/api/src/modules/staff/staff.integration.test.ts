@@ -68,6 +68,12 @@ beforeAll(async () => {
     return idToken;
   };
 
+  await pool.query(`
+    INSERT INTO shop_users (id, shop_id, phone, display_name, role, status, invited_at, activated_at)
+    VALUES (gen_random_uuid(), '${shopId}', '+919876599999', 'Active Staff', 'shop_staff', 'ACTIVE', now(), now())
+    ON CONFLICT DO NOTHING;
+  `);
+
   const rawOwnerToken = await signIn('+15555550010');
   await pool.query(`
     INSERT INTO shop_users (id, shop_id, phone, display_name, role, status, invited_at)
@@ -121,7 +127,7 @@ describe('POST /api/v1/staff', () => {
     await request(app.getHttpServer())
       .post('/api/v1/staff')
       .set('Authorization', `Bearer ${ownerToken}`)
-      .send({ phone: '+15555550010', display_name: 'Owner Again', role: 'shop_staff' })
+      .send({ phone: '+919876599999', display_name: 'Already Active', role: 'shop_staff' })
       .expect(409);
   });
 
