@@ -72,4 +72,40 @@ describe('PatchShopProfileSchema', () => {
     const result = PatchShopProfileSchema.safeParse({ operating_hours: hours });
     expect(result.success).toBe(true);
   });
+
+  it('rejects enabled day with null open time (HOURS_REQUIRED_WHEN_ENABLED)', () => {
+    const hours = {
+      mon: { enabled: true, open: null, close: '20:00' },
+      tue: { enabled: true, open: '10:00', close: '20:00' },
+      wed: { enabled: true, open: '10:00', close: '20:00' },
+      thu: { enabled: true, open: '10:00', close: '20:00' },
+      fri: { enabled: true, open: '10:00', close: '20:00' },
+      sat: { enabled: true, open: '10:00', close: '18:00' },
+      sun: { enabled: false, open: null, close: null },
+    };
+    const result = PatchShopProfileSchema.safeParse({ operating_hours: hours });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const messages = result.error.issues.map((i) => i.message);
+      expect(messages).toContain('HOURS_REQUIRED_WHEN_ENABLED');
+    }
+  });
+
+  it('rejects invalid time value (25:00) with TIME_INVALID', () => {
+    const hours = {
+      mon: { enabled: true, open: '25:00', close: '20:00' },
+      tue: { enabled: true, open: '10:00', close: '20:00' },
+      wed: { enabled: true, open: '10:00', close: '20:00' },
+      thu: { enabled: true, open: '10:00', close: '20:00' },
+      fri: { enabled: true, open: '10:00', close: '20:00' },
+      sat: { enabled: true, open: '10:00', close: '18:00' },
+      sun: { enabled: false, open: null, close: null },
+    };
+    const result = PatchShopProfileSchema.safeParse({ operating_hours: hours });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const messages = result.error.issues.map((i) => i.message);
+      expect(messages).toContain('TIME_INVALID');
+    }
+  });
 });
