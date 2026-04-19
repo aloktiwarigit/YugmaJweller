@@ -1,0 +1,9 @@
+{
+  "eyebrow": "Welcome",
+  "headline": "Let's set up your shop",
+  "subcopy": "First step: add staff and assign roles",
+  "cta_staff": "Add staff",
+  "cta_settings": "Go to settings",
+  "tabs": { "dashboard": "Dashboard", "invoices": "Invoices", "products": "Products", "customers": "Customers" },
+  "stub_story_1_2": "Available in Story 1.2"
+}

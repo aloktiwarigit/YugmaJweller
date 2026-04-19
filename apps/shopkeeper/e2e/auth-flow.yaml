@@ -1,0 +1,16 @@
+appId: com.goldsmith.shopkeeper.dev
+---
+- launchApp
+- assertVisible: "अयोध्या स्वर्णकार"
+- assertVisible: "अपना फ़ोन नंबर डालें"
+- tapOn:
+    id: "phone-input"
+- inputText: "9876543210"
+- tapOn: "आगे बढ़ें"
+- assertVisible: "OTP डालें"
+- inputText: "123456"
+- tapOn: "सत्यापित करें"
+- assertVisible: "आइए, अपना shop set up करें"
+- assertVisible: "Staff जोड़ें"
+- assertNotVisible: "Goldsmith"
+- assertNotVisible: "Powered by"

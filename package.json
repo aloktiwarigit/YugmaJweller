@@ -32,5 +32,13 @@
     "typescript": "^5.4.0",
     "vitest": "^1.4.0",
     "@vitest/coverage-v8": "^1.4.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "protobufjs",
+      "unrs-resolver",
+      "@nestjs/core"
+    ]
   }
 }

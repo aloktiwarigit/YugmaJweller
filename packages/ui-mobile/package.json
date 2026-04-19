@@ -1,0 +1,28 @@
+{
+  "name": "@goldsmith/ui-mobile",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "react": "18.x",
+    "react-native": "0.74.x || 0.75.x || 0.76.x"
+  },
+  "dependencies": {
+    "@goldsmith/ui-tokens": "workspace:*"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^14.2.0",
+    "@types/react": "^18.2.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-native": "0.74.0",
+    "jsdom": "^24.0.0",
+    "vitest": "^1.4.0",
+    "typescript": "^5.4.0"
+  }
+}
