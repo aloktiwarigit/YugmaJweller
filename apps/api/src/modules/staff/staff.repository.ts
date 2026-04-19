@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable } from '@nestjs/common';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import type { InviteRole } from './dto/invite-staff.dto';
 import type { StaffListItemDto } from './dto/staff-list-item.dto';
@@ -46,7 +46,8 @@ export class StaffRepository {
         if (status !== 'INVITED') {
           throw new ConflictException('staff.already_exists');
         }
-        return this.refreshInvited({ existingId: existing.rows[0]!.id, invitedByUserId: args.invitedByUserId });
+        // Re-invite: reuse the same transaction — do NOT open a nested withTenantTx
+        return this._refreshInvited(tx, { existingId: existing.rows[0]!.id, invitedByUserId: args.invitedByUserId });
       }
 
       const res = await tx.query<ShopUserRow>(
@@ -60,19 +61,26 @@ export class StaffRepository {
   }
 
   async refreshInvited(args: { existingId: string; invitedByUserId: string }): Promise<ShopUserRow> {
-    return withTenantTx(this.pool, async (tx) => {
-      const res = await tx.query<ShopUserRow>(
-        `UPDATE shop_users
-            SET invited_by_user_id = $2,
-                invited_at         = now(),
-                updated_at         = now()
-          WHERE id = $1
-            AND status = 'INVITED'
-          RETURNING id, phone, display_name, role, status, invited_by_user_id, invited_at, activated_at`,
-        [args.existingId, args.invitedByUserId],
-      );
-      return res.rows[0]!;
-    });
+    return withTenantTx(this.pool, (tx) => this._refreshInvited(tx, args));
+  }
+
+  private async _refreshInvited(
+    tx: PoolClient,
+    args: { existingId: string; invitedByUserId: string },
+  ): Promise<ShopUserRow> {
+    const res = await tx.query<ShopUserRow>(
+      `UPDATE shop_users
+          SET invited_by_user_id = $2,
+              invited_at         = now(),
+              updated_at         = now()
+        WHERE id = $1
+          AND status = 'INVITED'
+        RETURNING id, phone, display_name, role, status, invited_by_user_id, invited_at, activated_at`,
+      [args.existingId, args.invitedByUserId],
+    );
+    const row = res.rows[0];
+    if (!row) throw new ConflictException('staff.invite_race_condition');
+    return row;
   }
 
   async findAllByShop(): Promise<StaffListItemDto[]> {
