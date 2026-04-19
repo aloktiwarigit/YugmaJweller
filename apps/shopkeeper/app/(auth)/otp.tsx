@@ -7,6 +7,7 @@ import { Button, Input, Toast } from '@goldsmith/ui-mobile';
 import { colors, typography, spacing } from '@goldsmith/ui-tokens';
 import { useOtpStore } from '../../src/stores/otpStore';
 import { useAuthStore } from '../../src/stores/authStore';
+import { useTenantStore } from '../../src/stores/tenantStore';
 import { postAuthSession } from '../../src/api/endpoints';
 
 const RESEND_SECONDS = 60;
@@ -22,6 +23,7 @@ function maskPhone(e164: string): string {
 export default function OtpScreen(): React.ReactElement {
   const { confirmation, phoneE164, clear } = useOtpStore();
   const setUser = useAuthStore((s) => s.setUser);
+  const tenant = useTenantStore((s) => s.tenant);
 
   const [code, setCode] = useState('');
   const [verifying, setVerifying] = useState(false);
@@ -142,7 +144,7 @@ export default function OtpScreen(): React.ReactElement {
             color: colors.ink,
           }}
         >
-          {t('common.app_name')}
+          {tenant?.displayName ?? ''}
         </Text>
       </View>
 

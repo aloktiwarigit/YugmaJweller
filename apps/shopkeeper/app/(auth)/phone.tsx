@@ -6,6 +6,7 @@ import { t } from '@goldsmith/i18n';
 import { Button, Input, Toast } from '@goldsmith/ui-mobile';
 import { colors, typography, spacing } from '@goldsmith/ui-tokens';
 import { useOtpStore } from '../../src/stores/otpStore';
+import { useTenantStore } from '../../src/stores/tenantStore';
 
 const PHONE_RE = /^\d{10}$/;
 
@@ -15,6 +16,7 @@ export default function PhoneScreen(): React.ReactElement {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const { setConfirmation } = useOtpStore();
+  const tenant = useTenantStore((s) => s.tenant);
 
   const isValid = PHONE_RE.test(phone);
 
@@ -64,7 +66,7 @@ export default function PhoneScreen(): React.ReactElement {
             color: colors.ink,
           }}
         >
-          {t('common.app_name')}
+          {tenant?.displayName ?? ''}
         </Text>
       </View>
 
