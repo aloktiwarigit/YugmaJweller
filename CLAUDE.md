@@ -210,6 +210,50 @@ Everything in the original "Enterprise Floor" (Sentry + OTel + feature flags + S
 - No FLOAT for weights. No cross-tenant queries. No hardcoded per-tenant values. No Goldsmith-brand leakage to customer surfaces. No compliance rules configurable by shopkeeper.
 - Memory is at `C:\Users\alokt\.claude\projects\C--Alok-Business-Projects-Goldsmith\memory\MEMORY.md`. Read feedback files before making decisions that overlap prior user directives.
 
+## Ceremony tiering per story (A / B / C) — 2026-04-19
+
+The enterprise quality floor (TS strict, no FLOAT, no cross-tenant, Sentry, OTel, axe-core, threat model, ADRs, 48dp touch, Hindi-first, Codex green) applies to **every class**. Only the process ceremony above the floor scales with risk.
+
+### Class A — full ceremony
+Applies to: auth, money/weight columns, RLS/tenant-isolation, compliance hard-blocks (269ST/PMLA/GST/HUID/PAN), encryption, `platform_admin`, cross-tenant ops, migrations touching RLS/roles/SECURITY DEFINER, webhook handlers.
+
+Protocol:
+1. Fresh session → `/superpowers:brainstorming`
+2. Fresh session → `/superpowers:writing-plans` → commit `plans/<story-id>.md`
+3. Fresh session → `/superpowers:executing-plans` with TDD (Red → Green → Refactor)
+4. `/superpowers:verification-before-completion`
+5. **5-layer review gate:** `/code-review` → `/security-review` → Codex CLI → `/bmad-code-review` → `/superpowers:requesting-code-review`
+6. Runtime smoke test on intended surface (see Non-negotiable floor below)
+7. `git push` only after all 6 pass
+
+### Class B — compressed ceremony (updated 2026-04-19)
+Applies to: products, customers, dashboards, notification prefs, non-auth staff CRUD, settings UI not touching compliance, search, reports, debt/fix PRs.
+
+Protocol:
+1. Fresh session → `/superpowers:brainstorming` (kept — alignment is cheap)
+2. Fresh session → `/superpowers:writing-plans` → commit plan file (kept)
+3. Single-implementer execution in one session — **no 3-subagent-per-task pattern** (overkill for Class B)
+4. TDD per-commit discipline (kept)
+5. **2-layer review gate only:** Codex CLI (authoritative) → `/superpowers:requesting-code-review` (merge-readiness checklist). DROP `/code-review` + `/security-review` + `/bmad-code-review` — they add inspection overlap with zero runtime coverage. Add them back on elevation to Class A.
+6. **Runtime smoke test on intended surface** — mandatory before PR merge:
+   - Shopkeeper stories: emulator or device (Metro boot + golden-path flow)
+   - API-only stories: `curl` round-trip against running service
+   - Web stories: browser render + golden-path flow
+7. `git push`
+
+### Class C — minimal ceremony
+Applies to: copy tweaks, color/spacing, config toggles, doc-only, refactors < 50 LOC, dep bumps.
+
+Protocol: `/bmad-quick-dev` or inline, single session, **Codex-only review**, tests only where behavior changed. Runtime smoke test required **only if behavior changed** — doc-only and config-toggle-only changes are exempt (no runtime surface to test).
+
+### Reclassification rules
+- If mid-story a B/C task reveals a Class A surface (new API endpoint, money field, auth adjacency) → STOP, reclassify to A, add missing ceremony, then continue. Never merge a Class A touch under a B/C gate.
+- Mixed-surface PRs default to the highest class. Split PRs to keep B/C out of A ceremony when practical.
+- Story 1.1 and all stories merged at/before 1.1 are locked on uniform-ceremony rules. Tiering applies from 1.2 onward.
+
+### Non-negotiable floor (all classes)
+Story AC is not closed until the changed surface has been smoke-tested on its intended runtime — **unless the change has no runtime surface** (doc-only, config-toggle-only). A passing test suite + clean code review does not substitute for running the actual artifact the story promised. Layered code inspection catches surface bugs; runtime integration catches system bugs. Without the runtime gate, system bugs leak straight to the demo.
+
 ## BMAD decision-point SOP
 
 At every BMAD workflow menu (A/P/C), auto-execute:
