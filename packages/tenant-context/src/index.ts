@@ -6,3 +6,4 @@ export type {
   TenantContext, AuthenticatedTenantContext, UnauthenticatedTenantContext,
   Tenant, ShopUserRole,
 } from './context';
+export type { TenantAuditPort } from './audit-port';

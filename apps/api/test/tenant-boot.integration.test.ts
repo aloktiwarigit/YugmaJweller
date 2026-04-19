@@ -19,6 +19,9 @@ describe('GET /api/v1/tenant/boot', () => {
     pool = createPool({ connectionString: container.getConnectionUri() });
     await runMigrations(pool, resolve(__dirname, '../../../packages/db/src/migrations'));
     process.env['DATABASE_URL'] = container.getConnectionUri();
+    // FirebaseAdminProvider needs these env vars to boot (emulator path, no real creds needed).
+    process.env['FIREBASE_AUTH_EMULATOR_HOST'] = '127.0.0.1:9099';
+    process.env['FIREBASE_PROJECT_ID'] = 'goldsmith-test';
     await pool.query(
       `INSERT INTO shops (id, slug, display_name, status, config)
        VALUES ($1, 'anchor-dev', 'Anchor Dev', 'ACTIVE', $2)`,

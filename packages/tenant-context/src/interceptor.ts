@@ -11,6 +11,7 @@ import { switchMap } from 'rxjs/operators';
 import { tenantContext } from './als';
 import type { TenantContext, ShopUserRole } from './context';
 import type { TenantLookup } from './tenant-cache';
+import type { TenantAuditPort } from './audit-port';
 
 export interface RequestLike {
   headers: Record<string, string | string[] | undefined>;
@@ -24,11 +25,17 @@ export interface TenantResolver {
   fromJwt(req: RequestLike): string | undefined;
 }
 
+function stringHeader(req: RequestLike, name: string): string | undefined {
+  const v = req.headers[name];
+  return typeof v === 'string' ? v : undefined;
+}
+
 @Injectable()
 export class TenantInterceptor implements NestInterceptor {
   constructor(
     private readonly resolver: TenantResolver,
     private readonly tenants: TenantLookup,
+    private readonly audit?: TenantAuditPort,
   ) {}
 
   intercept(ctx: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -49,10 +56,26 @@ export class TenantInterceptor implements NestInterceptor {
   private async resolve(ctx: ExecutionContext): Promise<TenantContext> {
     const req = ctx.switchToHttp().getRequest<RequestLike & { user?: { shop_id?: string; uid?: string; role?: ShopUserRole } }>();
 
+    const jwtShopId    = this.resolver.fromJwt(req);
+    const headerShopId = this.resolver.fromHeader(req);
+
+    if (jwtShopId && headerShopId && jwtShopId !== headerShopId) {
+      const requestId = stringHeader(req, 'x-request-id');
+      const ip = stringHeader(req, 'x-forwarded-for');
+      const userAgent = stringHeader(req, 'user-agent');
+      this.audit?.claimConflict({
+        jwtShopId, headerShopId,
+        ...(requestId !== undefined && { requestId }),
+        ...(ip !== undefined && { ip }),
+        ...(userAgent !== undefined && { userAgent }),
+      });
+      throw new ForbiddenException({ code: 'tenant.claim_conflict' });
+    }
+
     // JWT → Host → Header priority.
-    let shopId: string | undefined = this.resolver.fromJwt(req);
+    let shopId: string | undefined = jwtShopId;
     if (!shopId && req.hostname) shopId = await this.resolver.fromHost(req.hostname);
-    shopId ??= this.resolver.fromHeader(req);
+    shopId ??= headerShopId;
 
     if (!shopId) throw new UnauthorizedException('tenant.resolution_failed');
     const tenant = await this.tenants.byId(shopId);

@@ -9,6 +9,8 @@ export class HttpTenantResolver implements TenantResolver {
     const h = req.headers['x-tenant-id'];
     return typeof h === 'string' ? h : undefined;
   }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  fromJwt(_req: RequestLike): string | undefined { return undefined; }
+  fromJwt(req: RequestLike): string | undefined {
+    const user = (req as RequestLike & { user?: { shop_id?: string } }).user;
+    return user?.shop_id;
+  }
 }

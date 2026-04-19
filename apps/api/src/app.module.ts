@@ -1,7 +1,7 @@
 import { Module, type ExecutionContext, type CallHandler, Injectable, type NestInterceptor } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
-import { TenantInterceptor, type TenantLookup, type Tenant } from '@goldsmith/tenant-context';
+import { TenantInterceptor } from '@goldsmith/tenant-context';
 import { HealthController } from './health.controller';
 import { SKIP_TENANT } from './common/decorators/skip-tenant.decorator';
 import { HttpTenantResolver } from './tenant-resolver';
@@ -9,12 +9,8 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { FirebaseJwtGuard } from './common/guards/firebase-jwt.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { TenantBootModule } from './modules/tenant-boot/tenant-boot.module';
-
-@Injectable()
-class NoopTenantLookup implements TenantLookup {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async byId(_id: string): Promise<Tenant | undefined> { return undefined; }
-}
+import { DrizzleTenantLookup } from './drizzle-tenant-lookup';
+import { TenantAuditReporter } from './modules/tenant-boot/tenant-audit-reporter';
 
 @Injectable()
 class ConditionalTenantInterceptor implements NestInterceptor {
@@ -34,12 +30,12 @@ class ConditionalTenantInterceptor implements NestInterceptor {
   controllers: [HealthController],
   providers: [
     HttpTenantResolver,
-    NoopTenantLookup,
+    DrizzleTenantLookup,
     {
       provide: TenantInterceptor,
-      useFactory: (resolver: HttpTenantResolver, tenants: NoopTenantLookup) =>
-        new TenantInterceptor(resolver, tenants),
-      inject: [HttpTenantResolver, NoopTenantLookup],
+      useFactory: (resolver: HttpTenantResolver, tenants: DrizzleTenantLookup, audit: TenantAuditReporter) =>
+        new TenantInterceptor(resolver, tenants, audit),
+      inject: [HttpTenantResolver, DrizzleTenantLookup, TenantAuditReporter],
     },
     {
       provide: APP_GUARD,
