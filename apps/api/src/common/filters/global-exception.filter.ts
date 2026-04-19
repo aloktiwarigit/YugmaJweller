@@ -60,14 +60,23 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       const status = exception.getStatus();
       const body = exception.getResponse();
       const bodyCode = typeof body === 'object' && body && 'code' in body ? String((body as { code: unknown }).code) : undefined;
+      const bodyTitle = typeof body === 'object' && body && 'title' in body && (body as { title: unknown }).title != null
+        ? String((body as { title: unknown }).title)
+        : undefined;
       const problem: ProblemJson = {
         type: 'about:blank',
-        title: bodyCode ?? (typeof body === 'object' && body && 'title' in body ? String((body as { title: unknown }).title) : 'http_exception'),
+        title: bodyCode ?? bodyTitle ?? 'http_exception',
         status,
         detail: exception.message,
         requestId,
         ...(bodyCode ? { code: bodyCode } : {}),
-        ...(typeof body === 'object' && body !== null ? Object.fromEntries(Object.entries(body as Record<string, unknown>).filter(([k]) => k !== 'code' && k !== 'message')) : {}),
+        ...(typeof body === 'object' && body !== null
+          ? Object.fromEntries(
+              Object.entries(body as Record<string, unknown>).filter(
+                ([k]) => k !== 'code' && k !== 'message' && k !== 'status' && k !== 'statusCode' && k !== 'title' && k !== 'type',
+              ),
+            )
+          : {}),
       };
       logger.warn({ err: redactPhones(serializeError(exception)), status, requestId }, 'http exception');
       res.status(status).json(problem);
