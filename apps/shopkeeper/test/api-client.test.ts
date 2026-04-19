@@ -64,8 +64,9 @@ describe('api client — response interceptor (claim-missing retry)', () => {
   it('retries ONCE with force-refreshed token on 401 auth.claim_missing, succeeds on 2nd attempt', async () => {
     // First call → 401 claim_missing; second call → 200
     getIdTokenMock
-      .mockResolvedValueOnce('old-tok') // initial request interceptor (forceRefresh=false)
-      .mockResolvedValueOnce('new-tok'); // retry interceptor (forceRefresh=true)
+      .mockResolvedValueOnce('old-tok')  // initial request interceptor (forceRefresh=false)
+      .mockResolvedValueOnce('new-tok')  // retry response interceptor (forceRefresh=true)
+      .mockResolvedValueOnce('new-tok'); // retried request also runs through request interceptor
 
     mock
       .onGet('/protected')
@@ -77,12 +78,16 @@ describe('api client — response interceptor (claim-missing retry)', () => {
     expect(res.status).toBe(200);
     expect(res.data).toEqual({ data: 'ok' });
 
-    // Verify getIdToken was called twice: once with false, once with true
-    expect(getIdTokenMock).toHaveBeenCalledTimes(2);
+    // Verify getIdToken call sequence:
+    // 1. Request interceptor on original request → getIdToken(false) → 'old-tok'
+    // 2. Response interceptor on 401 claim_missing → getIdToken(true) → 'new-tok' (force-refresh)
+    // 3. Request interceptor on retried request → getIdToken(false) (retried request also runs through interceptor)
+    expect(getIdTokenMock).toHaveBeenCalledTimes(3);
     expect(getIdTokenMock).toHaveBeenNthCalledWith(1, false);
     expect(getIdTokenMock).toHaveBeenNthCalledWith(2, true);
+    expect(getIdTokenMock).toHaveBeenNthCalledWith(3, false);
 
-    // Verify second request carried the refreshed token
+    // Verify second request carried the refreshed token (set by response interceptor before re-dispatch)
     const requests = mock.history.get;
     expect(requests).toHaveLength(2);
     expect(requests[1]?.headers?.['Authorization']).toBe('Bearer new-tok');
