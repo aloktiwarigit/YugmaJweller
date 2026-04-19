@@ -1,0 +1,41 @@
+appId: com.goldsmith.shopkeeper.dev
+---
+- launchApp:
+    clearState: false   # preserve login state from auth-flow.yaml
+
+# Ensure we're on the dashboard
+- assertVisible: "आइए, अपना shop set up करें"
+
+# Navigate to staff screen
+- tapOn:
+    id: "dashboard-cta-staff"
+- assertVisible: "स्टाफ सदस्य"
+- assertVisible: "अभी तक कोई स्टाफ नहीं जोड़ा गया"
+
+# Open invite sheet
+- tapOn:
+    id: "staff-add-btn"
+- assertVisible: "नया स्टाफ आमंत्रित करें"
+- assertVisible: "नाम"
+- assertVisible: "मोबाइल नंबर"
+- assertVisible: "भूमिका"
+
+# Fill form
+- tapOn:
+    id: "invite-name-input"
+- inputText: "Amit"
+- tapOn:
+    id: "invite-phone-input"
+- inputText: "9876543211"
+
+# Submit
+- tapOn:
+    id: "invite-submit-btn"
+
+# After sheet closes, staff appears in list
+- assertVisible: "Amit"
+- assertVisible: "आमंत्रित"
+
+# Platform brand must not appear
+- assertNotVisible: "Goldsmith"
+- assertNotVisible: "Powered by"

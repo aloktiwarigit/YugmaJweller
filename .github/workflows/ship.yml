@@ -185,6 +185,24 @@ jobs:
           test -f apps/shopkeeper/e2e/auth-flow.yaml
           head -1 apps/shopkeeper/e2e/auth-flow.yaml | grep -q '^appId:'
 
+  e2e-staff:
+    # Same lightweight gate as e2e-shopkeeper: validates Maestro YAML is
+    # syntactically valid + CLI installs cleanly. No emulator until EAS
+    # Dev Client APK exists (post-anchor-SOW).
+    needs: [e2e-shopkeeper]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Maestro CLI
+        run: |
+          curl -Ls get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+      - name: Validate staff-invite-flow YAML
+        run: |
+          maestro --version
+          test -f apps/shopkeeper/e2e/staff-invite-flow.yaml
+          head -1 apps/shopkeeper/e2e/staff-invite-flow.yaml | grep -q '^appId:'
+
   lighthouse-stub:
     needs: install
     runs-on: ubuntu-latest
@@ -193,7 +211,7 @@ jobs:
       - run: echo "lighthouse-stub — real Lighthouse run added in Epic 7 customer-web story. CI shape preserved."
 
   build:
-    needs: [typecheck, lint, unit, integration, tenant-isolation, semgrep, build-shopkeeper, a11y-shopkeeper, e2e-shopkeeper, lighthouse-stub]
+    needs: [typecheck, lint, unit, integration, tenant-isolation, semgrep, build-shopkeeper, a11y-shopkeeper, e2e-shopkeeper, e2e-staff, lighthouse-stub]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
