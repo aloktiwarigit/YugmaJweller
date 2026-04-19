@@ -2,8 +2,8 @@
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["tsconfig.base.json", ".eslintrc.cjs"],
   "tasks": {
-    "typecheck":            { "dependsOn": ["^typecheck"], "outputs": [] },
-    "lint":                 { "outputs": [] },
+    "typecheck":            { "dependsOn": ["^build", "^typecheck"], "outputs": [] },
+    "lint":                 { "dependsOn": ["^build"], "outputs": [] },
     "test":                 { "dependsOn": ["^build"], "outputs": [] },
     "test:unit":            { "dependsOn": [], "outputs": [] },
     "test:integration":     { "dependsOn": ["^build"], "outputs": [] },

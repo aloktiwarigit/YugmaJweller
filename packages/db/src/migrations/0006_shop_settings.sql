@@ -10,13 +10,8 @@ ALTER TABLE shops
   ADD COLUMN logo_url              TEXT,
   ADD COLUMN years_in_business     INT;
 
--- Part B: shops RLS for UPDATE (SELECT remains unrestricted for tenant boot + auth)
-ALTER TABLE shops ENABLE ROW LEVEL SECURITY;
-ALTER TABLE shops FORCE ROW LEVEL SECURITY;
-CREATE POLICY rls_shops_select_all ON shops FOR SELECT USING (true);
-CREATE POLICY rls_shops_update_own ON shops FOR UPDATE
-  USING      (id = current_setting('app.current_shop_id')::uuid)
-  WITH CHECK (id = current_setting('app.current_shop_id')::uuid);
+-- shops is a platformGlobalTable (used for tenant boot + auth); tenant isolation
+-- on UPDATE is enforced by the WHERE id = $shopId clause in the query layer, not RLS.
 
 GRANT UPDATE (
   display_name, address_json, gstin, bis_registration, contact_phone,

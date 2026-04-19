@@ -23,10 +23,9 @@ export class SettingsRepository {
   constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
 
   async getShopProfile(): Promise<ShopProfileRow> {
-    const shopId = tenantContext.requireCurrent().shopId;
-    const c = await this.pool.connect();
-    try {
-      const r = await c.query<ShopsRow>(
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+      const r = await tx.query<ShopsRow>(
         `SELECT display_name, address_json, gstin, bis_registration, contact_phone,
                 operating_hours_json, about_text, logo_url, years_in_business, updated_at
            FROM shops WHERE id = $1`,
@@ -34,9 +33,7 @@ export class SettingsRepository {
       );
       if (r.rows.length === 0) throw new NotFoundException({ code: 'shop.not_found' });
       return this.mapRow(r.rows[0]);
-    } finally {
-      c.release();
-    }
+    });
   }
 
   async updateShopProfile(patch: PatchShopProfileDto): Promise<UpdateProfileResult> {
