@@ -14,3 +14,6 @@ export { ThemeProvider, useTheme } from './providers/ThemeProvider';
 export type { Theme } from './providers/ThemeProvider';
 
 export { toHaveMinTouchTarget } from './matchers/toHaveMinTouchTarget';
+
+export { FormField } from './composed/FormField';
+export type { FormFieldProps } from './composed/FormField';
