@@ -176,9 +176,11 @@ Prepend this priming to any frontend-design session on a new feature.
 - ✅ PRFAQ Challenge — complete
 - ✅ Create PRD — complete (126 FRs, 70 NFRs)
 - ✅ Check Implementation Readiness — complete (9.2/10)
-- ⏭️ Next: Create UX Design (CU) with Sally
-- Then: Create Architecture (CA) with Winston
-- Then: Create Epics & Stories (CE) → Sprint Planning → Dev cycle
+- ✅ Create UX Design — complete (Direction 5 Hindi-First Editorial locked)
+- ✅ Create Architecture — complete (modular monolith, 12 ADRs)
+- ✅ Create Epics & Stories — complete (16 epics, 138 stories)
+- ✅ .bmad-readiness-passed — gate passed 2026-04-17
+- ⏭️ **Now in execution:** Sprint 1 — story-by-story dev cycle
 
 ## Startup economics (startup-lean, revenue-first)
 
@@ -218,21 +220,20 @@ The enterprise quality floor (TS strict, no FLOAT, no cross-tenant, Sentry, OTel
 Applies to: auth, money/weight columns, RLS/tenant-isolation, compliance hard-blocks (269ST/PMLA/GST/HUID/PAN), encryption, `platform_admin`, cross-tenant ops, migrations touching RLS/roles/SECURITY DEFINER, webhook handlers.
 
 Protocol:
-1. Fresh session → `/superpowers:brainstorming`
-2. Fresh session → `/superpowers:writing-plans` → commit `plans/<story-id>.md`
-3. Fresh session → `/superpowers:executing-plans` with TDD (Red → Green → Refactor)
-4. `/superpowers:verification-before-completion`
-5. **Review gate:** Codex CLI (mandatory) + `/security-review` (domain threat model for auth/crypto/payments — the one Claude layer worth keeping on Class A). DROP `/code-review`, `/bmad-code-review`, `/superpowers:requesting-code-review`.
-6. Runtime smoke test on intended surface (see Non-negotiable floor below)
-7. `git push` only after all 6 pass
+1. Same session → `/superpowers:brainstorming` + `/superpowers:writing-plans` → commit `plans/<story-id>.md` — **5-7 work streams** (WS-A Data, WS-B API, WS-C Security, WS-D Mobile, WS-E Gate). See work-stream template at `docs/superpowers/plans/_TEMPLATE-work-stream.md`.
+2. `/superpowers:executing-plans` — **dispatch parallel agents per work stream**. Auth/RLS/money/crypto stories: **fresh session** for context quarantine. Other Class A: same session permitted.
+3. TDD per work stream (Red → Green → Refactor). No separate verification step — TDD completion IS verification.
+4. **Review gate — run in parallel:** `codex review --base main` AND `/security-review` simultaneously on HEAD. Both `.codex-review-passed` + `.security-review-passed` markers required. DROP `/code-review`, `/bmad-code-review`, `/superpowers:requesting-code-review`.
+5. Runtime smoke test on intended surface (see Non-negotiable floor below)
+6. `git push` only after 4 and 5 pass
 
 ### Class B — compressed ceremony (updated 2026-04-19)
 Applies to: products, customers, dashboards, notification prefs, non-auth staff CRUD, settings UI not touching compliance, search, reports, debt/fix PRs.
 
 Protocol:
-1. Fresh session → `/superpowers:brainstorming` (kept — alignment is cheap)
-2. Fresh session → `/superpowers:writing-plans` → commit plan file (kept)
-3. Single-implementer execution in one session — **no 3-subagent-per-task pattern** (overkill for Class B)
+1. `/superpowers:brainstorming` — same session (alignment is cheap; no fresh-session overhead for Class B)
+2. `/superpowers:writing-plans` → commit plan file — **3-5 work streams**, same session. No B-slots.
+3. Single-implementer execution, **same session** (default). Fresh session only if plan reveals a Class A surface mid-execution — triggers reclassification to A, not just a session reset.
 4. TDD per-commit discipline (kept)
 5. **Review gate: Codex CLI only.** Run `codex review --base main`, write `.codex-review-passed` marker. DROP all Claude-on-Claude layers (`/code-review`, `/security-review`, `/bmad-code-review`, `/superpowers:requesting-code-review`) — echo chamber with ~90% overlap and zero cross-model signal. CI is the second gate.
 6. **Runtime smoke test on intended surface** — mandatory before PR merge:
@@ -254,14 +255,75 @@ Protocol: `/bmad-quick-dev` or inline, single session, **Codex-only review**, te
 ### Non-negotiable floor (all classes)
 Story AC is not closed until the changed surface has been smoke-tested on its intended runtime — **unless the change has no runtime surface** (doc-only, config-toggle-only). A passing test suite + clean code review does not substitute for running the actual artifact the story promised. Layered code inspection catches surface bugs; runtime integration catches system bugs. Without the runtime gate, system bugs leak straight to the demo.
 
-## BMAD decision-point SOP
+---
 
-At every BMAD workflow menu (A/P/C), auto-execute:
-1. **A** — run 5 top context-matched elicitation methods, synthesise recommendation, apply by default
-2. **P** — run Party Mode with 3-4 relevant BMAD personas, apply synthesis by default
-3. **C** — continue to next step
+## Android smoke test — known Windows issues (learned 2026-04-19)
 
-User directive (2026-04-16): auto-accept recommendations unless user overrides. No y/n prompts at each micro-step.
+Running `expo run:android` or `npx expo start --dev-client` on Windows with pnpm has several landmines. Read this before starting any shopkeeper smoke test.
+
+### 1. Windows MAX_PATH (260-char) breaks CMake/Gradle
+pnpm's virtual store puts packages at `.pnpm/<pkg>@<ver>_<hash>/node_modules/...`. The hash encodes peer-dep combinations and can be 30-60 chars. Combined with `C:\Alok\Business Projects\Goldsmith\.worktrees\<branch>\`, paths routinely exceed 260 chars.
+
+**Symptom:** `java.io.IOException: The filename, directory name, or volume label syntax is incorrect` during `app:compileDebugJavaWithJavac`.
+
+**Fix:** Build from a short root. Copy the repo to `C:\gs\` (5-char root) and build from there:
+```
+xcopy /E /I "C:\Alok\Business Projects\Goldsmith" C:\gs
+cd C:\gs\apps\shopkeeper
+npx expo run:android --device
+```
+The Windows long-path registry key (`HKLM\...\LongPathsEnabled=1`) is NOT sufficient — CMake/ninja are not compiled with `longPathAware` and ignore it.
+
+### 2. Junctions don't help
+Windows junctions (`mklink /J C:\wt "C:\Alok\Business Projects\..."`) are resolved to their real target by CMake's `stat()` calls. No path shortening benefit.
+
+### 3. `node-linker=hoisted` causes duplicate Gradle plugin
+Adding `node-linker=hoisted` to `.npmrc` creates two copies of `@react-native/gradle-plugin` — one from pnpm's virtual store, one hoisted — both registered as Gradle included builds with the same build path `:gradle-plugin`. Build fails immediately.
+
+**Don't do this.** Keep pnpm's default virtual store layout.
+
+### 4. Metro must run from the same root as the APK build
+The dev-client APK bakes in relative pnpm hash paths for the JS bundle entry. If Metro runs from a different root (e.g., worktree) those paths don't resolve.
+
+**Rule:** Always start Metro from `C:\gs\apps\shopkeeper` when the APK was built from `C:\gs`.
+
+### 5. pnpm virtual store isolation breaks Metro — hoist everything
+After a fresh pnpm install, packages like `@babel/runtime`, `@react-native/assets-registry`, `@tanstack/react-query` etc. exist only in the virtual store (`.pnpm/<pkg>@<ver>/node_modules/`). Metro cannot find them via its resolver — it whack-a-moles with a new "Unable to resolve" error for each missing package.
+
+**The only reliable fix for the C:\gs dev copy:** set `public-hoist-pattern[]=*` in `.npmrc` and re-run `pnpm install`. This hoists all packages to the root `node_modules/`, which Metro can traverse normally:
+
+```
+# C:\gs\.npmrc — add this line
+public-hoist-pattern[]=*
+```
+```bash
+cd C:/gs && echo y | pnpm install
+```
+
+**Do NOT try:** adding packages one by one, symlinking manually, or adding specific patterns (`@babel/*`, `@tanstack/*`) — you will whack-a-mole through 10+ packages.
+
+**Important:** Do NOT add `public-hoist-pattern[]=*` to the real repo's `.npmrc` (at `C:\Alok\Business Projects\Goldsmith\.npmrc`) or any worktree. That change lives only in `C:\gs` which is the throw-away build copy.
+
+### 6. expo-linking version split
+`expo-linking@55.0.13` calls `requireNativeModule('ExpoLinking')` — it's a native module. `expo-linking@6.3.1` is pure JS (re-exports `Linking` from react-native). The APK's native shell only contains the modules autolinking registered at build time.
+
+If the Metro bundle resolves to `expo-linking@55.0.13` but the APK was built without `ExpoLinking` native module → crash at boot.
+
+**Fix:** Pin `expo-linking@~6.3.1` as a direct dep in `apps/shopkeeper/package.json`. Check pnpm lock to confirm `expo-router` resolves to the `p3emlajxqafsfmn5fyfb4xm6ji` hash (which depends on 6.3.1), not the `zbxarhgj6iufaeqwbgpssqow3a` hash (which depends on 55.0.13).
+
+### 7. Stale Metro cache re-introduces resolved native modules
+Even after fixing `expo-linking` version, a cached Metro bundle can serve the old 55.x resolution.
+
+**Always restart Metro with `--clear`** after any dependency changes:
+```
+npx expo start --dev-client --clear --port 8081
+```
+
+### 8. ADB reverse tunnel must be re-armed each session
+```bash
+adb -s <DEVICE_SERIAL> reverse tcp:8081 tcp:8081
+```
+Run this after every Metro restart. Verify with `adb reverse --list`.
 
 ---
 
