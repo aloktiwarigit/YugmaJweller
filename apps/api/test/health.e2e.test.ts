@@ -7,6 +7,10 @@ import { AppModule } from '../src/app.module';
 let app: INestApplication;
 
 beforeAll(async () => {
+  // FirebaseAdminProvider requires these env vars to initialise.
+  process.env['FIREBASE_AUTH_EMULATOR_HOST'] = '127.0.0.1:9099';
+  process.env['FIREBASE_PROJECT_ID'] = 'goldsmith-test';
+  process.env['DATABASE_URL'] ??= 'postgres://postgres:postgres@localhost:5432/goldsmith_dev';
   const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
   app = module.createNestApplication();
   await app.init();

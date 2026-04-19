@@ -12,6 +12,12 @@ rules:
         - "packages/testing/**"
         - "**/*.test.ts"
         - "**/*.integration.test.ts"
+        - "apps/api/src/modules/auth/**"        # pre-tenant: auth lookup + rate-limit (see ADR-0016)
+        - "apps/api/src/modules/tenant-boot/**" # pre-tenant: slug→tenant bootstrap
+        - "apps/api/src/drizzle-tenant-lookup.ts" # pre-tenant: resolves tenant from shop_id before ctx exists
+        - "packages/audit/src/platform-audit-log.ts" # platform-global: writes to platform_audit_events (no tenant ctx)
+        - "ops/semgrep/tests/**"
+        - "scripts/**"                           # seed/migration scripts run as superuser, not in tenant context
     patterns:
       - pattern-either:
           - pattern: $DB.execute($...X)

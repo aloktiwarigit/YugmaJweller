@@ -68,7 +68,24 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "${{ env.NODE_VERSION }}", cache: "pnpm" }
       - run: pnpm install --frozen-lockfile
+      - name: Install Java for Firebase emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install firebase-tools
+        run: npm install -g firebase-tools@latest
+      - name: Start Firebase Auth emulator
+        run: |
+          firebase emulators:start --only auth --project goldsmith-test &
+          sleep 8
+        env:
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
+          FIREBASE_PROJECT_ID: goldsmith-test
       - run: pnpm test:integration
+        env:
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
+          FIREBASE_PROJECT_ID: goldsmith-test
 
   tenant-isolation:
     needs: install
@@ -80,7 +97,24 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "${{ env.NODE_VERSION }}", cache: "pnpm" }
       - run: pnpm install --frozen-lockfile
+      - name: Install Java for Firebase emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install firebase-tools
+        run: npm install -g firebase-tools@latest
+      - name: Start Firebase Auth emulator
+        run: |
+          firebase emulators:start --only auth --project goldsmith-test &
+          sleep 8
+        env:
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
+          FIREBASE_PROJECT_ID: goldsmith-test
       - run: pnpm test:tenant-isolation
+        env:
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
+          FIREBASE_PROJECT_ID: goldsmith-test
 
   semgrep:
     needs: install

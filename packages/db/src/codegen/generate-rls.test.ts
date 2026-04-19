@@ -13,8 +13,16 @@ describe('generateRlsSql', () => {
     const sql = generateRlsSql();
     expect(sql).toContain('ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;');
     expect(sql).toContain(
-      `CREATE POLICY rls_invoices_tenant_isolation ON invoices\n  FOR ALL\n  USING (shop_id = current_setting('app.current_shop_id', true)::uuid)\n  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);`,
+      `CREATE POLICY rls_invoices_tenant_isolation ON invoices\n  FOR ALL\n  USING (shop_id = current_setting('app.current_shop_id')::uuid)\n  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);`,
     );
+  });
+
+  it('emits fail-loud current_setting (no second arg) for tenant tables', () => {
+    tableRegistry.clear();
+    tenantScopedTable('invoices', { total: text('total') });
+    const sql = generateRlsSql();
+    expect(sql).toContain("current_setting('app.current_shop_id')::uuid");
+    expect(sql).not.toContain("current_setting('app.current_shop_id', true)");
   });
 
   it('emits FORCE ROW LEVEL SECURITY so owners cannot bypass', () => {

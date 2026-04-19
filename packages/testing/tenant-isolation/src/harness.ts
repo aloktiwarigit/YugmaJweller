@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import { tenantContext } from '@goldsmith/tenant-context';
+import { tenantContext, type Tenant, type UnauthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { withTenantTx, tableRegistry } from '@goldsmith/db';
 import { fixtureRegistry } from '../fixtures/registry';
 import '../fixtures/tenant-a';
@@ -28,8 +28,19 @@ export async function runTenantIsolationHarness(pool: Pool): Promise<HarnessResu
   const tenantTables = tableRegistry.list().filter((m) => m.kind === 'tenant');
 
   for (const self of tenants) {
+    const tenant: Tenant = {
+      id: self.id,
+      slug: self.slug,
+      display_name: self.displayName,
+      status: 'ACTIVE',
+    };
+    const ctx: UnauthenticatedTenantContext = {
+      shopId: self.id,
+      tenant,
+      authenticated: false,
+    };
     for (const meta of tenantTables) {
-      const rows = await tenantContext.runWith({ shopId: self.id } as never, () =>
+      const rows = await tenantContext.runWith(ctx, () =>
         withTenantTx(pool, async (tx) => {
           const r = await tx.query(`SELECT shop_id FROM ${meta.name}`);
           return r.rows as Array<{ shop_id: string }>;

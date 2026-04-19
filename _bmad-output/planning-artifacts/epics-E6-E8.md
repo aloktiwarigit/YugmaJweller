@@ -28,6 +28,8 @@ notes:
 
 ### Story 6.1: Shopkeeper creates a customer record with phone primary key per shop
 
+**Class:** A — PII encryption (PAN/KYC) via packages/security + RLS + DPDPA compliance schema foundation.
+
 **As a Shopkeeper (Ravi at counter with walk-in customer)**,
 I want to create a new customer record in 30 seconds — phone + name minimum, address + PAN + DOB optional — with validation,
 So that this customer's every future interaction (billing, wishlist, reviews, rate-lock) is linked to this record.
@@ -72,6 +74,8 @@ So that this customer's every future interaction (billing, wishlist, reviews, ra
 
 ### Story 6.2: Shopkeeper links family members to a customer
 
+**Class:** B — CRM family-link graph on a safe non-PII relationship surface.
+
 **As a Shopkeeper (Ravi noting Priya's wedding buyer context)**,
 I want to link her mother, sister, mother-in-law as family members on her profile,
 So that future interactions with those family members recognize their relationship to Priya (useful for bridal custom orders).
@@ -104,6 +108,8 @@ So that future interactions with those family members recognize their relationsh
 
 ### Story 6.3: Shopkeeper views a customer's full purchase history across all staff and all dates
 
+**Class:** B — Read-only purchase history reporting via service interface.
+
 **As a Shopkeeper (Ravi greeting a returning customer)**,
 I want to see every invoice this customer has ever had with our shop — dates, amounts, items, HUIDs,
 So that I can reference past purchases and personalize the conversation.
@@ -135,6 +141,8 @@ So that I can reference past purchases and personalize the conversation.
 
 ### Story 6.4: Shopkeeper tracks customer credit balance (advance paid + outstanding dues)
 
+**Class:** B — Materialized view on invoice/payment events; safe money-display reporting.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want a single view of every customer who owes me money OR has paid me in advance,
 So that I never call the wrong customer for payment or double-charge someone who pre-paid.
@@ -165,6 +173,8 @@ So that I never call the wrong customer for payment or double-charge someone who
 ---
 
 ### Story 6.5: Shopkeeper adds private notes to a customer record
+
+**Class:** B — Append-only customer notes with LWW sync; safe CRM feature.
 
 **As a Shopkeeper (Ravi after Priya's visit)**,
 I want to write "Daughter's wedding Nov 15; MIL conservative color preference" on Priya's profile,
@@ -198,6 +208,8 @@ So that any staff member — including me 3 months from now — sees this contex
 
 ### Story 6.6: Shopkeeper records customer occasions for reminder workflows
 
+**Class:** B — Scheduled occasion-reminder job; safe CRM workflow.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to note Priya's birthday on Nov 12 and her husband's anniversary on Dec 3,
 So that a week before each, I get a push reminder to send a personalized WhatsApp message.
@@ -228,6 +240,8 @@ So that a week before each, I get a push reminder to send a personalized WhatsAp
 ---
 
 ### Story 6.7: Shopkeeper searches customers by phone/name/recent-activity with Hindi/English transliteration
+
+**Class:** C — Meilisearch per-tenant customer search; search-only, no behavior change.
 
 **As a Shop Staff (Ravi during Dhanteras rush)**,
 I want to find Anupriya Verma by typing "anu" OR "अनु" OR last-4 phone digits — in under 1 second,
@@ -260,6 +274,8 @@ So that I can pull up her record before the next customer loses patience.
 ---
 
 ### Story 6.8: Customer requests DPDPA-compliant deletion; shopkeeper honours within 30 days retaining legally-required records
+
+**Class:** A — Compliance DPDPA delete + PMLA legal-retention override for invoices/KYC/HUID with soft/hard-delete flow.
 
 **As a Customer (Priya changing her mind about a jeweller 2 years later)**,
 I want to delete my personal data from Anchor Jewellers' app via a single request,
@@ -306,6 +322,8 @@ I need to soft-delete within 30 days then hard-delete, retaining only invoices +
 
 ### Story 6.9: Customer consent schema foundation for viewing tracking (FR68 schema only)
 
+**Class:** C — Viewing-consent schema + API stub; no business logic or tracking yet.
+
 **As the Goldsmith System**,
 I need the consent table + API endpoints ready so Epic 12 can begin tracking viewing events only with opt-in.
 
@@ -347,6 +365,8 @@ I need the consent table + API endpoints ready so Epic 12 can begin tracking vie
 
 ### Story 8.1: System auto-credits loyalty points on invoice completion using shopkeeper-configured earn rate
 
+**Class:** B — Loyalty accrual ledger counter (non-monetary balance); safe feature endpoint.
+
 **As a Shopkeeper (Rajesh-ji)**,
 I want every invoice to auto-credit loyalty points at my configured rate (say, 1 point per ₹100 of gold value),
 So that my regulars see points accumulate without me managing anything.
@@ -379,6 +399,8 @@ So that my regulars see points accumulate without me managing anything.
 ---
 
 ### Story 8.2: Customer views current tier + points + progression toward next tier
+
+**Class:** B — Customer-facing loyalty tier + progression display; no behavior change.
 
 **As a Customer (Priya checking her app)**,
 I want to see I'm at "Gold tier, 8,420 points, 1,580 more to Platinum",
@@ -414,6 +436,8 @@ So that I know I'm close to the next benefit and I'm tempted to come back for th
 
 ### Story 8.3: Shopkeeper redeems customer loyalty points as invoice discount line
 
+**Class:** A — Redemption line passes through compliance gate on invoice totals (money-adjacent + compliance interaction).
+
 **As a Shopkeeper (Ravi during checkout)**,
 I want to apply Priya's 8,420 points as a ₹842 discount on this invoice (redemption rate: 10 points = ₹1),
 So that her loyalty materializes as real savings at the counter.
@@ -446,6 +470,8 @@ So that her loyalty materializes as real savings at the counter.
 ---
 
 ### Story 8.4: System auto-upgrades/downgrades customer tier based on rolling-12-month total
+
+**Class:** B — Nightly tier state-machine recompute; safe non-compliance batch job.
 
 **As the Goldsmith System**,
 I need to re-evaluate every customer's tier nightly against their rolling-12-month purchase total — upgrading them when they cross thresholds, downgrading when they drop below,
@@ -480,6 +506,8 @@ So that loyalty tiers reflect current spending, not historical peak.
 ---
 
 ### Story 8.5: Customer celebrates tier upgrade with designed-moment animation
+
+**Class:** C — Tier-upgrade celebration animation; UI-only moment, no behavior change.
 
 **As a Customer (Priya hitting Platinum)**,
 I want a genuinely celebratory moment in the app — confetti, a personalised Hindi message, a badge unlock — when I upgrade,

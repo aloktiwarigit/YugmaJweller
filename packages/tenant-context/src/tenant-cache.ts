@@ -24,4 +24,8 @@ export class TenantCache implements TenantLookup {
   async invalidate(shopId: string): Promise<void> {
     await this.redis.del(`tenant:${shopId}`);
   }
+
+  // TODO(follow-up story): wire TenantCache.invalidate() into the tenant-update path so that
+  // config changes (e.g. shopkeeper changes display_name, primary_color) are reflected within
+  // one TTL cycle rather than requiring a full cache expiry. Track as a story in E3 epic.
 }

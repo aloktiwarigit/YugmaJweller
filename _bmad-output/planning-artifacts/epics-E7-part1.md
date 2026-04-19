@@ -36,6 +36,8 @@ notes:
 
 ### Story 7.1: Customer opens the jeweller's branded app and sees 4-second ArrivalSequence with live rate + featured pieces
 
+**Class:** B — Customer-web shell + tenant-theming; no auth/compliance/money.
+
 **As a Customer (Priya opening the Anchor Jewellers app for the first time via WhatsApp link)**,
 I want a 4-second arrival that establishes the jeweller's brand immediately — logo, Hindi greeting, today's gold rate, featured pieces — before I even tap anything,
 So that I instantly know this is a premium trusted jeweller, not a generic e-commerce app.
@@ -90,6 +92,8 @@ So that I instantly know this is a premium trusted jeweller, not a generic e-com
 
 ### Story 7.2: Customer signs up via phone OTP with privacy consent toggle for viewing tracking
 
+**Class:** A — Customer-app phone-OTP signup flow in apps/api/src/modules/auth.
+
 **As a Customer (Priya deciding to use the app beyond browsing)**,
 I want a simple phone-OTP signup with a clear opt-in toggle for "Recent activity tracking" (default-on but one-tap off),
 So that I can save wishlists/custom orders without feeling tracked against my will.
@@ -126,6 +130,8 @@ So that I can save wishlists/custom orders without feeling tracked against my wi
 ---
 
 ### Story 7.3: Customer browses products by category with live-synced availability
+
+**Class:** B — Catalog browse by category; tenant-scoped reads on a safe surface.
 
 **As a Customer (Priya browsing bridal sets)**,
 I want to tap "दुल्हन" and see every published bridal piece with live availability — pieces sold earlier today disappear within 30 seconds,
@@ -167,6 +173,8 @@ So that I never fall in love with something already sold.
 
 ### Story 7.4: Customer filters products by metal, purity, price range, occasion, in-stock-only
 
+**Class:** B — Catalog filtering; no money/weight primitives touched.
+
 **As a Customer (Priya looking for 22K bridal between ₹3-5 lakh)**,
 I want to narrow the catalog with additive filters that apply instantly,
 So that I see only pieces that match my budget and preferences.
@@ -200,6 +208,8 @@ So that I see only pieces that match my budget and preferences.
 
 ### Story 7.5: Customer searches products by free text in Hindi or English
 
+**Class:** B — Catalog free-text search (Hindi/English) via Meilisearch.
+
 **As a Customer (Priya thinking "kundan earrings")**,
 I want to type "kundan" OR "कुंदन" and get matching results — script doesn't matter,
 So that language is never a barrier.
@@ -230,6 +240,8 @@ So that language is never a barrier.
 ---
 
 ### Story 7.6: Customer views product detail with images + full price breakdown + HUID + certification
+
+**Class:** B — Product detail page reads packages/money display; no new money/compliance logic.
 
 **As a Customer (Priya deciding on the श्रेया bridal set)**,
 I want to see: multiple lifestyle + product images, full transparent price breakdown (weight × rate + making + stones + GST), HUID + BIS certification, weight/purity specs, description, availability,
@@ -271,6 +283,8 @@ So that I can make an informed, family-consulted decision without a phone call t
 
 ### Story 7.7: Customer taps HUID QR scan → BIS-verified ceremony fires (designed moment)
 
+**Class:** A — HUID QR scan → BIS/Surepass verify (compliance hard-block integration).
+
 **As a Customer (Vikram first-time visitor from out-of-town)**,
 I want to scan the HUID QR code and see a cryptographically real BIS verification — not a fake seal — within 2 seconds,
 So that I trust this jeweller before I hand over ₹85,000 cash.
@@ -311,6 +325,8 @@ So that I trust this jeweller before I hand over ₹85,000 cash.
 
 ### Story 7.8: Customer adds product to wishlist (synced to shopkeeper CRM)
 
+**Class:** B — Wishlist with tenant-scoped RLS; safe catalog surface.
+
 **As a Customer (Priya saving items before visiting shop)**,
 I want one-tap wishlist so pieces I like are remembered across sessions AND visible to the salesperson when I walk in (per Epic 12 walk-in context),
 So that my shop visit starts warm, not cold.
@@ -345,6 +361,8 @@ So that my shop visit starts warm, not cold.
 
 ### Story 7.9: Customer shares product link via WhatsApp / SMS / copy
 
+**Class:** B — Product share link UX; no auth/money/compliance.
+
 **As a Customer (Priya wanting family consensus)**,
 I want to share the श्रेया bridal set with my family WhatsApp group so they can see the exact piece I'm considering — image + price + shop name — without installing the app,
 So that consensus forms before I commit ₹3.8L.
@@ -377,6 +395,8 @@ So that consensus forms before I commit ₹3.8L.
 ---
 
 ### Story 7.10: Customer submits "Inquire at Shop" request with optional note
+
+**Class:** B — Catalog inquiry writes to CRM on a safe surface.
 
 **As a Customer (who hasn't decided yet but wants to follow up)**,
 I want to send an inquiry from a product page — "Can I visit Saturday to try this on?" — that lands in the shopkeeper's CRM as an inquiry,

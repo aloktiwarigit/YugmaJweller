@@ -2,6 +2,8 @@ import type { Pool } from 'pg';
 import { fixtureRegistry } from './registry';
 
 export const TENANT_C_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+export const TENANT_C_PHONE = '+15555550003';
+export const TENANT_C_UID   = 'firebase-uid-c';
 
 fixtureRegistry.add({
   id: TENANT_C_ID,
@@ -13,10 +15,10 @@ fixtureRegistry.add({
       await c.query(`SET ROLE app_user`);
       await c.query(`SET app.current_shop_id='${id}'`);
       await c.query(
-        `INSERT INTO shop_users (shop_id, phone, display_name, role, status) VALUES
-          ($1,'+91CCC001','Chandra C','shop_admin','ACTIVE'),
-          ($1,'+91CCC002','Charu C','shop_staff','ACTIVE')`,
-        [id],
+        `INSERT INTO shop_users (shop_id, phone, display_name, role, status, firebase_uid) VALUES
+          ($1, $2, 'Chandra C', 'shop_admin', 'ACTIVE', $3),
+          ($1, '+15555550013', 'Charu C', 'shop_staff', 'ACTIVE', null)`,
+        [id, TENANT_C_PHONE, TENANT_C_UID],
       );
       for (let i = 1; i <= 5; i++) {
         await c.query(

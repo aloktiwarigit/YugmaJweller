@@ -3,10 +3,12 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import { resolve } from 'node:path';
 import { Pool } from 'pg';
 import { createPool, runMigrations } from '@goldsmith/db';
-import { tenantContext } from '@goldsmith/tenant-context';
+import { tenantContext, type Tenant, type UnauthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { auditLog } from '../src/audit-log';
 
 const A = '11111111-1111-1111-1111-111111111111';
+const tenantA: Tenant = { id: A, slug: 'a', display_name: 'A', status: 'ACTIVE' };
+const ctxA: UnauthenticatedTenantContext = { shopId: A, tenant: tenantA, authenticated: false };
 let container: StartedPostgreSqlContainer;
 let pool: Pool;
 
@@ -25,7 +27,7 @@ afterAll(async () => { await pool?.end(); await container?.stop(); });
 
 describe('auditLog', () => {
   it('inserts a row under the current tenant', async () => {
-    await tenantContext.runWith({ shopId: A } as never, () =>
+    await tenantContext.runWith(ctxA, () =>
       auditLog(pool, { action: 'test.happened', subjectType: 'demo', subjectId: 'x', before: null, after: { ok: true } }),
     );
     const c = await pool.connect();

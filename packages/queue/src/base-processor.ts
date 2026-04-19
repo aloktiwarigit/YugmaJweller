@@ -22,7 +22,7 @@ export function createTenantWorker<T>(
       const tenant = await tenants.byId(shopId);
       if (!tenant) throw new Error('tenant.not_found');
       if (tenant.status !== 'ACTIVE') throw new Error('tenant.inactive');
-      const ctx: TenantContext = { shopId: tenant.id, tenant };
+      const ctx: TenantContext = { shopId: tenant.id, tenant, authenticated: false };
       return tenantContext.runWith(ctx, async () => {
         logger.info({ jobId: job.id, shopId, name: job.name }, 'processing');
         await handler(ctx, job.data.data);

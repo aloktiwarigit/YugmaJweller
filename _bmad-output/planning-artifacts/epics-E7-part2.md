@@ -15,6 +15,8 @@ notes:
 
 ### Story 7.11: Customer views store info (hours, address, directions, phone, about, reviews)
 
+**Class:** B — Store info + Ola Maps adapter display; no compliance/money.
+
 **As a Customer (Vikram visiting from out-of-town)**,
 I want to quickly find when the shop is open, where exactly it is, how to call, and read about its story,
 So that I can plan my visit and feel grounded in the shop's history.
@@ -52,6 +54,8 @@ So that I can plan my visit and feel grounded in the shop's history.
 
 ### Story 7.12: Customer views unified profile (purchases + loyalty + wishlist + custom orders + rate-locks + try-at-home)
 
+**Class:** B — Customer-web unified profile dashboard reading via service APIs; safe surface.
+
 **As a Customer (Priya)**,
 I want a single "My Account" screen that surfaces everything happening with this jeweller — past purchases, loyalty tier/points, saved wishlist, active custom orders, rate-locks, try-at-home bookings,
 So that I don't have to hunt through separate sections.
@@ -85,6 +89,8 @@ So that I don't have to hunt through separate sections.
 
 ### Story 7.13: Customer marks an inquiry or wishlist item as "for gift" (triggers gift-wrap flag for shop)
 
+**Class:** B — Wishlist gift-toggle schema extension (flag only); no compliance/money.
+
 **As a Customer (Rohit buying for his sister's birthday)**,
 I want a simple toggle on wishlist or inquiry marking it "Gift",
 So that the shop knows to prepare a gift box + omit price from the tag.
@@ -116,6 +122,8 @@ So that the shop knows to prepare a gift box + omit price from the tag.
 ---
 
 ### Story 7.14: Customer app shows ONLY the anchor/tenant's brand — Goldsmith platform brand NEVER visible
+
+**Class:** B — CI/build tooling (Semgrep + ESLint + Chromatic VR) enforcing white-label invariant; no runtime behavior change.
 
 **This is the white-label invariant enforcement story. Locks the moat.**
 
@@ -164,6 +172,8 @@ I need structural guarantees — not checklist items — that the platform brand
 
 ### Story 7.15: Customer toggles app language Hindi ↔ English; choice persists
 
+**Class:** B — i18n Hindi ↔ English toggle UX; no auth/money/compliance.
+
 **As a Customer (Amit who's comfortable in both languages)**,
 I want a single toggle at the top right to switch Hindi ↔ English — and my choice persists across sessions,
 So that I read in my preferred language without setting it every time.
@@ -201,6 +211,8 @@ So that I read in my preferred language without setting it every time.
 ---
 
 ### Story 7.16: Customer submits + views verified-buyer reviews (rating + text) on products and shop
+
+**Class:** B — Reviews module verified via invoice link; safe feature surface.
 
 **As a Customer (Priya 2 weeks post-wedding)**,
 I want to rate + review the श्रेया bridal set AND the Anchor Jewellers shop — linked to my invoice so the review is verified-buyer,
@@ -242,6 +254,8 @@ So that my positive experience helps other brides trust this jeweller.
 
 ### Story 7.17: Shopkeeper moderates customer reviews (flag, respond publicly, request removal)
 
+**Class:** B — Shopkeeper review moderation UI on a safe surface.
+
 **As a Shop Owner (Rajesh-ji)**,
 I want to respond publicly to reviews + flag inappropriate ones for platform-admin review,
 So that I can engage authentic customer feedback while protecting my shop from abuse.
@@ -278,6 +292,8 @@ So that I can engage authentic customer feedback while protecting my shop from a
 
 ### Story 7.18: Customer uses in-app ring sizer (physical-method + paper-print method)
 
+**Class:** B — In-app ring-sizer tool; no auth/money/compliance.
+
 **As a Customer (Priya measuring for her sister's ring)**,
 I want the app to help me measure ring size — either by placing a known-size ring on screen (physical method) or printing a paper template,
 So that I buy the right size without visiting the shop.
@@ -310,6 +326,8 @@ So that I buy the right size without visiting the shop.
 
 ### Story 7.19: Customer uses in-app bangle sizer (diameter reference + measurement guide)
 
+**Class:** B — In-app bangle-sizer tool; no auth/money/compliance.
+
 **As a Customer (Priya buying bangles for a gift)**,
 I want to measure bangle size using a paper-print method with clear Hindi instructions,
 So that I don't order the wrong size.
@@ -339,6 +357,8 @@ So that I don't order the wrong size.
 ---
 
 ### Story 7.20: Customer views shop's return/exchange policy on every product detail page + dedicated policy section
+
+**Class:** B — Customer-web policy display reading shop settings; safe surface.
 
 **As a Customer (Priya considering commitment)**,
 I want to read exactly what happens if I want to return or exchange — shopkeeper-written + visible on PDP and a dedicated section,

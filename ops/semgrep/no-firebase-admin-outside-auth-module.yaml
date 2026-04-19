@@ -1,0 +1,17 @@
+rules:
+  - id: goldsmith.no-firebase-admin-outside-auth-module
+    languages: [typescript]
+    severity: ERROR
+    message: |
+      Direct import of firebase-admin is forbidden outside
+      apps/api/src/modules/auth. Use the FirebaseAdminProvider injected
+      from AuthModule (ADR-0016 + spec §13 invariant 17).
+    pattern-regex: "^import\\s+(\\w+|\\{[^}]+\\}|\\*\\s+as\\s+\\w+)\\s+from\\s+['\"]firebase-admin['\"]"
+    paths:
+      exclude:
+        - "apps/api/src/modules/auth/**"
+        - "scripts/seed-anchor.ts"
+        - "ops/semgrep/tests/**"
+        - "apps/api/test/**"
+        - "packages/testing/tenant-isolation/fixtures/firebase-emulator.ts"
+        - "packages/testing/tenant-isolation/test/**"

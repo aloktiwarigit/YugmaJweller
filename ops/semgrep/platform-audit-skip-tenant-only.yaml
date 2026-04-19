@@ -1,0 +1,17 @@
+rules:
+  - id: goldsmith.platform-audit-skip-tenant-only
+    languages: [typescript]
+    severity: WARNING
+    message: |
+      platformAuditLog() is for pre-tenant events (auth, tenant-boot).
+      If you're logging a tenant-scoped event, use auditLog() instead so
+      shop_id + RLS attribution is recorded correctly.
+    patterns:
+      - pattern: platformAuditLog($POOL, { ... })
+    paths:
+      include:
+        - "apps/api/src/modules/**"
+      exclude:
+        - "apps/api/src/modules/auth/**"
+        - "apps/api/src/modules/tenant-boot/**"
+        - "ops/semgrep/tests/**"
