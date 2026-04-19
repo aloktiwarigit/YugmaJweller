@@ -160,7 +160,7 @@ function StaffRow({ item }: { item: StaffListItemDto }): React.ReactElement {
   const statusKey = item.status.toLowerCase() as 'invited' | 'active' | 'suspended';
   const statusText = t(`staff.status_${statusKey}`);
   const pillColor =
-    item.status === 'ACTIVE' ? colors.primary : item.status === 'INVITED' ? '#C49A3C' : colors.error;
+    item.status === 'ACTIVE' ? colors.primary : item.status === 'INVITED' ? colors.warning : colors.error;
 
   return (
     <View style={styles.staffRow}>

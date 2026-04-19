@@ -6,6 +6,7 @@ export const colors = {
   inkMute: '#4A526E',
   border:  '#D9C9A8',
   error:   '#B1402B',
+  warning: '#C49A3C',   // amber-gold — used for pending/invited states
 } as const;
 
 export type ColorToken = keyof typeof colors;

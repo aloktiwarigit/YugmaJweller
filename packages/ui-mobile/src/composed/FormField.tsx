@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
   error: {
     marginTop: spacing.xs,
     fontSize: 14,
-    color: colors.error ?? '#B91C1C',
+    color: colors.error,
     fontFamily: typography.body.family,
   },
 });
