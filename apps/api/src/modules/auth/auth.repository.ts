@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import { tenantContext, type Tenant, type ShopUserRole, type UnauthenticatedTenantContext } from '@goldsmith/tenant-context';
@@ -13,7 +13,7 @@ export interface PhoneLookupRow {
 
 @Injectable()
 export class AuthRepository {
-  constructor(private readonly pool: Pool) {}
+  constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
 
   async lookupByPhone(phoneE164: string): Promise<PhoneLookupRow | null> {
     const c = await this.pool.connect();

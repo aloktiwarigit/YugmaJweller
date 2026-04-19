@@ -7,16 +7,16 @@ let h: AuthTestHarness;
 beforeAll(async () => { h = await setupAuthTestHarness(); }, 180_000);
 afterAll(async () => { await teardownAuthTestHarness(h); });
 
-async function seedTenant(shopId: string, slug: string, phone: string): Promise<string> {
+async function seedTenant(id: string, slug: string, phone: string): Promise<string> {
   await h.pool.query(
     `INSERT INTO shops (id, slug, display_name, status) VALUES ($1, $2, $3, 'ACTIVE') ON CONFLICT DO NOTHING`,
-    [shopId, slug, `Shop ${slug}`],
+    [id, slug, `Shop ${slug}`],
   );
   const r = await h.pool.query(
     `INSERT INTO shop_users (shop_id, phone, display_name, role, status)
      VALUES ($1, $2, 'Owner', 'shop_admin', 'INVITED')
      ON CONFLICT (shop_id, phone) DO UPDATE SET status = 'INVITED' RETURNING id`,
-    [shopId, phone],
+    [id, phone],
   );
   return r.rows[0].id;
 }

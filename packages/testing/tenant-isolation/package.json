@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./fixtures/firebase-emulator": "./fixtures/firebase-emulator.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint src test",

@@ -1,12 +1,28 @@
 // apps/api/test/_auth-test-setup.ts
 import { Test, type TestingModule } from '@nestjs/testing';
-import { type INestApplication } from '@nestjs/common';
+import { type INestApplication, Injectable } from '@nestjs/common';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Pool } from 'pg';
 import { resolve } from 'node:path';
 import { createPool, runMigrations } from '@goldsmith/db';
+import { TenantInterceptor, type TenantLookup, type Tenant } from '@goldsmith/tenant-context';
+import { HttpTenantResolver } from '../src/tenant-resolver';
 import { AppModule } from '../src/app.module';
 import { startFirebaseAuthEmulator, stopFirebaseAuthEmulator } from '@goldsmith/testing-tenant-isolation/fixtures/firebase-emulator';
+
+/** Real tenant lookup backed by the test Postgres pool — replaces NoopTenantLookup in integration tests. */
+@Injectable()
+class TestTenantLookup implements TenantLookup {
+  constructor(private readonly pool: Pool) {}
+  async byId(id: string): Promise<Tenant | undefined> {
+    const res = await this.pool.query<{ id: string; slug: string; display_name: string; status: string; config: unknown }>(
+      `SELECT id, slug, display_name, status, config FROM shops WHERE id = $1`,
+      [id],
+    );
+    if (res.rows.length === 0) return undefined;
+    return res.rows[0] as Tenant;
+  }
+}
 
 export interface AuthTestHarness {
   container: StartedPostgreSqlContainer;
@@ -25,8 +41,15 @@ export async function setupAuthTestHarness(): Promise<AuthTestHarness> {
   const pool = createPool({ connectionString: container.getConnectionUri() });
   await runMigrations(pool, resolve(__dirname, '../../../packages/db/src/migrations'));
   process.env['DATABASE_URL'] = container.getConnectionUri();
+  const tenantLookup = new TestTenantLookup(pool);
   const testingModule = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider('PG_POOL').useValue(pool)
+    // Override TenantInterceptor with one backed by the real test DB so /auth/me can resolve tenants.
+    .overrideProvider(TenantInterceptor)
+    .useFactory({
+      factory: (resolver: HttpTenantResolver) => new TenantInterceptor(resolver, tenantLookup),
+      inject: [HttpTenantResolver],
+    })
     .compile();
   const app = testingModule.createNestApplication();
   await app.init();

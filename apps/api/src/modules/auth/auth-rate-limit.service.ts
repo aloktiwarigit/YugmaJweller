@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { Pool } from 'pg';
 
 export interface RateLimitCheck {
@@ -14,7 +14,7 @@ const LOCKOUT_MS   = 15 * 60 * 1000;
 
 @Injectable()
 export class AuthRateLimitService {
-  constructor(private readonly pool: Pool) {}
+  constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
 
   async check(phoneE164: string): Promise<RateLimitCheck> {
     const c = await this.pool.connect();

@@ -1,11 +1,14 @@
 import { Module, type ExecutionContext, type CallHandler, Injectable, type NestInterceptor } from '@nestjs/common';
-import { APP_FILTER, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
+import { TenantInterceptor, type TenantLookup, type Tenant } from '@goldsmith/tenant-context';
 import { HealthController } from './health.controller';
 import { SKIP_TENANT } from './common/decorators/skip-tenant.decorator';
 import { HttpTenantResolver } from './tenant-resolver';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
-import { TenantInterceptor, type TenantLookup, type Tenant } from '@goldsmith/tenant-context';
+import { FirebaseJwtGuard } from './common/guards/firebase-jwt.guard';
+import { AuthModule } from './modules/auth/auth.module';
+import { TenantBootModule } from './modules/tenant-boot/tenant-boot.module';
 
 @Injectable()
 class NoopTenantLookup implements TenantLookup {
@@ -27,6 +30,7 @@ class ConditionalTenantInterceptor implements NestInterceptor {
 }
 
 @Module({
+  imports: [AuthModule, TenantBootModule],
   controllers: [HealthController],
   providers: [
     HttpTenantResolver,
@@ -38,12 +42,17 @@ class ConditionalTenantInterceptor implements NestInterceptor {
       inject: [HttpTenantResolver, NoopTenantLookup],
     },
     {
+      provide: APP_GUARD,
+      useFactory: (reflector: Reflector) => new FirebaseJwtGuard(reflector),
+      inject: [Reflector],
+    },
+    {
       provide: APP_INTERCEPTOR,
       useFactory: (reflector: Reflector, inner: TenantInterceptor) =>
         new ConditionalTenantInterceptor(reflector, inner),
       inject: [Reflector, TenantInterceptor],
     },
-    { provide: APP_FILTER,      useClass: GlobalExceptionFilter },
+    { provide: APP_FILTER, useClass: GlobalExceptionFilter },
   ],
 })
 export class AppModule {}

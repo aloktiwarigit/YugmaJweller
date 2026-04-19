@@ -21,6 +21,8 @@
     "@nestjs/platform-express": "^10.3.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0",
+    "@goldsmith/audit": "workspace:*",
+    "@goldsmith/db": "workspace:*",
     "@goldsmith/tenant-context": "workspace:*",
     "@goldsmith/observability": "workspace:*",
     "@goldsmith/secrets": "workspace:*",
@@ -30,7 +32,7 @@
     "passport-http-bearer": "^1.0.1"
   },
   "devDependencies": {
-    "@goldsmith/db": "workspace:*",
+    "@goldsmith/testing-tenant-isolation": "workspace:*",
     "@nestjs/testing": "^10.3.0",
     "@testcontainers/postgresql": "^10.8.0",
     "@types/express": "^4.17.0",

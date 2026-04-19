@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy as BearerStrategy } from 'passport-http-bearer';
 import type admin from 'firebase-admin';
@@ -15,7 +15,7 @@ type AdminLike = FirebaseAdminProvider | admin.app.App;
 
 @Injectable()
 export class FirebaseJwtStrategy extends PassportStrategy(BearerStrategy, 'firebase-jwt') {
-  constructor(private readonly provider: AdminLike) { super(); }
+  constructor(@Inject(FirebaseAdminProvider) private readonly provider: AdminLike) { super(); }
 
   async validate(token: string): Promise<FirebaseUserClaims> {
     try {
