@@ -1,0 +1,22 @@
+rules:
+  - id: goldsmith.no-shop-id-from-body
+    languages: [typescript]
+    severity: ERROR
+    message: |
+      shop_id must come from TenantContext.shopId (set by TenantInterceptor from the verified JWT),
+      never from request body/params/query. Violates spec invariant #25 and threat-model S1-M2.
+    patterns:
+      - pattern-either:
+          - pattern: $X.body.shop_id
+          - pattern: $X.body.shopId
+          - pattern: $X.params.shop_id
+          - pattern: $X.params.shopId
+          - pattern: $X.query.shop_id
+          - pattern: $X.query.shopId
+          - pattern: $DTO.shop_id
+          - pattern: $DTO.shopId
+    paths:
+      exclude:
+        - "packages/tenant-context/**"
+        - "**/*.test.ts"
+        - "ops/semgrep/tests/**"
