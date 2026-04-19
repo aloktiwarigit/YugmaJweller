@@ -13,8 +13,6 @@ rules:
           - pattern: $X.params.shopId
           - pattern: $X.query.shop_id
           - pattern: $X.query.shopId
-          - pattern: $DTO.shop_id
-          - pattern: $DTO.shopId
     paths:
       exclude:
         - "packages/tenant-context/**"
