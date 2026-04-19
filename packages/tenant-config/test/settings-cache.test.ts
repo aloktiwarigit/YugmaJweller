@@ -60,4 +60,27 @@ describe('SettingsCache', () => {
     await cache.invalidate(SHOP_A);
     expect(mockRedis.del).toHaveBeenCalledWith(`shop:${SHOP_A}:settings:profile`);
   });
+
+  it('returns null and deletes key on malformed JSON in cache', async () => {
+    mockRedis.get.mockResolvedValueOnce('NOT_VALID_JSON');
+    mockRedis.del.mockResolvedValueOnce(1);
+    const result = await cache.getProfile(SHOP_A);
+    expect(result).toBeNull();
+    expect(mockRedis.del).toHaveBeenCalledWith(`shop:${SHOP_A}:settings:profile`);
+  });
+
+  it('returns null and deletes key when cached shape fails Zod validation', async () => {
+    mockRedis.get.mockResolvedValueOnce(JSON.stringify({ name: null, updated_at: '2026-04-19T00:00:00.000Z' }));
+    mockRedis.del.mockResolvedValueOnce(1);
+    const result = await cache.getProfile(SHOP_A);
+    expect(result).toBeNull();
+    expect(mockRedis.del).toHaveBeenCalledWith(`shop:${SHOP_A}:settings:profile`);
+  });
+
+  it('propagates Redis error from getProfile as null (absorbed)', async () => {
+    mockRedis.get.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+    mockRedis.del.mockResolvedValueOnce(1);
+    const result = await cache.getProfile(SHOP_A);
+    expect(result).toBeNull();
+  });
 });

@@ -58,3 +58,16 @@ export interface ShopProfileRow {
   years_in_business: number | null;
   updated_at: string;
 }
+
+export const ShopProfileRowSchema = z.object({
+  name:              z.string(),
+  address:           AddressSchema.nullable(),
+  gstin:             z.string().nullable(),
+  bis_registration:  z.string().nullable(),
+  contact_phone:     z.string().nullable(),
+  operating_hours:   OperatingHoursSchema.nullable(),
+  about_text:        z.string().nullable(),
+  logo_url:          z.string().nullable(),
+  years_in_business: z.number().nullable(),
+  updated_at:        z.string(),
+});
