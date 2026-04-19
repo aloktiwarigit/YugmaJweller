@@ -30,7 +30,11 @@ describe('FormField', () => {
 
   it('has min touch target height of 48 on the input', () => {
     render(<FormField label="नाम" value="" onChangeText={() => undefined} testID="name-field" />);
-    const input = screen.getByTestId('name-field-input');
-    expect(input).toHaveMinTouchTarget();
+    const input = screen.getByTestId('name-field-input') as HTMLElement;
+    // Input primitive has minHeight: 48 in its style.
+    // React serialises numeric style values as "<n>px" on DOM elements in jsdom.
+    const minHeightStr = input.style.minHeight; // e.g. "48px"
+    const minHeight = parseFloat(minHeightStr);
+    expect(minHeight).toBeGreaterThanOrEqual(48);
   });
 });

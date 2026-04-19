@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TextInput, StyleSheet } from 'react-native';
-import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
+import { View, Text, StyleSheet } from 'react-native';
+import { colors, typography, spacing } from '@goldsmith/ui-tokens';
+import { Input } from '../primitives/Input';
 
 export interface FormFieldProps {
   /** Must be pre-translated */
@@ -29,16 +30,14 @@ export function FormField({
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
+      <Input
         value={value}
         onChangeText={onChangeText}
-        placeholder={placeholder}
+        {...(placeholder !== undefined ? { placeholder } : {})}
         keyboardType={keyboardType}
-        maxLength={maxLength}
-        testID={testID ? `${testID}-input` : undefined}
+        {...(maxLength !== undefined ? { maxLength } : {})}
+        {...(testID !== undefined ? { testID: `${testID}-input` } : {})}
         accessibilityLabel={label}
-        placeholderTextColor={colors.inkMute}
-        style={styles.input}
       />
       {error ? (
         <Text style={styles.error} testID={testID ? `${testID}-error` : undefined}>
@@ -59,22 +58,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     fontFamily: typography.body.family,
   },
-  input: {
-    minHeight: 48,
-    minWidth: 48,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.ink,
-    backgroundColor: colors.bg,
-    fontFamily: typography.body.family,
-    fontSize: 18,
-  },
   error: {
     marginTop: spacing.xs,
-    fontSize: 13,
-    color: colors.error,
+    fontSize: 14,
+    color: colors.error ?? '#B91C1C',
     fontFamily: typography.body.family,
   },
 });
