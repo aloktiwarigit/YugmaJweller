@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text } from 'react-native';
 import { router } from 'expo-router';
-import { verifyOtp } from '@goldsmith/auth-client';
+import { verifyOtp, sendOtp } from '@goldsmith/auth-client';
 import { t } from '@goldsmith/i18n';
 import { Button, Input, Toast } from '@goldsmith/ui-mobile';
 import { colors, typography, spacing } from '@goldsmith/ui-tokens';
@@ -102,8 +102,6 @@ export default function OtpScreen(): React.ReactElement {
     if (!phoneE164 || secondsLeft > 0) return;
     setErrorMsg(null);
     try {
-      // Dynamically import sendOtp to avoid circular dep concerns
-      const { sendOtp } = await import('@goldsmith/auth-client');
       const newConfirmation = await sendOtp(phoneE164);
       useOtpStore.getState().setConfirmation(
         newConfirmation as Parameters<ReturnType<typeof useOtpStore.getState>['setConfirmation']>[0],
