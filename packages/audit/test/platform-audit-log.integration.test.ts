@@ -51,6 +51,13 @@ describe('platformAuditLog', () => {
     })).rejects.toThrow('platform-audit-log.phone_in_metadata_forbidden');
   });
 
+  it('rejects nested phone key in metadata at any depth', async () => {
+    await expect(platformAuditLog(pool, {
+      action: AuditAction.AUTH_VERIFY_FAILURE,
+      metadata: { user: { phone_number: '+919000007777' } },
+    })).rejects.toThrow('platform-audit-log.phone_in_metadata_forbidden');
+  });
+
   it('no metadata defaults to empty object', async () => {
     await platformAuditLog(pool, { action: AuditAction.TENANT_BOOT });
     const r = await pool.query('SELECT metadata FROM platform_audit_events LIMIT 1');

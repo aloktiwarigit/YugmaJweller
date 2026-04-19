@@ -75,4 +75,22 @@ describe('GET /api/v1/tenant/boot', () => {
     const res = await request(app.getHttpServer()).get('/api/v1/tenant/boot?slug=anchor-dev').set('If-None-Match', etag);
     expect(res.status).toBe(304);
   });
+
+  it('successful boot emits TENANT_BOOT platform audit event', async () => {
+    await pool.query('DELETE FROM platform_audit_events WHERE action = $1', ['TENANT_BOOT']);
+    await request(app.getHttpServer()).get('/api/v1/tenant/boot?slug=anchor-dev');
+    // Allow the fire-and-forget audit to settle
+    await new Promise((r) => setTimeout(r, 100));
+    const r = await pool.query(
+      `SELECT action, metadata FROM platform_audit_events WHERE action = 'TENANT_BOOT' LIMIT 1`,
+    );
+    expect(r.rowCount).toBeGreaterThan(0);
+    expect((r.rows[0].metadata as { slug?: string }).slug).toBe('anchor-dev');
+  });
+
+  it('slug array param returns 404 (typeof guard)', async () => {
+    // Express parses ?slug=a&slug=b as an array — guard must catch this
+    const res = await request(app.getHttpServer()).get('/api/v1/tenant/boot?slug=anchor-dev&slug=other');
+    expect(res.status).toBe(404);
+  });
 });

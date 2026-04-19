@@ -13,14 +13,22 @@ export interface PlatformAuditEntry {
 
 const PHONE_KEYS = /^(phone|phone_number|phoneE164|phone_e164)$/i;
 
+function scrubValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(scrubValue);
+  if (value && typeof value === 'object' && !(value instanceof Date)) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (PHONE_KEYS.test(k)) throw new Error('platform-audit-log.phone_in_metadata_forbidden — use phoneE164 param');
+      out[k] = scrubValue(v);
+    }
+    return out;
+  }
+  return value;
+}
+
 function scrubMetadata(m: Record<string, unknown> | undefined): Record<string, unknown> {
   if (!m) return {};
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(m)) {
-    if (PHONE_KEYS.test(k)) throw new Error('platform-audit-log.phone_in_metadata_forbidden — use phoneE164 param');
-    out[k] = v;
-  }
-  return out;
+  return scrubValue(m) as Record<string, unknown>;
 }
 
 function sha256(v: string): string {

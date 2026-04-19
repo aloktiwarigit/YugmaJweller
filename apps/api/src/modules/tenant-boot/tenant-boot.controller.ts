@@ -13,8 +13,12 @@ export class TenantBootController {
   @SkipAuth()
   @Header('Cache-Control', 'max-age=86400, stale-while-revalidate=86400')
   async boot(@Query('slug') slug: string, @Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<{ id: string; display_name: string; config: Record<string, unknown> } | undefined> {
-    if (!slug || slug.length > 128) throw new NotFoundException({ code: 'tenant.not_found' });
-    const result = await this.svc.bootBySlug(slug);
+    if (typeof slug !== 'string' || !slug || slug.length > 128) throw new NotFoundException({ code: 'tenant.not_found' });
+    const result = await this.svc.bootBySlug(slug, {
+      ip: req.ip,
+      userAgent: String(req.headers['user-agent'] ?? ''),
+      requestId: String(req.headers['x-request-id'] ?? ''),
+    });
     if (req.headers['if-none-match'] === result.etag) { res.status(304); return; }
     res.setHeader('ETag', result.etag);
     return { id: result.id, display_name: result.display_name, config: result.config };
