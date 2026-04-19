@@ -222,7 +222,7 @@ Protocol:
 2. Fresh session → `/superpowers:writing-plans` → commit `plans/<story-id>.md`
 3. Fresh session → `/superpowers:executing-plans` with TDD (Red → Green → Refactor)
 4. `/superpowers:verification-before-completion`
-5. **5-layer review gate:** `/code-review` → `/security-review` → Codex CLI → `/bmad-code-review` → `/superpowers:requesting-code-review`
+5. **Review gate:** Codex CLI (mandatory) + `/security-review` (domain threat model for auth/crypto/payments — the one Claude layer worth keeping on Class A). DROP `/code-review`, `/bmad-code-review`, `/superpowers:requesting-code-review`.
 6. Runtime smoke test on intended surface (see Non-negotiable floor below)
 7. `git push` only after all 6 pass
 
@@ -234,7 +234,7 @@ Protocol:
 2. Fresh session → `/superpowers:writing-plans` → commit plan file (kept)
 3. Single-implementer execution in one session — **no 3-subagent-per-task pattern** (overkill for Class B)
 4. TDD per-commit discipline (kept)
-5. **2-layer review gate only:** Codex CLI (authoritative) → `/superpowers:requesting-code-review` (merge-readiness checklist). DROP `/code-review` + `/security-review` + `/bmad-code-review` — they add inspection overlap with zero runtime coverage. Add them back on elevation to Class A.
+5. **Review gate: Codex CLI only.** Run `codex review --base main`, write `.codex-review-passed` marker. DROP all Claude-on-Claude layers (`/code-review`, `/security-review`, `/bmad-code-review`, `/superpowers:requesting-code-review`) — echo chamber with ~90% overlap and zero cross-model signal. CI is the second gate.
 6. **Runtime smoke test on intended surface** — mandatory before PR merge:
    - Shopkeeper stories: emulator or device (Metro boot + golden-path flow)
    - API-only stories: `curl` round-trip against running service
