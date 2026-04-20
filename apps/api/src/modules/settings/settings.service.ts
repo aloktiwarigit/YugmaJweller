@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { PatchShopProfileSchema, LoyaltyConfig, LoyaltyConfigSchema, PatchLoyaltyDto } from '@goldsmith/shared';
 import type { PatchShopProfileDto, ShopProfileRow } from '@goldsmith/shared';
@@ -74,17 +74,15 @@ export class SettingsService {
         thresholdPaise,
         badgeColor: dto.badgeColor,
       };
-      // Enforce strict ascending tier order
-      if (
-        newConfig.tiers[0].thresholdPaise >= newConfig.tiers[1].thresholdPaise ||
-        newConfig.tiers[1].thresholdPaise >= newConfig.tiers[2].thresholdPaise
-      ) {
-        return { ok: false, error: 'TIER_ORDER_INVALID' };
-      }
     } else {
       // type === 'rate'
       newConfig.earnRatePercentage = dto.earnRatePercentage;
       newConfig.redemptionRatePercentage = dto.redemptionRatePercentage;
+    }
+
+    // Enforce strict ascending tier order on both branches
+    if (!SettingsService.isAscendingOrder(newConfig.tiers)) {
+      return { ok: false, error: 'TIER_ORDER_INVALID' };
     }
 
     const parsed = LoyaltyConfigSchema.safeParse(newConfig);
@@ -100,14 +98,23 @@ export class SettingsService {
       action: AuditAction.SETTINGS_LOYALTY_UPDATED,
       subjectType: 'shop',
       subjectId: shopId,
-      metadata: { type: dto.type },
+      metadata: { type: dto.type, before: current, after: parsed.data },
     }).catch(() => undefined);
 
     return { ok: true, config: parsed.data };
   }
 
   private static rupeesToPaise(rupees: string): number {
-    return Math.round(parseFloat(rupees) * 100);
+    const paise = Math.round(parseFloat(rupees) * 100);
+    if (!Number.isInteger(paise) || paise < 0 || paise > 1_000_000_000) {
+      throw new UnprocessableEntityException({ code: 'settings.threshold_out_of_range' });
+    }
+    return paise;
+  }
+
+  private static isAscendingOrder(tiers: LoyaltyConfig['tiers']): boolean {
+    return tiers[0].thresholdPaise < tiers[1].thresholdPaise &&
+           tiers[1].thresholdPaise < tiers[2].thresholdPaise;
   }
 
   private async auditProfileUpdate(

@@ -73,7 +73,7 @@ export class SettingsController {
     if (!['shop_admin', 'shop_manager'].includes(ctx.role)) throw new ForbiddenException({ code: 'auth.insufficient_role' });
     const config = await this.svc.getLoyalty();
     const etag = `"${createHash('sha256').update(JSON.stringify(config)).digest('hex').slice(0, 16)}"`;
-    res.setHeader('X-ETag', etag);
+    res.setHeader('ETag', etag);
     return { ...config, etag };
   }
 
@@ -94,11 +94,14 @@ export class SettingsController {
 
     const result = await this.svc.updateLoyalty(parsed.data);
     if (!result.ok) {
-      throw new UnprocessableEntityException({ code: result.error });
+      const code = result.error === 'TIER_ORDER_INVALID'
+        ? 'settings.tier_order_invalid'
+        : result.error;
+      throw new UnprocessableEntityException({ code });
     }
 
     const etag = `"${createHash('sha256').update(JSON.stringify(result.config)).digest('hex').slice(0, 16)}"`;
-    res.setHeader('X-ETag', etag);
+    res.setHeader('ETag', etag);
     return { ...result.config, etag };
   }
 }

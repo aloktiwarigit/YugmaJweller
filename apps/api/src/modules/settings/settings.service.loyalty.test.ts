@@ -203,4 +203,77 @@ describe('SettingsService.updateLoyalty', () => {
     expect(repoUpsertLoyalty()).toHaveBeenCalledOnce();
     expect(cacheInvalidateLoyalty()).toHaveBeenCalledOnce();
   });
+
+  it('type=rate returns TIER_ORDER_INVALID when stored tiers are already out-of-order', async () => {
+    // Fix 2: isAscendingOrder is now called on both branches
+    const outOfOrderConfig: LoyaltyConfig = {
+      ...DEFAULT_CONFIG,
+      tiers: [
+        { name: 'Silver',  thresholdPaise: 50_000_000, badgeColor: '#C0C0C0' }, // higher than Gold
+        { name: 'Gold',    thresholdPaise: 15_000_000, badgeColor: '#FFD700' },
+        { name: 'Diamond', thresholdPaise: 50_000_000, badgeColor: '#B9F2FF' },
+      ],
+    };
+    cacheGetLoyalty().mockResolvedValueOnce(outOfOrderConfig);
+
+    const svc = makeService();
+    const result = await tenantContext.runWith(ctx, () => svc.updateLoyalty({
+      type: 'rate',
+      earnRatePercentage: '2.00',
+      redemptionRatePercentage: '1.00',
+    }));
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe('TIER_ORDER_INVALID');
+    }
+    expect(repoUpsertLoyalty()).not.toHaveBeenCalled();
+  });
+
+  it('invalidates cache after successful upsert', async () => {
+    cacheGetLoyalty().mockResolvedValueOnce(DEFAULT_CONFIG);
+    repoUpsertLoyalty().mockResolvedValueOnce(undefined);
+    cacheInvalidateLoyalty().mockResolvedValueOnce(undefined);
+
+    const svc = makeService();
+    const result = await tenantContext.runWith(ctx, () => svc.updateLoyalty({
+      type: 'rate',
+      earnRatePercentage: '1.50',
+      redemptionRatePercentage: '0.75',
+    }));
+
+    expect(result.ok).toBe(true);
+    expect(cacheInvalidateLoyalty()).toHaveBeenCalledOnce();
+  });
+
+  it('fires audit log fire-and-forget and does not await it', async () => {
+    const { auditLog } = await import('@goldsmith/audit');
+    const auditLogMock = auditLog as ReturnType<typeof vi.fn>;
+    // Make audit resolution slow — the function should still return without waiting
+    let resolveAudit!: () => void;
+    auditLogMock.mockReturnValueOnce(new Promise<void>((res) => { resolveAudit = res; }));
+
+    cacheGetLoyalty().mockResolvedValueOnce(DEFAULT_CONFIG);
+    repoUpsertLoyalty().mockResolvedValueOnce(undefined);
+    cacheInvalidateLoyalty().mockResolvedValueOnce(undefined);
+
+    const svc = makeService();
+    const result = await tenantContext.runWith(ctx, () => svc.updateLoyalty({
+      type: 'rate',
+      earnRatePercentage: '1.25',
+      redemptionRatePercentage: '0.50',
+    }));
+
+    // Should resolve even though audit promise hasn't settled
+    expect(result.ok).toBe(true);
+    // Audit was called with before/after in metadata
+    expect(auditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        metadata: expect.objectContaining({ before: DEFAULT_CONFIG }),
+      }),
+    );
+    // Settle the deferred audit to avoid unhandled rejection
+    resolveAudit();
+  });
 });
