@@ -7,8 +7,8 @@ import { tenantContext } from '@goldsmith/tenant-context';
  * Redis-backed cache for shop profile data.
  *
  * Contract:
- * - `getProfile`: swallows Redis errors + JSON parse errors as cache misses (deletes corrupt key).
- * - `setProfile` / `invalidate`: Redis errors propagate to the caller.
+ * - `getProfile` / `getMakingCharges`: swallows Redis errors + JSON parse errors as cache misses (deletes corrupt key).
+ * - `setProfile` / `invalidate` / `setMakingCharges` / `invalidateMakingCharges`: Redis errors propagate to the caller.
  */
 export class SettingsCache {
   /** Profile TTL: 60 s — within the ≤30-s write-propagation p95 target when invalidation fires on save. */
