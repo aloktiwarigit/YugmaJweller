@@ -192,15 +192,11 @@ describe('SettingsService', () => {
       ).resolves.toEqual(MAKING_CHARGE_DEFAULTS);
     });
 
-    it('merges supplied categories with defaults — unspecified categories retain defaults', async () => {
+    it('passes patch items and defaults to repo.upsertMakingCharges for atomic merge', async () => {
       const { svc, repo } = makeSvc();
-      // current = MAKING_CHARGE_DEFAULTS (returned from getMakingCharges which hits DB → null → defaults)
       const dto: PatchMakingChargesDto = [{ category: 'BRIDAL', type: 'percent', value: '20.00' }];
       await tenantContext.runWith(ctx, () => svc.updateMakingCharges(dto));
-      const merged = MAKING_CHARGE_DEFAULTS.map((c) =>
-        c.category === 'BRIDAL' ? { ...c, value: '20.00' } : c,
-      );
-      expect(repo.upsertMakingCharges).toHaveBeenCalledWith(merged);
+      expect(repo.upsertMakingCharges).toHaveBeenCalledWith(dto, MAKING_CHARGE_DEFAULTS);
     });
   });
 });

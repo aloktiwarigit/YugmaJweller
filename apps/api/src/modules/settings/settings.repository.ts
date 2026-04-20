@@ -80,15 +80,22 @@ export class SettingsRepository {
     });
   }
 
-  async upsertMakingCharges(configs: MakingChargeConfig[]): Promise<UpdateMakingChargesResult> {
+  async upsertMakingCharges(
+    patchItems: MakingChargeConfig[],
+    defaults: MakingChargeConfig[],
+  ): Promise<UpdateMakingChargesResult> {
     return withTenantTx(this.pool, async (tx) => {
       const shopId = tenantContext.requireCurrent().shopId;
 
       const beforeRow = await tx.query<{ making_charges_json: MakingChargeConfig[] | null }>(
-        `SELECT making_charges_json FROM shop_settings WHERE shop_id = $1`,
+        `SELECT making_charges_json FROM shop_settings WHERE shop_id = $1 FOR UPDATE`,
         [shopId],
       );
-      const before = beforeRow.rows.length > 0 ? beforeRow.rows[0].making_charges_json : null;
+      const before = beforeRow.rows.length > 0 ? (beforeRow.rows[0].making_charges_json ?? null) : null;
+
+      const current = before ?? defaults;
+      const patchMap = new Map(patchItems.map((c) => [c.category, c]));
+      const merged = current.map((c) => patchMap.get(c.category) ?? c);
 
       const r = await tx.query<{ making_charges_json: MakingChargeConfig[] }>(
         `INSERT INTO shop_settings (shop_id, making_charges_json)
@@ -96,7 +103,7 @@ export class SettingsRepository {
          ON CONFLICT (shop_id)
          DO UPDATE SET making_charges_json = $2::jsonb, updated_at = now()
          RETURNING making_charges_json`,
-        [shopId, JSON.stringify(configs)],
+        [shopId, JSON.stringify(merged)],
       );
       const after = r.rows[0].making_charges_json;
 

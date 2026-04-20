@@ -78,11 +78,7 @@ export class SettingsService {
       throw new BadRequestException({ code: 'validation.failed', errors });
     }
 
-    const current = await this.getMakingCharges();
-    const patchMap = new Map(parsed.data.map((c) => [c.category, c]));
-    const merged = current.map((c) => patchMap.get(c.category) ?? c);
-
-    const { before, after } = await this.repo.upsertMakingCharges(merged);
+    const { before, after } = await this.repo.upsertMakingCharges(parsed.data, MAKING_CHARGE_DEFAULTS);
 
     await this.cache.invalidateMakingCharges();
 

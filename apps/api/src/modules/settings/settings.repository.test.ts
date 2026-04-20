@@ -149,50 +149,59 @@ describe('SettingsRepository', () => {
   });
 
   describe('upsertMakingCharges', () => {
-    it('returns before: null and after: configs for a fresh shop', async () => {
-      const configs: MakingChargeConfig[] = MAKING_CHARGE_DEFAULTS;
+    it('returns before: null and after: merged configs for a fresh shop', async () => {
+      const patchItems: MakingChargeConfig[] = [{ category: 'RINGS', type: 'percent', value: '14.00' }];
+      const defaults = MAKING_CHARGE_DEFAULTS;
+      const expectedAfter = defaults.map((c) =>
+        c.category === 'RINGS' ? { ...c, value: '14.00' } : c,
+      );
       const mockClient = {
         query: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
               sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
           if (sql.includes('INSERT')) {
-            return { rows: [{ making_charges_json: configs }], rowCount: 1 };
+            return { rows: [{ making_charges_json: expectedAfter }], rowCount: 1 };
           }
+          // SELECT FOR UPDATE before state: fresh shop has null
           return { rows: [{ making_charges_json: null }], rowCount: 1 };
         }),
         release: vi.fn(),
       } as unknown as PoolClient;
       const mockPool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
       const testRepo = new SettingsRepository(mockPool);
-      const result = await tenantContext.runWith(ctxA, () => testRepo.upsertMakingCharges(configs));
+      const result = await tenantContext.runWith(ctxA, () =>
+        testRepo.upsertMakingCharges(patchItems, defaults),
+      );
       expect(result.before).toBeNull();
-      expect(result.after).toEqual(configs);
+      expect(result.after).toEqual(expectedAfter);
     });
 
-    it('returns before: existing array and after: new configs', async () => {
-      const existing: MakingChargeConfig[] = [{ category: 'RINGS', type: 'percent', value: '10.00' }];
-      const updated: MakingChargeConfig[] = [{ category: 'RINGS', type: 'percent', value: '15.00' }];
+    it('returns before: existing array and after: merged configs', async () => {
+      const existing: MakingChargeConfig[] = MAKING_CHARGE_DEFAULTS.map((c) => c);
+      const patchItems: MakingChargeConfig[] = [{ category: 'RINGS', type: 'percent', value: '15.00' }];
+      const expectedAfter = existing.map((c) => c.category === 'RINGS' ? { ...c, value: '15.00' } : c);
       const mockClient = {
         query: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
               sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
           if (sql.includes('INSERT')) {
-            return { rows: [{ making_charges_json: updated }], rowCount: 1 };
+            return { rows: [{ making_charges_json: expectedAfter }], rowCount: 1 };
           }
-          // SELECT before
           return { rows: [{ making_charges_json: existing }], rowCount: 1 };
         }),
         release: vi.fn(),
       } as unknown as PoolClient;
       const mockPool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
       const testRepo = new SettingsRepository(mockPool);
-      const result = await tenantContext.runWith(ctxA, () => testRepo.upsertMakingCharges(updated));
+      const result = await tenantContext.runWith(ctxA, () =>
+        testRepo.upsertMakingCharges(patchItems, MAKING_CHARGE_DEFAULTS),
+      );
       expect(result.before).toEqual(existing);
-      expect(result.after).toEqual(updated);
+      expect(result.after).toEqual(expectedAfter);
     });
 
     it('stores value as string not number', async () => {
-      const configs: MakingChargeConfig[] = [{ category: 'RINGS', type: 'percent', value: '12.00' }];
+      const patchItems: MakingChargeConfig[] = [{ category: 'RINGS', type: 'percent', value: '12.00' }];
       let capturedParams: unknown[] | undefined;
       const mockClient = {
         query: vi.fn().mockImplementation(async (sql: string, params?: unknown[]) => {
@@ -200,16 +209,17 @@ describe('SettingsRepository', () => {
               sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
           if (sql.includes('INSERT')) {
             capturedParams = params;
-            return { rows: [{ making_charges_json: configs }], rowCount: 1 };
+            return { rows: [{ making_charges_json: patchItems }], rowCount: 1 };
           }
-          // SELECT before
           return { rows: [{ making_charges_json: null }], rowCount: 1 };
         }),
         release: vi.fn(),
       } as unknown as PoolClient;
       const mockPool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
       const testRepo = new SettingsRepository(mockPool);
-      await tenantContext.runWith(ctxA, () => testRepo.upsertMakingCharges(configs));
+      await tenantContext.runWith(ctxA, () =>
+        testRepo.upsertMakingCharges(patchItems, MAKING_CHARGE_DEFAULTS),
+      );
       expect(capturedParams).toBeDefined();
       const jsonStr = capturedParams![1] as string;
       const parsed = JSON.parse(jsonStr) as Array<{ value: unknown }>;
