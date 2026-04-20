@@ -101,6 +101,18 @@ export class AuthService {
       user_id: row.userId,  // DB UUID — enables TenantInterceptor to propagate userId without extra query
     });
 
+    // 7a. Post-claims final check — minimises the window where a concurrent revokeStaff() could
+    //     have called markRevoked() between steps 6 and 7. If revoked, clear the claims we just
+    //     wrote and abort. A residual race smaller than this window is bounded by the network RTT
+    //     to Firebase; FirebaseJwtStrategy uses verifyIdToken(token, true) which enforces token
+    //     revocation checks, providing a second line of defence for that residual window.
+    const finalStatus = await this.repo.getStatusById(row.shopId, row.userId);
+    if (!finalStatus || finalStatus === 'REVOKED') {
+      await this.firebase.admin().auth().setCustomUserClaims(args.uid, {});
+      await this.firebase.admin().auth().revokeRefreshTokens(args.uid);
+      throw new ForbiddenException({ code: 'auth.rejected' });
+    }
+
     // 8. Audit verify-success
     await this.auditVerifySuccess({ tenant, userId: row.userId, role: row.role, ip: args.ip, userAgent: args.userAgent, requestId: args.requestId });
 
