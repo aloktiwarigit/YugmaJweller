@@ -63,4 +63,61 @@ export class AuthRepository {
       }),
     );
   }
+
+  async inviteStaff(args: {
+    phone: string;
+    role: 'shop_staff' | 'shop_manager';
+    displayName: string;
+    invitedByUserId: string;
+    shopId: string;
+    tenant: Tenant;
+  }): Promise<{ conflict: boolean; userId?: string }> {
+    return withTenantTx(this.pool, async (tx) => {
+      const conflict = await tx.query<{ id: string }>(
+        `SELECT id FROM shop_users
+          WHERE shop_id = $1 AND phone = $2 AND status IN ('INVITED', 'ACTIVE')`,
+        [args.shopId, args.phone],
+      );
+      if ((conflict.rowCount ?? 0) > 0) return { conflict: true };
+
+      const inserted = await tx.query<{ id: string }>(
+        `INSERT INTO shop_users (shop_id, phone, display_name, role, status, invited_by_user_id, invited_at)
+         VALUES ($1, $2, $3, $4, 'INVITED', $5, now())
+         RETURNING id`,
+        [args.shopId, args.phone, args.displayName, args.role, args.invitedByUserId],
+      );
+      return { conflict: false, userId: inserted.rows[0].id };
+    });
+  }
+
+  async listUsers(shopId: string): Promise<Array<{
+    id: string; displayName: string; role: string; status: string;
+    phone: string; invitedAt: string | null; activatedAt: string | null;
+  }>> {
+    const c = await this.pool.connect();
+    try {
+      await c.query('SET ROLE app_user');
+      const res = await c.query<{
+        id: string; display_name: string; role: string; status: string;
+        phone: string; invited_at: string | null; activated_at: string | null;
+      }>(
+        `SELECT id, display_name, role, status, phone, invited_at, activated_at
+           FROM shop_users WHERE shop_id = $1 ORDER BY created_at DESC`,
+        [shopId],
+      );
+      return res.rows.map((r) => ({
+        id: r.id,
+        displayName: r.display_name,
+        role: r.role,
+        status: r.status,
+        phone: r.phone,
+        invitedAt: r.invited_at,
+        activatedAt: r.activated_at,
+      }));
+    } finally {
+      await c.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
+      await c.query('RESET ROLE').catch(() => undefined);
+      c.release();
+    }
+  }
 }
