@@ -15,6 +15,7 @@
   "dependencies": {
     "@goldsmith/auth-client": "workspace:*",
     "@goldsmith/i18n": "workspace:*",
+    "@goldsmith/shared": "workspace:*",
     "@goldsmith/ui-mobile": "workspace:*",
     "@goldsmith/ui-tokens": "workspace:*",
     "@expo/metro-runtime": "~3.2.3",
