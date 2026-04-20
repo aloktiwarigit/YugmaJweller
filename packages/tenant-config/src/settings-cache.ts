@@ -1,6 +1,6 @@
 import type { Redis } from '@goldsmith/cache';
-import type { ShopProfileRow, MakingChargeConfig } from '@goldsmith/shared';
-import { ShopProfileRowSchema, MakingChargesArraySchema } from '@goldsmith/shared';
+import type { ShopProfileRow, MakingChargeConfig, WastageConfig } from '@goldsmith/shared';
+import { ShopProfileRowSchema, MakingChargesArraySchema, WastageArraySchema } from '@goldsmith/shared';
 import { tenantContext } from '@goldsmith/tenant-context';
 
 /**
@@ -71,11 +71,41 @@ export class SettingsCache {
     await this.redis.del(this.makingChargesKey());
   }
 
+  async getWastage(): Promise<WastageConfig[] | null> {
+    const key = this.wastageKey();
+    try {
+      const raw = await this.redis.get(key);
+      if (!raw) return null;
+      const parsed: unknown = JSON.parse(raw);
+      const result = WastageArraySchema.safeParse(parsed);
+      if (!result.success) {
+        await this.redis.del(key);
+        return null;
+      }
+      return result.data;
+    } catch {
+      try { await this.redis.del(key); } catch { /* ignore del failure */ }
+      return null;
+    }
+  }
+
+  async setWastage(data: WastageConfig[]): Promise<void> {
+    await this.redis.set(this.wastageKey(), JSON.stringify(data), 'EX', this.ttlSec);
+  }
+
+  async invalidateWastage(): Promise<void> {
+    await this.redis.del(this.wastageKey());
+  }
+
   private profileKey(): string {
     return `shop:${tenantContext.requireCurrent().shopId}:settings:profile`;
   }
 
   private makingChargesKey(): string {
     return `shop:${tenantContext.requireCurrent().shopId}:settings:making_charges`;
+  }
+
+  private wastageKey(): string {
+    return `shop:${tenantContext.requireCurrent().shopId}:settings:wastage`;
   }
 }
