@@ -10,6 +10,8 @@ export type { ToastProps } from './primitives/Toast';
 export { Skeleton } from './primitives/Skeleton';
 export type { SkeletonProps } from './primitives/Skeleton';
 
+export { SettingsGroupCard } from './primitives/SettingsGroupCard';
+
 export { ThemeProvider, useTheme } from './providers/ThemeProvider';
 export type { Theme } from './providers/ThemeProvider';
 
