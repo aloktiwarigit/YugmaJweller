@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { ShopProfileRow, PatchShopProfileDto, AddressDto, OperatingHoursDto } from '@goldsmith/shared';
+import { LoyaltyConfig, LoyaltyConfigSchema, LOYALTY_DEFAULTS } from '@goldsmith/shared';
 import type { UpdateProfileResult } from './settings.types';
 
 interface ShopsRow {
@@ -66,6 +67,27 @@ export class SettingsRepository {
 
       return { before, after };
     });
+  }
+
+  async getLoyalty(shopId: string): Promise<LoyaltyConfig> {
+    const r = await this.pool.query<{ loyalty_json: unknown }>(
+      `SELECT loyalty_json FROM shop_settings WHERE shop_id = $1`,
+      [shopId],
+    );
+    if (r.rows.length === 0 || r.rows[0].loyalty_json == null) {
+      return LOYALTY_DEFAULTS;
+    }
+    const parsed = LoyaltyConfigSchema.safeParse(r.rows[0].loyalty_json);
+    return parsed.success ? parsed.data : LOYALTY_DEFAULTS;
+  }
+
+  async upsertLoyalty(shopId: string, config: LoyaltyConfig): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO shop_settings (shop_id, loyalty_json)
+       VALUES ($1, $2::jsonb)
+       ON CONFLICT (shop_id) DO UPDATE SET loyalty_json = EXCLUDED.loyalty_json, updated_at = now()`,
+      [shopId, JSON.stringify(config)],
+    );
   }
 
   private async readProfileTx(tx: PoolClient): Promise<ShopProfileRow> {

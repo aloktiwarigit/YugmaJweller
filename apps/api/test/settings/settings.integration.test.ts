@@ -18,6 +18,7 @@ import { SettingsRepository } from '../../src/modules/settings/settings.reposito
 import { SettingsService } from '../../src/modules/settings/settings.service';
 import { SettingsCache } from '@goldsmith/tenant-config';
 import { DrizzleTenantLookup } from '../../src/drizzle-tenant-lookup';
+import { LOYALTY_DEFAULTS } from '@goldsmith/shared';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ const mockCache = {
 
 let container: StartedPostgreSqlContainer;
 let pool: Pool;
+let repo: SettingsRepository;
 let svc: SettingsService;
 
 beforeAll(async () => {
@@ -59,7 +61,7 @@ beforeAll(async () => {
   );
 
   // Inject pool directly — no NestJS DI container needed.
-  const repo = new SettingsRepository(pool as never);
+  repo = new SettingsRepository(pool as never);
 
   // DrizzleTenantLookup just needs the pool (for cache invalidation path).
   const tenantLookup = new DrizzleTenantLookup(pool as never);
@@ -145,5 +147,57 @@ describe('SettingsRepository + SettingsService integration', () => {
     );
 
     expect(profile.about_text).toBe('प्रीमियम सोना और आभूषण');
+  });
+
+  describe('loyalty', () => {
+    it('getLoyalty returns LOYALTY_DEFAULTS when shop has no loyalty_json set', async () => {
+      // shop_settings row may not exist yet for this shop; either way loyalty_json is null
+      const config = await tenantContext.runWith(makeCtx(), () =>
+        repo.getLoyalty(SHOP_A),
+      );
+      expect(config).toEqual(LOYALTY_DEFAULTS);
+    });
+
+    it('getLoyalty returns the stored config after upsertLoyalty', async () => {
+      const custom = {
+        ...LOYALTY_DEFAULTS,
+        earnRatePercentage: '2.00',
+      };
+      await tenantContext.runWith(makeCtx(), () =>
+        repo.upsertLoyalty(SHOP_A, custom),
+      );
+      const config = await tenantContext.runWith(makeCtx(), () =>
+        repo.getLoyalty(SHOP_A),
+      );
+      expect(config.earnRatePercentage).toBe('2.00');
+      expect(config.tiers).toEqual(LOYALTY_DEFAULTS.tiers);
+    });
+
+    it('upsertLoyalty is idempotent — second call updates, no duplicate rows', async () => {
+      const v1 = { ...LOYALTY_DEFAULTS, earnRatePercentage: '3.00' };
+      const v2 = { ...LOYALTY_DEFAULTS, earnRatePercentage: '4.00' };
+      await tenantContext.runWith(makeCtx(), () => repo.upsertLoyalty(SHOP_A, v1));
+      await tenantContext.runWith(makeCtx(), () => repo.upsertLoyalty(SHOP_A, v2));
+
+      const r = await pool.query<{ count: string }>(
+        `SELECT COUNT(*) AS count FROM shop_settings WHERE shop_id = $1`,
+        [SHOP_A],
+      );
+      expect(Number(r.rows[0].count)).toBe(1);
+
+      const config = await tenantContext.runWith(makeCtx(), () =>
+        repo.getLoyalty(SHOP_A),
+      );
+      expect(config.earnRatePercentage).toBe('4.00');
+    });
+
+    it('stored thresholdPaise values are integers', async () => {
+      const config = await tenantContext.runWith(makeCtx(), () =>
+        repo.getLoyalty(SHOP_A),
+      );
+      for (const tier of config.tiers) {
+        expect(Number.isInteger(tier.thresholdPaise)).toBe(true);
+      }
+    });
   });
 });
