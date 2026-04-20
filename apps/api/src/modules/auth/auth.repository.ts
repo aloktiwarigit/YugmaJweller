@@ -97,6 +97,8 @@ export class AuthRepository {
     const c = await this.pool.connect();
     try {
       await c.query('SET ROLE app_user');
+      // Set GUC so RLS policy on shop_users can filter on current_setting('app.current_shop_id').
+      await c.query(`SET app.current_shop_id = '${shopId}'`);
       const res = await c.query<{
         id: string; display_name: string; role: string; status: string;
         phone: string; invited_at: string | null; activated_at: string | null;

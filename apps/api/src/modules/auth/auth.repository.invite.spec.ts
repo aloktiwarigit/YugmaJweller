@@ -69,7 +69,8 @@ describe('AuthRepository.listUsers', () => {
     const mockClient = {
       query: vi.fn()
         .mockResolvedValueOnce(undefined)   // SET ROLE app_user
-        .mockResolvedValueOnce({ rows })
+        .mockResolvedValueOnce(undefined)   // SET app.current_shop_id (GUC for RLS)
+        .mockResolvedValueOnce({ rows })    // SELECT shop_users
         .mockResolvedValueOnce(undefined)   // POISON
         .mockResolvedValueOnce(undefined),  // RESET ROLE
       release: vi.fn(),

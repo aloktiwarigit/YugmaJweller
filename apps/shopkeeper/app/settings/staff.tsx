@@ -22,18 +22,12 @@ import type { AxiosError } from 'axios';
 
 interface StaffUser {
   id: string;
-  display_name: string;
+  displayName: string;
   phone: string;
   role: 'shop_admin' | 'shop_manager' | 'shop_staff';
-  status: 'active' | 'invited';
-}
-
-interface UsersResponse {
-  users: StaffUser[];
-}
-
-interface PermissionsResponse {
-  permissions: Record<string, boolean>;
+  status: 'ACTIVE' | 'INVITED' | 'SUSPENDED' | 'REVOKED';
+  invitedAt: string | null;
+  activatedAt: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -61,8 +55,8 @@ function RoleBadge({ role }: { role: string }): React.ReactElement {
   );
 }
 
-function StatusBadge({ status }: { status: 'active' | 'invited' }): React.ReactElement {
-  const isActive = status === 'active';
+function StatusBadge({ status }: { status: StaffUser['status'] }): React.ReactElement {
+  const isActive = status === 'ACTIVE';
   return (
     <View style={[styles.statusBadge, isActive ? styles.statusBadgeActive : styles.statusBadgeInvited]}>
       <Text style={[styles.statusBadgeText, isActive ? styles.statusTextActive : styles.statusTextInvited]}>
@@ -106,8 +100,8 @@ export default function StaffScreen(): React.ReactElement {
     setListLoading(true);
     setListError(null);
     try {
-      const res = await api.get<UsersResponse>('/auth/users');
-      setStaff(res.data.users ?? []);
+      const res = await api.get<StaffUser[]>('/auth/users');
+      setStaff(res.data ?? []);
     } catch {
       setListError('स्टाफ लोड नहीं हो सका। दोबारा कोशिश करें।');
     } finally {
@@ -127,9 +121,9 @@ export default function StaffScreen(): React.ReactElement {
     if (!isAdmin) return;
     setPermsLoading(true);
     api
-      .get<PermissionsResponse>('/auth/roles/shop_manager/permissions')
+      .get<Record<string, boolean>>('/auth/roles/shop_manager/permissions')
       .then((res) => {
-        setPermissions(res.data.permissions ?? {});
+        setPermissions(res.data ?? {});
       })
       .catch(() => {
         // non-blocking — permissions section stays empty
@@ -175,13 +169,15 @@ export default function StaffScreen(): React.ReactElement {
   // ---------------------------------------------------------------------------
 
   const handlePermToggle = (key: string, value: boolean): void => {
+    const previous = permissions;
     const updated = { ...permissions, [key]: value };
     setPermissions(updated);
+    // UpdatePermissionSchema expects { permission_key, is_enabled } — one call per toggle.
     api
-      .put('/auth/roles/shop_manager/permissions', { permissions: updated })
+      .put('/auth/roles/shop_manager/permissions', { permission_key: key, is_enabled: value })
       .catch(() => {
-        // Rollback on error
-        setPermissions(permissions);
+        // Rollback optimistic update on error
+        setPermissions(previous);
         Alert.alert('त्रुटि', 'अनुमति अपडेट नहीं हो सकी।');
       });
   };
@@ -227,10 +223,10 @@ export default function StaffScreen(): React.ReactElement {
             testID={`staff-row-${member.id}`}
             style={styles.staffRow}
             accessible
-            accessibilityLabel={`${member.display_name}, ${ROLE_HINDI[member.role] ?? member.role}, ${member.status === 'active' ? 'सक्रिय' : 'आमंत्रित'}`}
+            accessibilityLabel={`${member.displayName}, ${ROLE_HINDI[member.role] ?? member.role}, ${member.status === 'ACTIVE' ? 'सक्रिय' : 'आमंत्रित'}`}
           >
             <View style={styles.staffRowMain}>
-              <Text style={styles.staffName}>{member.display_name}</Text>
+              <Text style={styles.staffName}>{member.displayName}</Text>
               <Text style={styles.staffPhone}>{member.phone}</Text>
             </View>
             <View style={styles.staffRowBadges}>

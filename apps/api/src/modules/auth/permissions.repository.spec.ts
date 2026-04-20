@@ -11,6 +11,7 @@ function makePool(rows: Record<string, unknown>[]): import('pg').Pool {
     connect: vi.fn().mockResolvedValue({
       query: vi.fn()
         .mockResolvedValueOnce(undefined)         // SET ROLE app_user
+        .mockResolvedValueOnce(undefined)         // SET app.current_shop_id (GUC for RLS)
         .mockResolvedValueOnce({ rows })           // SELECT role_permissions
         .mockResolvedValue(undefined),             // finally: POISON_UUID + RESET ROLE
       release: vi.fn(),

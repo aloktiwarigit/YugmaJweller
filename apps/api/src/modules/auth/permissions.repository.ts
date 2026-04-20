@@ -12,6 +12,8 @@ export class PermissionsRepository {
     const c = await this.pool.connect();
     try {
       await c.query('SET ROLE app_user');
+      // Set GUC so RLS policy on role_permissions can filter on current_setting('app.current_shop_id').
+      await c.query(`SET app.current_shop_id = '${shopId}'`);
       const res = await c.query<{ permission_key: string; is_enabled: boolean }>(
         `SELECT permission_key, is_enabled FROM role_permissions WHERE shop_id = $1 AND role = $2`,
         [shopId, role],
