@@ -32,5 +32,23 @@
       "close_label":  "Closing time",
       "closed_label": "Closed"
     }
+  },
+  "making_charges": {
+    "title": "Making Charges",
+    "type_percent": "Percent",
+    "type_fixed": "₹/gram",
+    "save_success": "Changes saved ✓",
+    "errors": {
+      "VALUE_POSITIVE_REQUIRED": "Making charge must be greater than 0",
+      "PERCENT_MAX_100": "Percent cannot exceed 100"
+    },
+    "categories": {
+      "RINGS": "Rings",
+      "CHAINS": "Chains",
+      "BANGLES": "Bangles",
+      "BRIDAL": "Bridal",
+      "SILVER": "Silver",
+      "WHOLESALE": "Wholesale"
+    }
   }
 }
