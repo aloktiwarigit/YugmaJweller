@@ -1,14 +1,46 @@
-import { Controller, Get, HttpCode, Inject, Ip, Post, Req, UnauthorizedException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Ip,
+  Param,
+  Post,
+  Put,
+  Req,
+  UnauthorizedException,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { TenantContextDec } from '@goldsmith/tenant-context';
+import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext, TenantContext } from '@goldsmith/tenant-context';
+import { auditLog, AuditAction } from '@goldsmith/audit';
+import type { InviteStaffDto, UpdatePermissionDto } from '@goldsmith/shared';
+import { InviteStaffSchema, UpdatePermissionSchema } from '@goldsmith/shared';
+import { PermissionsCache } from '@goldsmith/tenant-config';
 import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AuthService } from './auth.service';
+import { AuthRepository } from './auth.repository';
+import { PermissionsRepository } from './permissions.repository';
+import { PolicyGuard } from './guards/policy.guard';
 import { TenantWalkerRoute } from '../../common/decorators/tenant-walker-route.decorator';
+
+type FirebaseRequest = Request & { user?: { uid?: string; phone_number?: string } };
 
 @Controller('/api/v1/auth')
 export class AuthController {
-  constructor(@Inject(AuthService) private readonly svc: AuthService) {}
+  constructor(
+    @Inject(AuthService) private readonly svc: AuthService,
+    @Inject(AuthRepository) private readonly authRepo: AuthRepository,
+    @Inject(PermissionsRepository) private readonly permissionsRepo: PermissionsRepository,
+    @Inject(PermissionsCache) private readonly permissionsCache: PermissionsCache,
+    @Inject('PG_POOL') private readonly pool: import('pg').Pool,
+  ) {}
 
   @Post('/session')
   @HttpCode(200)
@@ -16,7 +48,7 @@ export class AuthController {
   @SkipTenant()
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   async session(@Req() req: Request, @Ip() ip: string) {
-    const user = (req as Request & { user?: { uid?: string; phone_number?: string } }).user;
+    const user = (req as FirebaseRequest).user;
     if (!user?.uid || !user.phone_number) throw new UnauthorizedException({ code: 'auth.missing' });
     return this.svc.session({
       uid: user.uid,
@@ -37,5 +69,62 @@ export class AuthController {
       user: { id: auth.userId, role: auth.role },
       tenant: { id: auth.tenant.id, slug: auth.tenant.slug, display_name: auth.tenant.display_name },
     };
+  }
+
+  @Post('/invite')
+  @Roles('shop_admin', 'shop_manager')
+  @UseGuards(PolicyGuard)
+  @UsePipes(new ZodValidationPipe(InviteStaffSchema))
+  async invite(
+    @Body() dto: InviteStaffDto,
+  ): Promise<{ userId: string }> {
+    const ctx = tenantContext.requireCurrent();
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    const auth = ctx as AuthenticatedTenantContext;
+    return this.svc.invite(auth.shopId, dto, auth.userId);
+  }
+
+  @Get('/users')
+  @Roles('shop_admin', 'shop_manager')
+  async listUsers(): Promise<Array<{
+    id: string; displayName: string; role: string; status: string;
+    phone: string; invitedAt: string | null; activatedAt: string | null;
+  }>> {
+    const ctx = tenantContext.requireCurrent();
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    const auth = ctx as AuthenticatedTenantContext;
+    return this.authRepo.listUsers(auth.shopId);
+  }
+
+  @Get('/roles/:role/permissions')
+  @Roles('shop_admin')
+  async getPermissions(@Param('role') role: string): Promise<Record<string, boolean>> {
+    const ctx = tenantContext.requireCurrent();
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    const auth = ctx as AuthenticatedTenantContext;
+    return this.permissionsRepo.getPermissions(auth.shopId, role as import('@goldsmith/tenant-context').ShopUserRole);
+  }
+
+  @Put('/roles/:role/permissions')
+  @Roles('shop_admin')
+  async updatePermission(
+    @Param('role') role: string,
+    @Body(new ZodValidationPipe(UpdatePermissionSchema)) dto: UpdatePermissionDto,
+    @Req() _req: Request,
+  ): Promise<void> {
+    const ctx = tenantContext.requireCurrent();
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    const auth = ctx as AuthenticatedTenantContext;
+    const shopId = auth.shopId;
+    await this.permissionsRepo.upsertPermission(shopId, role as import('@goldsmith/tenant-context').ShopUserRole, dto.permission_key, dto.is_enabled);
+    await this.permissionsCache.invalidate(shopId, role as import('@goldsmith/tenant-context').ShopUserRole);
+    await tenantContext.runWith(auth, () =>
+      auditLog(this.pool, {
+        action: AuditAction.PERMISSIONS_UPDATED,
+        subjectType: 'role_permissions',
+        actorUserId: auth.userId,
+        metadata: { role, permission_key: dto.permission_key, is_enabled: dto.is_enabled },
+      }),
+    );
   }
 }
