@@ -11,10 +11,9 @@
  *    → FirebaseJwtStrategy converts it to UnauthorizedException (401).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { FirebaseJwtStrategy } from './firebase-jwt.strategy';
-import type { Tenant, ShopUserRole } from '@goldsmith/tenant-context';
 
 // ---------------------------------------------------------------------------
 // Test 1: Cross-tenant isolation at service level
