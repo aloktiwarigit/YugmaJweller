@@ -87,6 +87,13 @@ export class SettingsRepository {
     return withTenantTx(this.pool, async (tx) => {
       const shopId = tenantContext.requireCurrent().shopId;
 
+      // Ensure the row exists so SELECT FOR UPDATE always acquires a row-level lock,
+      // preventing lost-update races when two concurrent PATCHes arrive for a fresh shop.
+      await tx.query(
+        `INSERT INTO shop_settings (shop_id) VALUES ($1) ON CONFLICT (shop_id) DO NOTHING`,
+        [shopId],
+      );
+
       const beforeRow = await tx.query<{ making_charges_json: MakingChargeConfig[] | null }>(
         `SELECT making_charges_json FROM shop_settings WHERE shop_id = $1 FOR UPDATE`,
         [shopId],
