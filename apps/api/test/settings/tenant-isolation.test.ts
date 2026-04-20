@@ -173,4 +173,63 @@ describe('shop_settings RLS tenant isolation', () => {
     );
     expect(check.rows[0].display_name).toBe('Shop A Updated');
   });
+
+  it('tenant A cannot read tenant B making_charges via service layer', async () => {
+    // First, write shop B's making charges as tenant B
+    const tenantB = makeTenant(TENANT_B, 'shop-b', 'Shop B');
+    const ctxB = makeCtx(TENANT_B, tenantB);
+    await tenantContext.runWith(ctxB, () =>
+      withTenantTx(pool, async (tx) => {
+        await tx.query(
+          `UPDATE shop_settings SET making_charges_json = $2::jsonb WHERE shop_id = $1`,
+          [TENANT_B, JSON.stringify([{ category: 'RINGS', type: 'percent', value: '99.00' }])],
+        );
+      }),
+    );
+
+    // Tenant A reads — should only see its own data (null → defaults, not B's 99.00)
+    const tenantA = makeTenant(TENANT_A, 'shop-a', 'Shop A');
+    const ctxA = makeCtx(TENANT_A, tenantA);
+    const rows = await tenantContext.runWith(ctxA, () =>
+      withTenantTx(pool, async (tx) => {
+        const r = await tx.query<{ making_charges_json: unknown }>(
+          'SELECT making_charges_json FROM shop_settings',
+        );
+        return r.rows;
+      }),
+    );
+
+    // Tenant A should see only its own row
+    expect(rows.length).toBe(1);
+    // Its making_charges_json should not contain the value '99.00' (that's tenant B's)
+    const json = rows[0].making_charges_json as Array<{ value: string }> | null;
+    const hasB = json?.some((c) => c.value === '99.00') ?? false;
+    expect(hasB).toBe(false);
+  });
+
+  it('tenant A making_charges upsert does not affect tenant B row', async () => {
+    // Tenant A upserts its own making charges
+    const tenantA = makeTenant(TENANT_A, 'shop-a', 'Shop A');
+    const ctxA = makeCtx(TENANT_A, tenantA);
+    await tenantContext.runWith(ctxA, () =>
+      withTenantTx(pool, async (tx) => {
+        await tx.query(
+          `INSERT INTO shop_settings (shop_id, making_charges_json)
+           VALUES ($1, $2::jsonb)
+           ON CONFLICT (shop_id)
+           DO UPDATE SET making_charges_json = $2::jsonb`,
+          [TENANT_A, JSON.stringify([{ category: 'RINGS', type: 'percent', value: '11.00' }])],
+        );
+      }),
+    );
+
+    // Verify tenant B's row is untouched
+    const check = await pool.query<{ making_charges_json: unknown }>(
+      'SELECT making_charges_json FROM shop_settings WHERE shop_id = $1',
+      [TENANT_B],
+    );
+    const jsonB = check.rows[0].making_charges_json as Array<{ value: string }> | null;
+    const hasA = jsonB?.some((c) => c.value === '11.00') ?? false;
+    expect(hasA).toBe(false);
+  });
 });
