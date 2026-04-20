@@ -33,9 +33,12 @@ const tenant: Tenant = {
 
 // Cache that always misses — forces DB reads so we can verify persistence.
 const mockCache = {
-  getProfile: async () => null,
-  setProfile: async () => undefined,
-  invalidate: async () => undefined,
+  getProfile:        async () => null,
+  setProfile:        async () => undefined,
+  invalidate:        async () => undefined,
+  getLoyalty:        async () => null,
+  setLoyalty:        async () => undefined,
+  invalidateLoyalty: async () => undefined,
 } as unknown as SettingsCache;
 
 // ─── Test harness ─────────────────────────────────────────────────────────────
@@ -197,6 +200,77 @@ describe('SettingsRepository + SettingsService integration', () => {
       );
       for (const tier of config.tiers) {
         expect(Number.isInteger(tier.thresholdPaise)).toBe(true);
+      }
+    });
+
+    it('updateLoyalty type=tier persists tier name and converts rupees to paise', async () => {
+      const result = await tenantContext.runWith(makeCtx(), () =>
+        svc.updateLoyalty(SHOP_A, {
+          type:            'tier',
+          index:           0,
+          name:            'Bronze',
+          thresholdRupees: '25000',
+          badgeColor:      '#CD7F32',
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+
+      const config = await tenantContext.runWith(makeCtx(), () =>
+        repo.getLoyalty(SHOP_A),
+      );
+      // 25000 rupees × 100 = 2,500,000 paise
+      expect(config.tiers[0].name).toBe('Bronze');
+      expect(config.tiers[0].thresholdPaise).toBe(2_500_000);
+      expect(config.tiers[0].badgeColor).toBe('#CD7F32');
+    });
+
+    it('updateLoyalty type=rate persists both earn and redemption rates', async () => {
+      const result = await tenantContext.runWith(makeCtx(), () =>
+        svc.updateLoyalty(SHOP_A, {
+          type:                     'rate',
+          earnRatePercentage:       '2.50',
+          redemptionRatePercentage: '0.50',
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+
+      const config = await tenantContext.runWith(makeCtx(), () =>
+        repo.getLoyalty(SHOP_A),
+      );
+      expect(config.earnRatePercentage).toBe('2.50');
+      expect(config.redemptionRatePercentage).toBe('0.50');
+    });
+
+    it('updateLoyalty type=tier returns TIER_ORDER_INVALID when order is violated', async () => {
+      // First reset to defaults so thresholds are predictable
+      await tenantContext.runWith(makeCtx(), () =>
+        repo.upsertLoyalty(SHOP_A, {
+          tiers: [
+            { name: 'Silver',  thresholdPaise: 5_000_000,  badgeColor: '#C0C0C0' },
+            { name: 'Gold',    thresholdPaise: 15_000_000,  badgeColor: '#FFD700' },
+            { name: 'Diamond', thresholdPaise: 50_000_000,  badgeColor: '#B9F2FF' },
+          ],
+          earnRatePercentage:       '1.00',
+          redemptionRatePercentage: '1.00',
+        }),
+      );
+
+      // tier[0] default is Rs 50,000; set tier[1] to Rs 40,000 — violates ascending order
+      const result = await tenantContext.runWith(makeCtx(), () =>
+        svc.updateLoyalty(SHOP_A, {
+          type:            'tier',
+          index:           1,
+          name:            'Gold',
+          thresholdRupees: '40000',
+          badgeColor:      '#FFD700',
+        }),
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toBe('TIER_ORDER_INVALID');
       }
     });
   });
