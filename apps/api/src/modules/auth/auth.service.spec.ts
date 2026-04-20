@@ -242,6 +242,7 @@ function makeRevokeService(opts: {
   };
 
   const mockFirebaseAuth = {
+    setCustomUserClaims: vi.fn().mockResolvedValue(undefined),
     revokeRefreshTokens: vi.fn().mockResolvedValue(undefined),
     updateUser: vi.fn().mockResolvedValue(undefined),
   };
@@ -266,6 +267,7 @@ describe('AuthService.revokeStaff()', () => {
     await svc.revokeStaff(SHOP_ID, TARGET_ID, CALLER_ID);
 
     expect(authRepo.markRevoked).toHaveBeenCalledWith(SHOP_ID, TARGET_ID, CALLER_ID);
+    expect(mockFirebaseAuth.setCustomUserClaims).toHaveBeenCalledWith(FIREBASE_UID, {});
     expect(mockFirebaseAuth.revokeRefreshTokens).toHaveBeenCalledWith(FIREBASE_UID);
     // updateUser({ disabled: true }) is intentionally NOT called — disabling the Firebase
     // account globally would break cross-shop users whose phone has an active membership elsewhere.
@@ -281,6 +283,7 @@ describe('AuthService.revokeStaff()', () => {
     await svc.revokeStaff(SHOP_ID, TARGET_ID, CALLER_ID);
 
     expect(authRepo.markRevoked).toHaveBeenCalledOnce();
+    expect(mockFirebaseAuth.setCustomUserClaims).not.toHaveBeenCalled();
     expect(mockFirebaseAuth.revokeRefreshTokens).not.toHaveBeenCalled();
   });
 
@@ -344,6 +347,7 @@ describe('AuthService.revokeStaff()', () => {
 
     await svc.revokeStaff(SHOP_ID, TARGET_ID, CALLER_ID);
 
+    expect(mockFirebaseAuth.setCustomUserClaims).toHaveBeenCalledWith(RACE_UID, {});
     expect(mockFirebaseAuth.revokeRefreshTokens).toHaveBeenCalledWith(RACE_UID);
     expect(mockFirebaseAuth.updateUser).not.toHaveBeenCalled();
   });
