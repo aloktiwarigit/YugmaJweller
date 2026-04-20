@@ -108,6 +108,8 @@ export class AuthService {
 
   private static readonly INDIA_MOBILE_RE = /^\+91[6-9]\d{9}$/;
 
+  private static readonly INVITABLE_ROLES: ReadonlySet<string> = new Set(['shop_manager', 'shop_staff']);
+
   async invite(args: { phone: string; role: 'shop_manager' | 'shop_staff' }): Promise<InvitedRow> {
     const ctx = tenantContext.current();
     if (!ctx?.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
@@ -116,8 +118,12 @@ export class AuthService {
       throw new BadRequestException({ code: 'auth.invalid_phone' });
     }
 
+    if (!AuthService.INVITABLE_ROLES.has(args.role as string)) {
+      throw new BadRequestException({ code: 'auth.invalid_role' });
+    }
+
     const existing = await this.repo.findByPhoneInShop(args.phone);
-    if (existing && (existing.status === 'INVITED' || existing.status === 'ACTIVE')) {
+    if (existing) {
       throw new ConflictException({ code: 'auth.staff_already_exists' });
     }
 

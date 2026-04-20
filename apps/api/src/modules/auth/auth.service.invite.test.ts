@@ -70,7 +70,7 @@ describe('AuthService.invite()', () => {
     expect(result.id).toBe('invited-uuid');
   });
 
-  it('throws 409 when phone is already INVITED', async () => {
+  it('throws 409 when phone already exists (any status)', async () => {
     const { svc } = makeSvc({
       findByPhoneInShop: vi.fn().mockResolvedValue({ id: 'existing', status: 'INVITED' }),
     });
@@ -81,15 +81,13 @@ describe('AuthService.invite()', () => {
     ).rejects.toThrow(ConflictException);
   });
 
-  it('throws 409 when phone is already ACTIVE', async () => {
-    const { svc } = makeSvc({
-      findByPhoneInShop: vi.fn().mockResolvedValue({ id: 'existing', status: 'ACTIVE' }),
-    });
+  it('throws 400 when role is not invitable (e.g. shop_admin)', async () => {
+    const { svc } = makeSvc();
     await expect(
       tenantContext.runWith(ownerCtx, () =>
-        svc.invite({ phone: '+919876543210', role: 'shop_staff' }),
+        svc.invite({ phone: '+919876543210', role: 'shop_admin' as 'shop_staff' }),
       ),
-    ).rejects.toThrow(ConflictException);
+    ).rejects.toThrow(BadRequestException);
   });
 
   it('throws 400 on invalid phone format', async () => {
