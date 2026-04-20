@@ -2,8 +2,8 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import { tenantContext } from '@goldsmith/tenant-context';
-import type { ShopProfileRow, PatchShopProfileDto, AddressDto, OperatingHoursDto } from '@goldsmith/shared';
-import type { UpdateProfileResult } from './settings.types';
+import type { ShopProfileRow, PatchShopProfileDto, AddressDto, OperatingHoursDto, MakingChargeConfig } from '@goldsmith/shared';
+import type { UpdateProfileResult, UpdateMakingChargesResult } from './settings.types';
 
 interface ShopsRow {
   display_name: string;
@@ -63,6 +63,42 @@ export class SettingsRepository {
         `INSERT INTO shop_settings (shop_id) VALUES ($1) ON CONFLICT (shop_id) DO NOTHING`,
         [shopId],
       );
+
+      return { before, after };
+    });
+  }
+
+  async getMakingCharges(): Promise<MakingChargeConfig[] | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+      const r = await tx.query<{ making_charges_json: MakingChargeConfig[] | null }>(
+        `SELECT making_charges_json FROM shop_settings WHERE shop_id = $1`,
+        [shopId],
+      );
+      if (r.rows.length === 0) return null;
+      return r.rows[0].making_charges_json;
+    });
+  }
+
+  async upsertMakingCharges(configs: MakingChargeConfig[]): Promise<UpdateMakingChargesResult> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+
+      const beforeRow = await tx.query<{ making_charges_json: MakingChargeConfig[] | null }>(
+        `SELECT making_charges_json FROM shop_settings WHERE shop_id = $1`,
+        [shopId],
+      );
+      const before = beforeRow.rows.length > 0 ? beforeRow.rows[0].making_charges_json : null;
+
+      const r = await tx.query<{ making_charges_json: MakingChargeConfig[] }>(
+        `INSERT INTO shop_settings (shop_id, making_charges_json)
+         VALUES ($1, $2::jsonb)
+         ON CONFLICT (shop_id)
+         DO UPDATE SET making_charges_json = $2::jsonb, updated_at = now()
+         RETURNING making_charges_json`,
+        [shopId, JSON.stringify(configs)],
+      );
+      const after = r.rows[0].making_charges_json;
 
       return { before, after };
     });

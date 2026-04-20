@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Pool, PoolClient } from 'pg';
 import { tenantContext, type Tenant, type UnauthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { SettingsRepository } from './settings.repository';
-import type { PatchShopProfileDto } from '@goldsmith/shared';
+import type { PatchShopProfileDto, MakingChargeConfig } from '@goldsmith/shared';
+import { MAKING_CHARGE_DEFAULTS } from '@goldsmith/shared';
 
 const SHOP_A = '11111111-1111-1111-1111-111111111111';
 const tenantA: Tenant = { id: SHOP_A, slug: 'a', display_name: 'Rajesh Jewellers', status: 'ACTIVE' };
@@ -94,6 +95,129 @@ describe('SettingsRepository', () => {
       const updateCalls = (querySpy.mock.calls as [string][]).filter(([sql]) => typeof sql === 'string' && sql.includes('UPDATE shops'));
       expect(updateCalls).toHaveLength(0);
       expect(result.before.name).toBe(result.after.name);
+    });
+  });
+
+  describe('getMakingCharges', () => {
+    it('returns null when making_charges_json is null', async () => {
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
+              sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
+          return { rows: [{ making_charges_json: null }], rowCount: 1 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const mockPool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const testRepo = new SettingsRepository(mockPool);
+      const result = await tenantContext.runWith(ctxA, () => testRepo.getMakingCharges());
+      expect(result).toBeNull();
+    });
+
+    it('returns parsed array when making_charges_json is populated', async () => {
+      const stored: MakingChargeConfig[] = [
+        { category: 'RINGS', type: 'percent', value: '12.00' },
+      ];
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
+              sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
+          return { rows: [{ making_charges_json: stored }], rowCount: 1 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const mockPool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const testRepo = new SettingsRepository(mockPool);
+      const result = await tenantContext.runWith(ctxA, () => testRepo.getMakingCharges());
+      expect(result).toEqual(stored);
+    });
+
+    it('returns null when shop_settings row does not exist', async () => {
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
+              sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
+          return { rows: [], rowCount: 0 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const mockPool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const testRepo = new SettingsRepository(mockPool);
+      const result = await tenantContext.runWith(ctxA, () => testRepo.getMakingCharges());
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('upsertMakingCharges', () => {
+    it('returns before: null and after: configs for a fresh shop', async () => {
+      const configs: MakingChargeConfig[] = MAKING_CHARGE_DEFAULTS;
+      let callCount = 0;
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
+              sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
+          if (sql.includes('INSERT')) {
+            return { rows: [{ making_charges_json: configs }], rowCount: 1 };
+          }
+          // SELECT before
+          const result = { rows: [{ making_charges_json: null }], rowCount: 1 };
+          callCount++;
+          return result;
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const mockPool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const testRepo = new SettingsRepository(mockPool);
+      const result = await tenantContext.runWith(ctxA, () => testRepo.upsertMakingCharges(configs));
+      expect(result.before).toBeNull();
+      expect(result.after).toEqual(configs);
+    });
+
+    it('returns before: existing array and after: new configs', async () => {
+      const existing: MakingChargeConfig[] = [{ category: 'RINGS', type: 'percent', value: '10.00' }];
+      const updated: MakingChargeConfig[] = [{ category: 'RINGS', type: 'percent', value: '15.00' }];
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
+              sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
+          if (sql.includes('INSERT')) {
+            return { rows: [{ making_charges_json: updated }], rowCount: 1 };
+          }
+          // SELECT before
+          return { rows: [{ making_charges_json: existing }], rowCount: 1 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const mockPool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const testRepo = new SettingsRepository(mockPool);
+      const result = await tenantContext.runWith(ctxA, () => testRepo.upsertMakingCharges(updated));
+      expect(result.before).toEqual(existing);
+      expect(result.after).toEqual(updated);
+    });
+
+    it('stores value as string not number', async () => {
+      const configs: MakingChargeConfig[] = [{ category: 'RINGS', type: 'percent', value: '12.00' }];
+      let capturedParams: unknown[] | undefined;
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string, params?: unknown[]) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
+              sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
+          if (sql.includes('INSERT')) {
+            capturedParams = params;
+            return { rows: [{ making_charges_json: configs }], rowCount: 1 };
+          }
+          // SELECT before
+          return { rows: [{ making_charges_json: null }], rowCount: 1 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const mockPool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const testRepo = new SettingsRepository(mockPool);
+      await tenantContext.runWith(ctxA, () => testRepo.upsertMakingCharges(configs));
+      expect(capturedParams).toBeDefined();
+      const jsonStr = capturedParams![1] as string;
+      const parsed = JSON.parse(jsonStr) as Array<{ value: unknown }>;
+      expect(typeof parsed[0].value).toBe('string');
     });
   });
 });
