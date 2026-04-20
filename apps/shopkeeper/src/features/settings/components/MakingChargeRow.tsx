@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Pressable, TextInput, StyleSheet } from 'react-native';
 import { t } from '@goldsmith/i18n';
 import type { MakingChargeConfig } from '@goldsmith/shared';
@@ -26,7 +26,13 @@ export function MakingChargeRow({ config, onChange }: Props): React.ReactElement
   const labelPercent = t('settings.making_charges.type_percent');
   const labelFixed = t('settings.making_charges.type_fixed');
 
+  // Sync local input when config.value changes from parent (e.g. after API load or save)
+  useEffect(() => {
+    setInputValue(config.value);
+  }, [config.value]);
+
   function handleTypeToggle(newType: MakingChargeConfig['type']): void {
+    setError(validate(inputValue, newType)); // recompute error for new type
     onChange({ ...config, type: newType });
   }
 
