@@ -85,3 +85,92 @@ describe('AuthRepository.listUsers', () => {
     expect((result as { id: string }[])[0]?.id).toBe('u1');
   });
 });
+
+describe('AuthRepository.revokeStaff', () => {
+  it('returns { firebaseUid, role } when target user exists in shop', async () => {
+    // SELECT sequence for revokeStaff (raw pool.connect(), like listUsers):
+    // SET ROLE app_user → SET app.current_shop_id → SELECT → POISON (finally) → RESET ROLE (finally)
+    const mockClient = {
+      query: vi.fn()
+        .mockResolvedValueOnce(undefined)                                           // SET ROLE app_user
+        .mockResolvedValueOnce(undefined)                                           // SET app.current_shop_id
+        .mockResolvedValueOnce({                                                    // SELECT firebase_uid, role
+          rows: [{ firebase_uid: 'fb-uid-1', role: 'shop_staff' }],
+          rowCount: 1,
+        })
+        .mockResolvedValueOnce(undefined)                                           // POISON (finally)
+        .mockResolvedValueOnce(undefined),                                          // RESET ROLE (finally)
+      release: vi.fn(),
+    };
+    const pool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as import('pg').Pool;
+    const repo = new AuthRepository(pool);
+
+    const result = await repo.revokeStaff('shop-1', 'user-1');
+
+    expect(result).toEqual({ firebaseUid: 'fb-uid-1', role: 'shop_staff' });
+  });
+
+  it('returns null when user does not exist or belongs to different shop', async () => {
+    const mockClient = {
+      query: vi.fn()
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined),
+      release: vi.fn(),
+    };
+    const pool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as import('pg').Pool;
+    const repo = new AuthRepository(pool);
+
+    const result = await repo.revokeStaff('shop-1', 'nonexistent-user');
+
+    expect(result).toBeNull();
+  });
+
+  it('returns { firebaseUid: null, role } when firebase_uid is null (never activated)', async () => {
+    const mockClient = {
+      query: vi.fn()
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce({ rows: [{ firebase_uid: null, role: 'shop_staff' }], rowCount: 1 })
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined),
+      release: vi.fn(),
+    };
+    const pool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as import('pg').Pool;
+    const repo = new AuthRepository(pool);
+
+    const result = await repo.revokeStaff('shop-1', 'user-never-activated');
+
+    expect(result).toEqual({ firebaseUid: null, role: 'shop_staff' });
+  });
+});
+
+describe('AuthRepository.markRevoked', () => {
+  it('executes UPDATE with correct params inside transaction', async () => {
+    // withTenantTx sequence: BEGIN → SET LOCAL ROLE app_user → SET LOCAL app.current_shop_id → UPDATE → COMMIT → POISON (finally) → release
+    const mockClient = {
+      query: vi.fn()
+        .mockResolvedValueOnce(undefined)                                           // BEGIN
+        .mockResolvedValueOnce(undefined)                                           // SET LOCAL ROLE app_user
+        .mockResolvedValueOnce(undefined)                                           // SET LOCAL app.current_shop_id
+        .mockResolvedValueOnce({ rowCount: 1 })                                    // UPDATE shop_users
+        .mockResolvedValueOnce(undefined)                                           // COMMIT
+        .mockResolvedValueOnce(undefined),                                          // POISON (finally)
+      release: vi.fn(),
+    };
+    const pool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as import('pg').Pool;
+    const repo = new AuthRepository(pool);
+
+    await tenantContext.runWith(ctx, async () => {
+      await repo.markRevoked('shop-1', 'user-1', 'owner-1');
+    });
+
+    // Find the UPDATE call (4th query, index 3)
+    const updateCall = mockClient.query.mock.calls[3] as [string, string[]];
+    expect(updateCall[0]).toContain('UPDATE shop_users');
+    expect(updateCall[0]).toContain("status = 'REVOKED'");
+    expect(updateCall[1]).toEqual(['owner-1', 'user-1', 'shop-1']);
+  });
+});

@@ -90,6 +90,38 @@ export class AuthRepository {
     });
   }
 
+  async revokeStaff(shopId: string, targetUserId: string): Promise<{ firebaseUid: string | null; role: ShopUserRole } | null> {
+    const c = await this.pool.connect();
+    try {
+      await c.query('SET ROLE app_user');
+      await c.query(`SET app.current_shop_id = '${shopId}'`);
+      const res = await c.query<{ firebase_uid: string | null; role: ShopUserRole }>(
+        `SELECT firebase_uid, role FROM shop_users WHERE id = $1 AND shop_id = $2`,
+        [targetUserId, shopId],
+      );
+      if (res.rows.length === 0) return null;
+      return { firebaseUid: res.rows[0].firebase_uid, role: res.rows[0].role };
+    } finally {
+      await c.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
+      await c.query('RESET ROLE').catch(() => undefined);
+      c.release();
+    }
+  }
+
+  async markRevoked(shopId: string, targetUserId: string, revokedByUserId: string): Promise<void> {
+    await withTenantTx(this.pool, async (tx) => {
+      await tx.query(
+        `UPDATE shop_users
+            SET status = 'REVOKED',
+                revoked_at = NOW(),
+                revoked_by_user_id = $1,
+                updated_at = NOW()
+          WHERE id = $2 AND shop_id = $3`,
+        [revokedByUserId, targetUserId, shopId],
+      );
+    });
+  }
+
   async listUsers(shopId: string): Promise<Array<{
     id: string; displayName: string; role: string; status: string;
     phone: string; invitedAt: string | null; activatedAt: string | null;
