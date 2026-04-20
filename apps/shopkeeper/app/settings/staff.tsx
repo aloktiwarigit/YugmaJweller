@@ -209,7 +209,7 @@ export default function StaffScreen(): React.ReactElement {
       await api.delete(`/auth/staff/${target.id}`);
       setSuccessMsg('हटा दिया गया');
       setTimeout(() => setSuccessMsg(null), 3000);
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
     } catch (err) {
       // Revert optimistic remove
       setStaff((prev) => [target, ...prev]);

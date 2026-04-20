@@ -116,7 +116,7 @@ export class AuthRepository {
                 revoked_at = NOW(),
                 revoked_by_user_id = $1,
                 updated_at = NOW()
-          WHERE id = $2 AND shop_id = $3`,
+          WHERE id = $2 AND shop_id = $3 AND status != 'REVOKED'`,
         [revokedByUserId, targetUserId, shopId],
       );
     });
