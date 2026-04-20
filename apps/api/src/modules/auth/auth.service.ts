@@ -86,17 +86,25 @@ export class AuthService {
     //    a Firebase quota/network failure doesn't leave a stale rate-limit row.
     await this.rateLimit.recordSuccess(args.phoneE164);
 
-    // 6. Set Firebase custom claims so subsequent ID tokens carry shop_id + role + user_id (DB UUID)
+    // 6. Re-check status immediately before writing claims — closes the race where a concurrent
+    //    revokeStaff() clears claims between our lookupByPhone and here. If the user was revoked
+    //    after our initial read, we must not restore stale shop_id/role claims.
+    const statusCheck = await this.repo.getStatusById(row.shopId, row.userId);
+    if (!statusCheck || statusCheck === 'REVOKED') {
+      throw new ForbiddenException({ code: 'auth.rejected' });
+    }
+
+    // 7. Set Firebase custom claims so subsequent ID tokens carry shop_id + role + user_id (DB UUID)
     await this.firebase.admin().auth().setCustomUserClaims(args.uid, {
       shop_id: row.shopId,
       role: row.role,
       user_id: row.userId,  // DB UUID — enables TenantInterceptor to propagate userId without extra query
     });
 
-    // 7. Audit verify-success
+    // 8. Audit verify-success
     await this.auditVerifySuccess({ tenant, userId: row.userId, role: row.role, ip: args.ip, userAgent: args.userAgent, requestId: args.requestId });
 
-    // 8. Load display_name under tenant ctx
+    // 9. Load display_name under tenant ctx
     const user = await this.loadUserDisplayName({ tenant, userId: row.userId, role: row.role });
 
     return {
