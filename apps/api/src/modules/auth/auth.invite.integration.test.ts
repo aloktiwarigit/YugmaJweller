@@ -7,7 +7,7 @@
  *  3. Tenant isolation for insertInvited: verifies SET LOCAL uses caller's shop_id
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { Pool, PoolClient } from 'pg';
 import {
   tenantContext,
@@ -66,7 +66,7 @@ describe('invite → session → ACTIVE flow', () => {
   };
 
   // Fully mocked repo so we can spy on linkFirebaseUid
-  function makeRepo() {
+  function makeRepo(): AuthRepository {
     return {
       findByPhoneInShop: vi.fn().mockResolvedValue(null),
       insertInvited: vi.fn().mockResolvedValue({
@@ -89,7 +89,7 @@ describe('invite → session → ACTIVE flow', () => {
   }
 
   // Firebase mock — setCustomUserClaims is a no-op
-  function makeFirebase() {
+  function makeFirebase(): FirebaseAdminProvider {
     const setCustomUserClaims = vi.fn().mockResolvedValue(undefined);
     return {
       admin: () => ({ auth: () => ({ setCustomUserClaims }) }),
@@ -97,7 +97,7 @@ describe('invite → session → ACTIVE flow', () => {
   }
 
   // Rate-limit mock — always ok
-  function makeRateLimit() {
+  function makeRateLimit(): AuthRateLimitService {
     return {
       check: vi.fn().mockResolvedValue({ ok: true }),
       recordSuccess: vi.fn().mockResolvedValue(undefined),

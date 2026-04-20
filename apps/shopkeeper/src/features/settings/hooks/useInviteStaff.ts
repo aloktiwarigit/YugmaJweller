@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 import { api } from '../../../api/client';
 import type { StaffMember } from './useStaffList';
 
@@ -12,7 +12,7 @@ async function postInviteStaff(payload: InviteStaffPayload): Promise<StaffMember
   return res.data;
 }
 
-export function useInviteStaff() {
+export function useInviteStaff(): UseMutationResult<StaffMember, Error, InviteStaffPayload> {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: postInviteStaff,

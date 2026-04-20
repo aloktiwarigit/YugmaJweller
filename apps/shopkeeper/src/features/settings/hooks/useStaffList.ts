@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { api } from '../../../api/client';
 
 export interface StaffMember {
@@ -15,7 +15,7 @@ async function fetchStaffList(): Promise<StaffMember[]> {
   return res.data;
 }
 
-export function useStaffList() {
+export function useStaffList(): UseQueryResult<StaffMember[]> {
   return useQuery({
     queryKey: ['staff'],
     queryFn: fetchStaffList,

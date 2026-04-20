@@ -4,7 +4,7 @@ import { AuthService } from './auth.service';
 import { AuthRepository } from './auth.repository';
 import { AuthRateLimitService } from './auth-rate-limit.service';
 import { FirebaseAdminProvider } from './firebase-admin.provider';
-import { StubSmsAdapter, type ISmsAdapter } from './adapters/sms.adapter';
+import type { ISmsAdapter } from './adapters/sms.adapter';
 import { tenantContext, type Tenant, type AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import type { Pool, PoolClient } from 'pg';
 
@@ -25,7 +25,7 @@ function makeSvc(overrides: {
   findByPhoneInShop?: ReturnType<typeof vi.fn>;
   insertInvited?: ReturnType<typeof vi.fn>;
   listStaff?: ReturnType<typeof vi.fn>;
-} = {}) {
+} = {}): { svc: AuthService; repo: AuthRepository; sms: ISmsAdapter; pool: Pool; auditClient: PoolClient } {
   const insertedRow = {
     id: 'invited-uuid', phone: '+919876543210', role: 'shop_staff',
     status: 'INVITED', invited_at: new Date(),
