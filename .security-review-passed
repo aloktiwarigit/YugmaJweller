@@ -1,1 +1,1 @@
-Security review passed 2026-04-20T18:47:54Z. No findings >= 8/10 confidence after filtering. Story 1.4 — no phone PII in audit, no privilege escalation, RLS/tenant isolation intact.
+story-1.5 security review passed 2026-04-20T21:47:53Z
