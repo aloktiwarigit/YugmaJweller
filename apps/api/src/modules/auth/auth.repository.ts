@@ -55,6 +55,7 @@ export class AuthRepository {
                   updated_at   = now()
             WHERE id = $2
               AND shop_id = $3
+              AND status != 'REVOKED'
               AND (firebase_uid IS NULL OR firebase_uid = $1)
             RETURNING firebase_uid`,
           [args.firebaseUid, args.userId, args.shopId],

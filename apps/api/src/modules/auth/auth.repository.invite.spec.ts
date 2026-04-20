@@ -147,6 +147,36 @@ describe('AuthRepository.revokeStaff', () => {
   });
 });
 
+describe('AuthRepository.linkFirebaseUid', () => {
+  it('returns { linked: false } when row is already REVOKED', async () => {
+    // withTenantTx: BEGIN → SET LOCAL ROLE → SET LOCAL shop_id → UPDATE (0 rows) → COMMIT → POISON
+    const mockClient = {
+      query: vi.fn()
+        .mockResolvedValueOnce(undefined)          // BEGIN
+        .mockResolvedValueOnce(undefined)          // SET LOCAL ROLE app_user
+        .mockResolvedValueOnce(undefined)          // SET LOCAL app.current_shop_id
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })  // UPDATE — status='REVOKED' guard blocks
+        .mockResolvedValueOnce(undefined)          // COMMIT
+        .mockResolvedValueOnce(undefined),         // POISON (finally)
+      release: vi.fn(),
+    };
+    const pool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as import('pg').Pool;
+    const repo = new AuthRepository(pool);
+
+    let result: { linked: boolean } | undefined;
+    await tenantContext.runWith(ctx, async () => {
+      result = await repo.linkFirebaseUid({
+        shopId: 'shop-1', userId: 'user-revoked', firebaseUid: 'fb-uid-new', tenant: fakeTenant,
+      });
+    });
+
+    expect(result?.linked).toBe(false);
+    // Verify the UPDATE SQL guards against REVOKED status
+    const updateCall = mockClient.query.mock.calls[3] as [string, string[]];
+    expect(updateCall[0]).toContain("status != 'REVOKED'");
+  });
+});
+
 describe('AuthRepository.markRevoked', () => {
   it('executes UPDATE with correct params inside transaction', async () => {
     // withTenantTx sequence: BEGIN → SET LOCAL ROLE app_user → SET LOCAL app.current_shop_id → UPDATE → COMMIT → POISON (finally) → release
