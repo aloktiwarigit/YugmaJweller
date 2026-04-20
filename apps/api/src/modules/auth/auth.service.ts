@@ -152,6 +152,17 @@ export class AuthService {
 
     await this.repo.markRevoked(shopId, targetUserId, callerUserId);
 
+    // Post-revoke re-check: a concurrent /auth/session for an INVITED user (firebaseUid was null
+    // above) can call linkFirebaseUid between our initial SELECT and the UPDATE above. The
+    // status != 'REVOKED' guard on linkFirebaseUid closes the window going forward, but any UID
+    // linked just before our UPDATE would be missed by the pre-revoke snapshot. Re-reading after
+    // markRevoked (when status is definitively REVOKED) catches this race.
+    const latestUid = await this.repo.getFirebaseUid(shopId, targetUserId);
+    if (latestUid && latestUid !== row.firebaseUid) {
+      await this.firebase.admin().auth().revokeRefreshTokens(latestUid);
+      await this.firebase.admin().auth().updateUser(latestUid, { disabled: true });
+    }
+
     const tenant = await this.loadTenantById(shopId);
     const ctx: AuthenticatedTenantContext = {
       shopId, tenant,

@@ -109,6 +109,23 @@ export class AuthRepository {
     }
   }
 
+  async getFirebaseUid(shopId: string, userId: string): Promise<string | null> {
+    const c = await this.pool.connect();
+    try {
+      await c.query('SET ROLE app_user');
+      await c.query(`SET app.current_shop_id = '${shopId}'`);
+      const res = await c.query<{ firebase_uid: string | null }>(
+        `SELECT firebase_uid FROM shop_users WHERE id = $1 AND shop_id = $2`,
+        [userId, shopId],
+      );
+      return res.rows.length > 0 ? (res.rows[0].firebase_uid ?? null) : null;
+    } finally {
+      await c.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
+      await c.query('RESET ROLE').catch(() => undefined);
+      c.release();
+    }
+  }
+
   async markRevoked(shopId: string, targetUserId: string, revokedByUserId: string): Promise<void> {
     await withTenantTx(this.pool, async (tx) => {
       await tx.query(

@@ -233,10 +233,12 @@ function makeRevokePoolMock() {
 
 function makeRevokeService(opts: {
   targetRow: { firebaseUid: string | null; role: ShopUserRole; status?: string } | null;
+  getFirebaseUidResult?: string | null;
 }) {
   const authRepo = {
     revokeStaff: vi.fn().mockResolvedValue(opts.targetRow),
     markRevoked: vi.fn().mockResolvedValue(undefined),
+    getFirebaseUid: vi.fn().mockResolvedValue(opts.getFirebaseUidResult ?? null),
   };
 
   const mockFirebaseAuth = {
@@ -326,5 +328,21 @@ describe('AuthService.revokeStaff()', () => {
     expect(metadata).toEqual({ before: { status: 'INVITED' }, after: { status: 'REVOKED' } });
     expect(metadata).not.toHaveProperty('phone');
     expect(metadata).not.toHaveProperty('firebaseUid');
+  });
+
+  it('revokes a UID linked concurrently between revokeStaff() read and markRevoked()', async () => {
+    // Simulates the race: initial read returns firebaseUid=null (INVITED user),
+    // but a concurrent /session links a UID just before markRevoked commits.
+    // Post-revoke getFirebaseUid() returns the newly linked UID — service must revoke it.
+    const RACE_UID = 'firebase-uid-race-linked';
+    const { svc, mockFirebaseAuth } = makeRevokeService({
+      targetRow: { firebaseUid: null, role: 'shop_staff', status: 'INVITED' },
+      getFirebaseUidResult: RACE_UID,
+    });
+
+    await svc.revokeStaff(SHOP_ID, TARGET_ID, CALLER_ID);
+
+    expect(mockFirebaseAuth.revokeRefreshTokens).toHaveBeenCalledWith(RACE_UID);
+    expect(mockFirebaseAuth.updateUser).toHaveBeenCalledWith(RACE_UID, { disabled: true });
   });
 });
