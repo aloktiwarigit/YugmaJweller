@@ -1,1 +1,1 @@
-Codex review passed 2026-04-20T18:47:54Z. 1 P1 + 4 P2 issues identified and fixed: RolesGuard ordering, GUC before RLS queries in listUsers+getPermissions, staff.tsx API contract (list parsing + permissions GET/PUT shape).
+story-1.5 codex review passed 2026-04-20T23:01:52Z
