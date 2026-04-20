@@ -1,11 +1,13 @@
-import { ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { auditLog, platformAuditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext, type Tenant, type AuthenticatedTenantContext, type ShopUserRole } from '@goldsmith/tenant-context';
 import { withTenantTx } from '@goldsmith/db';
 import { FirebaseAdminProvider } from './firebase-admin.provider';
 import { AuthRepository } from './auth.repository';
+import type { InvitedRow, StaffListRow } from './auth.repository';
 import { AuthRateLimitService } from './auth-rate-limit.service';
+import { SMS_ADAPTER, type ISmsAdapter } from './adapters/sms.adapter';
 
 export interface SessionResult {
   user: { id: string; display_name: string; role: ShopUserRole };
@@ -20,6 +22,7 @@ export class AuthService {
     @Inject(FirebaseAdminProvider) private readonly firebase: FirebaseAdminProvider,
     @Inject(AuthRepository) private readonly repo: AuthRepository,
     @Inject(AuthRateLimitService) private readonly rateLimit: AuthRateLimitService,
+    @Inject(SMS_ADAPTER) private readonly sms: ISmsAdapter,
   ) {}
 
   async session(args: { uid: string; phoneE164: string; ip?: string; userAgent?: string; requestId?: string }): Promise<SessionResult> {
@@ -101,6 +104,45 @@ export class AuthService {
       tenant: { id: tenant.id, slug: tenant.slug, display_name: tenant.display_name, config: (tenant.config ?? {}) as Record<string, unknown> },
       requires_token_refresh: true,
     };
+  }
+
+  private static readonly INDIA_MOBILE_RE = /^\+91[6-9]\d{9}$/;
+
+  async invite(args: { phone: string; role: 'shop_manager' | 'shop_staff' }): Promise<InvitedRow> {
+    const ctx = tenantContext.current();
+    if (!ctx?.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+
+    if (!AuthService.INDIA_MOBILE_RE.test(args.phone)) {
+      throw new BadRequestException({ code: 'auth.invalid_phone' });
+    }
+
+    const existing = await this.repo.findByPhoneInShop(args.phone);
+    if (existing && (existing.status === 'INVITED' || existing.status === 'ACTIVE')) {
+      throw new ConflictException({ code: 'auth.staff_already_exists' });
+    }
+
+    const row = await this.repo.insertInvited({
+      phone: args.phone,
+      role: args.role,
+      invitedByUserId: ctx.userId,
+    });
+
+    await this.sms.send(args.phone, `आपको ${ctx.tenant.display_name} में staff के रूप में आमंत्रित किया गया है।`);
+
+    await auditLog(this.pool, {
+      action: AuditAction.STAFF_INVITED,
+      subjectType: 'shop_user',
+      subjectId: row.id,
+      actorUserId: ctx.userId,
+      before: null,
+      after: { phone: args.phone, role: args.role, status: 'INVITED' },
+    });
+
+    return row;
+  }
+
+  async listStaff(): Promise<StaffListRow[]> {
+    return this.repo.listStaff();
   }
 
   private async loadTenantById(id: string): Promise<Tenant> {
