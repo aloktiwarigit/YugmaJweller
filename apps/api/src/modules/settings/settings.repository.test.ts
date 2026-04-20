@@ -151,7 +151,6 @@ describe('SettingsRepository', () => {
   describe('upsertMakingCharges', () => {
     it('returns before: null and after: configs for a fresh shop', async () => {
       const configs: MakingChargeConfig[] = MAKING_CHARGE_DEFAULTS;
-      let callCount = 0;
       const mockClient = {
         query: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
@@ -159,10 +158,7 @@ describe('SettingsRepository', () => {
           if (sql.includes('INSERT')) {
             return { rows: [{ making_charges_json: configs }], rowCount: 1 };
           }
-          // SELECT before
-          const result = { rows: [{ making_charges_json: null }], rowCount: 1 };
-          callCount++;
-          return result;
+          return { rows: [{ making_charges_json: null }], rowCount: 1 };
         }),
         release: vi.fn(),
       } as unknown as PoolClient;

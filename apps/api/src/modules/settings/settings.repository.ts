@@ -76,7 +76,7 @@ export class SettingsRepository {
         [shopId],
       );
       if (r.rows.length === 0) return null;
-      return r.rows[0].making_charges_json;
+      return r.rows[0].making_charges_json ?? null;
     });
   }
 
