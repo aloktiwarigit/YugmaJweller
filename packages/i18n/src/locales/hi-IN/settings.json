@@ -40,6 +40,34 @@
       "closed_label": "बंद"
     }
   },
+  "making_charges": {
+    "title": "बनाई का खर्च",
+    "type_percent": "प्रतिशत",
+    "type_fixed": "₹/ग्राम",
+    "save_success": "बदलाव सहेज लिया ✓",
+    "errors": {
+      "VALUE_POSITIVE_REQUIRED": "बनाई का खर्च 0 से ज़्यादा होना चाहिए",
+      "PERCENT_MAX_100": "प्रतिशत 100 से ज़्यादा नहीं हो सकता"
+    },
+    "categories": {
+      "RINGS": "अंगूठी",
+      "CHAINS": "चेन",
+      "BANGLES": "चूड़ी",
+      "BRIDAL": "दुल्हन",
+      "SILVER": "चाँदी",
+      "WHOLESALE": "थोक"
+    }
+  },
+  "wastage": {
+    "title": "घटत का प्रतिशत",
+    "save_success": "बदलाव सहेज लिया ✓",
+    "error_load": "डेटा लोड नहीं हो सका — फिर से कोशिश करें",
+    "errors": {
+      "VALUE_POSITIVE_REQUIRED": "घटत 0 से ज़्यादा होनी चाहिए",
+      "VALUE_FORMAT_INVALID": "कृपया सही संख्या डालें",
+      "wastage_high": "घटत 30% से ज़्यादा नहीं होनी चाहिए — कृपया सही मात्रा डालें"
+    }
+  },
   "loyalty": {
     "title": "लॉयल्टी प्रोग्राम",
     "tiers_section": "टियर",

@@ -13,6 +13,29 @@ export type {
   ShopProfileRow,
 } from './schemas/shop-profile.schema';
 export {
+  ProductCategory,
+  MakingChargeConfigSchema,
+  MakingChargesArraySchema,
+  PatchMakingChargesSchema,
+  MAKING_CHARGE_DEFAULTS,
+} from './schemas/making-charges.schema';
+export type {
+  MakingChargeConfig,
+  PatchMakingChargesDto,
+} from './schemas/making-charges.schema';
+
+export {
+  WastageConfigSchema,
+  PatchWastageSchema,
+  WastageArraySchema,
+  WASTAGE_DEFAULTS,
+} from './schemas/wastage.schema';
+export type {
+  WastageConfig,
+  PatchWastageDto,
+} from './schemas/wastage.schema';
+
+export {
   PERMISSION_KEYS,
   InviteStaffSchema,
   UpdatePermissionSchema,

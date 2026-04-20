@@ -35,6 +35,12 @@ export default defineConfig({
       'expo-router': fileURLToPath(
         new URL('./test/expo-router.mock.ts', import.meta.url),
       ),
+      '@goldsmith/shared': fileURLToPath(
+        new URL('../../packages/shared/src/index.ts', import.meta.url),
+      ),
+      '@goldsmith/i18n': fileURLToPath(
+        new URL('../../packages/i18n/src/index.ts', import.meta.url),
+      ),
     },
   },
 });

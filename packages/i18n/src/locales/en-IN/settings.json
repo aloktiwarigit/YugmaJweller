@@ -40,6 +40,34 @@
       "closed_label": "Closed"
     }
   },
+  "making_charges": {
+    "title": "Making Charges",
+    "type_percent": "Percent",
+    "type_fixed": "₹/gram",
+    "save_success": "Changes saved ✓",
+    "errors": {
+      "VALUE_POSITIVE_REQUIRED": "Making charge must be greater than 0",
+      "PERCENT_MAX_100": "Percent cannot exceed 100"
+    },
+    "categories": {
+      "RINGS": "Rings",
+      "CHAINS": "Chains",
+      "BANGLES": "Bangles",
+      "BRIDAL": "Bridal",
+      "SILVER": "Silver",
+      "WHOLESALE": "Wholesale"
+    }
+  },
+  "wastage": {
+    "title": "Wastage Percentages",
+    "save_success": "Changes saved ✓",
+    "error_load": "Could not load data — please retry",
+    "errors": {
+      "VALUE_POSITIVE_REQUIRED": "Wastage must be greater than 0",
+      "VALUE_FORMAT_INVALID": "Please enter a valid number",
+      "wastage_high": "Wastage cannot exceed 30% — please enter a correct amount"
+    }
+  },
   "loyalty": {
     "title": "Loyalty Programme",
     "tiers_section": "Tiers",

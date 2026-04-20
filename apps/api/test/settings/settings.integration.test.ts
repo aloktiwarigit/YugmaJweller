@@ -18,7 +18,7 @@ import { SettingsRepository } from '../../src/modules/settings/settings.reposito
 import { SettingsService } from '../../src/modules/settings/settings.service';
 import { SettingsCache } from '@goldsmith/tenant-config';
 import { DrizzleTenantLookup } from '../../src/drizzle-tenant-lookup';
-import { LOYALTY_DEFAULTS } from '@goldsmith/shared';
+import { LOYALTY_DEFAULTS, MAKING_CHARGE_DEFAULTS, WASTAGE_DEFAULTS } from '@goldsmith/shared';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -33,12 +33,18 @@ const tenant: Tenant = {
 
 // Cache that always misses — forces DB reads so we can verify persistence.
 const mockCache = {
-  getProfile:        async () => null,
-  setProfile:        async () => undefined,
-  invalidate:        async () => undefined,
-  getLoyalty:        async () => null,
-  setLoyalty:        async () => undefined,
-  invalidateLoyalty: async () => undefined,
+  getProfile:             async () => null,
+  setProfile:             async () => undefined,
+  invalidate:             async () => undefined,
+  getMakingCharges:       async () => null,
+  setMakingCharges:       async () => undefined,
+  invalidateMakingCharges: async () => undefined,
+  getWastage:             async () => null,
+  setWastage:             async () => undefined,
+  invalidateWastage:      async () => undefined,
+  getLoyalty:             async () => null,
+  setLoyalty:             async () => undefined,
+  invalidateLoyalty:      async () => undefined,
 } as unknown as SettingsCache;
 
 // ─── Test harness ─────────────────────────────────────────────────────────────
@@ -273,5 +279,97 @@ describe('SettingsRepository + SettingsService integration', () => {
         expect(result.error).toBe('TIER_ORDER_INVALID');
       }
     });
+  });
+});
+
+describe('getMakingCharges / updateMakingCharges integration', () => {
+  it('getMakingCharges returns MAKING_CHARGE_DEFAULTS for a fresh shop (null JSONB)', async () => {
+    const configs = await tenantContext.runWith(makeCtx(), () =>
+      svc.getMakingCharges(),
+    );
+    expect(configs).toEqual(MAKING_CHARGE_DEFAULTS);
+    expect(configs[0].category).toBe('RINGS');
+  });
+
+  it('PATCH → DB → GET round-trip: "10.00" in → "10.00" out (precision preserved as string)', async () => {
+    await tenantContext.runWith(makeCtx(), () =>
+      svc.updateMakingCharges([{ category: 'BRIDAL', type: 'percent', value: '10.00' }]),
+    );
+
+    // Verify the DB column directly (bypasses cache which always misses).
+    const r = await pool.query<{ making_charges_json: unknown }>(
+      'SELECT making_charges_json FROM shop_settings WHERE shop_id = $1',
+      [SHOP_A],
+    );
+    const stored = r.rows[0].making_charges_json as Array<{ category: string; value: unknown }>;
+    const bridal = stored.find((c) => c.category === 'BRIDAL');
+    expect(bridal?.value).toBe('10.00');
+    expect(typeof bridal?.value).toBe('string'); // ADR-0003: not a number
+  });
+
+  it('GET after PATCH returns the persisted merged values', async () => {
+    const configs = await tenantContext.runWith(makeCtx(), () =>
+      svc.getMakingCharges(),
+    );
+    const bridal = configs.find((c) => c.category === 'BRIDAL');
+    expect(bridal?.value).toBe('10.00');
+    // RINGS should retain its default
+    const rings = configs.find((c) => c.category === 'RINGS');
+    expect(rings?.value).toBe('12.00');
+  });
+});
+
+describe('getWastage / updateWastage integration', () => {
+  it('getWastage returns WASTAGE_DEFAULTS for a fresh shop (null JSONB)', async () => {
+    const configs = await tenantContext.runWith(makeCtx(), () =>
+      svc.getWastage(),
+    );
+    expect(configs).toEqual(WASTAGE_DEFAULTS);
+    expect(configs[0].category).toBe('RINGS');
+  });
+
+  it('PATCH → DB → GET round-trip: "2.50" in → "2.50" out (string not float)', async () => {
+    await tenantContext.runWith(makeCtx(), () =>
+      svc.updateWastage({ category: 'BRIDAL', percent: '2.50' }),
+    );
+
+    const r = await pool.query<{ wastage_json: unknown }>(
+      'SELECT wastage_json FROM shop_settings WHERE shop_id = $1',
+      [SHOP_A],
+    );
+    const stored = r.rows[0].wastage_json as Record<string, unknown>;
+    expect(stored['BRIDAL']).toBe('2.50');
+    expect(typeof stored['BRIDAL']).toBe('string');
+  });
+
+  it('GET after PATCH returns persisted merged values; other categories keep defaults', async () => {
+    const configs = await tenantContext.runWith(makeCtx(), () =>
+      svc.getWastage(),
+    );
+    const bridal = configs.find((c) => c.category === 'BRIDAL');
+    expect(bridal?.percent).toBe('2.50');
+    const rings = configs.find((c) => c.category === 'RINGS');
+    expect(rings?.percent).toBe('2.00');
+  });
+
+  it('PATCH with percent > 30 throws UnprocessableEntityException', async () => {
+    const { UnprocessableEntityException } = await import('@nestjs/common');
+    await expect(
+      tenantContext.runWith(makeCtx(), () =>
+        svc.updateWastage({ category: 'RINGS', percent: '50' }),
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('DECIMAL precision preserved: "1.50" stored as "1.50" not 1.5', async () => {
+    await tenantContext.runWith(makeCtx(), () =>
+      svc.updateWastage({ category: 'CHAINS', percent: '1.50' }),
+    );
+    const r = await pool.query<{ wastage_json: unknown }>(
+      'SELECT wastage_json FROM shop_settings WHERE shop_id = $1',
+      [SHOP_A],
+    );
+    const stored = r.rows[0].wastage_json as Record<string, unknown>;
+    expect(stored['CHAINS']).toBe('1.50');
   });
 });
