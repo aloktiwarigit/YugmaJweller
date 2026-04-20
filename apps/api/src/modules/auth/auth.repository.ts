@@ -96,7 +96,7 @@ export class AuthRepository {
       await c.query('SET ROLE app_user');
       await c.query(`SET app.current_shop_id = '${shopId}'`);
       const res = await c.query<{ firebase_uid: string | null; role: ShopUserRole }>(
-        `SELECT firebase_uid, role FROM shop_users WHERE id = $1 AND shop_id = $2`,
+        `SELECT firebase_uid, role FROM shop_users WHERE id = $1 AND shop_id = $2 AND status != 'REVOKED'`,
         [targetUserId, shopId],
       );
       if (res.rows.length === 0) return null;

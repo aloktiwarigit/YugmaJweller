@@ -142,13 +142,15 @@ export class AuthService {
     if (targetUserId === callerUserId) throw new BadRequestException({ code: 'auth.self_revoke' });
     if (row.role === 'shop_admin') throw new ForbiddenException({ code: 'auth.cannot_revoke_admin' });
 
-    await this.repo.markRevoked(shopId, targetUserId, callerUserId);
-
     if (row.firebaseUid !== null) {
       await this.firebase.admin().auth().revokeRefreshTokens(row.firebaseUid);
       // Disable the Firebase account so a new OTP cannot produce a fresh token with stale claims.
+      // Firebase calls precede markRevoked so that a Firebase failure leaves DB state intact
+      // (retry-safe), rather than leaving the DB marked REVOKED with live Firebase credentials.
       await this.firebase.admin().auth().updateUser(row.firebaseUid, { disabled: true });
     }
+
+    await this.repo.markRevoked(shopId, targetUserId, callerUserId);
 
     const tenant = await this.loadTenantById(shopId);
     const ctx: AuthenticatedTenantContext = {
