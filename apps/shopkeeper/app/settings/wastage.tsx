@@ -22,14 +22,14 @@ export default function WastageScreen(): React.ReactElement {
   const { data, isLoading, error } = useQuery<WastageResponse>({
     queryKey: ['wastage'],
     queryFn: async () => {
-      const response = await api.get('settings/wastage');
+      const response = await api.get('/api/v1/settings/wastage');
       return response.data;
     },
   });
 
   const mutation = useMutation({
     mutationFn: async ({ category, percent }: { category: string; percent: string }) => {
-      const response = await api.patch('settings/wastage', { category, percent });
+      const response = await api.patch('/api/v1/settings/wastage', { category, percent });
       return response.data;
     },
   });
