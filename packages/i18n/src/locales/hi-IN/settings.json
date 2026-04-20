@@ -1,4 +1,11 @@
 {
+  "title": "सेटिंग्स",
+  "shop_profile": "शॉप प्रोफाइल",
+  "staff": "स्टाफ प्रबंधन",
+  "making_charges": "मेकिंग चार्जेस",
+  "permissions": "अनुमतियाँ",
+  "billing": "बिलिंग",
+  "reports": "रिपोर्ट्स",
   "profile": {
     "title": "दुकान की प्रोफ़ाइल",
     "fields": {

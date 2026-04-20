@@ -1,145 +1,501 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
-  Modal,
   ActivityIndicator,
   StyleSheet,
-  SafeAreaView,
+  Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { colors, spacing } from '@goldsmith/ui-tokens';
-import { t } from '@goldsmith/i18n';
+import { colors, spacing, typography } from '@goldsmith/ui-tokens';
+import { Toast } from '@goldsmith/ui-mobile';
+import { StaffInviteForm } from '../../src/components/StaffInviteForm';
+import { PermissionsMatrix } from '../../src/components/PermissionsMatrix';
+import { api } from '../../src/api/client';
 import { useAuthStore } from '../../src/stores/authStore';
-import { useStaffList } from '../../src/features/settings/hooks/useStaffList';
-import type { StaffMember } from '../../src/features/settings/hooks/useStaffList';
-import StaffInviteForm from '../../src/features/settings/components/StaffInviteForm';
+import type { AxiosError } from 'axios';
 
-export default function StaffScreen(): React.ReactElement {
-  const router = useRouter();
-  const role = useAuthStore((s) => s.user?.role);
-  const [sheetOpen, setSheetOpen] = useState(false);
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
-  useEffect(() => {
-    if (role !== undefined && role !== 'shop_admin') {
-      router.replace('/');
-    }
-  }, [role, router]);
+interface StaffUser {
+  id: string;
+  displayName: string;
+  phone: string;
+  role: 'shop_admin' | 'shop_manager' | 'shop_staff';
+  status: 'ACTIVE' | 'INVITED' | 'SUSPENDED' | 'REVOKED';
+  invitedAt: string | null;
+  activatedAt: string | null;
+}
 
-  const { data: staff, isLoading } = useStaffList();
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
-  const renderItem = ({ item }: { item: StaffMember }): React.ReactElement => (
-    <View style={styles.row}>
-      <View style={styles.rowLeft}>
-        <Text style={styles.phone}>{item.phone}</Text>
-        {item.invited_at !== null && (
-          <Text style={styles.invitedAt}>
-            {t('auth.staff.invited_at', { date: new Date(item.invited_at).toLocaleDateString('hi-IN') })}
-          </Text>
-        )}
-      </View>
-      <View style={styles.rowRight}>
-        <View style={[styles.chip, styles.roleChip]}>
-          <Text style={styles.chipText}>
-            {item.role === 'shop_manager' ? t('auth.staff.role_manager') : t('auth.staff.role_staff')}
-          </Text>
-        </View>
-        <View style={[styles.chip, item.status === 'ACTIVE' ? styles.activeChip : styles.invitedChip]}>
-          <Text style={styles.chipText}>
-            {item.status === 'ACTIVE' ? t('auth.staff.status_active') : t('auth.staff.status_invited')}
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
+const ROLE_HINDI: Record<string, string> = {
+  shop_admin: 'एडमिन',
+  shop_manager: 'मैनेजर',
+  shop_staff: 'स्टाफ',
+};
 
+type TabId = 'list' | 'invite';
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function RoleBadge({ role }: { role: string }): React.ReactElement {
+  const label = ROLE_HINDI[role] ?? role;
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>{t('auth.staff.screen_title')}</Text>
-      </View>
-
-      {/* List */}
-      {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
-      ) : staff && staff.length > 0 ? (
-        <FlatList
-          data={staff}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: 96 }}
-        />
-      ) : (
-        <View style={styles.centered}>
-          <Text style={styles.emptyText}>{t('auth.staff.empty')}</Text>
-        </View>
-      )}
-
-      {/* FAB */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setSheetOpen(true)}
-        accessibilityRole="button"
-        accessibilityLabel={t('auth.staff.invite_cta')}
-      >
-        <Text style={styles.fabText}>＋ {t('auth.staff.invite_cta')}</Text>
-      </TouchableOpacity>
-
-      {/* Bottom sheet modal */}
-      <Modal
-        visible={sheetOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSheetOpen(false)}
-      >
-        <TouchableOpacity
-          style={styles.backdrop}
-          onPress={() => setSheetOpen(false)}
-          activeOpacity={1}
-        />
-        <View style={styles.sheet}>
-          <StaffInviteForm onSuccess={() => setSheetOpen(false)} />
-        </View>
-      </Modal>
-    </SafeAreaView>
+    <View style={styles.roleBadge}>
+      <Text style={styles.roleBadgeText}>{label}</Text>
+    </View>
   );
 }
 
+function StatusBadge({ status }: { status: StaffUser['status'] }): React.ReactElement {
+  const isActive = status === 'ACTIVE';
+  return (
+    <View style={[styles.statusBadge, isActive ? styles.statusBadgeActive : styles.statusBadgeInvited]}>
+      <Text style={[styles.statusBadgeText, isActive ? styles.statusTextActive : styles.statusTextInvited]}>
+        {isActive ? 'सक्रिय' : 'आमंत्रित'}
+      </Text>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
+
+export default function StaffScreen(): React.ReactElement {
+  const user = useAuthStore((s) => s.user);
+  const shopId = user?.shopId ?? '';
+  const isAdmin = user?.role === 'shop_admin';
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<TabId>('list');
+
+  // Staff list state
+  const [staff, setStaff] = useState<StaffUser[]>([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
+
+  // Invite mutation state
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Permissions state (admin-only)
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+  const [permsLoading, setPermsLoading] = useState(false);
+
+  // ---------------------------------------------------------------------------
+  // Fetch staff list
+  // ---------------------------------------------------------------------------
+
+  const fetchStaff = useCallback(async (): Promise<void> => {
+    setListLoading(true);
+    setListError(null);
+    try {
+      const res = await api.get<StaffUser[]>('/auth/users');
+      setStaff(res.data ?? []);
+    } catch {
+      setListError('स्टाफ लोड नहीं हो सका। दोबारा कोशिश करें।');
+    } finally {
+      setListLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchStaff();
+  }, [fetchStaff]);
+
+  // ---------------------------------------------------------------------------
+  // Fetch permissions (admin only)
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    setPermsLoading(true);
+    api
+      .get<Record<string, boolean>>('/auth/roles/shop_manager/permissions')
+      .then((res) => {
+        setPermissions(res.data ?? {});
+      })
+      .catch(() => {
+        // non-blocking — permissions section stays empty
+      })
+      .finally(() => {
+        setPermsLoading(false);
+      });
+  }, [isAdmin]);
+
+  // ---------------------------------------------------------------------------
+  // Invite handler
+  // ---------------------------------------------------------------------------
+
+  const handleInvite = async (data: {
+    phone: string;
+    role: 'shop_staff' | 'shop_manager';
+    display_name: string;
+  }): Promise<void> => {
+    setInviteLoading(true);
+    setInviteError(null);
+    try {
+      await api.post('/auth/invite', { ...data, shop_id: shopId });
+      setSuccessMsg('आमंत्रण भेज दिया गया');
+      setTimeout(() => setSuccessMsg(null), 3000);
+      // Invalidate staff list
+      void fetchStaff();
+      // Switch back to list tab
+      setActiveTab('list');
+    } catch (err) {
+      const axiosErr = err as AxiosError<{ message?: string }>;
+      if (axiosErr.response?.status === 409) {
+        setInviteError('यह नंबर पहले से जुड़ा हुआ है।');
+      } else {
+        setInviteError('आमंत्रण नहीं भेजा जा सका। दोबारा कोशिश करें।');
+      }
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Permissions toggle handler
+  // ---------------------------------------------------------------------------
+
+  const handlePermToggle = (key: string, value: boolean): void => {
+    const previous = permissions;
+    const updated = { ...permissions, [key]: value };
+    setPermissions(updated);
+    // UpdatePermissionSchema expects { permission_key, is_enabled } — one call per toggle.
+    api
+      .put('/auth/roles/shop_manager/permissions', { permission_key: key, is_enabled: value })
+      .catch(() => {
+        // Rollback optimistic update on error
+        setPermissions(previous);
+        Alert.alert('त्रुटि', 'अनुमति अपडेट नहीं हो सकी।');
+      });
+  };
+
+  // ---------------------------------------------------------------------------
+  // Render helpers
+  // ---------------------------------------------------------------------------
+
+  const renderStaffList = (): React.ReactElement => {
+    if (listLoading) {
+      return (
+        <View style={styles.centeredPad}>
+          <ActivityIndicator size="large" color={colors.primary} testID="staff-list-loading" />
+        </View>
+      );
+    }
+    if (listError !== null) {
+      return (
+        <View style={styles.centeredPad}>
+          <Text style={styles.errorText}>{listError}</Text>
+          <TouchableOpacity
+            onPress={() => void fetchStaff()}
+            style={styles.retryButton}
+            accessibilityRole="button"
+          >
+            <Text style={styles.retryButtonText}>फिर से लोड करें</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (staff.length === 0) {
+      return (
+        <View style={styles.centeredPad}>
+          <Text style={styles.emptyText}>अभी कोई स्टाफ नहीं</Text>
+        </View>
+      );
+    }
+    return (
+      <View>
+        {staff.map((member) => (
+          <View
+            key={member.id}
+            testID={`staff-row-${member.id}`}
+            style={styles.staffRow}
+            accessible
+            accessibilityLabel={`${member.displayName}, ${ROLE_HINDI[member.role] ?? member.role}, ${member.status === 'ACTIVE' ? 'सक्रिय' : 'आमंत्रित'}`}
+          >
+            <View style={styles.staffRowMain}>
+              <Text style={styles.staffName}>{member.displayName}</Text>
+              <Text style={styles.staffPhone}>{member.phone}</Text>
+            </View>
+            <View style={styles.staffRowBadges}>
+              <RoleBadge role={member.role} />
+              <View style={{ width: 6 }} />
+              <StatusBadge status={member.status} />
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const renderInviteTab = (): React.ReactElement => (
+    <StaffInviteForm
+      onSubmit={(data) => void handleInvite(data)}
+      loading={inviteLoading}
+      error={inviteError}
+    />
+  );
+
+  // ---------------------------------------------------------------------------
+  // Main render
+  // ---------------------------------------------------------------------------
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      {/* Success toast */}
+      {successMsg !== null && (
+        <View style={styles.toastWrapper}>
+          <Toast message={successMsg} variant="info" testID="staff-success-toast" />
+        </View>
+      )}
+
+      {/* Tab bar */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          testID="tab-staff-list"
+          style={[styles.tab, activeTab === 'list' && styles.tabActive]}
+          onPress={() => setActiveTab('list')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'list' }}
+        >
+          <Text style={[styles.tabLabel, activeTab === 'list' && styles.tabLabelActive]}>
+            स्टाफ सूची
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          testID="tab-staff-invite"
+          style={[styles.tab, activeTab === 'invite' && styles.tabActive]}
+          onPress={() => setActiveTab('invite')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'invite' }}
+        >
+          <Text style={[styles.tabLabel, activeTab === 'invite' && styles.tabLabelActive]}>
+            आमंत्रित करें
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Tab content */}
+      <View style={styles.tabContent}>
+        {activeTab === 'list' ? renderStaffList() : renderInviteTab()}
+      </View>
+
+      {/* Permissions section — admin only */}
+      {isAdmin && (
+        <View style={styles.permsSection}>
+          <Text style={styles.permsSectionTitle}>मैनेजर की अनुमतियाँ</Text>
+          {permsLoading ? (
+            <ActivityIndicator
+              size="small"
+              color={colors.primary}
+              testID="perms-loading"
+              style={{ marginVertical: spacing.md }}
+            />
+          ) : (
+            <PermissionsMatrix
+              role="shop_manager"
+              permissions={permissions}
+              onToggle={handlePermToggle}
+            />
+          )}
+        </View>
+      )}
+
+      <View style={{ height: spacing.xl }} />
+    </ScrollView>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, borderColor: colors.border },
-  title: { fontSize: 20, fontWeight: '600', color: colors.ink },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { fontSize: 16, color: colors.inkMute },
-  row: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
-    borderBottomWidth: 1, borderColor: colors.border,
+  container: {
+    flex: 1,
+    backgroundColor: colors.bg,
   },
-  rowLeft: { flex: 1, gap: 4 },
-  rowRight: { flexDirection: 'row', gap: spacing.xs },
-  phone: { fontSize: 16, color: colors.ink },
-  invitedAt: { fontSize: 13, color: colors.inkMute },
-  chip: { paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: 12 },
-  chipText: { fontSize: 12, color: '#fff', fontWeight: '500' },
-  roleChip: { backgroundColor: colors.primary },
-  activeChip: { backgroundColor: '#2E7D32' },
-  invitedChip: { backgroundColor: '#9E9E9E' },
-  fab: {
-    position: 'absolute', bottom: spacing.xl, right: spacing.lg,
-    backgroundColor: colors.primary, borderRadius: 28,
-    paddingVertical: spacing.sm, paddingHorizontal: spacing.md,
-    elevation: 4,
+  contentContainer: {
+    paddingBottom: spacing.xl,
   },
-  fabText: { fontSize: 16, color: '#fff', fontWeight: '600' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: {
-    backgroundColor: colors.bg, borderTopLeftRadius: 16, borderTopRightRadius: 16,
-    paddingTop: spacing.md,
+  toastWrapper: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+  },
+
+  // Tab bar
+  tabBar: {
+    flexDirection: 'row',
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    borderRadius: 10,
+    backgroundColor: '#EDE3CC',
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  tabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabLabel: {
+    fontFamily: typography.body.family,
+    fontSize: 15,
+    fontWeight: '500',
+    color: colors.inkMute,
+  },
+  tabLabelActive: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
+
+  // Tab content
+  tabContent: {
+    marginTop: spacing.sm,
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: spacing.md,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  // Staff list
+  centeredPad: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.md,
+  },
+  emptyText: {
+    fontFamily: typography.body.family,
+    fontSize: 16,
+    color: colors.inkMute,
+    textAlign: 'center',
+  },
+  errorText: {
+    fontFamily: typography.body.family,
+    fontSize: 15,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  retryButton: {
+    marginTop: spacing.sm,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: 8,
+    backgroundColor: colors.primary,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  retryButtonText: {
+    fontFamily: typography.body.family,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  staffRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    minHeight: 64,
+  },
+  staffRowMain: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  staffName: {
+    fontFamily: typography.body.family,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  staffPhone: {
+    fontFamily: typography.body.family,
+    fontSize: 14,
+    color: colors.inkMute,
+    marginTop: 2,
+  },
+  staffRowBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+
+  // Role badge
+  roleBadge: {
+    backgroundColor: '#EDE3CC',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  roleBadgeText: {
+    fontFamily: typography.body.family,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+
+  // Status badge
+  statusBadge: {
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  statusBadgeActive: {
+    backgroundColor: '#D4EDDA',
+  },
+  statusBadgeInvited: {
+    backgroundColor: '#FFF3CD',
+  },
+  statusBadgeText: {
+    fontFamily: typography.body.family,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statusTextActive: {
+    color: '#1A6630',
+  },
+  statusTextInvited: {
+    color: '#856404',
+  },
+
+  // Permissions section
+  permsSection: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.lg,
+  },
+  permsSectionTitle: {
+    fontFamily: typography.headingMid.family,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.ink,
+    marginBottom: spacing.sm,
   },
 });

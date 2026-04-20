@@ -11,23 +11,6 @@ export interface PhoneLookupRow {
   firebaseUid: string | null;
 }
 
-export interface InvitedRow {
-  id: string;
-  phone: string;
-  role: ShopUserRole;
-  status: 'INVITED';
-  invited_at: Date;
-}
-
-export interface StaffListRow {
-  id: string;
-  phone: string;
-  display_name: string;
-  role: ShopUserRole;
-  status: 'INVITED' | 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
-  invited_at: Date | null;
-}
-
 @Injectable()
 export class AuthRepository {
   constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
@@ -81,38 +64,62 @@ export class AuthRepository {
     );
   }
 
-  async findByPhoneInShop(phone: string): Promise<{ id: string; status: string } | null> {
+  async inviteStaff(args: {
+    phone: string;
+    role: 'shop_staff' | 'shop_manager';
+    displayName: string;
+    invitedByUserId: string;
+    shopId: string;
+    tenant: Tenant;
+  }): Promise<{ conflict: boolean; userId?: string }> {
     return withTenantTx(this.pool, async (tx) => {
-      const res = await tx.query<{ id: string; status: string }>(
-        `SELECT id, status FROM shop_users WHERE phone = $1 LIMIT 1`,
-        [phone],
+      const conflict = await tx.query<{ id: string }>(
+        `SELECT id FROM shop_users
+          WHERE shop_id = $1 AND phone = $2 AND status IN ('INVITED', 'ACTIVE')`,
+        [args.shopId, args.phone],
       );
-      return res.rows[0] ?? null;
+      if ((conflict.rowCount ?? 0) > 0) return { conflict: true };
+
+      const inserted = await tx.query<{ id: string }>(
+        `INSERT INTO shop_users (shop_id, phone, display_name, role, status, invited_by_user_id, invited_at)
+         VALUES ($1, $2, $3, $4, 'INVITED', $5, now())
+         RETURNING id`,
+        [args.shopId, args.phone, args.displayName, args.role, args.invitedByUserId],
+      );
+      return { conflict: false, userId: inserted.rows[0].id };
     });
   }
 
-  async insertInvited(args: { phone: string; role: ShopUserRole; invitedByUserId: string }): Promise<InvitedRow> {
-    return withTenantTx(this.pool, async (tx) => {
-      const res = await tx.query<InvitedRow>(
-        `INSERT INTO shop_users
-           (shop_id, phone, display_name, role, status, invited_by_user_id, invited_at)
-         VALUES
-           (current_setting('app.current_shop_id')::uuid, $1, $1, $2, 'INVITED', $3, now())
-         RETURNING id, phone, role, status, invited_at`,
-        [args.phone, args.role, args.invitedByUserId],
+  async listUsers(shopId: string): Promise<Array<{
+    id: string; displayName: string; role: string; status: string;
+    phone: string; invitedAt: string | null; activatedAt: string | null;
+  }>> {
+    const c = await this.pool.connect();
+    try {
+      await c.query('SET ROLE app_user');
+      // Set GUC so RLS policy on shop_users can filter on current_setting('app.current_shop_id').
+      await c.query(`SET app.current_shop_id = '${shopId}'`);
+      const res = await c.query<{
+        id: string; display_name: string; role: string; status: string;
+        phone: string; invited_at: string | null; activated_at: string | null;
+      }>(
+        `SELECT id, display_name, role, status, phone, invited_at, activated_at
+           FROM shop_users WHERE shop_id = $1 ORDER BY created_at DESC`,
+        [shopId],
       );
-      return res.rows[0];
-    });
-  }
-
-  async listStaff(): Promise<StaffListRow[]> {
-    return withTenantTx(this.pool, async (tx) => {
-      const res = await tx.query<StaffListRow>(
-        `SELECT id, phone, display_name, role, status, invited_at
-           FROM shop_users
-          ORDER BY COALESCE(invited_at, created_at) DESC`,
-      );
-      return res.rows;
-    });
+      return res.rows.map((r) => ({
+        id: r.id,
+        displayName: r.display_name,
+        role: r.role,
+        status: r.status,
+        phone: r.phone,
+        invitedAt: r.invited_at,
+        activatedAt: r.activated_at,
+      }));
+    } finally {
+      await c.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
+      await c.query('RESET ROLE').catch(() => undefined);
+      c.release();
+    }
   }
 }

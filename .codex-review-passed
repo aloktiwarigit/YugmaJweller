@@ -1,7 +1,1 @@
-story: 2.3 (wastage-config)
-base: story-2.2-making-charges
-reviewed-at: 2026-04-20
-model: gpt-5.4
-findings:
-  - P2: API path prefix missing in wastage.tsx GET/PATCH — FIXED in commit ad45bf6
-result: PASSED (P2 fixed; no P1 findings)
+Codex review passed 2026-04-20T18:47:54Z. 1 P1 + 4 P2 issues identified and fixed: RolesGuard ordering, GUC before RLS queries in listUsers+getPermissions, staff.tsx API contract (list parsing + permissions GET/PUT shape).

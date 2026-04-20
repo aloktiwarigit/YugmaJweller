@@ -1,13 +1,13 @@
-import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { auditLog, platformAuditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext, type Tenant, type AuthenticatedTenantContext, type ShopUserRole } from '@goldsmith/tenant-context';
 import { withTenantTx } from '@goldsmith/db';
+import type { InviteStaffDto } from '@goldsmith/shared';
 import { FirebaseAdminProvider } from './firebase-admin.provider';
 import { AuthRepository } from './auth.repository';
-import type { InvitedRow, StaffListRow } from './auth.repository';
 import { AuthRateLimitService } from './auth-rate-limit.service';
-import { SMS_ADAPTER, type ISmsAdapter } from './adapters/sms.adapter';
+import { SMS_ADAPTER, type ISmsAdapter } from './sms/sms-adapter.interface';
 
 export interface SessionResult {
   user: { id: string; display_name: string; role: ShopUserRole };
@@ -22,7 +22,7 @@ export class AuthService {
     @Inject(FirebaseAdminProvider) private readonly firebase: FirebaseAdminProvider,
     @Inject(AuthRepository) private readonly repo: AuthRepository,
     @Inject(AuthRateLimitService) private readonly rateLimit: AuthRateLimitService,
-    @Inject(SMS_ADAPTER) private readonly sms: ISmsAdapter,
+    @Inject(SMS_ADAPTER) private readonly smsAdapter: ISmsAdapter,
   ) {}
 
   async session(args: { uid: string; phoneE164: string; ip?: string; userAgent?: string; requestId?: string }): Promise<SessionResult> {
@@ -106,49 +106,34 @@ export class AuthService {
     };
   }
 
-  private static readonly INDIA_MOBILE_RE = /^\+91[6-9]\d{9}$/;
-
-  private static readonly INVITABLE_ROLES: ReadonlySet<string> = new Set(['shop_manager', 'shop_staff']);
-
-  async invite(args: { phone: string; role: 'shop_manager' | 'shop_staff' }): Promise<InvitedRow> {
-    const ctx = tenantContext.current();
-    if (!ctx?.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
-
-    if (!AuthService.INDIA_MOBILE_RE.test(args.phone)) {
-      throw new BadRequestException({ code: 'auth.invalid_phone' });
-    }
-
-    if (!AuthService.INVITABLE_ROLES.has(args.role as string)) {
-      throw new BadRequestException({ code: 'auth.invalid_role' });
-    }
-
-    const existing = await this.repo.findByPhoneInShop(args.phone);
-    if (existing) {
-      throw new ConflictException({ code: 'auth.staff_already_exists' });
-    }
-
-    const row = await this.repo.insertInvited({
-      phone: args.phone,
-      role: args.role,
-      invitedByUserId: ctx.userId,
+  async invite(shopId: string, dto: InviteStaffDto, invitedByUserId: string): Promise<{ userId: string }> {
+    const tenant = await this.loadTenantById(shopId);
+    const result = await this.repo.inviteStaff({
+      shopId,
+      phone: dto.phone,
+      role: dto.role,
+      displayName: dto.display_name,
+      invitedByUserId,
+      tenant,
     });
-
-    await this.sms.send(args.phone, `आपको ${ctx.tenant.display_name} में staff के रूप में आमंत्रित किया गया है।`);
-
-    await auditLog(this.pool, {
-      action: AuditAction.STAFF_INVITED,
-      subjectType: 'shop_user',
-      subjectId: row.id,
-      actorUserId: ctx.userId,
-      before: null,
-      after: { phone: args.phone, role: args.role, status: 'INVITED' },
-    });
-
-    return row;
-  }
-
-  async listStaff(): Promise<StaffListRow[]> {
-    return this.repo.listStaff();
+    if (result.conflict) {
+      throw new ConflictException({ errorCode: 'auth.invite_conflict', message: 'User already exists in this shop' });
+    }
+    const ctx: AuthenticatedTenantContext = {
+      shopId, tenant,
+      authenticated: true, userId: invitedByUserId, role: 'shop_admin' as ShopUserRole,
+    };
+    await tenantContext.runWith(ctx, () =>
+      auditLog(this.pool, {
+        action: AuditAction.STAFF_INVITED,
+        subjectType: 'shop_user',
+        subjectId: result.userId,
+        actorUserId: invitedByUserId,
+        metadata: { role: dto.role, display_name: dto.display_name },
+      }),
+    );
+    await this.smsAdapter.sendInvite(dto.phone, shopId, result.userId!);
+    return { userId: result.userId! };
   }
 
   private async loadTenantById(id: string): Promise<Tenant> {
