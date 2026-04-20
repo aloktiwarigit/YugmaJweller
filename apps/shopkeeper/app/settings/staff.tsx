@@ -107,7 +107,7 @@ export default function StaffScreen(): React.ReactElement {
     setListError(null);
     try {
       const res = await api.get<StaffUser[]>('/auth/users');
-      setStaff(res.data ?? []);
+      setStaff((res.data ?? []).filter((m) => m.status !== 'REVOKED'));
     } catch {
       setListError('स्टाफ लोड नहीं हो सका। दोबारा कोशिश करें।');
     } finally {
