@@ -6,9 +6,8 @@ import type { SettingsCache } from '@goldsmith/tenant-config';
 import type { DrizzleTenantLookup } from '../../drizzle-tenant-lookup';
 import type { Pool } from 'pg';
 import { tenantContext, type Tenant, type AuthenticatedTenantContext } from '@goldsmith/tenant-context';
-import type { ShopProfileRow } from '@goldsmith/shared';
-import { MAKING_CHARGE_DEFAULTS, PatchMakingChargesSchema } from '@goldsmith/shared';
-import type { MakingChargeConfig, PatchMakingChargesDto } from '@goldsmith/shared';
+import { MAKING_CHARGE_DEFAULTS } from '@goldsmith/shared';
+import type { ShopProfileRow, MakingChargeConfig, PatchMakingChargesDto } from '@goldsmith/shared';
 
 const SHOP_A = '11111111-1111-1111-1111-111111111111';
 const tenant: Tenant = { id: SHOP_A, slug: 'a', display_name: 'Rajesh Jewellers', status: 'ACTIVE' };

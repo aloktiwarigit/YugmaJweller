@@ -1,22 +1,18 @@
 // TODO Story 1.4: wrap with SettingsGroupCard once available
-import React from 'react';
+import React, { useState } from 'react';
 import { View } from 'react-native';
 import { MakingChargeRow } from '../../src/features/settings/components/MakingChargeRow';
-import type { MakingChargeConfig } from '@goldsmith/shared';
-import { MAKING_CHARGE_DEFAULTS } from '@goldsmith/shared';
 
 export default function MakingChargesScreen(): React.ReactElement {
-  const [configs, setConfigs] = React.useState<MakingChargeConfig[]>(MAKING_CHARGE_DEFAULTS);
-
-  function handleChange(updated: MakingChargeConfig): void {
-    setConfigs((prev) => prev.map((c) => (c.category === updated.category ? updated : c)));
-  }
+  const [config, setConfig] = useState({
+    category: 'RINGS' as const,
+    type: 'percent' as const,
+    value: '12.00',
+  });
 
   return (
     <View>
-      {configs.map((c) => (
-        <MakingChargeRow key={c.category} config={c} onChange={handleChange} />
-      ))}
+      <MakingChargeRow config={config} onChange={setConfig} />
     </View>
   );
 }
