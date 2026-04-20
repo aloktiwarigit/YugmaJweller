@@ -95,7 +95,7 @@ describe('AuthRepository.revokeStaff', () => {
         .mockResolvedValueOnce(undefined)                                           // SET ROLE app_user
         .mockResolvedValueOnce(undefined)                                           // SET app.current_shop_id
         .mockResolvedValueOnce({                                                    // SELECT firebase_uid, role
-          rows: [{ firebase_uid: 'fb-uid-1', role: 'shop_staff' }],
+          rows: [{ firebase_uid: 'fb-uid-1', role: 'shop_staff', status: 'ACTIVE' }],
           rowCount: 1,
         })
         .mockResolvedValueOnce(undefined)                                           // POISON (finally)
@@ -107,7 +107,7 @@ describe('AuthRepository.revokeStaff', () => {
 
     const result = await repo.revokeStaff('shop-1', 'user-1');
 
-    expect(result).toEqual({ firebaseUid: 'fb-uid-1', role: 'shop_staff' });
+    expect(result).toEqual({ firebaseUid: 'fb-uid-1', role: 'shop_staff', status: 'ACTIVE' });
   });
 
   it('returns null when user does not exist or belongs to different shop', async () => {
@@ -133,7 +133,7 @@ describe('AuthRepository.revokeStaff', () => {
       query: vi.fn()
         .mockResolvedValueOnce(undefined)
         .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce({ rows: [{ firebase_uid: null, role: 'shop_staff' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ firebase_uid: null, role: 'shop_staff', status: 'ACTIVE' }], rowCount: 1 })
         .mockResolvedValueOnce(undefined)
         .mockResolvedValueOnce(undefined),
       release: vi.fn(),
@@ -143,7 +143,7 @@ describe('AuthRepository.revokeStaff', () => {
 
     const result = await repo.revokeStaff('shop-1', 'user-never-activated');
 
-    expect(result).toEqual({ firebaseUid: null, role: 'shop_staff' });
+    expect(result).toEqual({ firebaseUid: null, role: 'shop_staff', status: 'ACTIVE' });
   });
 });
 
