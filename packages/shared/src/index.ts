@@ -24,3 +24,14 @@ export type {
   MakingChargeConfig,
   PatchMakingChargesDto,
 } from './schemas/making-charges.schema';
+
+export {
+  WastageConfigSchema,
+  PatchWastageSchema,
+  WastageArraySchema,
+  WASTAGE_DEFAULTS,
+} from './schemas/wastage.schema';
+export type {
+  WastageConfig,
+  PatchWastageDto,
+} from './schemas/wastage.schema';
