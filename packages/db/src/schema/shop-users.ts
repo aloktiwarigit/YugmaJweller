@@ -16,6 +16,8 @@ export const shopUsers = tenantScopedTable(
     activated_at:         timestamp('activated_at', { withTimezone: true }),
     invited_by_user_id:   uuid('invited_by_user_id'),
     invited_at:           timestamp('invited_at', { withTimezone: true }),
+    revoked_at:           timestamp('revoked_at', { withTimezone: true }),
+    revoked_by_user_id:   uuid('revoked_by_user_id'),
     created_at:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updated_at:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
