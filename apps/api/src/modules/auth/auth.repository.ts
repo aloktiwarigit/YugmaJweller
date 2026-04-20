@@ -11,6 +11,23 @@ export interface PhoneLookupRow {
   firebaseUid: string | null;
 }
 
+export interface InvitedRow {
+  id: string;
+  phone: string;
+  role: ShopUserRole;
+  status: 'INVITED';
+  invited_at: Date;
+}
+
+export interface StaffListRow {
+  id: string;
+  phone: string;
+  display_name: string;
+  role: ShopUserRole;
+  status: 'INVITED' | 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
+  invited_at: Date | null;
+}
+
 @Injectable()
 export class AuthRepository {
   constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
@@ -62,5 +79,40 @@ export class AuthRepository {
         return { linked: res.rowCount !== null && res.rowCount > 0 };
       }),
     );
+  }
+
+  async findByPhoneInShop(phone: string): Promise<{ id: string; status: string } | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const res = await tx.query<{ id: string; status: string }>(
+        `SELECT id, status FROM shop_users WHERE phone = $1 LIMIT 1`,
+        [phone],
+      );
+      return res.rows[0] ?? null;
+    });
+  }
+
+  async insertInvited(args: { phone: string; role: ShopUserRole; invitedByUserId: string }): Promise<InvitedRow> {
+    return withTenantTx(this.pool, async (tx) => {
+      const res = await tx.query<InvitedRow>(
+        `INSERT INTO shop_users
+           (shop_id, phone, display_name, role, status, invited_by_user_id, invited_at)
+         VALUES
+           (current_setting('app.current_shop_id')::uuid, $1, $1, $2, 'INVITED', $3, now())
+         RETURNING id, phone, role, status, invited_at`,
+        [args.phone, args.role, args.invitedByUserId],
+      );
+      return res.rows[0];
+    });
+  }
+
+  async listStaff(): Promise<StaffListRow[]> {
+    return withTenantTx(this.pool, async (tx) => {
+      const res = await tx.query<StaffListRow>(
+        `SELECT id, phone, display_name, role, status, invited_at
+           FROM shop_users
+          ORDER BY COALESCE(invited_at, created_at) DESC`,
+      );
+      return res.rows;
+    });
   }
 }

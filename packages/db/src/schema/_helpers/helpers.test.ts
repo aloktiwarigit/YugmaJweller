@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { uuid, text } from 'drizzle-orm/pg-core';
 import { tenantScopedTable } from './tenantScopedTable';
+import { tenantSingletonTable } from './tenantSingletonTable';
 import { platformGlobalTable } from './platformGlobalTable';
 import { tableRegistry } from './registry';
 
@@ -35,5 +36,31 @@ describe('platformGlobalTable', () => {
     expect(tableRegistry.list()).toEqual([
       { name: 'rates', kind: 'global', encryptedColumns: [] },
     ]);
+  });
+});
+
+describe('tenantSingletonTable', () => {
+  it('registers metadata with kind=tenant', () => {
+    tenantSingletonTable('preferences', { theme: text('theme') });
+    expect(tableRegistry.list()).toEqual([
+      { name: 'preferences', kind: 'tenant', encryptedColumns: [] },
+    ]);
+  });
+});
+
+describe('tableRegistry', () => {
+  it('get returns registered meta', () => {
+    platformGlobalTable('lookup', { id: uuid('id').primaryKey() });
+    expect(tableRegistry.get('lookup')).toEqual({ name: 'lookup', kind: 'global', encryptedColumns: [] });
+  });
+
+  it('get returns undefined for unknown table', () => {
+    expect(tableRegistry.get('nonexistent')).toBeUndefined();
+  });
+
+  it('register throws on duplicate table name', () => {
+    platformGlobalTable('dup', { id: uuid('id').primaryKey() });
+    expect(() => tableRegistry.register({ name: 'dup', kind: 'global', encryptedColumns: [] }))
+      .toThrow('Table "dup" registered twice');
   });
 });

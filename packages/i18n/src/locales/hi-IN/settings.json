@@ -1,0 +1,36 @@
+{
+  "profile": {
+    "title": "दुकान की प्रोफ़ाइल",
+    "fields": {
+      "name":              "दुकान का नाम",
+      "address":           "पता",
+      "gstin":             "GSTIN",
+      "bis_registration":  "BIS Registration",
+      "contact_phone":     "फ़ोन",
+      "operating_hours":   "काम के घंटे",
+      "about_text":        "हमारे बारे में",
+      "logo":              "लोगो",
+      "years_in_business": "कितने साल से व्यापार"
+    },
+    "save_success": "बदलाव सहेज लिया ✓",
+    "errors": {
+      "GSTIN_INVALID":  "GSTIN format सही नहीं है। उदाहरण: 09AAACR5055K1Z5",
+      "PIN_INVALID":    "PIN कोड 6 अंकों का होना चाहिए",
+      "PHONE_INVALID":  "मान्य भारतीय फ़ोन नंबर दर्ज करें",
+      "NAME_REQUIRED":  "दुकान का नाम खाली नहीं हो सकता",
+      "ABOUT_TOO_LONG": "विवरण 500 अक्षरों से अधिक नहीं हो सकता",
+      "TIME_INVALID":   "समय HH:MM format में होना चाहिए (उदाहरण: 10:00)",
+      "HOURS_REQUIRED_WHEN_ENABLED": "खुले दिन का समय भरना ज़रूरी है",
+      "HOURS_MUST_BE_NULL_WHEN_DISABLED": "बंद दिन पर समय खाली होना चाहिए"
+    },
+    "operating_hours": {
+      "days": {
+        "mon": "सोमवार", "tue": "मंगलवार", "wed": "बुधवार",
+        "thu": "गुरुवार", "fri": "शुक्रवार", "sat": "शनिवार", "sun": "रविवार"
+      },
+      "open_label":   "खुलने का समय",
+      "close_label":  "बंद होने का समय",
+      "closed_label": "बंद"
+    }
+  }
+}

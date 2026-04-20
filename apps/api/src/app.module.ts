@@ -9,6 +9,8 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { FirebaseJwtGuard } from './common/guards/firebase-jwt.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { TenantBootModule } from './modules/tenant-boot/tenant-boot.module';
+import { TenantLookupModule } from './modules/tenant-lookup/tenant-lookup.module';
+import { SettingsModule } from './modules/settings/settings.module';
 import { DrizzleTenantLookup } from './drizzle-tenant-lookup';
 import { TenantAuditReporter } from './modules/tenant-boot/tenant-audit-reporter';
 
@@ -26,11 +28,10 @@ class ConditionalTenantInterceptor implements NestInterceptor {
 }
 
 @Module({
-  imports: [AuthModule, TenantBootModule],
+  imports: [AuthModule, TenantBootModule, TenantLookupModule, SettingsModule],
   controllers: [HealthController],
   providers: [
     HttpTenantResolver,
-    DrizzleTenantLookup,
     {
       provide: TenantInterceptor,
       useFactory: (resolver: HttpTenantResolver, tenants: DrizzleTenantLookup, audit: TenantAuditReporter) =>

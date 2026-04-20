@@ -1,4 +1,5 @@
 export * from './shops';
+export * from './shop-settings';
 export * from './shop-users';
 export * from './audit-events';
 export * from './auth-rate-limits';

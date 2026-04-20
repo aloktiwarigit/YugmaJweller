@@ -7,6 +7,7 @@ import { AuthRepository } from './auth.repository';
 import { AuthRateLimitService } from './auth-rate-limit.service';
 import { FirebaseAdminProvider } from './firebase-admin.provider';
 import { FirebaseJwtStrategy } from './firebase-jwt.strategy';
+import { SMS_ADAPTER, StubSmsAdapter } from './adapters/sms.adapter';
 
 @Module({
   imports: [PassportModule],
@@ -21,6 +22,7 @@ import { FirebaseJwtStrategy } from './firebase-jwt.strategy';
     AuthService,
     AuthRepository,
     AuthRateLimitService,
+    { provide: SMS_ADAPTER, useClass: StubSmsAdapter },
   ],
   exports: [FirebaseAdminProvider, 'PG_POOL'],
 })
