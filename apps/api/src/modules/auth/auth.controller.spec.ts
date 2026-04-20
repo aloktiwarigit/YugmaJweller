@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
 import { Reflector } from '@nestjs/core';
@@ -41,7 +41,7 @@ const updatePermDto = { permission_key: 'billing.create' as const, is_enabled: f
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
-const mockAuthService = { invite: vi.fn() };
+const mockAuthService = { invite: vi.fn(), revokeStaff: vi.fn() };
 const mockAuthRepo = { listUsers: vi.fn() };
 const mockPermissionsRepo = { getPermissions: vi.fn(), upsertPermission: vi.fn() };
 const mockPermissionsCache = { invalidate: vi.fn(), getPermissions: vi.fn(), setPermissions: vi.fn() };
@@ -198,6 +198,35 @@ describe('AuthController', () => {
       await expect(
         tenantContext.runWith(unauthCtx, () => controller.listUsers()) as Promise<unknown>,
       ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+  });
+
+  // ─── DELETE /staff/:userId ────────────────────────────────────────────────
+
+  describe('DELETE /staff/:userId', () => {
+    it('calls authService.revokeStaff and returns void (204)', async () => {
+      mockAuthService.revokeStaff.mockResolvedValueOnce(undefined);
+
+      const result = await withAdminCtx(() =>
+        controller.revokeStaff('staff-uuid-1'),
+      );
+
+      expect(mockAuthService.revokeStaff).toHaveBeenCalledWith(
+        SHOP_ID,
+        'staff-uuid-1',
+        USER_ID,
+      );
+      expect(result).toBeUndefined();
+    });
+
+    it('propagates NotFoundException from authService.revokeStaff', async () => {
+      mockAuthService.revokeStaff.mockRejectedValueOnce(
+        new NotFoundException({ code: 'auth.staff_not_found' }),
+      );
+
+      await expect(
+        withAdminCtx(() => controller.revokeStaff('nonexistent-id')),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });
