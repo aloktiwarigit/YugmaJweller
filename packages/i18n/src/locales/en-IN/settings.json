@@ -2,6 +2,18 @@
   "title": "Settings",
   "shop_profile": "Shop Profile",
   "staff": "Staff Management",
+  "staff_revoke": {
+    "button": "Remove",
+    "confirm_title": "Remove {{name}}?",
+    "confirm_body": "This action cannot be undone.",
+    "confirm_yes": "Yes, Remove",
+    "cancel": "Cancel",
+    "success_toast": "Staff member removed",
+    "error_self": "You cannot remove yourself",
+    "error_admin": "Cannot remove an admin",
+    "error_not_found": "Staff member not found",
+    "error_generic": "Could not remove. Please try again."
+  },
   "making_charges": "Making Charges",
   "permissions": "Permissions",
   "billing": "Billing",

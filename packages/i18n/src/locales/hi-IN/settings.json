@@ -2,6 +2,18 @@
   "title": "सेटिंग्स",
   "shop_profile": "शॉप प्रोफाइल",
   "staff": "स्टाफ प्रबंधन",
+  "staff_revoke": {
+    "button": "हटाएं",
+    "confirm_title": "क्या आप {{name}} को हटाना चाहते हैं?",
+    "confirm_body": "यह action वापस नहीं ली जा सकती।",
+    "confirm_yes": "हाँ, हटाएं",
+    "cancel": "रद्द करें",
+    "success_toast": "हटा दिया गया",
+    "error_self": "आप स्वयं को नहीं हटा सकते",
+    "error_admin": "एडमिन को नहीं हटाया जा सकता",
+    "error_not_found": "स्टाफ नहीं मिला",
+    "error_generic": "हटाया नहीं जा सका। दोबारा कोशिश करें।"
+  },
   "making_charges": "मेकिंग चार्जेस",
   "permissions": "अनुमतियाँ",
   "billing": "बिलिंग",
