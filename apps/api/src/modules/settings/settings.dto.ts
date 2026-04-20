@@ -6,3 +6,10 @@ export interface ShopProfileResponseDto extends ShopProfileRow {
 }
 
 export type LogoUploadUrlResponseDto = SasUrlResult;
+
+export interface LoyaltyResponseDto {
+  tiers: Array<{ name: string; thresholdPaise: number; badgeColor: string }>;
+  earnRatePercentage: string;
+  redemptionRatePercentage: string;
+  etag: string;
+}
