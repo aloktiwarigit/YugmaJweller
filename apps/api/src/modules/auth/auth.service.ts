@@ -163,7 +163,7 @@ export class AuthService {
         subjectType: 'shop_user',
         subjectId: targetUserId,
         actorUserId: callerUserId,
-        metadata: { before: { status: 'ACTIVE' }, after: { status: 'REVOKED' } },
+        metadata: { before: { status: row.status }, after: { status: 'REVOKED' } },
       }),
     );
   }

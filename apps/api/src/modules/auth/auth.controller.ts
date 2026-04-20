@@ -7,6 +7,7 @@ import {
   Inject,
   Ip,
   Param,
+  ParseUUIDPipe,
   Post,
   Put,
   Req,
@@ -132,7 +133,7 @@ export class AuthController {
   @Delete('/staff/:userId')
   @Roles('shop_admin')
   @HttpCode(204)
-  async revokeStaff(@Param('userId') userId: string): Promise<void> {
+  async revokeStaff(@Param('userId', new ParseUUIDPipe()) userId: string): Promise<void> {
     const ctx = tenantContext.requireCurrent();
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     const auth = ctx as AuthenticatedTenantContext;

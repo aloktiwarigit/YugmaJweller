@@ -232,7 +232,7 @@ function makeRevokePoolMock() {
 }
 
 function makeRevokeService(opts: {
-  targetRow: { firebaseUid: string | null; role: ShopUserRole } | null;
+  targetRow: { firebaseUid: string | null; role: ShopUserRole; status?: string } | null;
 }) {
   const authRepo = {
     revokeStaff: vi.fn().mockResolvedValue(opts.targetRow),
@@ -306,9 +306,9 @@ describe('AuthService.revokeStaff()', () => {
       .rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('emits STAFF_REVOKED audit event on success', async () => {
+  it('emits STAFF_REVOKED audit event with actual pre-revocation status', async () => {
     const { svc, auditClient } = makeRevokeService({
-      targetRow: { firebaseUid: FIREBASE_UID, role: 'shop_staff' },
+      targetRow: { firebaseUid: FIREBASE_UID, role: 'shop_staff', status: 'INVITED' },
     });
 
     await svc.revokeStaff(SHOP_ID, TARGET_ID, CALLER_ID);
@@ -320,10 +320,10 @@ describe('AuthService.revokeStaff()', () => {
     const action = insertCall![1][1] as string;
     expect(action).toBe(AuditAction.STAFF_REVOKED);
 
-    // Verify metadata shape — no PII, correct before/after
+    // Verify metadata uses actual status from DB row, not hardcoded 'ACTIVE'
     const metadataJson = insertCall![1][6] as string;
     const metadata = JSON.parse(metadataJson) as Record<string, unknown>;
-    expect(metadata).toEqual({ before: { status: 'ACTIVE' }, after: { status: 'REVOKED' } });
+    expect(metadata).toEqual({ before: { status: 'INVITED' }, after: { status: 'REVOKED' } });
     expect(metadata).not.toHaveProperty('phone');
     expect(metadata).not.toHaveProperty('firebaseUid');
   });

@@ -90,17 +90,17 @@ export class AuthRepository {
     });
   }
 
-  async revokeStaff(shopId: string, targetUserId: string): Promise<{ firebaseUid: string | null; role: ShopUserRole } | null> {
+  async revokeStaff(shopId: string, targetUserId: string): Promise<{ firebaseUid: string | null; role: ShopUserRole; status: string } | null> {
     const c = await this.pool.connect();
     try {
       await c.query('SET ROLE app_user');
       await c.query(`SET app.current_shop_id = '${shopId}'`);
-      const res = await c.query<{ firebase_uid: string | null; role: ShopUserRole }>(
-        `SELECT firebase_uid, role FROM shop_users WHERE id = $1 AND shop_id = $2 AND status != 'REVOKED'`,
+      const res = await c.query<{ firebase_uid: string | null; role: ShopUserRole; status: string }>(
+        `SELECT firebase_uid, role, status FROM shop_users WHERE id = $1 AND shop_id = $2 AND status != 'REVOKED'`,
         [targetUserId, shopId],
       );
       if (res.rows.length === 0) return null;
-      return { firebaseUid: res.rows[0].firebase_uid, role: res.rows[0].role };
+      return { firebaseUid: res.rows[0].firebase_uid, role: res.rows[0].role, status: res.rows[0].status };
     } finally {
       await c.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
       await c.query('RESET ROLE').catch(() => undefined);
