@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import type { Pool } from 'pg';
-import { PatchShopProfileSchema } from '@goldsmith/shared';
-import type { PatchShopProfileDto, ShopProfileRow } from '@goldsmith/shared';
+import { PatchShopProfileSchema, PatchMakingChargesSchema, MAKING_CHARGE_DEFAULTS } from '@goldsmith/shared';
+import type { PatchShopProfileDto, ShopProfileRow, MakingChargeConfig, PatchMakingChargesDto } from '@goldsmith/shared';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import { SettingsCache } from '@goldsmith/tenant-config';
@@ -54,6 +54,53 @@ export class SettingsService {
     if (!tc) return;
     await auditLog(this.pool, {
       action: AuditAction.SETTINGS_PROFILE_UPDATED,
+      subjectType: 'shop',
+      subjectId: tc.shopId,
+      actorUserId: tc.authenticated ? tc.userId : undefined,
+      before,
+      after,
+    });
+  }
+
+  async getMakingCharges(): Promise<MakingChargeConfig[]> {
+    const hit = await this.cache.getMakingCharges();
+    if (hit) return hit;
+    const stored = await this.repo.getMakingCharges();
+    let configs: MakingChargeConfig[];
+    if (!stored) {
+      configs = MAKING_CHARGE_DEFAULTS;
+    } else {
+      const storedMap = new Map(stored.map((c) => [c.category, c]));
+      configs = MAKING_CHARGE_DEFAULTS.map((d) => storedMap.get(d.category) ?? d);
+    }
+    await this.cache.setMakingCharges(configs);
+    return configs;
+  }
+
+  async updateMakingCharges(dto: PatchMakingChargesDto): Promise<MakingChargeConfig[]> {
+    const parsed = PatchMakingChargesSchema.safeParse(dto);
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), code: i.message }));
+      throw new BadRequestException({ code: 'validation.failed', errors });
+    }
+
+    const { before, after } = await this.repo.upsertMakingCharges(parsed.data, MAKING_CHARGE_DEFAULTS);
+
+    await this.cache.invalidateMakingCharges();
+
+    void this.auditMakingChargesUpdate(before, after).catch(() => undefined);
+
+    return after;
+  }
+
+  private async auditMakingChargesUpdate(
+    before: MakingChargeConfig[] | null,
+    after: MakingChargeConfig[],
+  ): Promise<void> {
+    const tc = tenantContext.current();
+    if (!tc) return;
+    await auditLog(this.pool, {
+      action: AuditAction.SETTINGS_MAKING_CHARGES_UPDATED,
       subjectType: 'shop',
       subjectId: tc.shopId,
       actorUserId: tc.authenticated ? tc.userId : undefined,

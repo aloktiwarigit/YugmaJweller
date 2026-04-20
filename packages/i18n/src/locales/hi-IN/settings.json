@@ -32,5 +32,23 @@
       "close_label":  "बंद होने का समय",
       "closed_label": "बंद"
     }
+  },
+  "making_charges": {
+    "title": "बनाई का खर्च",
+    "type_percent": "प्रतिशत",
+    "type_fixed": "₹/ग्राम",
+    "save_success": "बदलाव सहेज लिया ✓",
+    "errors": {
+      "VALUE_POSITIVE_REQUIRED": "बनाई का खर्च 0 से ज़्यादा होना चाहिए",
+      "PERCENT_MAX_100": "प्रतिशत 100 से ज़्यादा नहीं हो सकता"
+    },
+    "categories": {
+      "RINGS": "अंगूठी",
+      "CHAINS": "चेन",
+      "BANGLES": "चूड़ी",
+      "BRIDAL": "दुल्हन",
+      "SILVER": "चाँदी",
+      "WHOLESALE": "थोक"
+    }
   }
 }

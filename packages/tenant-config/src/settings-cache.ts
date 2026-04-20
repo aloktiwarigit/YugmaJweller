@@ -1,14 +1,14 @@
 import type { Redis } from '@goldsmith/cache';
-import type { ShopProfileRow } from '@goldsmith/shared';
-import { ShopProfileRowSchema } from '@goldsmith/shared';
+import type { ShopProfileRow, MakingChargeConfig } from '@goldsmith/shared';
+import { ShopProfileRowSchema, MakingChargesArraySchema } from '@goldsmith/shared';
 import { tenantContext } from '@goldsmith/tenant-context';
 
 /**
  * Redis-backed cache for shop profile data.
  *
  * Contract:
- * - `getProfile`: swallows Redis errors + JSON parse errors as cache misses (deletes corrupt key).
- * - `setProfile` / `invalidate`: Redis errors propagate to the caller.
+ * - `getProfile` / `getMakingCharges`: swallows Redis errors + JSON parse errors as cache misses (deletes corrupt key).
+ * - `setProfile` / `invalidate` / `setMakingCharges` / `invalidateMakingCharges`: Redis errors propagate to the caller.
  */
 export class SettingsCache {
   /** Profile TTL: 60 s — within the ≤30-s write-propagation p95 target when invalidation fires on save. */
@@ -45,7 +45,37 @@ export class SettingsCache {
     await this.redis.del(this.profileKey());
   }
 
+  async getMakingCharges(): Promise<MakingChargeConfig[] | null> {
+    const key = this.makingChargesKey();
+    try {
+      const raw = await this.redis.get(key);
+      if (!raw) return null;
+      const parsed: unknown = JSON.parse(raw);
+      const result = MakingChargesArraySchema.safeParse(parsed);
+      if (!result.success) {
+        await this.redis.del(key);
+        return null;
+      }
+      return result.data;
+    } catch {
+      try { await this.redis.del(key); } catch { /* ignore del failure */ }
+      return null;
+    }
+  }
+
+  async setMakingCharges(data: MakingChargeConfig[]): Promise<void> {
+    await this.redis.set(this.makingChargesKey(), JSON.stringify(data), 'EX', this.ttlSec);
+  }
+
+  async invalidateMakingCharges(): Promise<void> {
+    await this.redis.del(this.makingChargesKey());
+  }
+
   private profileKey(): string {
     return `shop:${tenantContext.requireCurrent().shopId}:settings:profile`;
+  }
+
+  private makingChargesKey(): string {
+    return `shop:${tenantContext.requireCurrent().shopId}:settings:making_charges`;
   }
 }
