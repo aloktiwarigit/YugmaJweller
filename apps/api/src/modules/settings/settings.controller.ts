@@ -15,8 +15,8 @@ import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext } from '@goldsmith/tenant-context';
 import { SettingsService } from './settings.service';
 import { BlobStorageService } from './blob-storage.service';
-import type { ShopProfileResponseDto, LogoUploadUrlResponseDto, MakingChargesResponseDto } from './settings.dto';
-import type { PatchShopProfileDto, PatchMakingChargesDto } from '@goldsmith/shared';
+import type { ShopProfileResponseDto, LogoUploadUrlResponseDto, MakingChargesResponseDto, WastageResponseDto } from './settings.dto';
+import type { PatchShopProfileDto, PatchMakingChargesDto, PatchWastageDto } from '@goldsmith/shared';
 
 @Controller('/api/v1/settings')
 export class SettingsController {
@@ -84,6 +84,33 @@ export class SettingsController {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     if (ctx.role !== 'shop_admin') throw new ForbiddenException({ code: 'auth.insufficient_role' });
     const configs = await this.svc.updateMakingCharges(body);
+    const etag = `"${createHash('sha256').update(JSON.stringify(configs)).digest('hex').slice(0, 16)}"`;
+    res.setHeader('ETag', etag);
+    return { configs, etag };
+  }
+
+  @Get('/wastage')
+  async getWastage(
+    @TenantContextDec() ctx: TenantContext,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<WastageResponseDto> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (!['shop_admin', 'shop_manager'].includes(ctx.role)) throw new ForbiddenException({ code: 'auth.insufficient_role' });
+    const configs = await this.svc.getWastage();
+    const etag = `"${createHash('sha256').update(JSON.stringify(configs)).digest('hex').slice(0, 16)}"`;
+    res.setHeader('ETag', etag);
+    return { configs, etag };
+  }
+
+  @Patch('/wastage')
+  async updateWastage(
+    @TenantContextDec() ctx: TenantContext,
+    @Body() body: PatchWastageDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<WastageResponseDto> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (ctx.role !== 'shop_admin') throw new ForbiddenException({ code: 'auth.insufficient_role' });
+    const configs = await this.svc.updateWastage(body);
     const etag = `"${createHash('sha256').update(JSON.stringify(configs)).digest('hex').slice(0, 16)}"`;
     res.setHeader('ETag', etag);
     return { configs, etag };
