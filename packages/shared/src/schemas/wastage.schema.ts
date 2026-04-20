@@ -1,8 +1,6 @@
 import { z } from 'zod';
 import { ProductCategory } from './making-charges.schema';
 
-export { ProductCategory };
-
 const positiveDecimalString = z
   .string()
   .regex(/^\d+(\.\d+)?$/, 'VALUE_FORMAT_INVALID')
