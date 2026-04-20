@@ -1,11 +1,13 @@
-import { ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { auditLog, platformAuditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext, type Tenant, type AuthenticatedTenantContext, type ShopUserRole } from '@goldsmith/tenant-context';
 import { withTenantTx } from '@goldsmith/db';
+import type { InviteStaffDto } from '@goldsmith/shared';
 import { FirebaseAdminProvider } from './firebase-admin.provider';
 import { AuthRepository } from './auth.repository';
 import { AuthRateLimitService } from './auth-rate-limit.service';
+import { SMS_ADAPTER, type ISmsAdapter } from './sms/sms-adapter.interface';
 
 export interface SessionResult {
   user: { id: string; display_name: string; role: ShopUserRole };
@@ -20,6 +22,7 @@ export class AuthService {
     @Inject(FirebaseAdminProvider) private readonly firebase: FirebaseAdminProvider,
     @Inject(AuthRepository) private readonly repo: AuthRepository,
     @Inject(AuthRateLimitService) private readonly rateLimit: AuthRateLimitService,
+    @Inject(SMS_ADAPTER) private readonly smsAdapter: ISmsAdapter,
   ) {}
 
   async session(args: { uid: string; phoneE164: string; ip?: string; userAgent?: string; requestId?: string }): Promise<SessionResult> {
@@ -101,6 +104,36 @@ export class AuthService {
       tenant: { id: tenant.id, slug: tenant.slug, display_name: tenant.display_name, config: (tenant.config ?? {}) as Record<string, unknown> },
       requires_token_refresh: true,
     };
+  }
+
+  async invite(shopId: string, dto: InviteStaffDto, invitedByUserId: string): Promise<{ userId: string }> {
+    const tenant = await this.loadTenantById(shopId);
+    const result = await this.repo.inviteStaff({
+      shopId,
+      phone: dto.phone,
+      role: dto.role,
+      displayName: dto.display_name,
+      invitedByUserId,
+      tenant,
+    });
+    if (result.conflict) {
+      throw new ConflictException({ errorCode: 'auth.invite_conflict', message: 'User already exists in this shop' });
+    }
+    const ctx: AuthenticatedTenantContext = {
+      shopId, tenant,
+      authenticated: true, userId: invitedByUserId, role: 'shop_admin' as ShopUserRole,
+    };
+    await tenantContext.runWith(ctx, () =>
+      auditLog(this.pool, {
+        action: AuditAction.STAFF_INVITED,
+        subjectType: 'shop_user',
+        subjectId: result.userId,
+        actorUserId: invitedByUserId,
+        metadata: { role: dto.role, display_name: dto.display_name },
+      }),
+    );
+    await this.smsAdapter.sendInvite(dto.phone, shopId, result.userId!);
+    return { userId: result.userId! };
   }
 
   private async loadTenantById(id: string): Promise<Tenant> {
