@@ -179,7 +179,18 @@ describe('SettingsService', () => {
       const auditSpy = vi.spyOn(svc as unknown as { auditMakingChargesUpdate: () => void }, 'auditMakingChargesUpdate');
       const dto: PatchMakingChargesDto = [{ category: 'RINGS', type: 'percent', value: '14.00' }];
       await tenantContext.runWith(ctx, () => svc.updateMakingCharges(dto));
+      await Promise.resolve(); // flush fire-and-forget audit microtask
       expect(auditSpy).toHaveBeenCalledWith(null, MAKING_CHARGE_DEFAULTS);
+    });
+
+    it('swallows auditLog failure and still returns after', async () => {
+      const { svc } = makeSvc();
+      vi.spyOn(svc as unknown as { auditMakingChargesUpdate: () => void }, 'auditMakingChargesUpdate')
+        .mockRejectedValueOnce(new Error('audit down'));
+      const dto: PatchMakingChargesDto = [{ category: 'RINGS', type: 'percent', value: '14.00' }];
+      await expect(
+        tenantContext.runWith(ctx, () => svc.updateMakingCharges(dto)),
+      ).resolves.toEqual(MAKING_CHARGE_DEFAULTS);
     });
 
     it('merges supplied categories with defaults — unspecified categories retain defaults', async () => {
