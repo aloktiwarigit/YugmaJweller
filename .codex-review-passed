@@ -1,1 +1,1 @@
-{"timestamp":"2026-04-20T16:52:31-04:00","commit":"f1c53e6b62eaed4d3b36c8da72d9b914abcba857","reviewer":"codex","model":"gpt-5.4","story":"2.4-loyalty-config","p1_fixed":"withTenantTx for getLoyalty+upsertLoyalty","p2_fixed":"LoyaltyTierForm useEffect prop sync"}
+story-2.4 loyalty config — codex review passed + review fixes applied 2026-04-20T21:00:41Z
