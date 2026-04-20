@@ -1,4 +1,4 @@
-import type { ShopProfileRow } from '@goldsmith/shared';
+import type { ShopProfileRow, MakingChargeConfig } from '@goldsmith/shared';
 import type { SasUrlResult } from './blob-storage.service';
 
 export interface ShopProfileResponseDto extends ShopProfileRow {
@@ -6,3 +6,8 @@ export interface ShopProfileResponseDto extends ShopProfileRow {
 }
 
 export type LogoUploadUrlResponseDto = SasUrlResult;
+
+export interface MakingChargesResponseDto {
+  configs: MakingChargeConfig[];
+  etag: string;
+}

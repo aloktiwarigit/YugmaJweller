@@ -15,8 +15,8 @@ import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext } from '@goldsmith/tenant-context';
 import { SettingsService } from './settings.service';
 import { BlobStorageService } from './blob-storage.service';
-import type { ShopProfileResponseDto, LogoUploadUrlResponseDto } from './settings.dto';
-import type { PatchShopProfileDto } from '@goldsmith/shared';
+import type { ShopProfileResponseDto, LogoUploadUrlResponseDto, MakingChargesResponseDto } from './settings.dto';
+import type { PatchShopProfileDto, PatchMakingChargesDto } from '@goldsmith/shared';
 
 @Controller('/api/v1/settings')
 export class SettingsController {
@@ -60,5 +60,32 @@ export class SettingsController {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     if (ctx.role !== 'shop_admin') throw new ForbiddenException({ code: 'auth.insufficient_role' });
     return this.blob.generateLogoSasUrl();
+  }
+
+  @Get('/making-charges')
+  async getMakingCharges(
+    @TenantContextDec() ctx: TenantContext,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<MakingChargesResponseDto> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (!['shop_admin', 'shop_manager'].includes(ctx.role)) throw new ForbiddenException({ code: 'auth.insufficient_role' });
+    const configs = await this.svc.getMakingCharges();
+    const etag = `"${createHash('sha256').update(JSON.stringify(configs)).digest('hex').slice(0, 16)}"`;
+    res.setHeader('ETag', etag);
+    return { configs, etag };
+  }
+
+  @Patch('/making-charges')
+  async updateMakingCharges(
+    @TenantContextDec() ctx: TenantContext,
+    @Body() body: PatchMakingChargesDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<MakingChargesResponseDto> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (ctx.role !== 'shop_admin') throw new ForbiddenException({ code: 'auth.insufficient_role' });
+    const configs = await this.svc.updateMakingCharges(body);
+    const etag = `"${createHash('sha256').update(JSON.stringify(configs)).digest('hex').slice(0, 16)}"`;
+    res.setHeader('ETag', etag);
+    return { configs, etag };
   }
 }
