@@ -1,7 +1,7 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import type { Pool } from 'pg';
-import { PatchShopProfileSchema, PatchMakingChargesSchema, MAKING_CHARGE_DEFAULTS } from '@goldsmith/shared';
-import type { PatchShopProfileDto, ShopProfileRow, MakingChargeConfig, PatchMakingChargesDto } from '@goldsmith/shared';
+import { PatchShopProfileSchema, PatchMakingChargesSchema, MAKING_CHARGE_DEFAULTS, PatchWastageSchema, WASTAGE_DEFAULTS } from '@goldsmith/shared';
+import type { PatchShopProfileDto, ShopProfileRow, MakingChargeConfig, PatchMakingChargesDto, WastageConfig, PatchWastageDto } from '@goldsmith/shared';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import { SettingsCache } from '@goldsmith/tenant-config';
@@ -101,6 +101,59 @@ export class SettingsService {
     if (!tc) return;
     await auditLog(this.pool, {
       action: AuditAction.SETTINGS_MAKING_CHARGES_UPDATED,
+      subjectType: 'shop',
+      subjectId: tc.shopId,
+      actorUserId: tc.authenticated ? tc.userId : undefined,
+      before,
+      after,
+    });
+  }
+
+  async getWastage(): Promise<WastageConfig[]> {
+    const hit = await this.cache.getWastage();
+    if (hit) return hit;
+    const storedMap = await this.repo.getWastage();
+    const configs: WastageConfig[] = storedMap === null
+      ? WASTAGE_DEFAULTS
+      : WASTAGE_DEFAULTS.map((d) => ({ category: d.category, percent: storedMap[d.category] ?? d.percent }));
+    await this.cache.setWastage(configs);
+    return configs;
+  }
+
+  async updateWastage(dto: PatchWastageDto): Promise<WastageConfig[]> {
+    const parsed = PatchWastageSchema.safeParse(dto);
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), code: i.message }));
+      throw new BadRequestException({ code: 'validation.failed', errors });
+    }
+
+    if (parseFloat(parsed.data.percent) > 30) {
+      throw new UnprocessableEntityException({
+        code: 'settings.wastage_high',
+        message: 'घटत 30% से ज़्यादा नहीं होनी चाहिए',
+      });
+    }
+
+    const { before, after } = await this.repo.upsertWastage(
+      parsed.data.category,
+      parsed.data.percent,
+    );
+
+    await this.cache.invalidateWastage();
+
+    void this.auditWastageUpdate(before, after).catch(() => undefined);
+
+    return after;
+  }
+
+  private async auditWastageUpdate(
+    before: WastageConfig[] | null,
+    after: WastageConfig[],
+  ): Promise<void> {
+    const tc = tenantContext.current();
+    if (!tc) return;
+    await auditLog(this.pool, {
+      action: AuditAction.SETTINGS_WASTAGE_UPDATED,
       subjectType: 'shop',
       subjectId: tc.shopId,
       actorUserId: tc.authenticated ? tc.userId : undefined,
