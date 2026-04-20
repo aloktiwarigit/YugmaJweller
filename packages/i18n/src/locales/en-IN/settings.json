@@ -39,5 +39,29 @@
       "close_label":  "Closing time",
       "closed_label": "Closed"
     }
+  },
+  "loyalty": {
+    "title": "Loyalty Programme",
+    "tiers_section": "Tiers",
+    "rates_section": "Points Rate",
+    "tier_name": "Tier Name",
+    "threshold": "Minimum Purchase (₹)",
+    "badge_color": "Badge Colour",
+    "earn_rate": "Earn Rate (%)",
+    "redemption_rate": "Redemption Rate (%)",
+    "save": "Save",
+    "save_success": "Changes saved ✓",
+    "errors": {
+      "TIER_NAME_REQUIRED": "Tier name cannot be empty",
+      "TIER_NAME_TOO_LONG": "Name cannot exceed 20 characters",
+      "THRESHOLD_MUST_BE_INTEGER": "Minimum purchase must be a whole number",
+      "THRESHOLD_MIN": "Minimum purchase cannot be less than 0",
+      "THRESHOLD_MAX": "Amount is too large",
+      "THRESHOLD_OUT_OF_RANGE": "Amount must be between 0 and 1,00,00,000",
+      "BADGE_COLOR_INVALID": "Colour must be in #RRGGBB format",
+      "VALUE_FORMAT_INVALID": "Enter a valid number",
+      "RATE_OUT_OF_RANGE": "Rate must be between 0 and 100",
+      "TIER_ORDER_INVALID": "Tier order is invalid — minimum purchase must be in ascending order"
+    }
   }
 }
