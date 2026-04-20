@@ -2,8 +2,9 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import { tenantContext } from '@goldsmith/tenant-context';
-import type { ShopProfileRow, PatchShopProfileDto, AddressDto, OperatingHoursDto, MakingChargeConfig } from '@goldsmith/shared';
-import type { UpdateProfileResult, UpdateMakingChargesResult } from './settings.types';
+import type { ShopProfileRow, PatchShopProfileDto, AddressDto, OperatingHoursDto, MakingChargeConfig, WastageConfig } from '@goldsmith/shared';
+import { WASTAGE_DEFAULTS } from '@goldsmith/shared';
+import type { UpdateProfileResult, UpdateMakingChargesResult, UpdateWastageResult } from './settings.types';
 
 interface ShopsRow {
   display_name: string;
@@ -77,6 +78,60 @@ export class SettingsRepository {
       );
       if (r.rows.length === 0) return null;
       return r.rows[0].making_charges_json ?? null;
+    });
+  }
+
+  async getWastage(): Promise<Record<string, string> | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+      const r = await tx.query<{ wastage_json: Record<string, string> | null }>(
+        `SELECT wastage_json FROM shop_settings WHERE shop_id = $1`,
+        [shopId],
+      );
+      if (r.rows.length === 0) return null;
+      return r.rows[0].wastage_json ?? null;
+    });
+  }
+
+  async upsertWastage(
+    category: string,
+    percent: string,
+  ): Promise<UpdateWastageResult> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+
+      // Ensure row exists so SELECT FOR UPDATE always finds a row.
+      await tx.query(
+        `INSERT INTO shop_settings (shop_id) VALUES ($1) ON CONFLICT (shop_id) DO NOTHING`,
+        [shopId],
+      );
+
+      const beforeRow = await tx.query<{ wastage_json: Record<string, string> | null }>(
+        `SELECT * FROM shop_settings WHERE shop_id = $1 FOR UPDATE`,
+        [shopId],
+      );
+      const storedMap: Record<string, string> = beforeRow.rows[0]?.wastage_json ?? {};
+      const before: WastageConfig[] | null = Object.keys(storedMap).length === 0
+        ? null
+        : WASTAGE_DEFAULTS.map((d) => ({ category: d.category, percent: storedMap[d.category] ?? d.percent }));
+
+      const mergedMap = { ...storedMap, [category]: percent };
+
+      const r = await tx.query<{ wastage_json: Record<string, string> }>(
+        `INSERT INTO shop_settings (shop_id, wastage_json)
+         VALUES ($1, $2::jsonb)
+         ON CONFLICT (shop_id)
+         DO UPDATE SET wastage_json = $2::jsonb, updated_at = now()
+         RETURNING wastage_json`,
+        [shopId, JSON.stringify(mergedMap)],
+      );
+      const afterMap = r.rows[0].wastage_json;
+      const after: WastageConfig[] = WASTAGE_DEFAULTS.map((d) => ({
+        category: d.category,
+        percent: afterMap[d.category] ?? d.percent,
+      }));
+
+      return { before, after };
     });
   }
 
