@@ -1,11 +1,13 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Inject,
   Ip,
   Param,
+  ParseUUIDPipe,
   Post,
   Put,
   Req,
@@ -126,5 +128,15 @@ export class AuthController {
         metadata: { role, permission_key: dto.permission_key, is_enabled: dto.is_enabled },
       }),
     );
+  }
+
+  @Delete('/staff/:userId')
+  @Roles('shop_admin')
+  @HttpCode(204)
+  async revokeStaff(@Param('userId', new ParseUUIDPipe()) userId: string): Promise<void> {
+    const ctx = tenantContext.requireCurrent();
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    const auth = ctx as AuthenticatedTenantContext;
+    await this.svc.revokeStaff(auth.shopId, userId, auth.userId);
   }
 }
