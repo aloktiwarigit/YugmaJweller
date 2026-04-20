@@ -21,6 +21,7 @@ function validate(value: string, type: MakingChargeConfig['type']): string | nul
 
 export function MakingChargeRow({ config, onChange }: Props): React.ReactElement {
   const [error, setError] = useState<string | null>(null);
+  const [inputValue, setInputValue] = useState(config.value);
   const label = t(`settings.making_charges.categories.${config.category}`);
   const labelPercent = t('settings.making_charges.type_percent');
   const labelFixed = t('settings.making_charges.type_fixed');
@@ -30,11 +31,12 @@ export function MakingChargeRow({ config, onChange }: Props): React.ReactElement
   }
 
   function handleValueChange(v: string): void {
+    setInputValue(v);
     onChange({ ...config, value: v });
   }
 
   function handleBlur(): void {
-    setError(validate(config.value, config.type));
+    setError(validate(inputValue, config.type));
   }
 
   return (
@@ -44,6 +46,8 @@ export function MakingChargeRow({ config, onChange }: Props): React.ReactElement
         <Pressable
           testID="toggle-percent"
           onPress={() => handleTypeToggle('percent')}
+          accessibilityRole="button"
+          accessibilityState={{ selected: config.type === 'percent' }}
           style={[styles.toggle, config.type === 'percent' && styles.toggleActive]}
         >
           <Text>{labelPercent}</Text>
@@ -51,13 +55,15 @@ export function MakingChargeRow({ config, onChange }: Props): React.ReactElement
         <Pressable
           testID="toggle-fixed"
           onPress={() => handleTypeToggle('fixed_per_gram')}
+          accessibilityRole="button"
+          accessibilityState={{ selected: config.type === 'fixed_per_gram' }}
           style={[styles.toggle, config.type === 'fixed_per_gram' && styles.toggleActive]}
         >
           <Text>{labelFixed}</Text>
         </Pressable>
         <TextInput
           testID="value-input"
-          value={config.value}
+          value={inputValue}
           onChangeText={handleValueChange}
           onBlur={handleBlur}
           keyboardType="decimal-pad"

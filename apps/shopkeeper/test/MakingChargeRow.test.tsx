@@ -74,6 +74,18 @@ describe('MakingChargeRow', () => {
     expect(getByText('प्रतिशत 100 से ज़्यादा नहीं हो सकता')).toBeTruthy();
   });
 
+  it('calls onChange with type=percent when percent toggle pressed from fixed', () => {
+    const onChange = vi.fn();
+    const { getByTestId } = render(
+      <MakingChargeRow
+        config={{ ...baseConfig, type: 'fixed_per_gram' }}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(getByTestId('toggle-percent'));
+    expect(onChange).toHaveBeenCalledWith({ ...baseConfig, type: 'percent' });
+  });
+
   it('does NOT show percent error for fixed_per_gram > 100', () => {
     const { getByTestId, queryByText } = render(
       <MakingChargeRow
