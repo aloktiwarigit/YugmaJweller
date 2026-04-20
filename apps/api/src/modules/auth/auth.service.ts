@@ -143,11 +143,13 @@ export class AuthService {
     if (row.role === 'shop_admin') throw new ForbiddenException({ code: 'auth.cannot_revoke_admin' });
 
     if (row.firebaseUid !== null) {
+      // Revoke all active refresh tokens — forces immediate re-authentication.
+      // We do NOT call updateUser({ disabled: true }) because the Firebase UID is tied to a
+      // phone number, and the same phone may have a valid membership in another shop. Disabling
+      // the account globally would lock out those other shops. Migration 0010 excludes REVOKED
+      // rows from auth_lookup_user_by_phone, so a revoked user cannot get new session claims for
+      // THIS shop even if Firebase still allows them to request a token.
       await this.firebase.admin().auth().revokeRefreshTokens(row.firebaseUid);
-      // Disable the Firebase account so a new OTP cannot produce a fresh token with stale claims.
-      // Firebase calls precede markRevoked so that a Firebase failure leaves DB state intact
-      // (retry-safe), rather than leaving the DB marked REVOKED with live Firebase credentials.
-      await this.firebase.admin().auth().updateUser(row.firebaseUid, { disabled: true });
     }
 
     await this.repo.markRevoked(shopId, targetUserId, callerUserId);
@@ -160,7 +162,6 @@ export class AuthService {
     const latestUid = await this.repo.getFirebaseUid(shopId, targetUserId);
     if (latestUid && latestUid !== row.firebaseUid) {
       await this.firebase.admin().auth().revokeRefreshTokens(latestUid);
-      await this.firebase.admin().auth().updateUser(latestUid, { disabled: true });
     }
 
     const tenant = await this.loadTenantById(shopId);

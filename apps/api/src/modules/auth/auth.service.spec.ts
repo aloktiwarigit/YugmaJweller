@@ -267,10 +267,13 @@ describe('AuthService.revokeStaff()', () => {
 
     expect(authRepo.markRevoked).toHaveBeenCalledWith(SHOP_ID, TARGET_ID, CALLER_ID);
     expect(mockFirebaseAuth.revokeRefreshTokens).toHaveBeenCalledWith(FIREBASE_UID);
-    expect(mockFirebaseAuth.updateUser).toHaveBeenCalledWith(FIREBASE_UID, { disabled: true });
+    // updateUser({ disabled: true }) is intentionally NOT called — disabling the Firebase
+    // account globally would break cross-shop users whose phone has an active membership elsewhere.
+    // Migration 0010 excludes REVOKED rows from phone lookup, closing that auth path at DB level.
+    expect(mockFirebaseAuth.updateUser).not.toHaveBeenCalled();
   });
 
-  it('skips revokeRefreshTokens and updateUser when firebaseUid is null', async () => {
+  it('skips revokeRefreshTokens when firebaseUid is null', async () => {
     const { svc, mockFirebaseAuth, authRepo } = makeRevokeService({
       targetRow: { firebaseUid: null, role: 'shop_staff' },
     });
@@ -279,7 +282,6 @@ describe('AuthService.revokeStaff()', () => {
 
     expect(authRepo.markRevoked).toHaveBeenCalledOnce();
     expect(mockFirebaseAuth.revokeRefreshTokens).not.toHaveBeenCalled();
-    expect(mockFirebaseAuth.updateUser).not.toHaveBeenCalled();
   });
 
   it('throws NotFoundException(404) when target user not found', async () => {
@@ -343,6 +345,6 @@ describe('AuthService.revokeStaff()', () => {
     await svc.revokeStaff(SHOP_ID, TARGET_ID, CALLER_ID);
 
     expect(mockFirebaseAuth.revokeRefreshTokens).toHaveBeenCalledWith(RACE_UID);
-    expect(mockFirebaseAuth.updateUser).toHaveBeenCalledWith(RACE_UID, { disabled: true });
+    expect(mockFirebaseAuth.updateUser).not.toHaveBeenCalled();
   });
 });
