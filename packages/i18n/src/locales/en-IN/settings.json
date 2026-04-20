@@ -1,4 +1,11 @@
 {
+  "title": "Settings",
+  "shop_profile": "Shop Profile",
+  "staff": "Staff Management",
+  "making_charges": "Making Charges",
+  "permissions": "Permissions",
+  "billing": "Billing",
+  "reports": "Reports",
   "profile": {
     "title": "Shop Profile",
     "fields": {
