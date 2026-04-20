@@ -8,12 +8,13 @@ interface Props {
   onChange: (c: MakingChargeConfig) => void;
 }
 
+const DECIMAL_RE = /^\d+(\.\d+)?$/;
+
 function validate(value: string, type: MakingChargeConfig['type']): string | null {
-  const n = parseFloat(value);
-  if (!value || isNaN(n) || n <= 0) {
+  if (!DECIMAL_RE.test(value) || parseFloat(value) <= 0) {
     return t('settings.making_charges.errors.VALUE_POSITIVE_REQUIRED');
   }
-  if (type === 'percent' && n > 100) {
+  if (type === 'percent' && parseFloat(value) > 100) {
     return t('settings.making_charges.errors.PERCENT_MAX_100');
   }
   return null;
