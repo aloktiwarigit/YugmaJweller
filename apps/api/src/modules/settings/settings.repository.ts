@@ -69,25 +69,31 @@ export class SettingsRepository {
     });
   }
 
-  async getLoyalty(shopId: string): Promise<LoyaltyConfig> {
-    const r = await this.pool.query<{ loyalty_json: unknown }>(
-      `SELECT loyalty_json FROM shop_settings WHERE shop_id = $1`,
-      [shopId],
-    );
-    if (r.rows.length === 0 || r.rows[0].loyalty_json == null) {
-      return LOYALTY_DEFAULTS;
-    }
-    const parsed = LoyaltyConfigSchema.safeParse(r.rows[0].loyalty_json);
-    return parsed.success ? parsed.data : LOYALTY_DEFAULTS;
+  async getLoyalty(): Promise<LoyaltyConfig> {
+    return withTenantTx(this.pool, async (tx) => {
+      const { shopId } = tenantContext.requireCurrent();
+      const r = await tx.query<{ loyalty_json: unknown }>(
+        `SELECT loyalty_json FROM shop_settings WHERE shop_id = $1`,
+        [shopId],
+      );
+      if (r.rows.length === 0 || r.rows[0].loyalty_json == null) {
+        return LOYALTY_DEFAULTS;
+      }
+      const parsed = LoyaltyConfigSchema.safeParse(r.rows[0].loyalty_json);
+      return parsed.success ? parsed.data : LOYALTY_DEFAULTS;
+    });
   }
 
-  async upsertLoyalty(shopId: string, config: LoyaltyConfig): Promise<void> {
-    await this.pool.query(
-      `INSERT INTO shop_settings (shop_id, loyalty_json)
-       VALUES ($1, $2::jsonb)
-       ON CONFLICT (shop_id) DO UPDATE SET loyalty_json = EXCLUDED.loyalty_json, updated_at = now()`,
-      [shopId, JSON.stringify(config)],
-    );
+  async upsertLoyalty(config: LoyaltyConfig): Promise<void> {
+    return withTenantTx(this.pool, async (tx) => {
+      const { shopId } = tenantContext.requireCurrent();
+      await tx.query(
+        `INSERT INTO shop_settings (shop_id, loyalty_json)
+         VALUES ($1, $2::jsonb)
+         ON CONFLICT (shop_id) DO UPDATE SET loyalty_json = EXCLUDED.loyalty_json, updated_at = now()`,
+        [shopId, JSON.stringify(config)],
+      );
+    });
   }
 
   private async readProfileTx(tx: PoolClient): Promise<ShopProfileRow> {

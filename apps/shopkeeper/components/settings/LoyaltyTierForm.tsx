@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -88,6 +88,15 @@ export function LoyaltyTierForm({
   const [thresholdRupees, setThresholdRupees] = useState(initialThresholdRupees);
   const [badgeColor, setBadgeColor] = useState(initialBadgeColor);
   const [errors, setErrors] = useState<TierErrors>({});
+
+  // Sync form state when the parent provides real server values after the
+  // initial API fetch completes (initial props start as LOYALTY_DEFAULTS).
+  useEffect(() => {
+    setName(initialName);
+    setThresholdRupees(initialThresholdRupees);
+    setBadgeColor(initialBadgeColor);
+    setErrors({});
+  }, [initialName, initialThresholdRupees, initialBadgeColor]);
 
   const idx = tierIndex;
 

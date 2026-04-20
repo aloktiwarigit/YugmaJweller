@@ -156,7 +156,7 @@ describe('SettingsRepository + SettingsService integration', () => {
     it('getLoyalty returns LOYALTY_DEFAULTS when shop has no loyalty_json set', async () => {
       // shop_settings row may not exist yet for this shop; either way loyalty_json is null
       const config = await tenantContext.runWith(makeCtx(), () =>
-        repo.getLoyalty(SHOP_A),
+        repo.getLoyalty(),
       );
       expect(config).toEqual(LOYALTY_DEFAULTS);
     });
@@ -167,10 +167,10 @@ describe('SettingsRepository + SettingsService integration', () => {
         earnRatePercentage: '2.00',
       };
       await tenantContext.runWith(makeCtx(), () =>
-        repo.upsertLoyalty(SHOP_A, custom),
+        repo.upsertLoyalty(custom),
       );
       const config = await tenantContext.runWith(makeCtx(), () =>
-        repo.getLoyalty(SHOP_A),
+        repo.getLoyalty(),
       );
       expect(config.earnRatePercentage).toBe('2.00');
       expect(config.tiers).toEqual(LOYALTY_DEFAULTS.tiers);
@@ -179,8 +179,8 @@ describe('SettingsRepository + SettingsService integration', () => {
     it('upsertLoyalty is idempotent — second call updates, no duplicate rows', async () => {
       const v1 = { ...LOYALTY_DEFAULTS, earnRatePercentage: '3.00' };
       const v2 = { ...LOYALTY_DEFAULTS, earnRatePercentage: '4.00' };
-      await tenantContext.runWith(makeCtx(), () => repo.upsertLoyalty(SHOP_A, v1));
-      await tenantContext.runWith(makeCtx(), () => repo.upsertLoyalty(SHOP_A, v2));
+      await tenantContext.runWith(makeCtx(), () => repo.upsertLoyalty(v1));
+      await tenantContext.runWith(makeCtx(), () => repo.upsertLoyalty(v2));
 
       const r = await pool.query<{ count: string }>(
         `SELECT COUNT(*) AS count FROM shop_settings WHERE shop_id = $1`,
@@ -189,14 +189,14 @@ describe('SettingsRepository + SettingsService integration', () => {
       expect(Number(r.rows[0].count)).toBe(1);
 
       const config = await tenantContext.runWith(makeCtx(), () =>
-        repo.getLoyalty(SHOP_A),
+        repo.getLoyalty(),
       );
       expect(config.earnRatePercentage).toBe('4.00');
     });
 
     it('stored thresholdPaise values are integers', async () => {
       const config = await tenantContext.runWith(makeCtx(), () =>
-        repo.getLoyalty(SHOP_A),
+        repo.getLoyalty(),
       );
       for (const tier of config.tiers) {
         expect(Number.isInteger(tier.thresholdPaise)).toBe(true);
@@ -205,7 +205,7 @@ describe('SettingsRepository + SettingsService integration', () => {
 
     it('updateLoyalty type=tier persists tier name and converts rupees to paise', async () => {
       const result = await tenantContext.runWith(makeCtx(), () =>
-        svc.updateLoyalty(SHOP_A, {
+        svc.updateLoyalty({
           type:            'tier',
           index:           0,
           name:            'Bronze',
@@ -217,7 +217,7 @@ describe('SettingsRepository + SettingsService integration', () => {
       expect(result.ok).toBe(true);
 
       const config = await tenantContext.runWith(makeCtx(), () =>
-        repo.getLoyalty(SHOP_A),
+        repo.getLoyalty(),
       );
       // 25000 rupees × 100 = 2,500,000 paise
       expect(config.tiers[0].name).toBe('Bronze');
@@ -227,7 +227,7 @@ describe('SettingsRepository + SettingsService integration', () => {
 
     it('updateLoyalty type=rate persists both earn and redemption rates', async () => {
       const result = await tenantContext.runWith(makeCtx(), () =>
-        svc.updateLoyalty(SHOP_A, {
+        svc.updateLoyalty({
           type:                     'rate',
           earnRatePercentage:       '2.50',
           redemptionRatePercentage: '0.50',
@@ -237,7 +237,7 @@ describe('SettingsRepository + SettingsService integration', () => {
       expect(result.ok).toBe(true);
 
       const config = await tenantContext.runWith(makeCtx(), () =>
-        repo.getLoyalty(SHOP_A),
+        repo.getLoyalty(),
       );
       expect(config.earnRatePercentage).toBe('2.50');
       expect(config.redemptionRatePercentage).toBe('0.50');
@@ -246,7 +246,7 @@ describe('SettingsRepository + SettingsService integration', () => {
     it('updateLoyalty type=tier returns TIER_ORDER_INVALID when order is violated', async () => {
       // First reset to defaults so thresholds are predictable
       await tenantContext.runWith(makeCtx(), () =>
-        repo.upsertLoyalty(SHOP_A, {
+        repo.upsertLoyalty({
           tiers: [
             { name: 'Silver',  thresholdPaise: 5_000_000,  badgeColor: '#C0C0C0' },
             { name: 'Gold',    thresholdPaise: 15_000_000,  badgeColor: '#FFD700' },
@@ -259,7 +259,7 @@ describe('SettingsRepository + SettingsService integration', () => {
 
       // tier[0] default is Rs 50,000; set tier[1] to Rs 40,000 — violates ascending order
       const result = await tenantContext.runWith(makeCtx(), () =>
-        svc.updateLoyalty(SHOP_A, {
+        svc.updateLoyalty({
           type:            'tier',
           index:           1,
           name:            'Gold',

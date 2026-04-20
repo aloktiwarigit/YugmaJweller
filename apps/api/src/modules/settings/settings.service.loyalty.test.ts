@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { LoyaltyConfig } from '@goldsmith/shared';
 import type { Pool } from 'pg';
+import { tenantContext } from '@goldsmith/tenant-context';
+import type { Tenant, AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 
 // Mock audit module before importing SettingsService
 vi.mock('@goldsmith/audit', async (importOriginal) => {
@@ -49,13 +51,17 @@ function makeService(): SettingsService {
 }
 
 // Helpers to call vitest mock API on typed stubs
-const cacheGetLoyalty       = () => (mockCache.getLoyalty       as unknown as MockFn);
-const cacheSetLoyalty       = () => (mockCache.setLoyalty       as unknown as MockFn);
-const cacheInvalidateLoyalty = () => (mockCache.invalidateLoyalty as unknown as MockFn);
-const repoGetLoyalty        = () => (mockRepo.getLoyalty        as unknown as MockFn);
-const repoUpsertLoyalty     = () => (mockRepo.upsertLoyalty     as unknown as MockFn);
+const cacheGetLoyalty        = (): MockFn => (mockCache.getLoyalty        as unknown as MockFn);
+const cacheSetLoyalty        = (): MockFn => (mockCache.setLoyalty        as unknown as MockFn);
+const cacheInvalidateLoyalty = (): MockFn => (mockCache.invalidateLoyalty as unknown as MockFn);
+const repoGetLoyalty         = (): MockFn => (mockRepo.getLoyalty         as unknown as MockFn);
+const repoUpsertLoyalty      = (): MockFn => (mockRepo.upsertLoyalty      as unknown as MockFn);
 
 const SHOP_ID = 'shop-uuid-001';
+const tenant: Tenant = { id: SHOP_ID, slug: 'test', display_name: 'Test Jewellers', status: 'ACTIVE' };
+const ctx: AuthenticatedTenantContext = {
+  shopId: SHOP_ID, tenant, authenticated: true, userId: 'u1', role: 'shop_admin',
+};
 
 const DEFAULT_CONFIG: LoyaltyConfig = {
   tiers: [
@@ -80,7 +86,7 @@ describe('SettingsService.getLoyalty', () => {
     cacheGetLoyalty().mockResolvedValueOnce(DEFAULT_CONFIG);
 
     const svc = makeService();
-    const result = await svc.getLoyalty(SHOP_ID);
+    const result = await tenantContext.runWith(ctx, () => svc.getLoyalty());
 
     expect(result).toEqual(DEFAULT_CONFIG);
     expect(repoGetLoyalty()).not.toHaveBeenCalled();
@@ -93,10 +99,10 @@ describe('SettingsService.getLoyalty', () => {
     cacheSetLoyalty().mockResolvedValueOnce(undefined);
 
     const svc = makeService();
-    const result = await svc.getLoyalty(SHOP_ID);
+    const result = await tenantContext.runWith(ctx, () => svc.getLoyalty());
 
     expect(result).toEqual(DEFAULT_CONFIG);
-    expect(repoGetLoyalty()).toHaveBeenCalledWith(SHOP_ID);
+    expect(repoGetLoyalty()).toHaveBeenCalledWith();
     expect(cacheSetLoyalty()).toHaveBeenCalledWith(DEFAULT_CONFIG);
   });
 });
@@ -116,13 +122,13 @@ describe('SettingsService.updateLoyalty', () => {
     cacheInvalidateLoyalty().mockResolvedValueOnce(undefined);
 
     const svc = makeService();
-    const result = await svc.updateLoyalty(SHOP_ID, {
+    const result = await tenantContext.runWith(ctx, () => svc.updateLoyalty({
       type: 'tier',
       index: 0,
       name: 'Bronze',
       thresholdRupees: '100.00', // 10000 paise
       badgeColor: '#CD7F32',
-    });
+    }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -142,13 +148,13 @@ describe('SettingsService.updateLoyalty', () => {
 
     const svc = makeService();
     // Set tier[0] threshold to same as tier[1] — violates ordering
-    const result = await svc.updateLoyalty(SHOP_ID, {
+    const result = await tenantContext.runWith(ctx, () => svc.updateLoyalty({
       type: 'tier',
       index: 0,
       name: 'Silver',
       thresholdRupees: '150000.00', // 15_000_000 paise — same as Gold
       badgeColor: '#C0C0C0',
-    });
+    }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -162,13 +168,13 @@ describe('SettingsService.updateLoyalty', () => {
 
     const svc = makeService();
     // Bump tier[1] above tier[2]
-    const result = await svc.updateLoyalty(SHOP_ID, {
+    const result = await tenantContext.runWith(ctx, () => svc.updateLoyalty({
       type: 'tier',
       index: 1,
       name: 'Gold',
       thresholdRupees: '600000.00', // 60_000_000 paise — above Diamond's 50_000_000
       badgeColor: '#FFD700',
-    });
+    }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -183,11 +189,11 @@ describe('SettingsService.updateLoyalty', () => {
     cacheInvalidateLoyalty().mockResolvedValueOnce(undefined);
 
     const svc = makeService();
-    const result = await svc.updateLoyalty(SHOP_ID, {
+    const result = await tenantContext.runWith(ctx, () => svc.updateLoyalty({
       type: 'rate',
       earnRatePercentage: '2.50',
       redemptionRatePercentage: '1.50',
-    });
+    }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {

@@ -71,7 +71,7 @@ export class SettingsController {
   ): Promise<LoyaltyResponseDto> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     if (!['shop_admin', 'shop_manager'].includes(ctx.role)) throw new ForbiddenException({ code: 'auth.insufficient_role' });
-    const config = await this.svc.getLoyalty(ctx.shopId);
+    const config = await this.svc.getLoyalty();
     const etag = `"${createHash('sha256').update(JSON.stringify(config)).digest('hex').slice(0, 16)}"`;
     res.setHeader('X-ETag', etag);
     return { ...config, etag };
@@ -92,7 +92,7 @@ export class SettingsController {
       throw new UnprocessableEntityException({ code: 'validation.failed', errors });
     }
 
-    const result = await this.svc.updateLoyalty(ctx.shopId, parsed.data);
+    const result = await this.svc.updateLoyalty(parsed.data);
     if (!result.ok) {
       throw new UnprocessableEntityException({ code: result.error });
     }

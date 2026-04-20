@@ -47,16 +47,16 @@ export class SettingsService {
     return after;
   }
 
-  async getLoyalty(shopId: string): Promise<LoyaltyConfig> {
+  async getLoyalty(): Promise<LoyaltyConfig> {
     const hit = await this.cache.getLoyalty();
     if (hit) return hit;
-    const config = await this.repo.getLoyalty(shopId);
+    const config = await this.repo.getLoyalty();
     await this.cache.setLoyalty(config);
     return config;
   }
 
-  async updateLoyalty(shopId: string, dto: PatchLoyaltyDto): Promise<UpdateLoyaltyResult> {
-    const current = await this.getLoyalty(shopId);
+  async updateLoyalty(dto: PatchLoyaltyDto): Promise<UpdateLoyaltyResult> {
+    const current = await this.getLoyalty();
     const newConfig: LoyaltyConfig = {
       ...current,
       tiers: [...current.tiers] as LoyaltyConfig['tiers'],
@@ -92,9 +92,10 @@ export class SettingsService {
       return { ok: false, error: 'SCHEMA_INVALID' };
     }
 
-    await this.repo.upsertLoyalty(shopId, parsed.data);
+    await this.repo.upsertLoyalty(parsed.data);
     await this.cache.invalidateLoyalty();
 
+    const { shopId } = tenantContext.requireCurrent();
     void auditLog(this.pool, {
       action: AuditAction.SETTINGS_LOYALTY_UPDATED,
       subjectType: 'shop',

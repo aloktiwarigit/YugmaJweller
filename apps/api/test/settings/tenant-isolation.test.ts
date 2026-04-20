@@ -191,7 +191,7 @@ describe('loyalty config tenant isolation', () => {
     // by the owning tenant; isolation is enforced on reads via the explicit shop_id filter
     // and verified below).
     await tenantContext.runWith(ctxA, () =>
-      repo.upsertLoyalty(TENANT_A, {
+      repo.upsertLoyalty({
         tiers: [
           { name: 'PlatinumA', thresholdPaise: 1_000_000,  badgeColor: '#E5E4E2' },
           { name: 'PlatinumB', thresholdPaise: 5_000_000,  badgeColor: '#C0C0C0' },
@@ -203,13 +203,13 @@ describe('loyalty config tenant isolation', () => {
     );
 
     // Shop B's context — reads loyalty for TENANT_B (not TENANT_A).
-    // repo.getLoyalty filters by the shopId argument, so passing TENANT_B must
-    // never return shop A's data.
+    // repo.getLoyalty reads shopId from tenantContext, so running under ctxB
+    // must never return shop A's data.
     const tenantB = makeTenant(TENANT_B, 'shop-b', 'Shop B');
     const ctxB = makeCtx(TENANT_B, tenantB);
 
     const configB = await tenantContext.runWith(ctxB, () =>
-      repo.getLoyalty(TENANT_B),
+      repo.getLoyalty(),
     );
 
     // Shop B has no loyalty_json — must get defaults, not shop A's 'PlatinumA' config.
@@ -218,7 +218,7 @@ describe('loyalty config tenant isolation', () => {
 
     // Confirm shop A's config is still intact (not leaked into shop B, nor corrupted).
     const configA = await tenantContext.runWith(ctxA, () =>
-      repo.getLoyalty(TENANT_A),
+      repo.getLoyalty(),
     );
     expect(configA.tiers[0].name).toBe('PlatinumA');
     expect(configA.earnRatePercentage).toBe('5.00');
