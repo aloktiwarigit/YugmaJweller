@@ -1,1 +1,7 @@
-codex review --base df2b880 passed 2026-04-20T02:14:13Z
+story: 2.3 (wastage-config)
+base: story-2.2-making-charges
+reviewed-at: 2026-04-20
+model: gpt-5.4
+findings:
+  - P2: API path prefix missing in wastage.tsx GET/PATCH — FIXED in commit ad45bf6
+result: PASSED (P2 fixed; no P1 findings)
