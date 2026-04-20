@@ -1,0 +1,25 @@
+rules:
+  - id: no-phone-in-staff-invited-audit
+    patterns:
+      - pattern: |
+          auditLog($POOL, {
+            ...,
+            action: AuditAction.STAFF_INVITED,
+            ...,
+            metadata: { ..., phone: ..., ... },
+            ...
+          })
+      - pattern: |
+          $AUDIT.log({
+            ...,
+            action: AuditAction.STAFF_INVITED,
+            ...,
+            metadata: { ..., phone: ..., ... },
+            ...
+          })
+    message: "STAFF_INVITED audit metadata must not contain the raw phone number (PII). Log role and display_name only."
+    languages: [typescript]
+    severity: ERROR
+    metadata:
+      category: security
+      pii: phone
