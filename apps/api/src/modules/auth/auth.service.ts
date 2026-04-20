@@ -161,8 +161,13 @@ export class AuthService {
     // status != 'REVOKED' guard on linkFirebaseUid closes the window going forward, but any UID
     // linked just before our UPDATE would be missed by the pre-revoke snapshot. Re-reading after
     // markRevoked (when status is definitively REVOKED) catches this race.
+    // Always re-clear and re-revoke after the DB row is definitively REVOKED. This closes two
+    // races: (a) an in-flight /session for the same UID could call setCustomUserClaims after our
+    // pre-revoke clear; (b) a concurrent /session for an INVITED user could link a new UID
+    // between our initial SELECT and the markRevoked UPDATE. Both are handled by re-reading and
+    // unconditionally clearing whatever UID is recorded after markRevoked commits.
     const latestUid = await this.repo.getFirebaseUid(shopId, targetUserId);
-    if (latestUid && latestUid !== row.firebaseUid) {
+    if (latestUid) {
       await this.firebase.admin().auth().setCustomUserClaims(latestUid, {});
       await this.firebase.admin().auth().revokeRefreshTokens(latestUid);
     }
