@@ -316,5 +316,12 @@ describe('AuthService.revokeStaff()', () => {
     expect(insertCall).toBeDefined();
     const action = insertCall![1][1] as string;
     expect(action).toBe(AuditAction.STAFF_REVOKED);
+
+    // Verify metadata shape — no PII, correct before/after
+    const metadataJson = insertCall![1][6] as string;
+    const metadata = JSON.parse(metadataJson) as Record<string, unknown>;
+    expect(metadata).toEqual({ before: { status: 'ACTIVE' }, after: { status: 'REVOKED' } });
+    expect(metadata).not.toHaveProperty('phone');
+    expect(metadata).not.toHaveProperty('firebaseUid');
   });
 });

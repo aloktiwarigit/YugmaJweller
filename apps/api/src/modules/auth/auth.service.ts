@@ -7,7 +7,7 @@ import type { InviteStaffDto } from '@goldsmith/shared';
 import { FirebaseAdminProvider } from './firebase-admin.provider';
 import { AuthRepository } from './auth.repository';
 import { AuthRateLimitService } from './auth-rate-limit.service';
-import { SMS_ADAPTER, type ISmsAdapter } from './sms/sms-adapter.interface';
+import { SMS_ADAPTER, ISmsAdapter } from './sms/sms-adapter.interface';
 
 export interface SessionResult {
   user: { id: string; display_name: string; role: ShopUserRole };
