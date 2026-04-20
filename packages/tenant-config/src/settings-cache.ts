@@ -1,6 +1,6 @@
 import type { Redis } from '@goldsmith/cache';
-import type { ShopProfileRow } from '@goldsmith/shared';
-import { ShopProfileRowSchema } from '@goldsmith/shared';
+import type { LoyaltyConfig, ShopProfileRow } from '@goldsmith/shared';
+import { LoyaltyConfigSchema, ShopProfileRowSchema } from '@goldsmith/shared';
 import { tenantContext } from '@goldsmith/tenant-context';
 
 /**
@@ -45,7 +45,37 @@ export class SettingsCache {
     await this.redis.del(this.profileKey());
   }
 
+  async getLoyalty(): Promise<LoyaltyConfig | null> {
+    const key = this.loyaltyKey();
+    try {
+      const raw = await this.redis.get(key);
+      if (!raw) return null;
+      const parsed: unknown = JSON.parse(raw);
+      const result = LoyaltyConfigSchema.safeParse(parsed);
+      if (!result.success) {
+        await this.redis.del(key);
+        return null;
+      }
+      return result.data;
+    } catch {
+      try { await this.redis.del(key); } catch { /* ignore del failure */ }
+      return null;
+    }
+  }
+
+  async setLoyalty(config: LoyaltyConfig): Promise<void> {
+    await this.redis.set(this.loyaltyKey(), JSON.stringify(config), 'EX', this.ttlSec);
+  }
+
+  async invalidateLoyalty(): Promise<void> {
+    await this.redis.del(this.loyaltyKey());
+  }
+
   private profileKey(): string {
     return `shop:${tenantContext.requireCurrent().shopId}:settings:profile`;
+  }
+
+  private loyaltyKey(): string {
+    return `shop:${tenantContext.requireCurrent().shopId}:settings:loyalty`;
   }
 }
