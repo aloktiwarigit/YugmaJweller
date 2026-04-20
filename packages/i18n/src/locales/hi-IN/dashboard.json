@@ -5,5 +5,14 @@
   "cta_staff": "Staff जोड़ें",
   "cta_settings": "सेटिंग्स में जाएँ",
   "tabs": { "dashboard": "डैशबोर्ड", "invoices": "इनवॉइस", "products": "प्रोडक्ट्स", "customers": "ग्राहक" },
-  "stub_story_1_2": "Story 1.2 में उपलब्ध"
+  "stub_story_1_2": "Story 1.2 में उपलब्ध",
+  "tabs_expanded": {
+    "dashboard": "डैशबोर्ड",
+    "billing": "बिलिंग",
+    "reports": "रिपोर्ट"
+  },
+  "stubs": {
+    "billing": "बिलिंग — जल्द आ रहा है",
+    "reports": "रिपोर्ट — जल्द आ रहा है"
+  }
 }

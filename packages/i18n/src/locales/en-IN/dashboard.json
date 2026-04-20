@@ -5,5 +5,14 @@
   "cta_staff": "Add staff",
   "cta_settings": "Go to settings",
   "tabs": { "dashboard": "Dashboard", "invoices": "Invoices", "products": "Products", "customers": "Customers" },
-  "stub_story_1_2": "Available in Story 1.2"
+  "stub_story_1_2": "Available in Story 1.2",
+  "tabs_expanded": {
+    "dashboard": "Dashboard",
+    "billing": "Billing",
+    "reports": "Reports"
+  },
+  "stubs": {
+    "billing": "Billing — Coming Soon",
+    "reports": "Reports — Coming Soon"
+  }
 }
