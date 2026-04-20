@@ -46,7 +46,7 @@ import { PolicyGuard } from './guards/policy.guard';
     AuthRateLimitService,
     { provide: SMS_ADAPTER, useClass: MockSmsAdapter },
   ],
-  exports: [FirebaseAdminProvider, 'PG_POOL'],
+  exports: [FirebaseAdminProvider, 'PG_POOL', PermissionsCache, PermissionsRepository, PolicyGuard],
 })
 export class AuthModule implements OnModuleDestroy {
   constructor(@Inject('AUTH_REDIS') private readonly redis: Redis) {}

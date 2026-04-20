@@ -7,6 +7,8 @@ import { SKIP_TENANT } from './common/decorators/skip-tenant.decorator';
 import { HttpTenantResolver } from './tenant-resolver';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { FirebaseJwtGuard } from './common/guards/firebase-jwt.guard';
+import { RolesGuard } from './common/guards/roles.guard';
+import { PolicyGuard } from './modules/auth/guards/policy.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { TenantBootModule } from './modules/tenant-boot/tenant-boot.module';
 import { TenantLookupModule } from './modules/tenant-lookup/tenant-lookup.module';
@@ -42,6 +44,15 @@ class ConditionalTenantInterceptor implements NestInterceptor {
       provide: APP_GUARD,
       useFactory: (reflector: Reflector) => new FirebaseJwtGuard(reflector),
       inject: [Reflector],
+    },
+    {
+      provide: APP_GUARD,
+      useFactory: (reflector: Reflector) => new RolesGuard(reflector),
+      inject: [Reflector],
+    },
+    {
+      provide: APP_GUARD,
+      useExisting: PolicyGuard,
     },
     {
       provide: APP_INTERCEPTOR,
