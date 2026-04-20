@@ -267,7 +267,7 @@ describe('SettingsService', () => {
     it('rejects percent > 30: error code is settings.wastage_high', async () => {
       const { svc } = makeSvc();
       const dto: PatchWastageDto = { category: 'RINGS', percent: '31' };
-      const caught = await tenantContext.runWith(ctx, () => svc.updateWastage(dto)).catch((e) => e);
+      const caught = await Promise.resolve(tenantContext.runWith(ctx, () => svc.updateWastage(dto))).catch((e: unknown) => e) as { response?: { code?: string } };
       expect(caught.response?.code).toBe('settings.wastage_high');
     });
 

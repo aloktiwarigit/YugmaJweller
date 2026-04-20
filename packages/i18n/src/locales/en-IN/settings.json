@@ -50,5 +50,15 @@
       "SILVER": "Silver",
       "WHOLESALE": "Wholesale"
     }
+  },
+  "wastage": {
+    "title": "Wastage Percentages",
+    "save_success": "Changes saved ✓",
+    "error_load": "Could not load data — please retry",
+    "errors": {
+      "VALUE_POSITIVE_REQUIRED": "Wastage must be greater than 0",
+      "VALUE_FORMAT_INVALID": "Please enter a valid number",
+      "wastage_high": "Wastage cannot exceed 30% — please enter a correct amount"
+    }
   }
 }

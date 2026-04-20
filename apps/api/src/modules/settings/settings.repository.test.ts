@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Pool, PoolClient } from 'pg';
 import { tenantContext, type Tenant, type UnauthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { SettingsRepository } from './settings.repository';
-import type { PatchShopProfileDto, MakingChargeConfig, WastageConfig } from '@goldsmith/shared';
-import { MAKING_CHARGE_DEFAULTS, WASTAGE_DEFAULTS } from '@goldsmith/shared';
+import type { PatchShopProfileDto, MakingChargeConfig } from '@goldsmith/shared';
+import { MAKING_CHARGE_DEFAULTS } from '@goldsmith/shared';
 
 const SHOP_A = '11111111-1111-1111-1111-111111111111';
 const tenantA: Tenant = { id: SHOP_A, slug: 'a', display_name: 'Rajesh Jewellers', status: 'ACTIVE' };
