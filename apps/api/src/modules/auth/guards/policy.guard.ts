@@ -7,9 +7,9 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { tenantContext } from '@goldsmith/tenant-context';
-import type { PermissionsCache } from '@goldsmith/tenant-config';
+import { PermissionsCache } from '@goldsmith/tenant-config';
 import { PERMISSION_KEY } from '../../../common/decorators/permission.decorator';
-import type { PermissionsRepository } from '../permissions.repository';
+import { PermissionsRepository } from '../permissions.repository';
 
 @Injectable()
 export class PolicyGuard implements CanActivate {
