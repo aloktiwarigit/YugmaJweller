@@ -2,8 +2,9 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import { tenantContext } from '@goldsmith/tenant-context';
-import type { ShopProfileRow, PatchShopProfileDto, AddressDto, OperatingHoursDto } from '@goldsmith/shared';
-import type { UpdateProfileResult } from './settings.types';
+import type { ShopProfileRow, PatchShopProfileDto, AddressDto, OperatingHoursDto, MakingChargeConfig, WastageConfig } from '@goldsmith/shared';
+import { LoyaltyConfig, LoyaltyConfigSchema, LOYALTY_DEFAULTS, WASTAGE_DEFAULTS } from '@goldsmith/shared';
+import type { UpdateProfileResult, UpdateMakingChargesResult, UpdateWastageResult } from './settings.types';
 
 interface ShopsRow {
   display_name: string;
@@ -65,6 +66,135 @@ export class SettingsRepository {
       );
 
       return { before, after };
+    });
+  }
+
+  async getMakingCharges(): Promise<MakingChargeConfig[] | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+      const r = await tx.query<{ making_charges_json: MakingChargeConfig[] | null }>(
+        `SELECT making_charges_json FROM shop_settings WHERE shop_id = $1`,
+        [shopId],
+      );
+      if (r.rows.length === 0) return null;
+      return r.rows[0].making_charges_json ?? null;
+    });
+  }
+
+  async getWastage(): Promise<Record<string, string> | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+      const r = await tx.query<{ wastage_json: Record<string, string> | null }>(
+        `SELECT wastage_json FROM shop_settings WHERE shop_id = $1`,
+        [shopId],
+      );
+      if (r.rows.length === 0) return null;
+      return r.rows[0].wastage_json ?? null;
+    });
+  }
+
+  async upsertWastage(
+    category: string,
+    percent: string,
+  ): Promise<UpdateWastageResult> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+
+      await tx.query(
+        `INSERT INTO shop_settings (shop_id) VALUES ($1) ON CONFLICT (shop_id) DO NOTHING`,
+        [shopId],
+      );
+
+      const beforeRow = await tx.query<{ wastage_json: Record<string, string> | null }>(
+        `SELECT wastage_json FROM shop_settings WHERE shop_id = $1 FOR UPDATE`,
+        [shopId],
+      );
+      const storedMap: Record<string, string> = beforeRow.rows[0]?.wastage_json ?? {};
+      const before: WastageConfig[] | null = Object.keys(storedMap).length === 0
+        ? null
+        : WASTAGE_DEFAULTS.map((d) => ({ category: d.category, percent: storedMap[d.category] ?? d.percent }));
+
+      const mergedMap = { ...storedMap, [category]: percent };
+
+      const r = await tx.query<{ wastage_json: Record<string, string> }>(
+        `INSERT INTO shop_settings (shop_id, wastage_json)
+         VALUES ($1, $2::jsonb)
+         ON CONFLICT (shop_id)
+         DO UPDATE SET wastage_json = $2::jsonb, updated_at = now()
+         RETURNING wastage_json`,
+        [shopId, JSON.stringify(mergedMap)],
+      );
+      const afterMap = r.rows[0].wastage_json;
+      const after: WastageConfig[] = WASTAGE_DEFAULTS.map((d) => ({
+        category: d.category,
+        percent: afterMap[d.category] ?? d.percent,
+      }));
+
+      return { before, after };
+    });
+  }
+
+  async upsertMakingCharges(
+    patchItems: MakingChargeConfig[],
+    defaults: MakingChargeConfig[],
+  ): Promise<UpdateMakingChargesResult> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+
+      await tx.query(
+        `INSERT INTO shop_settings (shop_id) VALUES ($1) ON CONFLICT (shop_id) DO NOTHING`,
+        [shopId],
+      );
+
+      const beforeRow = await tx.query<{ making_charges_json: MakingChargeConfig[] | null }>(
+        `SELECT making_charges_json FROM shop_settings WHERE shop_id = $1 FOR UPDATE`,
+        [shopId],
+      );
+      const before = beforeRow.rows.length > 0 ? (beforeRow.rows[0].making_charges_json ?? null) : null;
+
+      const storedMap = before ? new Map(before.map((c) => [c.category, c])) : null;
+      const current = storedMap ? defaults.map((d) => storedMap.get(d.category) ?? d) : defaults;
+      const patchMap = new Map(patchItems.map((c) => [c.category, c]));
+      const merged = current.map((c) => patchMap.get(c.category) ?? c);
+
+      const r = await tx.query<{ making_charges_json: MakingChargeConfig[] }>(
+        `INSERT INTO shop_settings (shop_id, making_charges_json)
+         VALUES ($1, $2::jsonb)
+         ON CONFLICT (shop_id)
+         DO UPDATE SET making_charges_json = $2::jsonb, updated_at = now()
+         RETURNING making_charges_json`,
+        [shopId, JSON.stringify(merged)],
+      );
+      const after = r.rows[0].making_charges_json;
+
+      return { before, after };
+    });
+  }
+
+  async getLoyalty(): Promise<LoyaltyConfig> {
+    return withTenantTx(this.pool, async (tx) => {
+      const { shopId } = tenantContext.requireCurrent();
+      const r = await tx.query<{ loyalty_json: unknown }>(
+        `SELECT loyalty_json FROM shop_settings WHERE shop_id = $1`,
+        [shopId],
+      );
+      if (r.rows.length === 0 || r.rows[0].loyalty_json == null) {
+        return LOYALTY_DEFAULTS;
+      }
+      const parsed = LoyaltyConfigSchema.safeParse(r.rows[0].loyalty_json);
+      return parsed.success ? parsed.data : LOYALTY_DEFAULTS;
+    });
+  }
+
+  async upsertLoyalty(config: LoyaltyConfig): Promise<void> {
+    return withTenantTx(this.pool, async (tx) => {
+      const { shopId } = tenantContext.requireCurrent();
+      await tx.query(
+        `INSERT INTO shop_settings (shop_id, loyalty_json)
+         VALUES ($1, $2::jsonb)
+         ON CONFLICT (shop_id) DO UPDATE SET loyalty_json = EXCLUDED.loyalty_json, updated_at = now()`,
+        [shopId, JSON.stringify(config)],
+      );
     });
   }
 

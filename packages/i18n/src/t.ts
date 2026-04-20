@@ -6,10 +6,12 @@ import hiDashboard from './locales/hi-IN/dashboard.json';
 import enAuth from './locales/en-IN/auth.json';
 import enCommon from './locales/en-IN/common.json';
 import enDashboard from './locales/en-IN/dashboard.json';
+import hiSettings from './locales/hi-IN/settings.json';
+import enSettings from './locales/en-IN/settings.json';
 
 const BUNDLES: Record<Locale, Record<string, unknown>> = {
-  'hi-IN': { auth: hiAuth, common: hiCommon, dashboard: hiDashboard },
-  'en-IN': { auth: enAuth, common: enCommon, dashboard: enDashboard },
+  'hi-IN': { auth: hiAuth, common: hiCommon, dashboard: hiDashboard, settings: hiSettings },
+  'en-IN': { auth: enAuth, common: enCommon, dashboard: enDashboard, settings: enSettings },
 };
 
 let current: Locale = 'hi-IN';
