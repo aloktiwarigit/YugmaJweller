@@ -1,4 +1,5 @@
 import type { ShopProfileRow, MakingChargeConfig, WastageConfig } from '@goldsmith/shared';
+import { LoyaltyConfig } from '@goldsmith/shared';
 
 export interface UpdateProfileResult {
   before: ShopProfileRow;
@@ -14,3 +15,5 @@ export interface UpdateWastageResult {
   before: WastageConfig[] | null;
   after:  WastageConfig[];
 }
+
+export type UpdateLoyaltyResult = { ok: true; config: LoyaltyConfig } | { ok: false; error: string };

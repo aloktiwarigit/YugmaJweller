@@ -16,3 +16,10 @@ export interface WastageResponseDto {
   configs: WastageConfig[];
   etag: string;
 }
+
+export interface LoyaltyResponseDto {
+  tiers: Array<{ name: string; thresholdPaise: number; badgeColor: string }>;
+  earnRatePercentage: string;
+  redemptionRatePercentage: string;
+  etag: string;
+}

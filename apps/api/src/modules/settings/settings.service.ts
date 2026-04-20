@@ -1,12 +1,13 @@
 import { BadRequestException, Inject, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import type { Pool } from 'pg';
-import { PatchShopProfileSchema, PatchMakingChargesSchema, MAKING_CHARGE_DEFAULTS, PatchWastageSchema, WASTAGE_DEFAULTS } from '@goldsmith/shared';
+import { PatchShopProfileSchema, LoyaltyConfig, LoyaltyConfigSchema, PatchLoyaltyDto, PatchMakingChargesSchema, MAKING_CHARGE_DEFAULTS, PatchWastageSchema, WASTAGE_DEFAULTS } from '@goldsmith/shared';
 import type { PatchShopProfileDto, ShopProfileRow, MakingChargeConfig, PatchMakingChargesDto, WastageConfig, PatchWastageDto } from '@goldsmith/shared';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import { SettingsCache } from '@goldsmith/tenant-config';
 import { SettingsRepository } from './settings.repository';
 import { DrizzleTenantLookup } from '../../drizzle-tenant-lookup';
+import type { UpdateLoyaltyResult } from './settings.types';
 
 @Injectable()
 export class SettingsService {
@@ -44,6 +45,76 @@ export class SettingsService {
     void this.auditProfileUpdate(before, after).catch(() => undefined);
 
     return after;
+  }
+
+  async getLoyalty(): Promise<LoyaltyConfig> {
+    const hit = await this.cache.getLoyalty();
+    if (hit) return hit;
+    const config = await this.repo.getLoyalty();
+    await this.cache.setLoyalty(config);
+    return config;
+  }
+
+  async updateLoyalty(dto: PatchLoyaltyDto): Promise<UpdateLoyaltyResult> {
+    const current = await this.getLoyalty();
+    const newConfig: LoyaltyConfig = {
+      ...current,
+      tiers: [...current.tiers] as LoyaltyConfig['tiers'],
+    };
+
+    if (dto.type === 'tier') {
+      const thresholdPaise = SettingsService.rupeesToPaise(dto.thresholdRupees);
+      newConfig.tiers = [
+        { ...newConfig.tiers[0] },
+        { ...newConfig.tiers[1] },
+        { ...newConfig.tiers[2] },
+      ] as LoyaltyConfig['tiers'];
+      newConfig.tiers[dto.index] = {
+        name: dto.name,
+        thresholdPaise,
+        badgeColor: dto.badgeColor,
+      };
+    } else {
+      // type === 'rate'
+      newConfig.earnRatePercentage = dto.earnRatePercentage;
+      newConfig.redemptionRatePercentage = dto.redemptionRatePercentage;
+    }
+
+    // Enforce strict ascending tier order on both branches
+    if (!SettingsService.isAscendingOrder(newConfig.tiers)) {
+      return { ok: false, error: 'TIER_ORDER_INVALID' };
+    }
+
+    const parsed = LoyaltyConfigSchema.safeParse(newConfig);
+    if (!parsed.success) {
+      return { ok: false, error: 'SCHEMA_INVALID' };
+    }
+
+    await this.repo.upsertLoyalty(parsed.data);
+    await this.cache.invalidateLoyalty();
+
+    const { shopId } = tenantContext.requireCurrent();
+    void auditLog(this.pool, {
+      action: AuditAction.SETTINGS_LOYALTY_UPDATED,
+      subjectType: 'shop',
+      subjectId: shopId,
+      metadata: { type: dto.type, before: current, after: parsed.data },
+    }).catch(() => undefined);
+
+    return { ok: true, config: parsed.data };
+  }
+
+  private static rupeesToPaise(rupees: string): number {
+    const paise = Math.round(parseFloat(rupees) * 100);
+    if (!Number.isInteger(paise) || paise < 0 || paise > 1_000_000_000) {
+      throw new UnprocessableEntityException({ code: 'settings.threshold_out_of_range' });
+    }
+    return paise;
+  }
+
+  private static isAscendingOrder(tiers: LoyaltyConfig['tiers']): boolean {
+    return tiers[0].thresholdPaise < tiers[1].thresholdPaise &&
+           tiers[1].thresholdPaise < tiers[2].thresholdPaise;
   }
 
   private async auditProfileUpdate(

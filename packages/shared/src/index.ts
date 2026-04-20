@@ -47,3 +47,18 @@ export type {
   UpdatePermissionDto,
   RolePermissionsRow,
 } from './schemas/role-permissions.schema';
+export {
+  LoyaltyTierSchema,
+  LoyaltyConfigSchema,
+  PatchLoyaltyTierSchema,
+  PatchLoyaltyRateSchema,
+  PatchLoyaltySchema,
+  LOYALTY_DEFAULTS,
+} from './schemas/loyalty-config.schema';
+export type {
+  LoyaltyTier,
+  LoyaltyConfig,
+  PatchLoyaltyTierDto,
+  PatchLoyaltyRateDto,
+  PatchLoyaltyDto,
+} from './schemas/loyalty-config.schema';
