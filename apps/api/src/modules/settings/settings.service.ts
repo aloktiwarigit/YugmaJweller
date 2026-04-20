@@ -66,7 +66,13 @@ export class SettingsService {
     const hit = await this.cache.getMakingCharges();
     if (hit) return hit;
     const stored = await this.repo.getMakingCharges();
-    const configs = stored ?? MAKING_CHARGE_DEFAULTS;
+    let configs: MakingChargeConfig[];
+    if (!stored) {
+      configs = MAKING_CHARGE_DEFAULTS;
+    } else {
+      const storedMap = new Map(stored.map((c) => [c.category, c]));
+      configs = MAKING_CHARGE_DEFAULTS.map((d) => storedMap.get(d.category) ?? d);
+    }
     await this.cache.setMakingCharges(configs);
     return configs;
   }

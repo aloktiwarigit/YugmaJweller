@@ -131,13 +131,17 @@ describe('SettingsService', () => {
       expect(cache.setMakingCharges).toHaveBeenCalledWith(MAKING_CHARGE_DEFAULTS);
     });
 
-    it('returns DB data when DB returns existing configs (no defaults injected)', async () => {
+    it('merges stored configs over defaults, filling missing categories', async () => {
       const { svc, repo, cache } = makeSvc();
       const existing: MakingChargeConfig[] = [{ category: 'RINGS', type: 'percent', value: '10.00' }];
       (repo.getMakingCharges as ReturnType<typeof vi.fn>).mockResolvedValueOnce(existing);
       const result = await tenantContext.runWith(ctx, () => svc.getMakingCharges());
-      expect(result).toEqual(existing);
-      expect(cache.setMakingCharges).toHaveBeenCalledWith(existing);
+      const expected = MAKING_CHARGE_DEFAULTS.map((d) =>
+        d.category === 'RINGS' ? { ...d, value: '10.00' } : d,
+      );
+      expect(result).toEqual(expected);
+      expect(result).toHaveLength(MAKING_CHARGE_DEFAULTS.length);
+      expect(cache.setMakingCharges).toHaveBeenCalledWith(expected);
     });
   });
 

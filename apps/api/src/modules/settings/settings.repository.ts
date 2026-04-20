@@ -100,7 +100,9 @@ export class SettingsRepository {
       );
       const before = beforeRow.rows.length > 0 ? (beforeRow.rows[0].making_charges_json ?? null) : null;
 
-      const current = before ?? defaults;
+      // Merge stored over defaults so partial/legacy rows never produce < 6 categories.
+      const storedMap = before ? new Map(before.map((c) => [c.category, c])) : null;
+      const current = storedMap ? defaults.map((d) => storedMap.get(d.category) ?? d) : defaults;
       const patchMap = new Map(patchItems.map((c) => [c.category, c]));
       const merged = current.map((c) => patchMap.get(c.category) ?? c);
 
