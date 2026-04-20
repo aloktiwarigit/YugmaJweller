@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { auditLog, platformAuditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext, type Tenant, type AuthenticatedTenantContext, type ShopUserRole } from '@goldsmith/tenant-context';
@@ -134,6 +134,34 @@ export class AuthService {
     );
     await this.smsAdapter.sendInvite(dto.phone, shopId, result.userId!);
     return { userId: result.userId! };
+  }
+
+  async revokeStaff(shopId: string, targetUserId: string, callerUserId: string): Promise<void> {
+    const row = await this.repo.revokeStaff(shopId, targetUserId);
+    if (!row) throw new NotFoundException({ code: 'auth.staff_not_found' });
+    if (targetUserId === callerUserId) throw new BadRequestException({ code: 'auth.self_revoke' });
+    if (row.role === 'shop_admin') throw new ForbiddenException({ code: 'auth.cannot_revoke_admin' });
+
+    await this.repo.markRevoked(shopId, targetUserId, callerUserId);
+
+    if (row.firebaseUid !== null) {
+      await this.firebase.admin().auth().revokeRefreshTokens(row.firebaseUid);
+    }
+
+    const tenant = await this.loadTenantById(shopId);
+    const ctx: AuthenticatedTenantContext = {
+      shopId, tenant,
+      authenticated: true, userId: callerUserId, role: 'shop_admin' as ShopUserRole,
+    };
+    await tenantContext.runWith(ctx, () =>
+      auditLog(this.pool, {
+        action: AuditAction.STAFF_REVOKED,
+        subjectType: 'shop_user',
+        subjectId: targetUserId,
+        actorUserId: callerUserId,
+        metadata: { before: { status: 'ACTIVE' }, after: { status: 'REVOKED' } },
+      }),
+    );
   }
 
   private async loadTenantById(id: string): Promise<Tenant> {
