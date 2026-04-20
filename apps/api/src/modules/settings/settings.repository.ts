@@ -107,7 +107,7 @@ export class SettingsRepository {
       );
 
       const beforeRow = await tx.query<{ wastage_json: Record<string, string> | null }>(
-        `SELECT * FROM shop_settings WHERE shop_id = $1 FOR UPDATE`,
+        `SELECT wastage_json FROM shop_settings WHERE shop_id = $1 FOR UPDATE`,
         [shopId],
       );
       const storedMap: Record<string, string> = beforeRow.rows[0]?.wastage_json ?? {};

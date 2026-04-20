@@ -281,13 +281,16 @@ describe('SettingsRepository', () => {
       const mockClient = {
         query: vi.fn().mockImplementation(async (sql: string, params?: unknown[]) => {
           if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
-              sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
+              sql.includes('SET LOCAL') || sql.includes('SET app.') || sql.includes('ON CONFLICT (shop_id) DO NOTHING')) return;
+          if (sql.includes('FOR UPDATE')) {
+            // SELECT FOR UPDATE — fresh shop
+            return { rows: [{ wastage_json: null }], rowCount: 1 };
+          }
           if (sql.includes('wastage_json')) {
             capturedParams = params;
             return { rows: [{ wastage_json: { BRIDAL: '2.50' } }], rowCount: 1 };
           }
-          // SELECT FOR UPDATE
-          return { rows: [{ wastage_json: null }], rowCount: 1 };
+          return { rows: [], rowCount: 0 };
         }),
         release: vi.fn(),
       } as unknown as PoolClient;
@@ -304,12 +307,16 @@ describe('SettingsRepository', () => {
       const mockClient = {
         query: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
-              sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
+              sql.includes('SET LOCAL') || sql.includes('SET app.') || sql.includes('ON CONFLICT (shop_id) DO NOTHING')) return;
+          if (sql.includes('FOR UPDATE')) {
+            // SELECT FOR UPDATE — fresh shop (null map)
+            return { rows: [{ wastage_json: null }], rowCount: 1 };
+          }
           if (sql.includes('wastage_json')) {
+            // UPSERT RETURNING
             return { rows: [{ wastage_json: { BRIDAL: '2.50' } }], rowCount: 1 };
           }
-          // SELECT FOR UPDATE — fresh shop has null
-          return { rows: [{ wastage_json: null }], rowCount: 1 };
+          return { rows: [], rowCount: 0 };
         }),
         release: vi.fn(),
       } as unknown as PoolClient;
