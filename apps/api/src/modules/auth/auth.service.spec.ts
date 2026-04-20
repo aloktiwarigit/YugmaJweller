@@ -241,6 +241,7 @@ function makeRevokeService(opts: {
 
   const mockFirebaseAuth = {
     revokeRefreshTokens: vi.fn().mockResolvedValue(undefined),
+    updateUser: vi.fn().mockResolvedValue(undefined),
   };
   const firebase = {
     admin: vi.fn().mockReturnValue({ auth: vi.fn().mockReturnValue(mockFirebaseAuth) }),
@@ -264,9 +265,10 @@ describe('AuthService.revokeStaff()', () => {
 
     expect(authRepo.markRevoked).toHaveBeenCalledWith(SHOP_ID, TARGET_ID, CALLER_ID);
     expect(mockFirebaseAuth.revokeRefreshTokens).toHaveBeenCalledWith(FIREBASE_UID);
+    expect(mockFirebaseAuth.updateUser).toHaveBeenCalledWith(FIREBASE_UID, { disabled: true });
   });
 
-  it('skips revokeRefreshTokens when firebaseUid is null', async () => {
+  it('skips revokeRefreshTokens and updateUser when firebaseUid is null', async () => {
     const { svc, mockFirebaseAuth, authRepo } = makeRevokeService({
       targetRow: { firebaseUid: null, role: 'shop_staff' },
     });
@@ -275,6 +277,7 @@ describe('AuthService.revokeStaff()', () => {
 
     expect(authRepo.markRevoked).toHaveBeenCalledOnce();
     expect(mockFirebaseAuth.revokeRefreshTokens).not.toHaveBeenCalled();
+    expect(mockFirebaseAuth.updateUser).not.toHaveBeenCalled();
   });
 
   it('throws NotFoundException(404) when target user not found', async () => {

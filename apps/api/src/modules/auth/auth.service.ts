@@ -146,6 +146,8 @@ export class AuthService {
 
     if (row.firebaseUid !== null) {
       await this.firebase.admin().auth().revokeRefreshTokens(row.firebaseUid);
+      // Disable the Firebase account so a new OTP cannot produce a fresh token with stale claims.
+      await this.firebase.admin().auth().updateUser(row.firebaseUid, { disabled: true });
     }
 
     const tenant = await this.loadTenantById(shopId);

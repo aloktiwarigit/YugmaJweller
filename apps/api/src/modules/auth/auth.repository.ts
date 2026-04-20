@@ -75,7 +75,7 @@ export class AuthRepository {
     return withTenantTx(this.pool, async (tx) => {
       const conflict = await tx.query<{ id: string }>(
         `SELECT id FROM shop_users
-          WHERE shop_id = $1 AND phone = $2 AND status IN ('INVITED', 'ACTIVE')`,
+          WHERE shop_id = $1 AND phone = $2 AND status IN ('INVITED', 'ACTIVE', 'REVOKED')`,
         [args.shopId, args.phone],
       );
       if ((conflict.rowCount ?? 0) > 0) return { conflict: true };

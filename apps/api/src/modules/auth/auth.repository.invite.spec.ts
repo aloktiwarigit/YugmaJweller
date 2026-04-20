@@ -7,7 +7,7 @@ const fakeTenant: Tenant = { id: 'shop-1', slug: 'sl', display_name: 'My Shop', 
 const ctx = { shopId: 'shop-1', tenant: fakeTenant, authenticated: false } as const;
 
 describe('AuthRepository.inviteStaff', () => {
-  it('returns conflict:true when phone already in INVITED/ACTIVE status', async () => {
+  it('returns conflict:true when phone already in INVITED/ACTIVE/REVOKED status', async () => {
     // withTenantTx sequence: BEGIN → SET LOCAL ROLE app_user → SET LOCAL app.current_shop_id
     //   → conflict SELECT (1 row) → COMMIT → SET app.current_shop_id=POISON → release
     const mockClient = {
