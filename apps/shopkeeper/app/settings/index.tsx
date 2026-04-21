@@ -4,11 +4,13 @@ import { router } from 'expo-router';
 import { colors, spacing, typography } from '@goldsmith/ui-tokens';
 
 const items = [
+  { key: 'account', label: 'मेरा खाता', route: '/settings/account' },
   { key: 'shop_profile', label: 'शॉप प्रोफाइल', route: '/settings/shop-profile' },
   { key: 'staff', label: 'स्टाफ प्रबंधन', route: '/settings/staff' },
   { key: 'making_charges', label: 'मेकिंग चार्जेस', route: '/settings/making-charges' },
   { key: 'billing', label: 'बिलिंग', route: '/settings/billing' },
   { key: 'reports', label: 'रिपोर्ट्स', route: '/settings/reports' },
+  { key: 'audit_log', label: 'गतिविधि लॉग', route: '/settings/audit-log' },
 ] as const;
 
 export default function SettingsScreen(): React.ReactElement {
