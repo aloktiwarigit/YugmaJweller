@@ -7,7 +7,7 @@ import { withTenantTx } from '@goldsmith/db';
 // ---------------------------------------------------------------------------
 
 export type AuditLogDateRange = 'today' | '7d' | '30d';
-export type AuditLogCategory = 'login' | 'staff' | 'settings' | 'permissions';
+export type AuditLogCategory = 'auth' | 'staff' | 'settings' | 'access';
 
 export interface AuditLogFilters {
   page: number;
@@ -35,10 +35,10 @@ export interface PaginatedAuditLog {
 // ---------------------------------------------------------------------------
 
 const CATEGORY_ACTIONS: Record<AuditLogCategory, string[]> = {
-  // User-facing login activity — excludes internal infra events (UID mismatch, token invalid, tenant boot)
-  login: [
+  auth: [
     'AUTH_VERIFY_SUCCESS', 'AUTH_VERIFY_FAILURE', 'AUTH_VERIFY_LOCKED',
-    'AUTH_VERIFY_REJECTED', 'AUTH_USER_PROVISIONED', 'AUTH_LOGOUT_ALL',
+    'AUTH_VERIFY_REJECTED', 'AUTH_USER_PROVISIONED', 'AUTH_UID_MISMATCH',
+    'AUTH_TOKEN_INVALID', 'AUTH_LOGOUT_ALL', 'TENANT_CLAIM_CONFLICT', 'TENANT_BOOT',
   ],
   staff: ['STAFF_INVITED', 'STAFF_REVOKED', 'STAFF_ACTIVATED'],
   settings: [
@@ -48,7 +48,7 @@ const CATEGORY_ACTIONS: Record<AuditLogCategory, string[]> = {
     'SETTINGS_CUSTOM_ORDER_POLICY_UPDATED', 'SETTINGS_RETURN_POLICY_UPDATED',
     'SETTINGS_NOTIFICATION_PREFS_UPDATED',
   ],
-  permissions: ['PERMISSIONS_UPDATED', 'ACCESS_DENIED'],
+  access: ['ACCESS_DENIED', 'PERMISSIONS_UPDATED'],
 };
 
 // ---------------------------------------------------------------------------

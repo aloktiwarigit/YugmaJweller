@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   Inject,
@@ -141,8 +142,9 @@ export class AuthController {
   ): Promise<unknown> {
     const ctx = tenantContext.requireCurrent();
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
-    // @Roles('shop_admin', 'shop_manager') already blocks shop_staff at PolicyGuard level —
-    // no redundant manual role check needed here.
+    const auth = ctx as AuthenticatedTenantContext;
+    // PolicyGuard only enforces @Permission() keys — not @Roles(). Explicit role check required.
+    if (auth.role === 'shop_staff') throw new ForbiddenException({ errorCode: 'auth.permission_denied' });
     const parsedPage = parseInt(page ?? '1', 10);
     const parsedPageSize = parseInt(pageSize ?? '20', 10);
     return this.svc.getAuditLog({

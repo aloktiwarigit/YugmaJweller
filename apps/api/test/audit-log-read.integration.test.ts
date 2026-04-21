@@ -161,12 +161,12 @@ describe('AuditLogRepository.findPaginated', () => {
   it('filters by category — login category returns only login actions', async () => {
     const shopId = await seedShop(`audit-cat-${Date.now()}`);
     await seedAuditEvents(shopId, [
-      'AUTH_VERIFY_SUCCESS', // login
-      'AUTH_VERIFY_SUCCESS', // login
+      'AUTH_VERIFY_SUCCESS', // auth
+      'AUTH_VERIFY_SUCCESS', // auth
       'STAFF_INVITED',       // staff
     ]);
 
-    const loginResult = await findInContext(shopId, { page: 1, pageSize: 10, category: 'login' });
+    const loginResult = await findInContext(shopId, { page: 1, pageSize: 10, category: 'auth' });
     const staffResult = await findInContext(shopId, { page: 1, pageSize: 10, category: 'staff' });
 
     expect(loginResult.total).toBe(2);

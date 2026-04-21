@@ -228,7 +228,7 @@ describe('AuthService.getAuditLog()', () => {
     const findPaginated = vi.fn().mockResolvedValue({ events: [], total: 3 });
     const { svc } = makeService({ auditLogRepoFindPaginated: findPaginated });
 
-    const filters: AuditLogFilters = { page: 1, pageSize: 10, category: 'login', dateRange: '7d' };
+    const filters: AuditLogFilters = { page: 1, pageSize: 10, category: 'auth', dateRange: '7d' };
     await svc.getAuditLog(filters);
 
     expect(findPaginated).toHaveBeenCalledOnce();
@@ -281,11 +281,12 @@ describe('AuthService.logoutAll()', () => {
     );
 
     // Helper: run fn inside a tenant context (as the TenantInterceptor would in production)
-    const withCtx = (fn: () => Promise<void>): Promise<unknown> =>
-      tenantContext.runWith(
+    const withCtx = async (fn: () => Promise<void>): Promise<void> => {
+      await tenantContext.runWith(
         { shopId: SHOP_ID, tenant: fakeTenant, authenticated: true, userId: 'user-123', role: 'shop_admin' },
         fn,
       );
+    };
 
     return { svc, mockRevoke, auditClient, pool, withCtx };
   }
