@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import type { Pool } from 'pg';
-import { PatchShopProfileSchema, PatchMakingChargesSchema, MAKING_CHARGE_DEFAULTS, PatchWastageSchema, WASTAGE_DEFAULTS } from '@goldsmith/shared';
-import type { PatchShopProfileDto, ShopProfileRow, MakingChargeConfig, PatchMakingChargesDto, WastageConfig, PatchWastageDto } from '@goldsmith/shared';
+import { PatchShopProfileSchema, PatchMakingChargesSchema, MAKING_CHARGE_DEFAULTS, PatchWastageSchema, WASTAGE_DEFAULTS, PatchRateLockSchema, RATE_LOCK_DEFAULT_DAYS } from '@goldsmith/shared';
+import type { PatchShopProfileDto, ShopProfileRow, MakingChargeConfig, PatchMakingChargesDto, WastageConfig, PatchWastageDto, PatchRateLockDto } from '@goldsmith/shared';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import { SettingsCache } from '@goldsmith/tenant-config';
@@ -154,6 +154,44 @@ export class SettingsService {
     if (!tc) return;
     await auditLog(this.pool, {
       action: AuditAction.SETTINGS_WASTAGE_UPDATED,
+      subjectType: 'shop',
+      subjectId: tc.shopId,
+      actorUserId: tc.authenticated ? tc.userId : undefined,
+      before,
+      after,
+    });
+  }
+
+  async getRateLock(): Promise<number> {
+    const hit = await this.cache.getRateLock();
+    if (hit !== null) return hit;
+    const stored = await this.repo.getRateLockDays();
+    const days = stored ?? RATE_LOCK_DEFAULT_DAYS;
+    await this.cache.setRateLock(days);
+    return days;
+  }
+
+  async updateRateLock(dto: PatchRateLockDto): Promise<number> {
+    const parsed = PatchRateLockSchema.safeParse(dto);
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), code: i.message }));
+      throw new UnprocessableEntityException({ code: 'validation.failed', errors });
+    }
+
+    const { before, after } = await this.repo.updateRateLockDays(parsed.data.rateLockDays);
+    await this.cache.invalidateRateLock();
+    void this.auditRateLockUpdate(before, after).catch(() => undefined);
+    return after;
+  }
+
+  private async auditRateLockUpdate(
+    before: number | null,
+    after: number,
+  ): Promise<void> {
+    const tc = tenantContext.current();
+    if (!tc) return;
+    await auditLog(this.pool, {
+      action: AuditAction.SETTINGS_RATE_LOCK_UPDATED,
       subjectType: 'shop',
       subjectId: tc.shopId,
       actorUserId: tc.authenticated ? tc.userId : undefined,
