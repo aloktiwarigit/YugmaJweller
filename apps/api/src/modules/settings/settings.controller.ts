@@ -124,7 +124,7 @@ export class SettingsController {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     if (!['shop_admin', 'shop_manager'].includes(ctx.role)) throw new ForbiddenException({ code: 'auth.insufficient_role' });
     const days = await this.svc.getRateLock();
-    const etag = `"${createHash('sha256').update(String(days)).digest('hex').slice(0, 16)}"`;
+    const etag = `"${createHash('sha256').update(JSON.stringify(days)).digest('hex').slice(0, 16)}"`;
     res.setHeader('ETag', etag);
     return { rateLockDays: days, etag };
   }
@@ -138,7 +138,7 @@ export class SettingsController {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     if (ctx.role !== 'shop_admin') throw new ForbiddenException({ code: 'auth.insufficient_role' });
     const days = await this.svc.updateRateLock(body);
-    const etag = `"${createHash('sha256').update(String(days)).digest('hex').slice(0, 16)}"`;
+    const etag = `"${createHash('sha256').update(JSON.stringify(days)).digest('hex').slice(0, 16)}"`;
     res.setHeader('ETag', etag);
     return { rateLockDays: days, etag };
   }
