@@ -14,3 +14,8 @@ export interface UpdateWastageResult {
   before: WastageConfig[] | null;
   after:  WastageConfig[];
 }
+
+export interface UpdateRateLockResult {
+  before: number | null;
+  after: number;
+}

@@ -4,7 +4,7 @@ import { withTenantTx } from '@goldsmith/db';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { ShopProfileRow, PatchShopProfileDto, AddressDto, OperatingHoursDto, MakingChargeConfig, WastageConfig } from '@goldsmith/shared';
 import { WASTAGE_DEFAULTS } from '@goldsmith/shared';
-import type { UpdateProfileResult, UpdateMakingChargesResult, UpdateWastageResult } from './settings.types';
+import type { UpdateProfileResult, UpdateMakingChargesResult, UpdateWastageResult, UpdateRateLockResult } from './settings.types';
 
 interface ShopsRow {
   display_name: string;
@@ -132,6 +132,45 @@ export class SettingsRepository {
       }));
 
       return { before, after };
+    });
+  }
+
+  async getRateLockDays(): Promise<number | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+      const r = await tx.query<{ rate_lock_days: number | null }>(
+        `SELECT rate_lock_days FROM shop_settings WHERE shop_id = $1`,
+        [shopId],
+      );
+      return r.rows[0]?.rate_lock_days ?? null;
+    });
+  }
+
+  async updateRateLockDays(days: number): Promise<UpdateRateLockResult> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+
+      // Ensure row exists so SELECT FOR UPDATE always acquires a lock.
+      await tx.query(
+        `INSERT INTO shop_settings (shop_id) VALUES ($1) ON CONFLICT (shop_id) DO NOTHING`,
+        [shopId],
+      );
+
+      const beforeRow = await tx.query<{ rate_lock_days: number | null }>(
+        `SELECT rate_lock_days FROM shop_settings WHERE shop_id = $1 FOR UPDATE`,
+        [shopId],
+      );
+      const before = beforeRow.rows[0]?.rate_lock_days ?? null;
+
+      const r = await tx.query<{ rate_lock_days: number }>(
+        `UPDATE shop_settings
+            SET rate_lock_days = $1, updated_at = now()
+          WHERE shop_id = $2
+          RETURNING rate_lock_days`,
+        [days, shopId],
+      );
+
+      return { before, after: r.rows[0].rate_lock_days };
     });
   }
 
