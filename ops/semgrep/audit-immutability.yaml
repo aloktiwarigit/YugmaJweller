@@ -1,0 +1,9 @@
+rules:
+  - id: no-drizzle-mutation-on-audit-events
+    languages:
+      - typescript
+    severity: ERROR
+    message: "audit_events is append-only — use auditLog() for writes"
+    pattern-either:
+      - pattern: $DB.update(auditEvents)
+      - pattern: $DB.delete(auditEvents)
