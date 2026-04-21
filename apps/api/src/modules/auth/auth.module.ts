@@ -7,6 +7,7 @@ import { PermissionsCache } from '@goldsmith/tenant-config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthRepository } from './auth.repository';
+import { AuditLogRepository } from './audit-log.repository';
 import { PermissionsRepository } from './permissions.repository';
 import { AuthRateLimitService } from './auth-rate-limit.service';
 import { FirebaseAdminProvider } from './firebase-admin.provider';
@@ -42,6 +43,7 @@ import { PolicyGuard } from './guards/policy.guard';
     FirebaseJwtStrategy,
     AuthService,
     AuthRepository,
+    AuditLogRepository,
     PermissionsRepository,
     AuthRateLimitService,
     { provide: SMS_ADAPTER, useClass: MockSmsAdapter },
