@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
 import { Reflector } from '@nestjs/core';
@@ -41,7 +41,7 @@ const updatePermDto = { permission_key: 'billing.create' as const, is_enabled: f
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
-const mockAuthService = { invite: vi.fn() };
+const mockAuthService = { invite: vi.fn(), getAuditLog: vi.fn(), logoutAll: vi.fn() };
 const mockAuthRepo = { listUsers: vi.fn() };
 const mockPermissionsRepo = { getPermissions: vi.fn(), upsertPermission: vi.fn() };
 const mockPermissionsCache = { invalidate: vi.fn(), getPermissions: vi.fn(), setPermissions: vi.fn() };
@@ -197,6 +197,116 @@ describe('AuthController', () => {
       const unauthCtx = { authenticated: false as const, shopId: SHOP_ID, tenant: fakeTenant };
       await expect(
         tenantContext.runWith(unauthCtx, () => controller.listUsers()) as Promise<unknown>,
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+  });
+
+  // ─── GET /audit-log ──────────────────────────────────────────────────────
+
+  describe('GET /audit-log', () => {
+    it('calls svc.getAuditLog and returns result for shop_admin', async () => {
+      const fakeResult = { events: [], total: 0, page: 1, pageSize: 20 };
+      mockAuthService.getAuditLog.mockResolvedValueOnce(fakeResult);
+
+      const result = await withAdminCtx(() =>
+        controller.getAuditLog(undefined, undefined, undefined, undefined),
+      );
+
+      expect(mockAuthService.getAuditLog).toHaveBeenCalledWith({
+        page: 1,
+        pageSize: 20,
+        dateRange: undefined,
+        category: undefined,
+      });
+      expect(result).toEqual(fakeResult);
+    });
+
+    it('calls svc.getAuditLog with parsed page/pageSize params', async () => {
+      const fakeResult = { events: [], total: 0, page: 2, pageSize: 10 };
+      mockAuthService.getAuditLog.mockResolvedValueOnce(fakeResult);
+
+      const result = await withAdminCtx(() =>
+        controller.getAuditLog('2', '10', '7d', 'auth'),
+      );
+
+      expect(mockAuthService.getAuditLog).toHaveBeenCalledWith({
+        page: 2,
+        pageSize: 10,
+        dateRange: '7d',
+        category: 'auth',
+      });
+      expect(result).toEqual(fakeResult);
+    });
+
+    it('throws ForbiddenException when role is shop_staff', async () => {
+      const staffCtx: AuthenticatedTenantContext = {
+        ...adminCtx,
+        role: 'shop_staff',
+      };
+
+      await expect(
+        tenantContext.runWith(staffCtx, () =>
+          controller.getAuditLog(undefined, undefined, undefined, undefined),
+        ) as Promise<unknown>,
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('throws UnauthorizedException when context is not authenticated', async () => {
+      const unauthCtx = { authenticated: false as const, shopId: SHOP_ID, tenant: fakeTenant };
+      await expect(
+        tenantContext.runWith(unauthCtx, () =>
+          controller.getAuditLog(undefined, undefined, undefined, undefined),
+        ) as Promise<unknown>,
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+  });
+
+  // ─── GET /audit-log/export ───────────────────────────────────────────────
+
+  describe('GET /audit-log/export', () => {
+    it('returns deferred stub', () => {
+      const result = controller.auditLogExport();
+      expect(result).toEqual({ status: 'deferred', reason: 'Azure subscription not provisioned' });
+    });
+  });
+
+  // ─── POST /logout/all ────────────────────────────────────────────────────
+
+  describe('POST /logout/all', () => {
+    it('calls svc.logoutAll with userId and firebaseUid', async () => {
+      const FIREBASE_UID = 'firebase-uid-abc';
+      mockAuthService.logoutAll.mockResolvedValueOnce(undefined);
+
+      const fakeReq = { user: { uid: FIREBASE_UID } } as never;
+      const result = await withAdminCtx(() => controller.logoutAll(fakeReq));
+
+      expect(mockAuthService.logoutAll).toHaveBeenCalledWith(USER_ID, FIREBASE_UID);
+      expect(result).toBeUndefined();
+    });
+
+    it('throws UnauthorizedException when uid is missing from firebase user', async () => {
+      const fakeReq = { user: { uid: undefined } } as never;
+
+      await expect(
+        withAdminCtx(() => controller.logoutAll(fakeReq)),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('throws UnauthorizedException when user is not on request', async () => {
+      const fakeReq = {} as never;
+
+      await expect(
+        withAdminCtx(() => controller.logoutAll(fakeReq)),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('throws UnauthorizedException when context is not authenticated', async () => {
+      const FIREBASE_UID = 'firebase-uid-abc';
+      const fakeReq = { user: { uid: FIREBASE_UID } } as never;
+      const unauthCtx = { authenticated: false as const, shopId: SHOP_ID, tenant: fakeTenant };
+
+      await expect(
+        tenantContext.runWith(unauthCtx, () => controller.logoutAll(fakeReq)) as Promise<unknown>,
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
   });
