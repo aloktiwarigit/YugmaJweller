@@ -276,6 +276,14 @@ describe('rate-lock', () => {
     expect(days).toBe(30);
   });
 
+  it('PATCH 1 → GET returns 1 (lower boundary)', async () => {
+    await tenantContext.runWith(rateLockCtx, () =>
+      svc.updateRateLock({ rateLockDays: 1 }),
+    );
+    const days = await tenantContext.runWith(rateLockCtx, () => svc.getRateLock());
+    expect(days).toBe(1);
+  });
+
   it('PATCH 31 → throws UnprocessableEntityException (422)', async () => {
     await expect(
       tenantContext.runWith(rateLockCtx, () =>
@@ -297,6 +305,6 @@ describe('rate-lock', () => {
       shopId: SHOP_A, tenant, authenticated: true, userId: 'u2', role: 'shop_manager',
     };
     const days = await tenantContext.runWith(managerCtx, () => svc.getRateLock());
-    expect(typeof days).toBe('number');
+    expect(days).toBe(1);
   });
 });
