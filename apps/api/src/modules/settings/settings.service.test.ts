@@ -324,8 +324,7 @@ describe('SettingsService', () => {
     describe('getRateLock', () => {
       it('returns cached value on hit', async () => {
         const { svc, repo, cache } = makeSvc();
-        (cache as unknown as { getRateLock: ReturnType<typeof vi.fn> }).getRateLock =
-          vi.fn().mockResolvedValueOnce(14);
+        (cache.getRateLock as ReturnType<typeof vi.fn>).mockResolvedValueOnce(14);
         const result = await tenantContext.runWith(ctx, () => svc.getRateLock());
         expect(result).toBe(14);
         expect(repo.getRateLockDays).not.toHaveBeenCalled();
@@ -333,32 +332,28 @@ describe('SettingsService', () => {
 
       it('returns default 7 when cache miss and DB null', async () => {
         const { svc, repo, cache } = makeSvc();
-        (cache as unknown as { getRateLock: ReturnType<typeof vi.fn> }).getRateLock =
-          vi.fn().mockResolvedValueOnce(null);
-        (repo as unknown as { getRateLockDays: ReturnType<typeof vi.fn> }).getRateLockDays =
-          vi.fn().mockResolvedValueOnce(null);
+        (cache.getRateLock as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+        (repo.getRateLockDays as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
         const result = await tenantContext.runWith(ctx, () => svc.getRateLock());
         expect(result).toBe(7);
+        expect(cache.setRateLock as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(7);
       });
 
       it('returns DB value when cache miss and DB has 14', async () => {
         const { svc, repo, cache } = makeSvc();
-        (cache as unknown as { getRateLock: ReturnType<typeof vi.fn> }).getRateLock =
-          vi.fn().mockResolvedValueOnce(null);
-        (repo as unknown as { getRateLockDays: ReturnType<typeof vi.fn> }).getRateLockDays =
-          vi.fn().mockResolvedValueOnce(14);
+        (cache.getRateLock as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+        (repo.getRateLockDays as ReturnType<typeof vi.fn>).mockResolvedValueOnce(14);
         const result = await tenantContext.runWith(ctx, () => svc.getRateLock());
         expect(result).toBe(14);
+        expect(cache.setRateLock as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(14);
       });
     });
 
     describe('updateRateLock', () => {
       it('updates DB, invalidates cache, returns after value', async () => {
         const { svc, repo, cache } = makeSvc();
-        (repo as unknown as { updateRateLockDays: ReturnType<typeof vi.fn> }).updateRateLockDays =
-          vi.fn().mockResolvedValueOnce({ before: 7, after: 14 });
-        (cache as unknown as { invalidateRateLock: ReturnType<typeof vi.fn> }).invalidateRateLock =
-          vi.fn().mockResolvedValueOnce(undefined);
+        (repo.updateRateLockDays as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ before: 7, after: 14 });
+        (cache.invalidateRateLock as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
         const result = await tenantContext.runWith(ctx, () =>
           svc.updateRateLock({ rateLockDays: 14 }),
         );
@@ -369,10 +364,8 @@ describe('SettingsService', () => {
 
       it('boundary: rateLockDays = 1 succeeds', async () => {
         const { svc, repo, cache } = makeSvc();
-        (repo as unknown as { updateRateLockDays: ReturnType<typeof vi.fn> }).updateRateLockDays =
-          vi.fn().mockResolvedValueOnce({ before: null, after: 1 });
-        (cache as unknown as { invalidateRateLock: ReturnType<typeof vi.fn> }).invalidateRateLock =
-          vi.fn().mockResolvedValueOnce(undefined);
+        (repo.updateRateLockDays as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ before: null, after: 1 });
+        (cache.invalidateRateLock as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
         const result = await tenantContext.runWith(ctx, () =>
           svc.updateRateLock({ rateLockDays: 1 }),
         );
@@ -381,10 +374,8 @@ describe('SettingsService', () => {
 
       it('boundary: rateLockDays = 30 succeeds', async () => {
         const { svc, repo, cache } = makeSvc();
-        (repo as unknown as { updateRateLockDays: ReturnType<typeof vi.fn> }).updateRateLockDays =
-          vi.fn().mockResolvedValueOnce({ before: null, after: 30 });
-        (cache as unknown as { invalidateRateLock: ReturnType<typeof vi.fn> }).invalidateRateLock =
-          vi.fn().mockResolvedValueOnce(undefined);
+        (repo.updateRateLockDays as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ before: null, after: 30 });
+        (cache.invalidateRateLock as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
         const result = await tenantContext.runWith(ctx, () =>
           svc.updateRateLock({ rateLockDays: 30 }),
         );
@@ -407,10 +398,8 @@ describe('SettingsService', () => {
 
       it('swallows auditLog failure and still returns result', async () => {
         const { svc, repo, cache } = makeSvc();
-        (repo as unknown as { updateRateLockDays: ReturnType<typeof vi.fn> }).updateRateLockDays =
-          vi.fn().mockResolvedValueOnce({ before: 7, after: 14 });
-        (cache as unknown as { invalidateRateLock: ReturnType<typeof vi.fn> }).invalidateRateLock =
-          vi.fn().mockResolvedValueOnce(undefined);
+        (repo.updateRateLockDays as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ before: 7, after: 14 });
+        (cache.invalidateRateLock as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
         vi.spyOn(
           svc as unknown as { auditRateLockUpdate: () => void },
           'auditRateLockUpdate',
