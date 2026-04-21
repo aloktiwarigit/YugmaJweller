@@ -7,7 +7,9 @@ import {
   ActivityIndicator,
   StyleSheet,
   Alert,
+  Modal,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { colors, spacing, typography } from '@goldsmith/ui-tokens';
 import { Toast } from '@goldsmith/ui-mobile';
 import { StaffInviteForm } from '../../src/components/StaffInviteForm';
@@ -88,6 +90,10 @@ export default function StaffScreen(): React.ReactElement {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Revoke state
+  const [revokeTarget, setRevokeTarget] = useState<StaffUser | null>(null);
+  const [revokeLoading, setRevokeLoading] = useState(false);
+
   // Permissions state (admin-only)
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const [permsLoading, setPermsLoading] = useState(false);
@@ -101,7 +107,7 @@ export default function StaffScreen(): React.ReactElement {
     setListError(null);
     try {
       const res = await api.get<StaffUser[]>('/auth/users');
-      setStaff(res.data ?? []);
+      setStaff((res.data ?? []).filter((m) => m.status !== 'REVOKED'));
     } catch {
       setListError('स्टाफ लोड नहीं हो सका। दोबारा कोशिश करें।');
     } finally {
@@ -183,6 +189,46 @@ export default function StaffScreen(): React.ReactElement {
   };
 
   // ---------------------------------------------------------------------------
+  // Revoke handler
+  // ---------------------------------------------------------------------------
+
+  const handleRevoke = (member: StaffUser): void => {
+    setRevokeTarget(member);
+  };
+
+  const confirmRevoke = async (): Promise<void> => {
+    if (!revokeTarget) return;
+    const target = revokeTarget;
+    setRevokeLoading(true);
+
+    // Optimistic remove
+    setStaff((prev) => prev.filter((m) => m.id !== target.id));
+    setRevokeTarget(null);
+
+    try {
+      await api.delete(`/auth/staff/${target.id}`);
+      setSuccessMsg('हटा दिया गया');
+      setTimeout(() => setSuccessMsg(null), 3000);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
+    } catch (err) {
+      // Revert optimistic remove
+      setStaff((prev) => [target, ...prev]);
+      const status = (err as AxiosError).response?.status;
+      if (status === 400) {
+        setListError('आप स्वयं को नहीं हटा सकते');
+      } else if (status === 403) {
+        setListError('एडमिन को नहीं हटाया जा सकता');
+      } else if (status === 404) {
+        setListError('स्टाफ नहीं मिला');
+      } else {
+        setListError('हटाया नहीं जा सका। दोबारा कोशिश करें।');
+      }
+    } finally {
+      setRevokeLoading(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
   // Render helpers
   // ---------------------------------------------------------------------------
 
@@ -233,6 +279,21 @@ export default function StaffScreen(): React.ReactElement {
               <RoleBadge role={member.role} />
               <View style={{ width: 6 }} />
               <StatusBadge status={member.status} />
+              {isAdmin && member.role !== 'shop_admin' && (
+                <>
+                  <View style={{ width: 8 }} />
+                  <TouchableOpacity
+                    testID={`revoke-btn-${member.id}`}
+                    style={styles.revokeButton}
+                    onPress={() => handleRevoke(member)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${member.displayName} को हटाएं`}
+                    disabled={revokeLoading}
+                  >
+                    <Text style={styles.revokeButtonText}>हटाएं</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
         ))}
@@ -314,6 +375,46 @@ export default function StaffScreen(): React.ReactElement {
       )}
 
       <View style={{ height: spacing.xl }} />
+
+      {/* Revoke confirmation modal */}
+      <Modal
+        visible={revokeTarget !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { /* non-dismissable via back button */ }}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>
+              {`क्या आप ${revokeTarget?.displayName ?? ''} को हटाना चाहते हैं?`}
+            </Text>
+            <Text style={styles.modalBody}>
+              यह action वापस नहीं ली जा सकती।
+            </Text>
+            <TouchableOpacity
+              testID="revoke-confirm-btn"
+              style={styles.revokeConfirmButton}
+              onPress={() => void confirmRevoke()}
+              disabled={revokeLoading}
+              accessibilityRole="button"
+            >
+              {revokeLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.revokeConfirmText}>हाँ, हटाएं</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="revoke-cancel-btn"
+              style={styles.revokeCancelButton}
+              onPress={() => setRevokeTarget(null)}
+              accessibilityRole="button"
+            >
+              <Text style={styles.revokeCancelText}>रद्द करें</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -484,6 +585,83 @@ const styles = StyleSheet.create({
   },
   statusTextInvited: {
     color: '#856404',
+  },
+
+  // Revoke button (inline in staff row)
+  revokeButton: {
+    backgroundColor: '#C0392B',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minWidth: 48,
+    minHeight: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  revokeButtonText: {
+    fontFamily: typography.body.family,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+
+  // Modal
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl + 16,
+  },
+  modalTitle: {
+    fontFamily: typography.headingMid.family,
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.ink,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  modalBody: {
+    fontFamily: typography.body.family,
+    fontSize: 15,
+    color: colors.inkMute,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  revokeConfirmButton: {
+    backgroundColor: '#C0392B',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    minHeight: 52,
+    justifyContent: 'center',
+  },
+  revokeConfirmText: {
+    fontFamily: typography.body.family,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  revokeCancelButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    minHeight: 52,
+    justifyContent: 'center',
+  },
+  revokeCancelText: {
+    fontFamily: typography.body.family,
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.ink,
   },
 
   // Permissions section

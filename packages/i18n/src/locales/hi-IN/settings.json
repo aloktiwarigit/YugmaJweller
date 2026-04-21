@@ -2,6 +2,18 @@
   "title": "सेटिंग्स",
   "shop_profile": "शॉप प्रोफाइल",
   "staff": "स्टाफ प्रबंधन",
+  "staff_revoke": {
+    "button": "हटाएं",
+    "confirm_title": "क्या आप {{name}} को हटाना चाहते हैं?",
+    "confirm_body": "यह action वापस नहीं ली जा सकती।",
+    "confirm_yes": "हाँ, हटाएं",
+    "cancel": "रद्द करें",
+    "success_toast": "हटा दिया गया",
+    "error_self": "आप स्वयं को नहीं हटा सकते",
+    "error_admin": "एडमिन को नहीं हटाया जा सकता",
+    "error_not_found": "स्टाफ नहीं मिला",
+    "error_generic": "हटाया नहीं जा सका। दोबारा कोशिश करें।"
+  },
   "making_charges": "मेकिंग चार्जेस",
   "permissions": "अनुमतियाँ",
   "billing": "बिलिंग",
@@ -75,6 +87,30 @@
     "save_success": "बदलाव सहेज लिया ✓",
     "errors": {
       "RANGE_INVALID": "अवधि 1 से 30 दिनों के बीच होनी चाहिए"
+    }
+  },
+  "loyalty": {
+    "title": "लॉयल्टी प्रोग्राम",
+    "tiers_section": "टियर",
+    "rates_section": "पॉइंट्स दर",
+    "tier_name": "टियर का नाम",
+    "threshold": "न्यूनतम खरीद (₹)",
+    "badge_color": "बैज रंग",
+    "earn_rate": "अर्जन दर (%)",
+    "redemption_rate": "रिडेम्प्शन दर (%)",
+    "save": "सहेजें",
+    "save_success": "बदलाव सहेज लिया ✓",
+    "errors": {
+      "TIER_NAME_REQUIRED": "टियर का नाम खाली नहीं हो सकता",
+      "TIER_NAME_TOO_LONG": "नाम 20 अक्षरों से अधिक नहीं",
+      "THRESHOLD_MUST_BE_INTEGER": "न्यूनतम खरीद पूर्ण संख्या होनी चाहिए",
+      "THRESHOLD_MIN": "न्यूनतम खरीद 0 से कम नहीं हो सकती",
+      "THRESHOLD_MAX": "राशि बहुत अधिक है",
+      "THRESHOLD_OUT_OF_RANGE": "राशि 0 से 1,00,00,000 के बीच होनी चाहिए",
+      "BADGE_COLOR_INVALID": "रंग #RRGGBB format में होना चाहिए",
+      "VALUE_FORMAT_INVALID": "मान्य संख्या दर्ज करें",
+      "RATE_OUT_OF_RANGE": "दर 0 से 100 के बीच होनी चाहिए",
+      "TIER_ORDER_INVALID": "टियर का क्रम सही नहीं — न्यूनतम खरीद बढ़ते क्रम में होनी चाहिए"
     }
   }
 }

@@ -56,3 +56,19 @@ export type {
   PatchRateLockDto,
   RateLockRow,
 } from './schemas/rate-lock.schema';
+
+export {
+  LoyaltyTierSchema,
+  LoyaltyConfigSchema,
+  PatchLoyaltyTierSchema,
+  PatchLoyaltyRateSchema,
+  PatchLoyaltySchema,
+  LOYALTY_DEFAULTS,
+} from './schemas/loyalty-config.schema';
+export type {
+  LoyaltyTier,
+  LoyaltyConfig,
+  PatchLoyaltyTierDto,
+  PatchLoyaltyRateDto,
+  PatchLoyaltyDto,
+} from './schemas/loyalty-config.schema';

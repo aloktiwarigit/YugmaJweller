@@ -55,6 +55,7 @@ export class AuthRepository {
                   updated_at   = now()
             WHERE id = $2
               AND shop_id = $3
+              AND status != 'REVOKED'
               AND (firebase_uid IS NULL OR firebase_uid = $1)
             RETURNING firebase_uid`,
           [args.firebaseUid, args.userId, args.shopId],
@@ -75,7 +76,7 @@ export class AuthRepository {
     return withTenantTx(this.pool, async (tx) => {
       const conflict = await tx.query<{ id: string }>(
         `SELECT id FROM shop_users
-          WHERE shop_id = $1 AND phone = $2 AND status IN ('INVITED', 'ACTIVE')`,
+          WHERE shop_id = $1 AND phone = $2 AND status IN ('INVITED', 'ACTIVE', 'REVOKED')`,
         [args.shopId, args.phone],
       );
       if ((conflict.rowCount ?? 0) > 0) return { conflict: true };
@@ -87,6 +88,72 @@ export class AuthRepository {
         [args.shopId, args.phone, args.displayName, args.role, args.invitedByUserId],
       );
       return { conflict: false, userId: inserted.rows[0].id };
+    });
+  }
+
+  async revokeStaff(shopId: string, targetUserId: string): Promise<{ firebaseUid: string | null; role: ShopUserRole; status: string } | null> {
+    const c = await this.pool.connect();
+    try {
+      await c.query('SET ROLE app_user');
+      await c.query(`SET app.current_shop_id = '${shopId}'`);
+      const res = await c.query<{ firebase_uid: string | null; role: ShopUserRole; status: string }>(
+        `SELECT firebase_uid, role, status FROM shop_users WHERE id = $1 AND shop_id = $2 AND status != 'REVOKED'`,
+        [targetUserId, shopId],
+      );
+      if (res.rows.length === 0) return null;
+      return { firebaseUid: res.rows[0].firebase_uid, role: res.rows[0].role, status: res.rows[0].status };
+    } finally {
+      await c.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
+      await c.query('RESET ROLE').catch(() => undefined);
+      c.release();
+    }
+  }
+
+  async getStatusById(shopId: string, userId: string): Promise<string | null> {
+    const c = await this.pool.connect();
+    try {
+      await c.query('SET ROLE app_user');
+      await c.query(`SET app.current_shop_id = '${shopId}'`);
+      const res = await c.query<{ status: string }>(
+        `SELECT status FROM shop_users WHERE id = $1 AND shop_id = $2`,
+        [userId, shopId],
+      );
+      return res.rows.length > 0 ? res.rows[0].status : null;
+    } finally {
+      await c.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
+      await c.query('RESET ROLE').catch(() => undefined);
+      c.release();
+    }
+  }
+
+  async getFirebaseUid(shopId: string, userId: string): Promise<string | null> {
+    const c = await this.pool.connect();
+    try {
+      await c.query('SET ROLE app_user');
+      await c.query(`SET app.current_shop_id = '${shopId}'`);
+      const res = await c.query<{ firebase_uid: string | null }>(
+        `SELECT firebase_uid FROM shop_users WHERE id = $1 AND shop_id = $2`,
+        [userId, shopId],
+      );
+      return res.rows.length > 0 ? (res.rows[0].firebase_uid ?? null) : null;
+    } finally {
+      await c.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
+      await c.query('RESET ROLE').catch(() => undefined);
+      c.release();
+    }
+  }
+
+  async markRevoked(shopId: string, targetUserId: string, revokedByUserId: string): Promise<void> {
+    await withTenantTx(this.pool, async (tx) => {
+      await tx.query(
+        `UPDATE shop_users
+            SET status = 'REVOKED',
+                revoked_at = NOW(),
+                revoked_by_user_id = $1,
+                updated_at = NOW()
+          WHERE id = $2 AND shop_id = $3 AND status != 'REVOKED'`,
+        [revokedByUserId, targetUserId, shopId],
+      );
     });
   }
 
