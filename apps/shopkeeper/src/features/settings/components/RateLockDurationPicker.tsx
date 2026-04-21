@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
+// eslint-disable-next-line import/no-unresolved -- expo-haptics is a native Expo module, not in node_modules; mocked in test via vitest alias; declared in expo-env.d.ts for tsc
 import * as Haptics from 'expo-haptics';
 import { SettingsGroupCard } from '@goldsmith/ui-mobile';
 import { t } from '@goldsmith/i18n';

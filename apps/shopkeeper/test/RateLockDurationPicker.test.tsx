@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RateLockDurationPicker } from '../src/features/settings/components/RateLockDurationPicker';
 
@@ -13,10 +13,10 @@ vi.mock('@goldsmith/i18n', () => ({
 }));
 
 describe('RateLockDurationPicker', () => {
-  let onSave: ReturnType<typeof vi.fn>;
+  let onSave: ReturnType<typeof vi.fn<[number], Promise<void>>>;
 
   beforeEach(() => {
-    onSave = vi.fn().mockResolvedValue(undefined);
+    onSave = vi.fn<[number], Promise<void>>().mockResolvedValue(undefined);
     vi.useFakeTimers();
   });
 
