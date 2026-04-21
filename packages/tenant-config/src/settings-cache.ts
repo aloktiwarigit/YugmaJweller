@@ -96,6 +96,31 @@ export class SettingsCache {
     await this.redis.del(this.wastageKey());
   }
 
+  async getRateLock(): Promise<number | null> {
+    const key = this.rateLockKey();
+    try {
+      const raw = await this.redis.get(key);
+      if (!raw) return null;
+      const parsed: unknown = JSON.parse(raw);
+      if (typeof parsed !== 'number' || !Number.isInteger(parsed)) {
+        await this.redis.del(key);
+        return null;
+      }
+      return parsed;
+    } catch {
+      try { await this.redis.del(key); } catch { /* ignore del failure */ }
+      return null;
+    }
+  }
+
+  async setRateLock(days: number): Promise<void> {
+    await this.redis.set(this.rateLockKey(), JSON.stringify(days), 'EX', this.ttlSec);
+  }
+
+  async invalidateRateLock(): Promise<void> {
+    await this.redis.del(this.rateLockKey());
+  }
+
   async getLoyalty(): Promise<LoyaltyConfig | null> {
     const key = this.loyaltyKey();
     try {
@@ -132,6 +157,10 @@ export class SettingsCache {
 
   private wastageKey(): string {
     return `shop:${tenantContext.requireCurrent().shopId}:settings:wastage`;
+  }
+
+  private rateLockKey(): string {
+    return `shop:${tenantContext.requireCurrent().shopId}:settings:rate_lock`;
   }
 
   private loyaltyKey(): string {

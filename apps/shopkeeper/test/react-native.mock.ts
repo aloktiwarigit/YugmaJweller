@@ -54,3 +54,19 @@ export const StyleSheet = {
       ? (Object.assign({}, ...s) as Record<string, unknown>)
       : ((s ?? {}) as Record<string, unknown>),
 };
+
+// Minimal Animated mock — no-op animations, passthrough View
+const noopAnimation = { start: (_cb?: () => void) => {} };
+export const Animated = {
+  Value: class {
+    constructor(_v: number) {}
+    stopAnimation(_cb?: () => void) {}
+    setValue(_v: number) {}
+  },
+  View: passthrough('animated-view'),
+  timing: (_val: unknown, _config: unknown) => noopAnimation,
+  sequence: (_animations: unknown[]) => noopAnimation,
+  parallel: (_animations: unknown[]) => noopAnimation,
+  spring: (_val: unknown, _config: unknown) => noopAnimation,
+  delay: (_ms: number) => noopAnimation,
+};

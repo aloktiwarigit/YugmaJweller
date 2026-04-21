@@ -35,6 +35,9 @@ export default defineConfig({
       'expo-router': fileURLToPath(
         new URL('./test/expo-router.mock.ts', import.meta.url),
       ),
+      'expo-haptics': fileURLToPath(
+        new URL('./test/expo-haptics.mock.ts', import.meta.url),
+      ),
       '@goldsmith/shared': fileURLToPath(
         new URL('../../packages/shared/src/index.ts', import.meta.url),
       ),

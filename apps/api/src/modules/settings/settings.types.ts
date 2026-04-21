@@ -16,4 +16,9 @@ export interface UpdateWastageResult {
   after:  WastageConfig[];
 }
 
+export interface UpdateRateLockResult {
+  before: number | null;
+  after: number;
+}
+
 export type UpdateLoyaltyResult = { ok: true; config: LoyaltyConfig } | { ok: false; error: string };

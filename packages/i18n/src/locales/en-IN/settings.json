@@ -80,6 +80,15 @@
       "wastage_high": "Wastage cannot exceed 30% — please enter a correct amount"
     }
   },
+  "rate_lock": {
+    "title": "Rate Lock Duration",
+    "label": "Rate Lock Duration (days)",
+    "description": "Customers can purchase at today's gold rate for this many days",
+    "save_success": "Changes saved ✓",
+    "errors": {
+      "RANGE_INVALID": "Duration must be between 1 and 30 days"
+    }
+  },
   "loyalty": {
     "title": "Loyalty Programme",
     "tiers_section": "Tiers",

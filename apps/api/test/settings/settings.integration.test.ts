@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Pool } from 'pg';
 import { resolve } from 'node:path';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
 import { createPool, runMigrations } from '@goldsmith/db';
 import { tenantContext, type Tenant, type AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { SettingsRepository } from '../../src/modules/settings/settings.repository';
@@ -42,6 +42,9 @@ const mockCache = {
   getWastage:             async () => null,
   setWastage:             async () => undefined,
   invalidateWastage:      async () => undefined,
+  getRateLock:            async () => null,
+  setRateLock:            async () => undefined,
+  invalidateRateLock:     async () => undefined,
   getLoyalty:             async () => null,
   setLoyalty:             async () => undefined,
   invalidateLoyalty:      async () => undefined,
@@ -371,5 +374,64 @@ describe('getWastage / updateWastage integration', () => {
     );
     const stored = r.rows[0].wastage_json as Record<string, unknown>;
     expect(stored['CHAINS']).toBe('1.50');
+  });
+});
+
+describe('rate-lock', () => {
+  const rateLockCtx: AuthenticatedTenantContext = {
+    shopId: SHOP_A, tenant, authenticated: true, userId: 'u1', role: 'shop_admin',
+  };
+
+  it('returns default 7 when never configured', async () => {
+    const days = await tenantContext.runWith(rateLockCtx, () => svc.getRateLock());
+    expect(days).toBe(7);
+  });
+
+  it('PATCH 14 → GET returns 14', async () => {
+    await tenantContext.runWith(rateLockCtx, () =>
+      svc.updateRateLock({ rateLockDays: 14 }),
+    );
+    const days = await tenantContext.runWith(rateLockCtx, () => svc.getRateLock());
+    expect(days).toBe(14);
+  });
+
+  it('PATCH 30 → GET returns 30 (upper boundary)', async () => {
+    await tenantContext.runWith(rateLockCtx, () =>
+      svc.updateRateLock({ rateLockDays: 30 }),
+    );
+    const days = await tenantContext.runWith(rateLockCtx, () => svc.getRateLock());
+    expect(days).toBe(30);
+  });
+
+  it('PATCH 1 → GET returns 1 (lower boundary)', async () => {
+    await tenantContext.runWith(rateLockCtx, () =>
+      svc.updateRateLock({ rateLockDays: 1 }),
+    );
+    const days = await tenantContext.runWith(rateLockCtx, () => svc.getRateLock());
+    expect(days).toBe(1);
+  });
+
+  it('PATCH 31 → throws UnprocessableEntityException (422)', async () => {
+    await expect(
+      tenantContext.runWith(rateLockCtx, () =>
+        svc.updateRateLock({ rateLockDays: 31 }),
+      ),
+    ).rejects.toThrow(UnprocessableEntityException);
+  });
+
+  it('PATCH 0 → throws UnprocessableEntityException (422)', async () => {
+    await expect(
+      tenantContext.runWith(rateLockCtx, () =>
+        svc.updateRateLock({ rateLockDays: 0 }),
+      ),
+    ).rejects.toThrow(UnprocessableEntityException);
+  });
+
+  it('shop_manager role can read via service (role enforcement is at controller layer)', async () => {
+    const managerCtx: AuthenticatedTenantContext = {
+      shopId: SHOP_A, tenant, authenticated: true, userId: 'u2', role: 'shop_manager',
+    };
+    const days = await tenantContext.runWith(managerCtx, () => svc.getRateLock());
+    expect(days).toBe(1);
   });
 });

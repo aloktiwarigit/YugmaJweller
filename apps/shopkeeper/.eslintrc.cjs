@@ -1,6 +1,15 @@
 /* eslint-env node */
 module.exports = {
   extends: ['../../.eslintrc.cjs'],
+  // android/ is gitignored native build output — not source; exclude from lint.
+  ignorePatterns: ['android/', 'ios/'],
+  // expo-haptics is a native Expo module: not installed in node_modules but
+  // available at runtime via Expo's native module registry. It is mocked in
+  // vitest via vitest.config.ts alias and declared in expo-env.d.ts for tsc.
+  // Tell the import resolver to skip it rather than false-positive on "unresolved".
+  settings: {
+    'import/ignore': ['expo-haptics'],
+  },
   rules: {
     '@typescript-eslint/no-unused-vars': [
       'error',

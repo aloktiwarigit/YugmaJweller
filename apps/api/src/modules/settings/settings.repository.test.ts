@@ -329,4 +329,99 @@ describe('SettingsRepository', () => {
       expect(bridal?.percent).toBe('2.50');
     });
   });
+
+  describe('getRateLockDays', () => {
+    it('returns null when shop_settings row does not exist', async () => {
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
+              sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
+          return { rows: [], rowCount: 0 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const mockPool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const testRepo = new SettingsRepository(mockPool);
+      const result = await tenantContext.runWith(ctxA, () => testRepo.getRateLockDays());
+      expect(result).toBeNull();
+    });
+
+    it('returns null when row exists but rate_lock_days is null', async () => {
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
+              sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
+          return { rows: [{ rate_lock_days: null }], rowCount: 1 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const mockPool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const testRepo = new SettingsRepository(mockPool);
+      const result = await tenantContext.runWith(ctxA, () => testRepo.getRateLockDays());
+      expect(result).toBeNull();
+    });
+
+    it('returns stored integer when rate_lock_days is set', async () => {
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
+              sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
+          return { rows: [{ rate_lock_days: 14 }], rowCount: 1 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const mockPool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const testRepo = new SettingsRepository(mockPool);
+      const result = await tenantContext.runWith(ctxA, () => testRepo.getRateLockDays());
+      expect(result).toBe(14);
+    });
+  });
+
+  describe('updateRateLockDays', () => {
+    it('returns before: null and after: new value for fresh shop', async () => {
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
+              sql.includes('SET LOCAL') || sql.includes('SET app.') ||
+              sql.includes('ON CONFLICT (shop_id) DO NOTHING')) return;
+          if (sql.includes('FOR UPDATE')) {
+            return { rows: [{ rate_lock_days: null }], rowCount: 1 };
+          }
+          if (sql.includes('UPDATE shop_settings')) {
+            return { rows: [{ rate_lock_days: 14 }], rowCount: 1 };
+          }
+          return { rows: [], rowCount: 0 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const mockPool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const testRepo = new SettingsRepository(mockPool);
+      const result = await tenantContext.runWith(ctxA, () => testRepo.updateRateLockDays(14));
+      expect(result.before).toBeNull();
+      expect(result.after).toBe(14);
+    });
+
+    it('returns before: previous value and after: new value when row already set', async () => {
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') ||
+              sql.includes('SET LOCAL') || sql.includes('SET app.') ||
+              sql.includes('ON CONFLICT (shop_id) DO NOTHING')) return;
+          if (sql.includes('FOR UPDATE')) {
+            return { rows: [{ rate_lock_days: 7 }], rowCount: 1 };
+          }
+          if (sql.includes('UPDATE shop_settings')) {
+            return { rows: [{ rate_lock_days: 21 }], rowCount: 1 };
+          }
+          return { rows: [], rowCount: 0 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const mockPool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const testRepo = new SettingsRepository(mockPool);
+      const result = await tenantContext.runWith(ctxA, () => testRepo.updateRateLockDays(21));
+      expect(result.before).toBe(7);
+      expect(result.after).toBe(21);
+    });
+  });
 });

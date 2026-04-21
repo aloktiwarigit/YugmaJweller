@@ -17,6 +17,11 @@ export interface WastageResponseDto {
   etag: string;
 }
 
+export interface RateLockResponseDto {
+  rateLockDays: number;
+  etag: string;
+}
+
 export interface LoyaltyResponseDto {
   tiers: Array<{ name: string; thresholdPaise: number; badgeColor: string }>;
   earnRatePercentage: string;

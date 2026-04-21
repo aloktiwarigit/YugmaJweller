@@ -80,6 +80,15 @@
       "wastage_high": "घटत 30% से ज़्यादा नहीं होनी चाहिए — कृपया सही मात्रा डालें"
     }
   },
+  "rate_lock": {
+    "title": "Rate Lock की अवधि",
+    "label": "Rate Lock की अवधि (दिनों में)",
+    "description": "इतने दिनों तक customer आज की gold rate पर खरीद सकते हैं",
+    "save_success": "बदलाव सहेज लिया ✓",
+    "errors": {
+      "RANGE_INVALID": "अवधि 1 से 30 दिनों के बीच होनी चाहिए"
+    }
+  },
   "loyalty": {
     "title": "लॉयल्टी प्रोग्राम",
     "tiers_section": "टियर",
