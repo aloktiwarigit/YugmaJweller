@@ -292,4 +292,28 @@ describe('shop_settings RLS tenant isolation', () => {
     const json = rows[0].wastage_json as Record<string, unknown> | null;
     expect(json?.['BRIDAL']).not.toBe('99.00');
   });
+
+  it('tenant A cannot read tenant B rate_lock_days via RLS', async () => {
+    // Seed tenant B's rate_lock_days as superuser (bypasses RLS)
+    await pool.query(
+      `INSERT INTO shop_settings (shop_id, rate_lock_days)
+       VALUES ($1, 21)
+       ON CONFLICT (shop_id) DO UPDATE SET rate_lock_days = 21`,
+      [TENANT_B],
+    );
+
+    // Tenant A attempts to query tenant B's row directly — RLS should block it
+    const tenantA: Tenant = makeTenant(TENANT_A, 'shop-a', 'Shop A');
+    const ctxA: UnauthenticatedTenantContext = makeCtx(TENANT_A, tenantA);
+    const result = await tenantContext.runWith(ctxA, () =>
+      withTenantTx(pool, async (tx) =>
+        tx.query<{ rate_lock_days: number | null }>(
+          `SELECT rate_lock_days FROM shop_settings WHERE shop_id = $1`,
+          [TENANT_B],
+        ),
+      ),
+    );
+    // RLS filters the row — tenant A sees 0 rows for tenant B's shop_id
+    expect(result.rows.length).toBe(0);
+  });
 });
