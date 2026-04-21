@@ -100,7 +100,8 @@ describe('RateLockDurationPicker', () => {
     fireEvent.click(getByTestId('rate-lock-increment'));
     await act(async () => {
       vi.advanceTimersByTime(1000);
-      // Allow the async save() to complete
+      // Allow the async save() to complete (two awaits: onSave + Haptics)
+      await Promise.resolve();
       await Promise.resolve();
     });
     expect(queryByTestId('rate-lock-success')).toBeTruthy();

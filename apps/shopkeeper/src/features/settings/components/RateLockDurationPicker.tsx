@@ -19,21 +19,29 @@ export function RateLockDurationPicker({ days, onSave }: Props): React.ReactElem
   const [error, setError] = useState<string | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onSaveRef = useRef(onSave);
   const shakeAnim = useRef(new Animated.Value(0)).current;
+
+  // Keep onSaveRef in sync with latest prop
+  useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
 
   // Sync if parent value changes (e.g. query refetch)
   useEffect(() => {
     setLocalDays(days);
   }, [days]);
 
-  // Cleanup debounce on unmount
+  // Cleanup debounce and success timer on unmount
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
     };
   }, []);
 
   function triggerShake(): void {
+    shakeAnim.stopAnimation();
+    shakeAnim.setValue(0);
     Animated.sequence([
       Animated.timing(shakeAnim, { toValue: 4, duration: 60, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: -4, duration: 60, useNativeDriver: true }),
@@ -57,11 +65,12 @@ export function RateLockDurationPicker({ days, onSave }: Props): React.ReactElem
   async function save(d: number): Promise<void> {
     setSaving(true);
     try {
-      await onSave(d);
+      await onSaveRef.current(d);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setShowSuccess(true);
       setError(null);
-      setTimeout(() => setShowSuccess(false), 2000);
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+      successTimerRef.current = setTimeout(() => setShowSuccess(false), 2000);
     } catch {
       setError(t('settings.rate_lock.errors.RANGE_INVALID'));
     } finally {

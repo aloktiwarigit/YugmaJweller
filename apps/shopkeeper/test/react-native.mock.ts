@@ -60,6 +60,8 @@ const noopAnimation = { start: (_cb?: () => void) => {} };
 export const Animated = {
   Value: class {
     constructor(_v: number) {}
+    stopAnimation(_cb?: () => void) {}
+    setValue(_v: number) {}
   },
   View: passthrough('animated-view'),
   timing: (_val: unknown, _config: unknown) => noopAnimation,
