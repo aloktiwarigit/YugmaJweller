@@ -8,6 +8,7 @@ import { FirebaseAdminProvider } from './firebase-admin.provider';
 import { AuthRepository } from './auth.repository';
 import { AuthRateLimitService } from './auth-rate-limit.service';
 import { SMS_ADAPTER, type ISmsAdapter } from './sms/sms-adapter.interface';
+import { AuditLogRepository, type AuditLogFilters, type PaginatedAuditLog } from './audit-log.repository';
 
 export interface SessionResult {
   user: { id: string; display_name: string; role: ShopUserRole };
@@ -23,6 +24,7 @@ export class AuthService {
     @Inject(AuthRepository) private readonly repo: AuthRepository,
     @Inject(AuthRateLimitService) private readonly rateLimit: AuthRateLimitService,
     @Inject(SMS_ADAPTER) private readonly smsAdapter: ISmsAdapter,
+    @Inject(AuditLogRepository) private readonly auditLogRepo: AuditLogRepository,
   ) {}
 
   async session(args: { uid: string; phoneE164: string; ip?: string; userAgent?: string; requestId?: string }): Promise<SessionResult> {
@@ -134,6 +136,24 @@ export class AuthService {
     );
     await this.smsAdapter.sendInvite(dto.phone, shopId, result.userId!);
     return { userId: result.userId! };
+  }
+
+  async getAuditLog(
+    filters: AuditLogFilters,
+  ): Promise<PaginatedAuditLog & { page: number; pageSize: number }> {
+    const result = await this.auditLogRepo.findPaginated(filters);
+    return { ...result, page: filters.page, pageSize: Math.min(filters.pageSize, 50) };
+  }
+
+  async logoutAll(userId: string, firebaseUid: string): Promise<void> {
+    await this.firebase.admin().auth().revokeRefreshTokens(firebaseUid);
+    await auditLog(this.pool, {
+      action: AuditAction.AUTH_LOGOUT_ALL,
+      subjectType: 'shop_user',
+      subjectId: userId,
+      actorUserId: userId,
+      metadata: { deviceCount: 'all' },
+    });
   }
 
   private async loadTenantById(id: string): Promise<Tenant> {

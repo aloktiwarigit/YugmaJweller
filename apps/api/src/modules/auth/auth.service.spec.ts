@@ -3,7 +3,8 @@ import { ConflictException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuditAction } from '@goldsmith/audit';
 import type { InviteStaffDto } from '@goldsmith/shared';
-import type { Tenant } from '@goldsmith/tenant-context';
+import { tenantContext, type Tenant } from '@goldsmith/tenant-context';
+import type { AuditLogFilters } from './audit-log.repository';
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -69,6 +70,7 @@ function makePoolMock(tenantOverride?: Partial<Tenant>) {
 function makeService(overrides: {
   inviteStaffResult?: { conflict: boolean; userId?: string };
   smsAdapterSendInvite?: (phone: string, shopName: string, inviteCode: string) => Promise<void>;
+  auditLogRepoFindPaginated?: ReturnType<typeof vi.fn>;
 }) {
   const inviteStaffResult = overrides.inviteStaffResult ?? { conflict: false, userId: NEW_USER_ID };
 
@@ -83,14 +85,18 @@ function makeService(overrides: {
 
   const pool = makePoolMock();
 
-  // AuthService constructor args order: pool, firebase, repo, rateLimit, smsAdapter
+  const auditLogRepo = {
+    findPaginated: overrides.auditLogRepoFindPaginated ?? vi.fn().mockResolvedValue({ events: [], total: 0 }),
+  };
+
+  // AuthService constructor args order: pool, firebase, repo, rateLimit, smsAdapter, auditLogRepo
   const firebase = {} as never;
   const rateLimit = {} as never;
 
   // We instantiate directly (no NestJS DI) and inject mocks via cast
-  const svc = new AuthService(pool, firebase, authRepo as never, rateLimit, smsAdapter);
+  const svc = new AuthService(pool, firebase, authRepo as never, rateLimit, smsAdapter, auditLogRepo as never);
 
-  return { svc, authRepo, smsAdapter, pool };
+  return { svc, authRepo, smsAdapter, pool, auditLogRepo };
 }
 
 // ---------------------------------------------------------------------------
@@ -186,5 +192,138 @@ describe('AuthService.invite()', () => {
     const result = await svc.invite(SHOP_ID, inviteDto, INVITER_ID);
 
     expect(result).toEqual({ userId: NEW_USER_ID });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AuthService.getAuditLog()
+// ---------------------------------------------------------------------------
+describe('AuthService.getAuditLog()', () => {
+  it('returns paginated audit log with page and pageSize metadata', async () => {
+    const mockEvents = [{ id: 'evt-1', action: 'AUTH_VERIFY_SUCCESS', actorName: 'Alice', actorRole: 'shop_admin', createdAt: '2026-04-20T00:00:00.000Z' }];
+    const findPaginated = vi.fn().mockResolvedValue({ events: mockEvents, total: 5 });
+    const { svc } = makeService({ auditLogRepoFindPaginated: findPaginated });
+
+    const filters: AuditLogFilters = { page: 2, pageSize: 20 };
+    const result = await svc.getAuditLog(filters);
+
+    expect(result.page).toBe(2);
+    expect(result.pageSize).toBe(20);
+    expect(result.total).toBe(5);
+    expect(result.events).toEqual(mockEvents);
+    expect(findPaginated).toHaveBeenCalledWith(filters);
+  });
+
+  it('caps pageSize at 50', async () => {
+    const findPaginated = vi.fn().mockResolvedValue({ events: [], total: 0 });
+    const { svc } = makeService({ auditLogRepoFindPaginated: findPaginated });
+
+    const filters: AuditLogFilters = { page: 1, pageSize: 200 };
+    const result = await svc.getAuditLog(filters);
+
+    expect(result.pageSize).toBe(50);
+  });
+
+  it('delegates filter params to auditLogRepo.findPaginated', async () => {
+    const findPaginated = vi.fn().mockResolvedValue({ events: [], total: 3 });
+    const { svc } = makeService({ auditLogRepoFindPaginated: findPaginated });
+
+    const filters: AuditLogFilters = { page: 1, pageSize: 10, category: 'auth', dateRange: '7d' };
+    await svc.getAuditLog(filters);
+
+    expect(findPaginated).toHaveBeenCalledOnce();
+    expect(findPaginated).toHaveBeenCalledWith(filters);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AuthService.logoutAll()
+// ---------------------------------------------------------------------------
+describe('AuthService.logoutAll()', () => {
+  // For logoutAll we need a pool that handles withTenantTx (BEGIN/GUC/INSERT/COMMIT)
+  // and a firebase mock that exposes admin().auth().revokeRefreshTokens()
+  function makeLogoutAllService(revokeImpl?: () => Promise<void>) {
+    const mockRevoke = vi.fn().mockImplementation(revokeImpl ?? (() => Promise.resolve()));
+    const firebase = {
+      admin: vi.fn().mockReturnValue({
+        auth: vi.fn().mockReturnValue({
+          revokeRefreshTokens: mockRevoke,
+        }),
+      }),
+    } as never;
+
+    const auditClient = {
+      query: vi.fn()
+        .mockResolvedValueOnce(undefined)   // BEGIN
+        .mockResolvedValueOnce(undefined)   // SET LOCAL ROLE
+        .mockResolvedValueOnce(undefined)   // SET LOCAL current_shop_id
+        .mockResolvedValueOnce(undefined)   // INSERT audit_events
+        .mockResolvedValueOnce(undefined)   // COMMIT
+        .mockResolvedValueOnce(undefined),  // finally: SET app.current_shop_id poison
+      release: vi.fn(),
+    };
+
+    const pool = {
+      connect: vi.fn().mockResolvedValue(auditClient),
+    } as unknown as import('pg').Pool;
+
+    const auditLogRepo = {
+      findPaginated: vi.fn().mockResolvedValue({ events: [], total: 0 }),
+    };
+
+    const svc = new AuthService(
+      pool,
+      firebase,
+      {} as never,   // authRepo — not needed for logoutAll
+      {} as never,   // rateLimit — not needed for logoutAll
+      {} as never,   // smsAdapter — not needed for logoutAll
+      auditLogRepo as never,
+    );
+
+    // Helper: run fn inside a tenant context (as the TenantInterceptor would in production)
+    const withCtx = (fn: () => Promise<void>) =>
+      tenantContext.runWith(
+        { shopId: SHOP_ID, tenant: fakeTenant, authenticated: true, userId: 'user-123', role: 'shop_admin' },
+        fn,
+      );
+
+    return { svc, mockRevoke, auditClient, pool, withCtx };
+  }
+
+  it('calls firebase revokeRefreshTokens with the given firebaseUid', async () => {
+    const { svc, mockRevoke, withCtx } = makeLogoutAllService();
+
+    await withCtx(() => svc.logoutAll('user-123', 'firebase-uid-abc'));
+
+    expect(mockRevoke).toHaveBeenCalledOnce();
+    expect(mockRevoke).toHaveBeenCalledWith('firebase-uid-abc');
+  });
+
+  it('emits AUTH_LOGOUT_ALL audit event after revoking tokens', async () => {
+    const { svc, mockRevoke, auditClient, withCtx } = makeLogoutAllService();
+
+    await withCtx(() => svc.logoutAll('user-123', 'firebase-uid-abc'));
+
+    expect(mockRevoke).toHaveBeenCalledOnce();
+
+    const insertCall = auditClient.query.mock.calls.find(
+      (args: unknown[]) => typeof args[0] === 'string' && (args[0] as string).includes('INSERT INTO audit_events'),
+    );
+    expect(insertCall).toBeDefined();
+    const action = insertCall![1][1] as string; // $2 = action
+    expect(action).toBe(AuditAction.AUTH_LOGOUT_ALL);
+  });
+
+  it('includes actorUserId = userId in the audit row', async () => {
+    const { svc, auditClient, withCtx } = makeLogoutAllService();
+
+    await withCtx(() => svc.logoutAll('user-123', 'firebase-uid-abc'));
+
+    const insertCall = auditClient.query.mock.calls.find(
+      (args: unknown[]) => typeof args[0] === 'string' && (args[0] as string).includes('INSERT INTO audit_events'),
+    );
+    expect(insertCall).toBeDefined();
+    const actorUserId = insertCall![1][0] as string; // $1 = actor_user_id
+    expect(actorUserId).toBe('user-123');
   });
 });
