@@ -21,6 +21,7 @@ export function RateLockDurationPicker({ days, onSave }: Props): React.ReactElem
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSaveRef = useRef(onSave);
+  const mountedRef = useRef(true);
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
   // Keep onSaveRef in sync with latest prop
@@ -34,6 +35,7 @@ export function RateLockDurationPicker({ days, onSave }: Props): React.ReactElem
   // Cleanup debounce and success timer on unmount
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (successTimerRef.current) clearTimeout(successTimerRef.current);
     };
@@ -63,18 +65,24 @@ export function RateLockDurationPicker({ days, onSave }: Props): React.ReactElem
   }
 
   async function save(d: number): Promise<void> {
+    if (!mountedRef.current) return;
     setSaving(true);
     try {
       await onSaveRef.current(d);
+      if (!mountedRef.current) return;
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (!mountedRef.current) return;
       setShowSuccess(true);
       setError(null);
       if (successTimerRef.current) clearTimeout(successTimerRef.current);
-      successTimerRef.current = setTimeout(() => setShowSuccess(false), 2000);
+      successTimerRef.current = setTimeout(() => {
+        if (mountedRef.current) setShowSuccess(false);
+      }, 2000);
     } catch {
+      if (!mountedRef.current) return;
       setError(t('settings.rate_lock.errors.RANGE_INVALID'));
     } finally {
-      setSaving(false);
+      if (mountedRef.current) setSaving(false);
     }
   }
 
