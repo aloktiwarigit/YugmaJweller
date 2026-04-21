@@ -15,8 +15,8 @@ import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext } from '@goldsmith/tenant-context';
 import { SettingsService } from './settings.service';
 import { BlobStorageService } from './blob-storage.service';
-import type { ShopProfileResponseDto, LogoUploadUrlResponseDto, MakingChargesResponseDto, WastageResponseDto } from './settings.dto';
-import type { PatchShopProfileDto, PatchMakingChargesDto, PatchWastageDto } from '@goldsmith/shared';
+import type { ShopProfileResponseDto, LogoUploadUrlResponseDto, MakingChargesResponseDto, WastageResponseDto, RateLockResponseDto } from './settings.dto';
+import type { PatchShopProfileDto, PatchMakingChargesDto, PatchWastageDto, PatchRateLockDto } from '@goldsmith/shared';
 
 @Controller('/api/v1/settings')
 export class SettingsController {
@@ -114,5 +114,32 @@ export class SettingsController {
     const etag = `"${createHash('sha256').update(JSON.stringify(configs)).digest('hex').slice(0, 16)}"`;
     res.setHeader('ETag', etag);
     return { configs, etag };
+  }
+
+  @Get('/rate-lock')
+  async getRateLock(
+    @TenantContextDec() ctx: TenantContext,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<RateLockResponseDto> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (!['shop_admin', 'shop_manager'].includes(ctx.role)) throw new ForbiddenException({ code: 'auth.insufficient_role' });
+    const days = await this.svc.getRateLock();
+    const etag = `"${createHash('sha256').update(String(days)).digest('hex').slice(0, 16)}"`;
+    res.setHeader('ETag', etag);
+    return { rateLockDays: days, etag };
+  }
+
+  @Patch('/rate-lock')
+  async updateRateLock(
+    @TenantContextDec() ctx: TenantContext,
+    @Body() body: PatchRateLockDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<RateLockResponseDto> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (ctx.role !== 'shop_admin') throw new ForbiddenException({ code: 'auth.insufficient_role' });
+    const days = await this.svc.updateRateLock(body);
+    const etag = `"${createHash('sha256').update(String(days)).digest('hex').slice(0, 16)}"`;
+    res.setHeader('ETag', etag);
+    return { rateLockDays: days, etag };
   }
 }

@@ -16,3 +16,8 @@ export interface WastageResponseDto {
   configs: WastageConfig[];
   etag: string;
 }
+
+export interface RateLockResponseDto {
+  rateLockDays: number;
+  etag: string;
+}
