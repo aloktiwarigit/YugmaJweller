@@ -12,6 +12,9 @@ export type { SkeletonProps } from './primitives/Skeleton';
 
 export { SettingsGroupCard } from './primitives/SettingsGroupCard';
 
+export { AuditEventRow } from './primitives/AuditEventRow';
+export type { AuditEventRowProps } from './primitives/AuditEventRow';
+
 export { ThemeProvider, useTheme } from './providers/ThemeProvider';
 export type { Theme } from './providers/ThemeProvider';
 
