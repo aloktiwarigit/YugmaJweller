@@ -47,3 +47,12 @@ export type {
   UpdatePermissionDto,
   RolePermissionsRow,
 } from './schemas/role-permissions.schema';
+
+export {
+  RATE_LOCK_DEFAULT_DAYS,
+  PatchRateLockSchema,
+} from './schemas/rate-lock.schema';
+export type {
+  PatchRateLockDto,
+  RateLockRow,
+} from './schemas/rate-lock.schema';
