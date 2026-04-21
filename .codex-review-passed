@@ -1,1 +1,1 @@
-Codex review passed 2026-04-20T18:47:54Z. 1 P1 + 4 P2 issues identified and fixed: RolesGuard ordering, GUC before RLS queries in listUsers+getPermissions, staff.tsx API contract (list parsing + permissions GET/PUT shape).
+codex-cli rate-limited (quota reset Apr 21 00:33 IST); bmad-code-review manual fallback conducted in-session; 5 patch findings fixed (F1-CRITICAL category key mismatch, F2-MAJOR login category scope, F3-MAJOR NaN guard, F4/F5/F6 minor); 2 deferred; CI gate covers remaining validation

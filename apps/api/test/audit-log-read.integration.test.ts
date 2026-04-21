@@ -64,6 +64,7 @@ async function seedShop(slug: string): Promise<string> {
  * For simplicity we use actor_user_id = NULL in audit rows.
  */
 async function seedAuditEvents(
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- test seeder, not production code
   shopId: string,
   actions: string[],
   /** How many days in the past (0 = now). Audit rows must be within the default 30d window. */
@@ -80,7 +81,9 @@ async function seedAuditEvents(
 }
 
 /** Run findPaginated inside the given shop's tenant context. */
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- return type inferred from repo call
 async function findInContext(
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- test harness, not production code
   shopId: string,
   filters: Parameters<AuditLogRepository['findPaginated']>[0],
 ) {
@@ -155,19 +158,19 @@ describe('AuditLogRepository.findPaginated', () => {
     expect(result.events).toHaveLength(0);
   });
 
-  it('filters by category — auth category returns only auth actions', async () => {
+  it('filters by category — login category returns only login actions', async () => {
     const shopId = await seedShop(`audit-cat-${Date.now()}`);
     await seedAuditEvents(shopId, [
-      'AUTH_VERIFY_SUCCESS', // auth
-      'AUTH_VERIFY_SUCCESS', // auth
+      'AUTH_VERIFY_SUCCESS', // login
+      'AUTH_VERIFY_SUCCESS', // login
       'STAFF_INVITED',       // staff
     ]);
 
-    const authResult = await findInContext(shopId, { page: 1, pageSize: 10, category: 'auth' });
+    const loginResult = await findInContext(shopId, { page: 1, pageSize: 10, category: 'login' });
     const staffResult = await findInContext(shopId, { page: 1, pageSize: 10, category: 'staff' });
 
-    expect(authResult.total).toBe(2);
-    expect(authResult.events.every((e) => e.action === 'AUTH_VERIFY_SUCCESS')).toBe(true);
+    expect(loginResult.total).toBe(2);
+    expect(loginResult.events.every((e) => e.action === 'AUTH_VERIFY_SUCCESS')).toBe(true);
 
     expect(staffResult.total).toBe(1);
     expect(staffResult.events[0]?.action).toBe('STAFF_INVITED');

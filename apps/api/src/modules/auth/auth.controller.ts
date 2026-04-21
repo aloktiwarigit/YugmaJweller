@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
   HttpCode,
   Inject,
@@ -142,18 +141,20 @@ export class AuthController {
   ): Promise<unknown> {
     const ctx = tenantContext.requireCurrent();
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
-    const auth = ctx as AuthenticatedTenantContext;
-    if (auth.role === 'shop_staff') throw new ForbiddenException({ errorCode: 'auth.permission_denied' });
+    // @Roles('shop_admin', 'shop_manager') already blocks shop_staff at PolicyGuard level —
+    // no redundant manual role check needed here.
+    const parsedPage = parseInt(page ?? '1', 10);
+    const parsedPageSize = parseInt(pageSize ?? '20', 10);
     return this.svc.getAuditLog({
-      page: Math.max(1, Number(page ?? '1')),
-      pageSize: Math.min(50, Math.max(1, Number(pageSize ?? '20'))),
+      page: Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1,
+      pageSize: Number.isFinite(parsedPageSize) ? Math.min(50, Math.max(1, parsedPageSize)) : 20,
       dateRange,
       category,
     });
   }
 
   @Get('/audit-log/export')
-  @Roles('shop_admin', 'shop_manager')
+  @Roles('shop_admin')
   @UseGuards(PolicyGuard)
   auditLogExport(): { status: string; reason: string } {
     return { status: 'deferred', reason: 'Azure subscription not provisioned' };

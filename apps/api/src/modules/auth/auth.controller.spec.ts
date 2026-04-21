@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
 import { Reflector } from '@nestjs/core';
@@ -47,7 +47,7 @@ const mockPermissionsRepo = { getPermissions: vi.fn(), upsertPermission: vi.fn()
 const mockPermissionsCache = { invalidate: vi.fn(), getPermissions: vi.fn(), setPermissions: vi.fn() };
 
 // Mock pool for auditLog (withTenantTx pattern)
-function makePoolMock() {
+function makePoolMock(): { connect: ReturnType<typeof vi.fn>; _client: { query: ReturnType<typeof vi.fn>; release: ReturnType<typeof vi.fn> } } {
   const client = {
     query: vi.fn()
       .mockResolvedValueOnce(undefined) // BEGIN
@@ -226,29 +226,35 @@ describe('AuthController', () => {
       mockAuthService.getAuditLog.mockResolvedValueOnce(fakeResult);
 
       const result = await withAdminCtx(() =>
-        controller.getAuditLog('2', '10', '7d', 'auth'),
+        controller.getAuditLog('2', '10', '7d', 'login'),
       );
 
       expect(mockAuthService.getAuditLog).toHaveBeenCalledWith({
         page: 2,
         pageSize: 10,
         dateRange: '7d',
-        category: 'auth',
+        category: 'login',
       });
       expect(result).toEqual(fakeResult);
     });
 
-    it('throws ForbiddenException when role is shop_staff', async () => {
+    it('shop_staff RBAC enforced at guard level (not in handler body)', async () => {
+      // @Roles('shop_admin', 'shop_manager') on the handler causes PolicyGuard to throw
+      // ForbiddenException in production. In this unit test PolicyGuard is mocked to always
+      // pass — so calling the handler directly with a shop_staff context succeeds.
+      // The RBAC gate is exercised in the integration tests (audit-log-read.integration.test.ts).
       const staffCtx: AuthenticatedTenantContext = {
         ...adminCtx,
         role: 'shop_staff',
       };
+      mockAuthService.getAuditLog.mockResolvedValueOnce({ events: [], total: 0, page: 1, pageSize: 20 });
 
+      // Handler body does NOT throw when guard mock allows through
       await expect(
         tenantContext.runWith(staffCtx, () =>
           controller.getAuditLog(undefined, undefined, undefined, undefined),
         ) as Promise<unknown>,
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).resolves.toBeDefined();
     });
 
     it('throws UnauthorizedException when context is not authenticated', async () => {

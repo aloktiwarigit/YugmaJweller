@@ -7,7 +7,7 @@ import { withTenantTx } from '@goldsmith/db';
 // ---------------------------------------------------------------------------
 
 export type AuditLogDateRange = 'today' | '7d' | '30d';
-export type AuditLogCategory = 'auth' | 'staff' | 'settings' | 'access';
+export type AuditLogCategory = 'login' | 'staff' | 'settings' | 'permissions';
 
 export interface AuditLogFilters {
   page: number;
@@ -35,10 +35,10 @@ export interface PaginatedAuditLog {
 // ---------------------------------------------------------------------------
 
 const CATEGORY_ACTIONS: Record<AuditLogCategory, string[]> = {
-  auth: [
+  // User-facing login activity — excludes internal infra events (UID mismatch, token invalid, tenant boot)
+  login: [
     'AUTH_VERIFY_SUCCESS', 'AUTH_VERIFY_FAILURE', 'AUTH_VERIFY_LOCKED',
-    'AUTH_VERIFY_REJECTED', 'AUTH_USER_PROVISIONED', 'AUTH_UID_MISMATCH',
-    'AUTH_TOKEN_INVALID', 'AUTH_LOGOUT_ALL', 'TENANT_CLAIM_CONFLICT', 'TENANT_BOOT',
+    'AUTH_VERIFY_REJECTED', 'AUTH_USER_PROVISIONED', 'AUTH_LOGOUT_ALL',
   ],
   staff: ['STAFF_INVITED', 'STAFF_REVOKED', 'STAFF_ACTIVATED'],
   settings: [
@@ -48,7 +48,7 @@ const CATEGORY_ACTIONS: Record<AuditLogCategory, string[]> = {
     'SETTINGS_CUSTOM_ORDER_POLICY_UPDATED', 'SETTINGS_RETURN_POLICY_UPDATED',
     'SETTINGS_NOTIFICATION_PREFS_UPDATED',
   ],
-  access: ['ACCESS_DENIED', 'PERMISSIONS_UPDATED'],
+  permissions: ['PERMISSIONS_UPDATED', 'ACCESS_DENIED'],
 };
 
 // ---------------------------------------------------------------------------
@@ -92,8 +92,8 @@ export class AuditLogRepository {
     return withTenantTx(this.pool, async (tx) => {
       const rows = await tx.query(
         `SELECT ae.id, ae.action, ae.created_at, ae.metadata,
-                COALESCE(su.display_name, NULL) AS actor_name,
-                COALESCE(su.role, NULL) AS actor_role
+                su.display_name AS actor_name,
+                su.role AS actor_role
          FROM audit_events ae
          LEFT JOIN shop_users su ON su.id = ae.actor_user_id
          WHERE ae.created_at >= $1

@@ -52,7 +52,7 @@ import type { AuditLogRepository } from '../src/modules/auth/audit-log.repositor
 // Factory helpers
 // ---------------------------------------------------------------------------
 
-function makeRevokeMock() {
+function makeRevokeMock(): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue(undefined);
 }
 
@@ -85,6 +85,7 @@ function makeService(revokeRefreshTokens: ReturnType<typeof makeRevokeMock>): Au
 }
 
 /** Wrap a call in a shop's tenant context (required by auditLog → withTenantTx). */
+// eslint-disable-next-line goldsmith/no-raw-shop-id-param -- test harness building context manually
 function withCtx<T>(shopId: string, userId: string, fn: () => Promise<T>): Promise<T> {
   const ctx: AuthenticatedTenantContext = {
     authenticated: true,
