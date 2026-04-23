@@ -100,26 +100,26 @@ function makeNullPool(): Pool {
 }
 
 // ---------------------------------------------------------------------------
-// Chaos Test 1: IBJA timeout → MetalsDev fallback within 10s
+// Chaos Test 1: IBJA times out (5s) → MetalsDev fallback within 10s
 // ---------------------------------------------------------------------------
 
-describe('Chaos: IBJA timeout (5100ms) → MetalsDev fallback within 10s', () => {
-  it('returns MetalsDev rates within 10 seconds; elapsed > 5000ms (waited on slow IBJA)', async () => {
+describe('Chaos: IBJA times out (5s) → MetalsDev fallback within 10s', () => {
+  it('returns MetalsDev rates within 10 seconds after IBJA 5s timeout fires', async () => {
     const chain = buildChain(new SlowIbjaAdapter(), new MetalsDevAdapter());
 
     const start = Date.now();
     const result = await chain.getRatesByPurity();
     const elapsedMs = Date.now() - start;
 
-    // Total elapsed must be > 5000ms (had to wait on slow IBJA attempt)
+    // Total elapsed must be >= 5000ms (IBJA timeout fired at 5s)
     expect(elapsedMs).toBeGreaterThan(5_000);
-    // But must complete before our chaos-test budget
+    // But must complete before our chaos-test budget (MetalsDev stub is fast)
     expect(elapsedMs).toBeLessThan(10_000);
 
-    // SlowIbjaAdapter succeeds after delay — source is 'ibja' (slow but not failing)
+    // IBJA timed out → FallbackChain fell through to MetalsDev
     expect(result.rates.GOLD_24K.perGramPaise).toBe(735000n);
-    expect(result.source).toBe('ibja');
-  }, 15_000); // generous test timeout to accommodate the slow adapter
+    expect(result.source).toBe('metalsdev');
+  }, 15_000); // generous test timeout to accommodate the 5s timeout
 });
 
 // ---------------------------------------------------------------------------
@@ -127,10 +127,22 @@ describe('Chaos: IBJA timeout (5100ms) → MetalsDev fallback within 10s', () =>
 // ---------------------------------------------------------------------------
 
 describe('Chaos: Both adapters fail → LKG cache', () => {
-  it('serves stale rates from LKG cache within 1 second when cache is pre-populated', async () => {
-    // Seed LKG cache before both adapters fail
-    const lkg = new LastKnownGoodCache(redis as never);
-    await lkg.update(fakePurityRates);
+  it('serves stale rates from LKG cache within 1 second when cache is pre-populated with stale data', async () => {
+    // Seed LKG with data that is 31 minutes old → stale=true
+    const staleDate = new Date(Date.now() - 31 * 60 * 1000);
+    const staleEntry = {
+      rates: {
+        GOLD_24K: { perGramPaise: fakePurityRates.GOLD_24K.perGramPaise.toString(), fetchedAt: fakePurityRates.GOLD_24K.fetchedAt.toISOString() },
+        GOLD_22K: { perGramPaise: fakePurityRates.GOLD_22K.perGramPaise.toString(), fetchedAt: fakePurityRates.GOLD_22K.fetchedAt.toISOString() },
+        GOLD_20K: { perGramPaise: fakePurityRates.GOLD_20K.perGramPaise.toString(), fetchedAt: fakePurityRates.GOLD_20K.fetchedAt.toISOString() },
+        GOLD_18K: { perGramPaise: fakePurityRates.GOLD_18K.perGramPaise.toString(), fetchedAt: fakePurityRates.GOLD_18K.fetchedAt.toISOString() },
+        GOLD_14K: { perGramPaise: fakePurityRates.GOLD_14K.perGramPaise.toString(), fetchedAt: fakePurityRates.GOLD_14K.fetchedAt.toISOString() },
+        SILVER_999: { perGramPaise: fakePurityRates.SILVER_999.perGramPaise.toString(), fetchedAt: fakePurityRates.SILVER_999.fetchedAt.toISOString() },
+        SILVER_925: { perGramPaise: fakePurityRates.SILVER_925.perGramPaise.toString(), fetchedAt: fakePurityRates.SILVER_925.fetchedAt.toISOString() },
+      },
+      storedAt: staleDate.toISOString(),
+    };
+    await redis.set('rates:last_known_good', JSON.stringify(staleEntry), 'EX', 24 * 60 * 60);
 
     const chain = buildChain(
       new AlwaysFailingIbjaAdapter(),
@@ -144,10 +156,10 @@ describe('Chaos: Both adapters fail → LKG cache', () => {
     // Should resolve quickly from the in-memory LKG mock
     expect(elapsedMs).toBeLessThan(1_000);
 
-    // LKG rates match what was seeded
+    // LKG rates match what was seeded, and stale=true because storedAt is 31 min ago
     expect(result.rates.GOLD_24K.perGramPaise).toBe(735000n);
     expect(result.source).toBe('last_known_good');
-    expect(result.stale).toBe(false);
+    expect(result.stale).toBe(true);
   });
 
   it('throws RatesUnavailableError when both adapters fail AND LKG cache is empty', async () => {

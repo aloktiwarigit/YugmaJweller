@@ -24,10 +24,21 @@ export class MetalsDevAdapter implements RatesPort {
   }
 
   async getRatesByPurity(): Promise<RatesResult> {
+    const TIMEOUT_MS = 5000;
+    let timer: ReturnType<typeof setTimeout>;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new RatesAdapterError(this.getName(), new Error('Request timeout'))),
+        TIMEOUT_MS,
+      );
+    });
     try {
-      const rates = await this._fetch();
+      const rates = await Promise.race([this._fetch(), timeoutPromise]);
+      clearTimeout(timer!);
       return { rates, source: this.getName(), stale: false };
     } catch (err) {
+      clearTimeout(timer!);
+      if (err instanceof RatesAdapterError) throw err;
       throw new RatesAdapterError(this.getName(), err);
     }
   }
