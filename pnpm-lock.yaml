@@ -61,9 +61,15 @@ importers:
       '@goldsmith/cache':
         specifier: workspace:*
         version: link:../../packages/cache
+      '@goldsmith/compliance':
+        specifier: workspace:*
+        version: link:../../packages/compliance
       '@goldsmith/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@goldsmith/integrations-storage':
+        specifier: workspace:*
+        version: link:../../packages/integrations/storage
       '@goldsmith/observability':
         specifier: workspace:*
         version: link:../../packages/observability

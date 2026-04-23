@@ -22,7 +22,7 @@ export const CreateProductSchema = z.object({
   status:                   STATUS.optional().default('IN_STOCK'),
 });
 
-export type CreateProductDto = z.infer<typeof CreateProductSchema>;
+export type CreateProductDto = z.input<typeof CreateProductSchema>;
 
 export const UpdateProductSchema = CreateProductSchema.partial();
 export type UpdateProductDto = z.infer<typeof UpdateProductSchema>;
