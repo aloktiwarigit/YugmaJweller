@@ -10,6 +10,7 @@ describe('CreateProductSchema', () => {
     netWeightG: '9.0000',
     stoneWeightG: '0.5000',
     status: 'IN_STOCK',
+    huid: 'AB1234',
   };
 
   it('accepts a valid product', () => {
