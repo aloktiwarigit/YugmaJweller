@@ -53,22 +53,23 @@ export class LastKnownGoodCache {
       rates: serialize(rates),
       storedAt: new Date().toISOString(),
     };
-    await this.redis.set(REDIS_KEY, JSON.stringify(entry));
+    await this.redis.set(REDIS_KEY, JSON.stringify(entry), 'EX', 24 * 60 * 60);
   }
 
   async get(): Promise<CachedRates | null> {
-    const raw = await this.redis.get(REDIS_KEY);
-    if (!raw) return null;
-
-    const entry: StoredEntry = JSON.parse(raw) as StoredEntry;
-    const storedAt = new Date(entry.storedAt);
-    const ageMs = Date.now() - storedAt.getTime();
-    const stale = ageMs > STALE_THRESHOLD_MS;
-
-    return {
-      rates: deserialize(entry.rates),
-      stale,
-      storedAt,
-    };
+    try {
+      const raw = await this.redis.get(REDIS_KEY);
+      if (!raw) return null;
+      const entry = JSON.parse(raw) as StoredEntry;
+      const storedAt = new Date(entry.storedAt);
+      const ageMs = Date.now() - storedAt.getTime();
+      return {
+        rates: deserialize(entry.rates),
+        stale: ageMs > STALE_THRESHOLD_MS,
+        storedAt,
+      };
+    } catch {
+      return null;
+    }
   }
 }

@@ -1,14 +1,19 @@
-import { Logger } from '@nestjs/common';
 import type { RatesPort, PurityRates } from './port';
 import { RatesUnavailableError } from './errors';
 import type { LastKnownGoodCache } from './last-known-good-cache';
+
+interface RatesLogger {
+  log(message: string): void;
+  warn(message: string): void;
+  error(message: string): void;
+}
 
 export class FallbackChain implements RatesPort {
   constructor(
     private readonly primary: RatesPort,
     private readonly secondary: RatesPort,
     private readonly lastKnownGoodCache: LastKnownGoodCache,
-    private readonly logger: Logger,
+    private readonly logger: RatesLogger,
   ) {}
 
   getName(): string {

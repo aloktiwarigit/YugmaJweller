@@ -36,8 +36,11 @@ export class CircuitBreaker implements RatesPort {
   private async setState(state: CircuitState): Promise<void> {
     if (state === 'OPEN') {
       await this.redis.set(this.keyState, state, 'EX', COOLDOWN_SEC * 4);
+    } else if (state === 'HALF_OPEN') {
+      await this.redis.set(this.keyState, state, 'EX', COOLDOWN_SEC);
     } else {
-      await this.redis.set(this.keyState, state);
+      // CLOSED: delete the key; missing → CLOSED in getState()
+      await this.redis.del(this.keyState);
     }
   }
 
@@ -55,8 +58,8 @@ export class CircuitBreaker implements RatesPort {
     if (count >= FAILURE_THRESHOLD) {
       const alreadyOpen = await this.redis.get(this.keyState);
       if (alreadyOpen !== 'OPEN') {
+        await this.redis.set(this.keyOpenedAt, String(Date.now()), 'NX');
         await this.setState('OPEN');
-        await this.redis.set(this.keyOpenedAt, String(Date.now()));
       }
     }
   }

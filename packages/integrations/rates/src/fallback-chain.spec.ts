@@ -51,7 +51,7 @@ describe('FallbackChain', () => {
     });
     const secondarySpy = vi.spyOn(secondary, 'getRatesByPurity');
 
-    const chain = new FallbackChain(primarySuccess, secondary, lkg, noopLogger as never);
+    const chain = new FallbackChain(primarySuccess, secondary, lkg, noopLogger);
     const rates = await chain.getRatesByPurity();
 
     expect(rates.GOLD_24K.perGramPaise).toBe(735000n);
@@ -62,7 +62,7 @@ describe('FallbackChain', () => {
     const secondarySuccess = makeAdapter('metalsdev', async () => STUB_RATES);
     const secondarySpy = vi.spyOn(secondarySuccess, 'getRatesByPurity');
 
-    const chain = new FallbackChain(adapterFail, secondarySuccess, lkg, noopLogger as never);
+    const chain = new FallbackChain(adapterFail, secondarySuccess, lkg, noopLogger);
     const rates = await chain.getRatesByPurity();
 
     expect(rates.GOLD_24K.perGramPaise).toBe(735000n);
@@ -77,7 +77,7 @@ describe('FallbackChain', () => {
     vi.useFakeTimers();
     vi.setSystemTime(Date.now() + 31 * 60 * 1000);
 
-    const chain = new FallbackChain(adapterFail, adapterFail, lkg, noopLogger as never);
+    const chain = new FallbackChain(adapterFail, adapterFail, lkg, noopLogger);
     const rates = await chain.getRatesByPurity();
 
     expect(rates.GOLD_24K.perGramPaise).toBe(735000n);
@@ -87,14 +87,14 @@ describe('FallbackChain', () => {
 
   it('all sources fail: throws RatesUnavailableError', async () => {
     // Empty cache (nothing stored)
-    const chain = new FallbackChain(adapterFail, adapterFail, lkg, noopLogger as never);
+    const chain = new FallbackChain(adapterFail, adapterFail, lkg, noopLogger);
     await expect(chain.getRatesByPurity()).rejects.toBeInstanceOf(RatesUnavailableError);
   });
 
   it('successful primary fetch: updates LastKnownGoodCache', async () => {
     const updateSpy = vi.spyOn(lkg, 'update');
 
-    const chain = new FallbackChain(primarySuccess, adapterFail, lkg, noopLogger as never);
+    const chain = new FallbackChain(primarySuccess, adapterFail, lkg, noopLogger);
     await chain.getRatesByPurity();
 
     expect(updateSpy).toHaveBeenCalledOnce();
