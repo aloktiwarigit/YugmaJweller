@@ -51,8 +51,13 @@ function makeSvc(): { svc: SettingsService; repo: SettingsRepository; cache: Set
 
   const tenantLookup = { invalidate: vi.fn() } as unknown as DrizzleTenantLookup;
   const pool = {} as Pool;
+  const flagsCache = {
+    getFlags: vi.fn().mockResolvedValue(null),
+    setFlags: vi.fn().mockResolvedValue(undefined),
+    invalidate: vi.fn().mockResolvedValue(undefined),
+  } as never;
 
-  const svc = new SettingsService(repo, cache, tenantLookup, pool);
+  const svc = new SettingsService(repo, cache, flagsCache, tenantLookup, pool);
   return { svc, repo, cache, tenantLookup };
 }
 
