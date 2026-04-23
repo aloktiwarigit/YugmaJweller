@@ -46,8 +46,14 @@ const mockTenantLookup = {
   invalidate: vi.fn(),
 } as unknown as DrizzleTenantLookup;
 
+const mockFlagsCache = {
+  getFlags: vi.fn().mockResolvedValue(null),
+  setFlags: vi.fn().mockResolvedValue(undefined),
+  invalidate: vi.fn().mockResolvedValue(undefined),
+} as never;
+
 function makeService(): SettingsService {
-  return new SettingsService(mockRepo, mockCache, mockTenantLookup, mockPool);
+  return new SettingsService(mockRepo, mockCache, mockFlagsCache, mockTenantLookup, mockPool);
 }
 
 // Helpers to call vitest mock API on typed stubs

@@ -1,4 +1,4 @@
-import type { ShopProfileRow, MakingChargeConfig, WastageConfig } from '@goldsmith/shared';
+import type { ShopProfileRow, MakingChargeConfig, WastageConfig, TryAtHomeRow } from '@goldsmith/shared';
 import { LoyaltyConfig } from '@goldsmith/shared';
 
 export interface UpdateProfileResult {
@@ -22,3 +22,8 @@ export interface UpdateRateLockResult {
 }
 
 export type UpdateLoyaltyResult = { ok: true; config: LoyaltyConfig } | { ok: false; error: string };
+
+export interface UpdateTryAtHomeResult {
+  before: TryAtHomeRow;
+  after: TryAtHomeRow;
+}

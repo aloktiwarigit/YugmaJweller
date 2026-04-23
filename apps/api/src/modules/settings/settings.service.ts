@@ -1,10 +1,19 @@
 import { BadRequestException, Inject, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import type { Pool } from 'pg';
-import { PatchShopProfileSchema, LoyaltyConfig, LoyaltyConfigSchema, PatchLoyaltyDto, PatchMakingChargesSchema, MAKING_CHARGE_DEFAULTS, PatchWastageSchema, WASTAGE_DEFAULTS, PatchRateLockSchema, RATE_LOCK_DEFAULT_DAYS } from '@goldsmith/shared';
-import type { PatchShopProfileDto, ShopProfileRow, MakingChargeConfig, PatchMakingChargesDto, WastageConfig, PatchWastageDto, PatchRateLockDto } from '@goldsmith/shared';
+import {
+  PatchShopProfileSchema, LoyaltyConfig, LoyaltyConfigSchema, PatchLoyaltyDto,
+  PatchMakingChargesSchema, MAKING_CHARGE_DEFAULTS, PatchWastageSchema, WASTAGE_DEFAULTS,
+  PatchRateLockSchema, RATE_LOCK_DEFAULT_DAYS,
+  PatchTryAtHomeSchema, TRY_AT_HOME_DEFAULT_MAX_PIECES,
+} from '@goldsmith/shared';
+import type {
+  PatchShopProfileDto, ShopProfileRow, MakingChargeConfig, PatchMakingChargesDto,
+  WastageConfig, PatchWastageDto, PatchRateLockDto, PatchTryAtHomeDto, TryAtHomeRow,
+} from '@goldsmith/shared';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
-import { SettingsCache } from '@goldsmith/tenant-config';
+import { SettingsCache, FeatureFlagsCache } from '@goldsmith/tenant-config';
+import type { FeatureFlags } from '@goldsmith/tenant-config';
 import { SettingsRepository } from './settings.repository';
 import { DrizzleTenantLookup } from '../../drizzle-tenant-lookup';
 import type { UpdateLoyaltyResult } from './settings.types';
@@ -14,6 +23,7 @@ export class SettingsService {
   constructor(
     @Inject(SettingsRepository)  private readonly repo: SettingsRepository,
     @Inject(SettingsCache)       private readonly cache: SettingsCache,
+    @Inject(FeatureFlagsCache)   private readonly flagsCache: FeatureFlagsCache,
     @Inject(DrizzleTenantLookup) private readonly tenantLookup: DrizzleTenantLookup,
     @Inject('PG_POOL')           private readonly pool: Pool,
   ) {}
@@ -263,6 +273,68 @@ export class SettingsService {
     if (!tc) return;
     await auditLog(this.pool, {
       action: AuditAction.SETTINGS_RATE_LOCK_UPDATED,
+      subjectType: 'shop',
+      subjectId: tc.shopId,
+      actorUserId: tc.authenticated ? tc.userId : undefined,
+      before,
+      after,
+    });
+  }
+
+  async getTryAtHome(): Promise<TryAtHomeRow> {
+    const { enabled, maxPieces } = await this.repo.getTryAtHome();
+    return {
+      tryAtHomeEnabled: enabled,
+      tryAtHomeMaxPieces: maxPieces ?? TRY_AT_HOME_DEFAULT_MAX_PIECES,
+    };
+  }
+
+  async updateTryAtHome(dto: PatchTryAtHomeDto): Promise<TryAtHomeRow> {
+    const parsed = PatchTryAtHomeSchema.safeParse(dto);
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), code: i.message }));
+      throw new UnprocessableEntityException({ code: 'validation.failed', errors });
+    }
+
+    const current = await this.repo.getTryAtHome();
+    const currentMaxPieces = current.maxPieces ?? TRY_AT_HOME_DEFAULT_MAX_PIECES;
+    const nextEnabled = parsed.data.tryAtHomeEnabled ?? current.enabled;
+    // "If tryAtHomeEnabled=false in the request → ignore tryAtHomeMaxPieces"
+    const nextMaxPieces = parsed.data.tryAtHomeEnabled === false
+      ? currentMaxPieces
+      : (parsed.data.tryAtHomeMaxPieces ?? currentMaxPieces);
+
+    const { before, after } = await this.repo.updateTryAtHome(nextEnabled, nextMaxPieces);
+
+    const { shopId } = tenantContext.requireCurrent();
+    await this.flagsCache.invalidate(shopId);
+
+    void this.auditTryAtHomeUpdate(before, after).catch(() => undefined);
+
+    return after;
+  }
+
+  async getFeatureFlags(): Promise<FeatureFlags> {
+    const { shopId } = tenantContext.requireCurrent();
+    const hit = await this.flagsCache.getFlags(shopId);
+    if (hit) return hit;
+    const { enabled, maxPieces } = await this.repo.getTryAtHome();
+    const flags: FeatureFlags = {
+      try_at_home: enabled,
+      max_pieces: maxPieces ?? TRY_AT_HOME_DEFAULT_MAX_PIECES,
+    };
+    await this.flagsCache.setFlags(shopId, flags);
+    return flags;
+  }
+
+  private async auditTryAtHomeUpdate(
+    before: TryAtHomeRow,
+    after: TryAtHomeRow,
+  ): Promise<void> {
+    const tc = tenantContext.current();
+    if (!tc) return;
+    await auditLog(this.pool, {
+      action: AuditAction.SETTINGS_TRY_AT_HOME_UPDATED,
       subjectType: 'shop',
       subjectId: tc.shopId,
       actorUserId: tc.authenticated ? tc.userId : undefined,

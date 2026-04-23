@@ -6,7 +6,7 @@ import { SettingsController } from './settings.controller';
 import { SettingsService } from './settings.service';
 import { SettingsRepository } from './settings.repository';
 import { BlobStorageService } from './blob-storage.service';
-import { SettingsCache } from '@goldsmith/tenant-config';
+import { SettingsCache, FeatureFlagsCache } from '@goldsmith/tenant-config';
 
 @Module({
   imports: [AuthModule, TenantLookupModule],
@@ -22,6 +22,11 @@ import { SettingsCache } from '@goldsmith/tenant-config';
     {
       provide: SettingsCache,
       useFactory: (redis: Redis) => new SettingsCache(redis, 60),
+      inject: ['SETTINGS_REDIS'],
+    },
+    {
+      provide: FeatureFlagsCache,
+      useFactory: (redis: Redis) => new FeatureFlagsCache(redis),
       inject: ['SETTINGS_REDIS'],
     },
   ],

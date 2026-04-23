@@ -14,11 +14,17 @@ import type { Response } from 'express';
 import { createHash } from 'node:crypto';
 import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext } from '@goldsmith/tenant-context';
-import { PatchLoyaltySchema } from '@goldsmith/shared';
-import type { PatchShopProfileDto, PatchMakingChargesDto, PatchWastageDto, PatchRateLockDto } from '@goldsmith/shared';
+import { PatchLoyaltySchema, PatchTryAtHomeSchema } from '@goldsmith/shared';
+import type {
+  PatchShopProfileDto, PatchMakingChargesDto, PatchWastageDto, PatchRateLockDto,
+} from '@goldsmith/shared';
 import { SettingsService } from './settings.service';
 import { BlobStorageService } from './blob-storage.service';
-import type { ShopProfileResponseDto, LogoUploadUrlResponseDto, MakingChargesResponseDto, WastageResponseDto, RateLockResponseDto, LoyaltyResponseDto } from './settings.dto';
+import type {
+  ShopProfileResponseDto, LogoUploadUrlResponseDto, MakingChargesResponseDto,
+  WastageResponseDto, RateLockResponseDto, LoyaltyResponseDto,
+  TryAtHomeResponseDto, FeatureFlagsResponseDto,
+} from './settings.dto';
 
 @Controller('/api/v1/settings')
 export class SettingsController {
@@ -184,5 +190,47 @@ export class SettingsController {
     const etag = `"${createHash('sha256').update(JSON.stringify(result.config)).digest('hex').slice(0, 16)}"`;
     res.setHeader('ETag', etag);
     return { ...result.config, etag };
+  }
+
+  @Get('/try-at-home')
+  async getTryAtHome(
+    @TenantContextDec() ctx: TenantContext,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<TryAtHomeResponseDto> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (!['shop_admin', 'shop_manager'].includes(ctx.role)) throw new ForbiddenException({ code: 'auth.insufficient_role' });
+    const data = await this.svc.getTryAtHome();
+    const etag = `"${createHash('sha256').update(JSON.stringify(data)).digest('hex').slice(0, 16)}"`;
+    res.setHeader('ETag', etag);
+    return { ...data, etag };
+  }
+
+  @Patch('/try-at-home')
+  async updateTryAtHome(
+    @TenantContextDec() ctx: TenantContext,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<TryAtHomeResponseDto> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (ctx.role !== 'shop_admin') throw new ForbiddenException({ code: 'auth.insufficient_role' });
+
+    const parsed = PatchTryAtHomeSchema.safeParse(body);
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), code: i.message }));
+      throw new UnprocessableEntityException({ code: 'validation.failed', errors });
+    }
+
+    const data = await this.svc.updateTryAtHome(parsed.data);
+    const etag = `"${createHash('sha256').update(JSON.stringify(data)).digest('hex').slice(0, 16)}"`;
+    res.setHeader('ETag', etag);
+    return { ...data, etag };
+  }
+
+  @Get('/feature-flags')
+  async getFeatureFlags(
+    @TenantContextDec() ctx: TenantContext,
+  ): Promise<FeatureFlagsResponseDto> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.svc.getFeatureFlags();
   }
 }

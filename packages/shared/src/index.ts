@@ -72,3 +72,13 @@ export type {
   PatchLoyaltyRateDto,
   PatchLoyaltyDto,
 } from './schemas/loyalty-config.schema';
+
+export {
+  TRY_AT_HOME_DEFAULT_ENABLED,
+  TRY_AT_HOME_DEFAULT_MAX_PIECES,
+  PatchTryAtHomeSchema,
+} from './schemas/try-at-home.schema';
+export type {
+  PatchTryAtHomeDto,
+  TryAtHomeRow,
+} from './schemas/try-at-home.schema';

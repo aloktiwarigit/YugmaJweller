@@ -1,4 +1,3 @@
-// TODO Story 1.4: wrap with SettingsGroupCard once available
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useQuery, useMutation } from '@tanstack/react-query';

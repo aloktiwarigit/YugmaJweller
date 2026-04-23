@@ -78,9 +78,16 @@ beforeAll(async () => {
   // DrizzleTenantLookup just needs the pool (for cache invalidation path).
   const tenantLookup = new DrizzleTenantLookup(pool as never);
 
+  const mockFlagsCache = {
+    getFlags: async () => null,
+    setFlags: async () => undefined,
+    invalidate: async () => undefined,
+  } as never;
+
   svc = new SettingsService(
     repo as never,
     mockCache,
+    mockFlagsCache,
     tenantLookup as never,
     pool as never,
   );
