@@ -26,7 +26,7 @@ const fakeRatesResult = {
   SILVER_999: { perGramPaise: 9500n, fetchedAt: NOW },
   SILVER_925: { perGramPaise: 8788n, fetchedAt: NOW },
   stale: false,
-  source: 'fallback-chain',
+  source: 'ibja',
 };
 
 // ---------------------------------------------------------------------------
@@ -68,7 +68,7 @@ describe('PricingController', () => {
       expect(result.GOLD_24K.perGramRupees).toBe('7350.00');
       expect(result.GOLD_24K.fetchedAt).toBe(NOW.toISOString());
       expect(result.stale).toBe(false);
-      expect(result.source).toBe('fallback-chain');
+      expect(result.source).toBe('ibja');
     });
 
     it('returns 503 when PricingService.getCurrentRates throws RatesUnavailableError', async () => {

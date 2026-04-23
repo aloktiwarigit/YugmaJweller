@@ -1,7 +1,7 @@
 // STUB: replace with real IBJA scraper/API when credentials obtained
 // See: https://www.ibja.co/ for API onboarding
 // GOLD_24K ≈ ₹7,350/g → 735000 paise
-import type { RatesPort, PurityRates } from './port';
+import type { RatesPort, PurityRates, RatesResult } from './port';
 import { RatesAdapterError } from './errors';
 
 export class IbjaAdapter implements RatesPort {
@@ -23,9 +23,10 @@ export class IbjaAdapter implements RatesPort {
     };
   }
 
-  async getRatesByPurity(): Promise<PurityRates> {
+  async getRatesByPurity(): Promise<RatesResult> {
     try {
-      return await this._fetch();
+      const rates = await this._fetch();
+      return { rates, source: this.getName(), stale: false };
     } catch (err) {
       throw new RatesAdapterError(this.getName(), err);
     }

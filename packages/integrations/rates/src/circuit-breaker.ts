@@ -1,5 +1,5 @@
 import type { Redis } from 'ioredis';
-import type { RatesPort, PurityRates } from './port';
+import type { RatesPort, RatesResult } from './port';
 import { CircuitOpenError, RatesAdapterError } from './errors';
 
 const FAILURE_THRESHOLD = 5;
@@ -71,7 +71,7 @@ export class CircuitBreaker implements RatesPort {
     return elapsed >= COOLDOWN_SEC;
   }
 
-  async getRatesByPurity(): Promise<PurityRates> {
+  async getRatesByPurity(): Promise<RatesResult> {
     const state = await this.getState();
 
     if (state === 'OPEN') {
@@ -91,13 +91,13 @@ export class CircuitBreaker implements RatesPort {
     return this.callAdapter();
   }
 
-  private async probe(): Promise<PurityRates> {
+  private async probe(): Promise<RatesResult> {
     try {
-      const rates = await this.adapter.getRatesByPurity();
+      const result = await this.adapter.getRatesByPurity();
       // Success → CLOSED
       await this.setState('CLOSED');
       await this.resetFailures();
-      return rates;
+      return result;
     } catch (err) {
       // Failure → back to OPEN
       await this.setState('OPEN');
@@ -107,12 +107,12 @@ export class CircuitBreaker implements RatesPort {
     }
   }
 
-  private async callAdapter(): Promise<PurityRates> {
+  private async callAdapter(): Promise<RatesResult> {
     try {
-      const rates = await this.adapter.getRatesByPurity();
+      const result = await this.adapter.getRatesByPurity();
       // Success in CLOSED — reset failures
       await this.redis.del(this.keyFailures);
-      return rates;
+      return result;
     } catch (err) {
       await this.recordFailure();
       if (err instanceof RatesAdapterError) throw err;

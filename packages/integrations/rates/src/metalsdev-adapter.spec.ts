@@ -5,16 +5,18 @@ import { RatesAdapterError } from './errors';
 describe('MetalsDevAdapter', () => {
   it('returns correct paise values for all purities', async () => {
     const adapter = new MetalsDevAdapter();
-    const rates = await adapter.getRatesByPurity();
+    const result = await adapter.getRatesByPurity();
 
-    expect(rates.GOLD_24K.perGramPaise).toBe(735000n);
-    expect(rates.GOLD_22K.perGramPaise).toBe(673750n);
-    expect(rates.GOLD_20K.perGramPaise).toBe(612500n);
-    expect(rates.GOLD_18K.perGramPaise).toBe(551250n);
-    expect(rates.GOLD_14K.perGramPaise).toBe(428750n);
-    expect(rates.SILVER_999.perGramPaise).toBe(9500n);
-    expect(rates.SILVER_925.perGramPaise).toBe(8788n);
-    expect(rates.GOLD_24K.fetchedAt).toBeInstanceOf(Date);
+    expect(result.rates.GOLD_24K.perGramPaise).toBe(735000n);
+    expect(result.rates.GOLD_22K.perGramPaise).toBe(673750n);
+    expect(result.rates.GOLD_20K.perGramPaise).toBe(612500n);
+    expect(result.rates.GOLD_18K.perGramPaise).toBe(551250n);
+    expect(result.rates.GOLD_14K.perGramPaise).toBe(428750n);
+    expect(result.rates.SILVER_999.perGramPaise).toBe(9500n);
+    expect(result.rates.SILVER_925.perGramPaise).toBe(8788n);
+    expect(result.rates.GOLD_24K.fetchedAt).toBeInstanceOf(Date);
+    expect(result.source).toBe('metalsdev');
+    expect(result.stale).toBe(false);
   });
 
   it('getName() returns "metalsdev"', () => {

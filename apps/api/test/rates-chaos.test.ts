@@ -108,7 +108,7 @@ describe('Chaos: IBJA timeout (5100ms) → MetalsDev fallback within 10s', () =>
     const chain = buildChain(new SlowIbjaAdapter(), new MetalsDevAdapter());
 
     const start = Date.now();
-    const rates = await chain.getRatesByPurity();
+    const result = await chain.getRatesByPurity();
     const elapsedMs = Date.now() - start;
 
     // Total elapsed must be > 5000ms (had to wait on slow IBJA attempt)
@@ -116,8 +116,9 @@ describe('Chaos: IBJA timeout (5100ms) → MetalsDev fallback within 10s', () =>
     // But must complete before our chaos-test budget
     expect(elapsedMs).toBeLessThan(10_000);
 
-    // MetalsDev stub served the rates
-    expect(rates.GOLD_24K.perGramPaise).toBe(735000n);
+    // SlowIbjaAdapter succeeds after delay — source is 'ibja' (slow but not failing)
+    expect(result.rates.GOLD_24K.perGramPaise).toBe(735000n);
+    expect(result.source).toBe('ibja');
   }, 15_000); // generous test timeout to accommodate the slow adapter
 });
 
@@ -137,14 +138,16 @@ describe('Chaos: Both adapters fail → LKG cache', () => {
     );
 
     const start = Date.now();
-    const rates = await chain.getRatesByPurity();
+    const result = await chain.getRatesByPurity();
     const elapsedMs = Date.now() - start;
 
     // Should resolve quickly from the in-memory LKG mock
     expect(elapsedMs).toBeLessThan(1_000);
 
     // LKG rates match what was seeded
-    expect(rates.GOLD_24K.perGramPaise).toBe(735000n);
+    expect(result.rates.GOLD_24K.perGramPaise).toBe(735000n);
+    expect(result.source).toBe('last_known_good');
+    expect(result.stale).toBe(false);
   });
 
   it('throws RatesUnavailableError when both adapters fail AND LKG cache is empty', async () => {
@@ -175,7 +178,7 @@ describe('Chaos: Redis unavailable → PricingService degrades gracefully', () =
     const pool = makeNullPool();
     // FallbackChain mock returns valid rates so we isolate to the Redis failure path
     const fallbackChain = {
-      getRatesByPurity: vi.fn().mockResolvedValue(fakePurityRates),
+      getRatesByPurity: vi.fn().mockResolvedValue({ rates: fakePurityRates, source: 'ibja', stale: false }),
       getName: vi.fn().mockReturnValue('ibja'),
     };
 
@@ -194,7 +197,7 @@ describe('Chaos: Redis unavailable → PricingService degrades gracefully', () =
 
     const pool = makeNullPool();
     const fallbackChain = {
-      getRatesByPurity: vi.fn().mockResolvedValue(fakePurityRates),
+      getRatesByPurity: vi.fn().mockResolvedValue({ rates: fakePurityRates, source: 'ibja', stale: false }),
       getName: vi.fn().mockReturnValue('ibja'),
     };
 

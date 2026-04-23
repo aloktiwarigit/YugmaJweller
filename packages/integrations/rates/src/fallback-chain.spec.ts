@@ -4,7 +4,7 @@ import type { Redis } from 'ioredis';
 import { FallbackChain } from './fallback-chain';
 import { LastKnownGoodCache } from './last-known-good-cache';
 import { RatesAdapterError, RatesUnavailableError } from './errors';
-import type { RatesPort, PurityRates } from './port';
+import type { RatesPort, PurityRates, RatesResult } from './port';
 
 const STUB_RATES: PurityRates = {
   GOLD_24K: { perGramPaise: 735000n, fetchedAt: new Date() },
@@ -16,7 +16,7 @@ const STUB_RATES: PurityRates = {
   SILVER_925: { perGramPaise: 8788n, fetchedAt: new Date() },
 };
 
-function makeAdapter(name: string, impl: () => Promise<PurityRates>): RatesPort {
+function makeAdapter(name: string, impl: () => Promise<RatesResult>): RatesPort {
   return { getName: () => name, getRatesByPurity: impl };
 }
 
@@ -38,7 +38,7 @@ describe('FallbackChain', () => {
     // Flush the shared store before each test to ensure clean state.
     await redis.flushall();
     lkg = new LastKnownGoodCache(redis);
-    primarySuccess = makeAdapter('ibja', async () => STUB_RATES);
+    primarySuccess = makeAdapter('ibja', async () => ({ rates: STUB_RATES, source: 'ibja', stale: false }));
     adapterFail = makeAdapter('fail', async () => {
       throw new RatesAdapterError('fail', new Error('network error'));
     });
@@ -52,20 +52,23 @@ describe('FallbackChain', () => {
     const secondarySpy = vi.spyOn(secondary, 'getRatesByPurity');
 
     const chain = new FallbackChain(primarySuccess, secondary, lkg, noopLogger);
-    const rates = await chain.getRatesByPurity();
+    const result = await chain.getRatesByPurity();
 
-    expect(rates.GOLD_24K.perGramPaise).toBe(735000n);
+    expect(result.rates.GOLD_24K.perGramPaise).toBe(735000n);
+    expect(result.source).toBe('ibja');
+    expect(result.stale).toBe(false);
     expect(secondarySpy).not.toHaveBeenCalled();
   });
 
   it('primary fails: secondary called, returns rates', async () => {
-    const secondarySuccess = makeAdapter('metalsdev', async () => STUB_RATES);
+    const secondarySuccess = makeAdapter('metalsdev', async () => ({ rates: STUB_RATES, source: 'metalsdev', stale: false }));
     const secondarySpy = vi.spyOn(secondarySuccess, 'getRatesByPurity');
 
     const chain = new FallbackChain(adapterFail, secondarySuccess, lkg, noopLogger);
-    const rates = await chain.getRatesByPurity();
+    const result = await chain.getRatesByPurity();
 
-    expect(rates.GOLD_24K.perGramPaise).toBe(735000n);
+    expect(result.rates.GOLD_24K.perGramPaise).toBe(735000n);
+    expect(result.source).toBe('metalsdev');
     expect(secondarySpy).toHaveBeenCalledOnce();
   });
 
@@ -78,9 +81,11 @@ describe('FallbackChain', () => {
     vi.setSystemTime(Date.now() + 31 * 60 * 1000);
 
     const chain = new FallbackChain(adapterFail, adapterFail, lkg, noopLogger);
-    const rates = await chain.getRatesByPurity();
+    const result = await chain.getRatesByPurity();
 
-    expect(rates.GOLD_24K.perGramPaise).toBe(735000n);
+    expect(result.rates.GOLD_24K.perGramPaise).toBe(735000n);
+    expect(result.source).toBe('last_known_good');
+    expect(result.stale).toBe(true);
 
     vi.useRealTimers();
   });
@@ -91,7 +96,7 @@ describe('FallbackChain', () => {
     await expect(chain.getRatesByPurity()).rejects.toBeInstanceOf(RatesUnavailableError);
   });
 
-  it('successful primary fetch: updates LastKnownGoodCache', async () => {
+  it('successful primary fetch: updates LastKnownGoodCache with the PurityRates (not the full result)', async () => {
     const updateSpy = vi.spyOn(lkg, 'update');
 
     const chain = new FallbackChain(primarySuccess, adapterFail, lkg, noopLogger);

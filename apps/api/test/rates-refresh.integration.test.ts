@@ -118,9 +118,8 @@ describe('PricingService.refreshRates() — happy path', () => {
       `SELECT source, gold_24k_paise FROM ibja_rate_snapshots ORDER BY fetched_at DESC LIMIT 1`,
     );
     expect(rows.rowCount).toBe(1);
-    // IbjaAdapter is the stub (stub returns ibja stub data); source is 'fallback-chain'
-    // because FallbackChain.getName() returns 'fallback-chain', which is what PricingService stores.
-    // The row's gold_24k_paise must match the stub value.
+    // IbjaAdapter served the rates — source must be 'ibja' (the winning adapter's name)
+    expect(rows.rows[0].source).toBe('ibja');
     expect(rows.rows[0].gold_24k_paise).toBe('735000');
   });
 });
@@ -146,13 +145,15 @@ describe('PricingService.refreshRates() — IBJA fails, MetalsDev serves', () =>
     const parsed = JSON.parse(cached!) as { GOLD_24K: { perGramPaise: string }; source: string };
     // MetalsDev stub also returns 735000n — both stubs have the same value
     expect(parsed.GOLD_24K.perGramPaise).toBe('735000');
-    expect(typeof parsed.source).toBe('string');
+    // IBJA failed → MetalsDev served → source must be 'metalsdev'
+    expect(parsed.source).toBe('metalsdev');
 
     // Snapshot must exist in DB (MetalsDev served)
-    const rows = await pool.query<{ gold_24k_paise: string }>(
-      `SELECT gold_24k_paise FROM ibja_rate_snapshots ORDER BY fetched_at DESC LIMIT 1`,
+    const rows = await pool.query<{ source: string; gold_24k_paise: string }>(
+      `SELECT source, gold_24k_paise FROM ibja_rate_snapshots ORDER BY fetched_at DESC LIMIT 1`,
     );
     expect(rows.rowCount).toBeGreaterThanOrEqual(1);
+    expect(rows.rows[0].source).toBe('metalsdev');
     expect(rows.rows[0].gold_24k_paise).toBe('735000');
   });
 });
@@ -247,8 +248,9 @@ describe('CircuitBreaker integration — IBJA opens after 5 failures', () => {
     // Call FallbackChain 5 times. Each call: IBJA fails → MetalsDev serves.
     // CircuitBreaker records a failure for IBJA on each call.
     for (let i = 0; i < 5; i++) {
-      const rates = await chain.getRatesByPurity();
-      expect(rates.GOLD_24K.perGramPaise).toBe(735000n);
+      const result = await chain.getRatesByPurity();
+      expect(result.rates.GOLD_24K.perGramPaise).toBe(735000n);
+      expect(result.source).toBe('metalsdev');
     }
 
     // After 5 failures CircuitBreaker should have opened (threshold = 5)
@@ -257,7 +259,8 @@ describe('CircuitBreaker integration — IBJA opens after 5 failures', () => {
 
     // One more call: IBJA circuit is OPEN (cooldown=120s not elapsed),
     // throws CircuitOpenError. FallbackChain catches it and falls to MetalsDev.
-    const rates = await chain.getRatesByPurity();
-    expect(rates.GOLD_24K.perGramPaise).toBe(735000n);
+    const result = await chain.getRatesByPurity();
+    expect(result.rates.GOLD_24K.perGramPaise).toBe(735000n);
+    expect(result.source).toBe('metalsdev');
   });
 });

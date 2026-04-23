@@ -7,7 +7,7 @@ import type { Mock } from 'vitest';
 import type { Pool } from 'pg';
 import type { Redis } from '@goldsmith/cache';
 import { RatesUnavailableError } from '@goldsmith/rates';
-import type { PurityRates } from '@goldsmith/rates';
+import type { PurityRates, RatesResult } from '@goldsmith/rates';
 import { AuditAction } from '@goldsmith/audit';
 import { PricingService } from './pricing.service';
 import type { FallbackChain } from '@goldsmith/rates';
@@ -37,7 +37,7 @@ const serializedRates = JSON.stringify({
   SILVER_999: { perGramPaise: '9500', fetchedAt: NOW.toISOString() },
   SILVER_925: { perGramPaise: '8788', fetchedAt: NOW.toISOString() },
   stale: false,
-  source: 'fallback-chain',
+  source: 'ibja',
 });
 
 // ---------------------------------------------------------------------------
@@ -64,9 +64,15 @@ function makeRedisMock() {
   } as unknown as Redis;
 }
 
+const fakeRatesResult: RatesResult = {
+  rates: fakePurityRates,
+  source: 'ibja',
+  stale: false,
+};
+
 function makeFallbackChainMock() {
   return {
-    getRatesByPurity: vi.fn().mockResolvedValue(fakePurityRates),
+    getRatesByPurity: vi.fn().mockResolvedValue(fakeRatesResult),
     getName: vi.fn().mockReturnValue('fallback-chain'),
   } as unknown as FallbackChain;
 }
@@ -154,7 +160,7 @@ describe('PricingService', () => {
       expect(fallbackChain.getRatesByPurity).not.toHaveBeenCalled();
       expect(result.GOLD_24K.perGramPaise).toBe(735000n);
       expect(result.stale).toBe(false);
-      expect(result.source).toBe('fallback-chain');
+      expect(result.source).toBe('ibja');
     });
 
     it('calls FallbackChain when cache miss and caches result with 15-min TTL (900s)', async () => {

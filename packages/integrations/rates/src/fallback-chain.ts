@@ -1,4 +1,4 @@
-import type { RatesPort, PurityRates } from './port';
+import type { RatesPort, RatesResult } from './port';
 import { RatesUnavailableError } from './errors';
 import type { LastKnownGoodCache } from './last-known-good-cache';
 
@@ -20,14 +20,14 @@ export class FallbackChain implements RatesPort {
     return 'fallback-chain';
   }
 
-  async getRatesByPurity(): Promise<PurityRates> {
+  async getRatesByPurity(): Promise<RatesResult> {
     // Tier 1: primary adapter
     try {
-      const rates = await this.primary.getRatesByPurity();
+      const result = await this.primary.getRatesByPurity();
       this.logger.log(`Rates served by primary (${this.primary.getName()})`);
       // Update LKG cache on success
-      await this.lastKnownGoodCache.update(rates);
-      return rates;
+      await this.lastKnownGoodCache.update(result.rates);
+      return result;
     } catch (primaryErr) {
       this.logger.warn(
         `Primary adapter (${this.primary.getName()}) failed: ${String(primaryErr)}`,
@@ -36,10 +36,10 @@ export class FallbackChain implements RatesPort {
 
     // Tier 2: secondary adapter
     try {
-      const rates = await this.secondary.getRatesByPurity();
+      const result = await this.secondary.getRatesByPurity();
       this.logger.log(`Rates served by secondary (${this.secondary.getName()})`);
-      await this.lastKnownGoodCache.update(rates);
-      return rates;
+      await this.lastKnownGoodCache.update(result.rates);
+      return result;
     } catch (secondaryErr) {
       this.logger.warn(
         `Secondary adapter (${this.secondary.getName()}) failed: ${String(secondaryErr)}`,
@@ -52,7 +52,7 @@ export class FallbackChain implements RatesPort {
       this.logger.warn(
         `Rates served from last-known-good cache (stale=${String(cached.stale)})`,
       );
-      return cached.rates;
+      return { rates: cached.rates, source: 'last_known_good', stale: cached.stale };
     }
 
     // All sources exhausted

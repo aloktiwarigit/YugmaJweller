@@ -8,7 +8,13 @@ export interface PurityRates {
   SILVER_925: { perGramPaise: bigint; fetchedAt: Date };
 }
 
+export interface RatesResult {
+  rates: PurityRates;
+  source: string; // 'ibja' | 'metalsdev' | 'last_known_good'
+  stale: boolean;
+}
+
 export interface RatesPort {
-  getRatesByPurity(): Promise<PurityRates>;
+  getRatesByPurity(): Promise<RatesResult>;
   getName(): string; // 'ibja' | 'metalsdev'
 }

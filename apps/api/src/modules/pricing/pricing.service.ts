@@ -107,25 +107,24 @@ export class PricingService {
     }
 
     // Cache miss — call FallbackChain (throws RatesUnavailableError if all sources fail)
-    const liveRates = await this.fallbackChain.getRatesByPurity();
-    const source = this.fallbackChain.getName();
+    const liveResult = await this.fallbackChain.getRatesByPurity();
+    const { rates: liveRates, source, stale } = liveResult;
 
     // Cache the result with 15-min TTL
-    const serialized = serializeRates(liveRates, false, source);
+    const serialized = serializeRates(liveRates, stale, source);
     await this.redis.setex(REDIS_KEY_CURRENT, TTL_CURRENT_CACHE_SEC, serialized);
 
-    return { ...liveRates, stale: false, source };
+    return { ...liveRates, stale, source };
   }
 
   // -------------------------------------------------------------------------
   // refreshRates — called by BullMQ worker on schedule
   // -------------------------------------------------------------------------
   async refreshRates(): Promise<void> {
-    const rates = await this.fallbackChain.getRatesByPurity();
-    const source = this.fallbackChain.getName();
+    const { rates, source, stale } = await this.fallbackChain.getRatesByPurity();
 
     // 1. Write to Redis 'rates:current' with 30-min TTL
-    const serialized = serializeRates(rates, false, source);
+    const serialized = serializeRates(rates, stale, source);
     await this.redis.setex(REDIS_KEY_CURRENT, TTL_REFRESH_SEC, serialized);
 
     // 2. Insert snapshot into ibja_rate_snapshots (platform-global table, no tenant context)
@@ -140,7 +139,7 @@ export class PricingService {
       gold_14k_paise: rates.GOLD_14K.perGramPaise,
       silver_999_paise: rates.SILVER_999.perGramPaise,
       silver_925_paise: rates.SILVER_925.perGramPaise,
-      stale: false,
+      stale,
     };
     const client = await this.pool.connect();
     try {

@@ -3,7 +3,7 @@ import RedisMock from 'ioredis-mock';
 import type { Redis } from 'ioredis';
 import { CircuitBreaker } from './circuit-breaker';
 import { CircuitOpenError, RatesAdapterError } from './errors';
-import type { RatesPort, PurityRates } from './port';
+import type { RatesPort, PurityRates, RatesResult } from './port';
 
 const STUB_RATES: PurityRates = {
   GOLD_24K: { perGramPaise: 735000n, fetchedAt: new Date() },
@@ -15,7 +15,9 @@ const STUB_RATES: PurityRates = {
   SILVER_925: { perGramPaise: 8788n, fetchedAt: new Date() },
 };
 
-function makeAdapter(name: string, impl: () => Promise<PurityRates>): RatesPort {
+const STUB_RESULT: RatesResult = { rates: STUB_RATES, source: 'test', stale: false };
+
+function makeAdapter(name: string, impl: () => Promise<RatesResult>): RatesPort {
   return { getName: () => name, getRatesByPurity: impl };
 }
 
@@ -44,7 +46,7 @@ describe('CircuitBreaker', () => {
     // ioredis-mock shares context across instances with the same host:port/db.
     // Flush the shared store before each test to ensure clean state.
     await redis.flushall();
-    successAdapter = makeAdapter('test', async () => STUB_RATES);
+    successAdapter = makeAdapter('test', async () => STUB_RESULT);
     failAdapter = makeAdapter('test', async () => {
       throw new RatesAdapterError('test', new Error('network error'));
     });
@@ -56,8 +58,8 @@ describe('CircuitBreaker', () => {
 
   it('starts in CLOSED state', async () => {
     const cb = new CircuitBreaker(successAdapter, redis);
-    const rates = await cb.getRatesByPurity();
-    expect(rates.GOLD_24K.perGramPaise).toBe(735000n);
+    const result = await cb.getRatesByPurity();
+    expect(result.rates.GOLD_24K.perGramPaise).toBe(735000n);
   });
 
   it('CLOSED→OPEN after 5 consecutive failures within 60s', async () => {
@@ -99,8 +101,8 @@ describe('CircuitBreaker', () => {
 
     // After cooldown, a HALF_OPEN probe with success adapter should succeed
     const healedCb = new CircuitBreaker(successAdapter, redis);
-    const rates = await healedCb.getRatesByPurity();
-    expect(rates.GOLD_24K.perGramPaise).toBe(735000n);
+    const result = await healedCb.getRatesByPurity();
+    expect(result.rates.GOLD_24K.perGramPaise).toBe(735000n);
   });
 
   it('HALF_OPEN: successful probe → returns to CLOSED', async () => {
