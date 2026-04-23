@@ -112,5 +112,14 @@
       "RATE_OUT_OF_RANGE": "दर 0 से 100 के बीच होनी चाहिए",
       "TIER_ORDER_INVALID": "टियर का क्रम सही नहीं — न्यूनतम खरीद बढ़ते क्रम में होनी चाहिए"
     }
+  },
+  "try_at_home": {
+    "title": "घर पर try करें",
+    "description": "Customer घर पर कुछ pieces try करके खरीद सकते हैं",
+    "max_pieces_label": "अधिकतम pieces per booking",
+    "save_success": "बदलाव सहेज लिया ✓",
+    "errors": {
+      "MAX_PIECES_RANGE": "अधिकतम pieces 1 से 10 के बीच होने चाहिए"
+    }
   }
 }

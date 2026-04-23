@@ -112,5 +112,14 @@
       "RATE_OUT_OF_RANGE": "Rate must be between 0 and 100",
       "TIER_ORDER_INVALID": "Tier order is invalid — minimum purchase must be in ascending order"
     }
+  },
+  "try_at_home": {
+    "title": "Try at Home",
+    "description": "Customers can try pieces at home before buying",
+    "max_pieces_label": "Max pieces per booking",
+    "save_success": "Changes saved ✓",
+    "errors": {
+      "MAX_PIECES_RANGE": "Max pieces must be between 1 and 10"
+    }
   }
 }
