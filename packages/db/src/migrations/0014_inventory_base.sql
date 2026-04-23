@@ -47,6 +47,7 @@ CREATE TABLE products (
 );
 CREATE INDEX products_shop_id_idx        ON products (shop_id);
 CREATE INDEX products_shop_id_status_idx ON products (shop_id, status);
+CREATE UNIQUE INDEX products_shop_id_sku_unique ON products (shop_id, sku);
 
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products FORCE ROW LEVEL SECURITY;
@@ -81,4 +82,4 @@ CREATE POLICY rls_product_images_tenant_isolation ON product_images
 -- but explicit grant matches the established per-story pattern).
 GRANT SELECT, INSERT, UPDATE ON product_categories TO app_user;
 GRANT SELECT, INSERT, UPDATE ON products           TO app_user;
-GRANT SELECT, INSERT, UPDATE ON product_images     TO app_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON product_images TO app_user;

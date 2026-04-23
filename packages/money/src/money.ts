@@ -14,6 +14,8 @@ export class MoneyInPaise {
   }
 
   toRupees(): string {
+    // Display-only: Number() is safe up to ~900 trillion paise (Rs 9 trillion).
+    // Never use for arithmetic — the spec designates this as display/logging only.
     const fmt = new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
