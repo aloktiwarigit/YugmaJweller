@@ -36,7 +36,8 @@ describe('AuthService.revokeStaff — cross-tenant isolation', () => {
     const rateLimit = {} as never;
     const smsAdapter = { sendOtp: vi.fn(), sendInvite: vi.fn() } as never;
 
-    const svc = new AuthService(pool, firebase as never, authRepo as never, rateLimit, smsAdapter);
+    const auditLogRepo = { findPaginated: vi.fn() } as never;
+    const svc = new AuthService(pool, firebase as never, authRepo as never, rateLimit, smsAdapter, auditLogRepo);
 
     const SHOP_A = 'aaaaaaaa-0000-0000-0000-000000000001';
     const USER_FROM_SHOP_B = 'bbbbbbbb-0000-0000-0000-000000000002'; // belongs to shop-B

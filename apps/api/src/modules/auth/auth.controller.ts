@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   Inject,
@@ -10,6 +11,7 @@ import {
   ParseUUIDPipe,
   Post,
   Put,
+  Query,
   Req,
   UnauthorizedException,
   UseGuards,
@@ -28,6 +30,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AuthService } from './auth.service';
 import { AuthRepository } from './auth.repository';
+import type { AuditLogDateRange, AuditLogCategory } from './audit-log.repository';
 import { PermissionsRepository } from './permissions.repository';
 import { PolicyGuard } from './guards/policy.guard';
 import { TenantWalkerRoute } from '../../common/decorators/tenant-walker-route.decorator';
@@ -128,6 +131,49 @@ export class AuthController {
         metadata: { role, permission_key: dto.permission_key, is_enabled: dto.is_enabled },
       }),
     );
+  }
+
+  @Get('/audit-log')
+  @Roles('shop_admin', 'shop_manager')
+  @UseGuards(PolicyGuard)
+  async getAuditLog(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('dateRange') dateRange?: AuditLogDateRange,
+    @Query('category') category?: AuditLogCategory,
+  ): Promise<unknown> {
+    const ctx = tenantContext.requireCurrent();
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    const auth = ctx as AuthenticatedTenantContext;
+    // PolicyGuard only enforces @Permission() keys — not @Roles(). Explicit role check required.
+    if (auth.role === 'shop_staff') throw new ForbiddenException({ errorCode: 'auth.permission_denied' });
+    const parsedPage = parseInt(page ?? '1', 10);
+    const parsedPageSize = parseInt(pageSize ?? '20', 10);
+    return this.svc.getAuditLog({
+      page: Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1,
+      pageSize: Number.isFinite(parsedPageSize) ? Math.min(50, Math.max(1, parsedPageSize)) : 20,
+      dateRange,
+      category,
+    });
+  }
+
+  @Get('/audit-log/export')
+  @Roles('shop_admin')
+  @UseGuards(PolicyGuard)
+  auditLogExport(): { status: string; reason: string } {
+    return { status: 'deferred', reason: 'Azure subscription not provisioned' };
+  }
+
+  @Post('/logout/all')
+  @UseGuards(PolicyGuard)
+  @HttpCode(204)
+  async logoutAll(@Req() req: Request): Promise<void> {
+    const user = (req as FirebaseRequest).user;
+    if (!user?.uid) throw new UnauthorizedException({ code: 'auth.missing' });
+    const ctx = tenantContext.requireCurrent();
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    const auth = ctx as AuthenticatedTenantContext;
+    await this.svc.logoutAll(auth.userId, user.uid);
   }
 
   @Delete('/staff/:userId')

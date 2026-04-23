@@ -7,7 +7,8 @@ import type { InviteStaffDto } from '@goldsmith/shared';
 import { FirebaseAdminProvider } from './firebase-admin.provider';
 import { AuthRepository } from './auth.repository';
 import { AuthRateLimitService } from './auth-rate-limit.service';
-import { SMS_ADAPTER, ISmsAdapter } from './sms/sms-adapter.interface';
+import { SMS_ADAPTER, type ISmsAdapter } from './sms/sms-adapter.interface';
+import { AuditLogRepository, type AuditLogFilters, type PaginatedAuditLog } from './audit-log.repository';
 
 export interface SessionResult {
   user: { id: string; display_name: string; role: ShopUserRole };
@@ -23,6 +24,7 @@ export class AuthService {
     @Inject(AuthRepository) private readonly repo: AuthRepository,
     @Inject(AuthRateLimitService) private readonly rateLimit: AuthRateLimitService,
     @Inject(SMS_ADAPTER) private readonly smsAdapter: ISmsAdapter,
+    @Inject(AuditLogRepository) private readonly auditLogRepo: AuditLogRepository,
   ) {}
 
   async session(args: { uid: string; phoneE164: string; ip?: string; userAgent?: string; requestId?: string }): Promise<SessionResult> {
@@ -156,6 +158,24 @@ export class AuthService {
     return { userId: result.userId! };
   }
 
+  async getAuditLog(
+    filters: AuditLogFilters,
+  ): Promise<PaginatedAuditLog & { page: number; pageSize: number }> {
+    const result = await this.auditLogRepo.findPaginated(filters);
+    return { ...result, page: filters.page, pageSize: Math.min(filters.pageSize, 50) };
+  }
+
+  async logoutAll(userId: string, firebaseUid: string): Promise<void> {
+    await this.firebase.admin().auth().revokeRefreshTokens(firebaseUid);
+    await auditLog(this.pool, {
+      action: AuditAction.AUTH_LOGOUT_ALL,
+      subjectType: 'shop_user',
+      subjectId: userId,
+      actorUserId: userId,
+      metadata: { deviceCount: 'all' },
+    });
+  }
+
   async revokeStaff(shopId: string, targetUserId: string, callerUserId: string): Promise<void> {
     const row = await this.repo.revokeStaff(shopId, targetUserId);
     if (!row) throw new NotFoundException({ code: 'auth.staff_not_found' });
@@ -181,11 +201,6 @@ export class AuthService {
     // status != 'REVOKED' guard on linkFirebaseUid closes the window going forward, but any UID
     // linked just before our UPDATE would be missed by the pre-revoke snapshot. Re-reading after
     // markRevoked (when status is definitively REVOKED) catches this race.
-    // Always re-clear and re-revoke after the DB row is definitively REVOKED. This closes two
-    // races: (a) an in-flight /session for the same UID could call setCustomUserClaims after our
-    // pre-revoke clear; (b) a concurrent /session for an INVITED user could link a new UID
-    // between our initial SELECT and the markRevoked UPDATE. Both are handled by re-reading and
-    // unconditionally clearing whatever UID is recorded after markRevoked commits.
     const latestUid = await this.repo.getFirebaseUid(shopId, targetUserId);
     if (latestUid) {
       await this.firebase.admin().auth().setCustomUserClaims(latestUid, {});

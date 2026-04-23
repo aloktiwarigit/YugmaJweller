@@ -55,4 +55,6 @@ export const StyleSheet = {
     Array.isArray(s)
       ? (Object.assign({}, ...s) as Record<string, unknown>)
       : ((s ?? {}) as Record<string, unknown>),
+  // Match the iOS/Android value so components using StyleSheet.hairlineWidth compile/run in tests
+  hairlineWidth: 0.5,
 };

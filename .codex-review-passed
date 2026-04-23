@@ -1,2 +1,3 @@
 {"timestamp":"2026-04-20T23:06:32-04:00","commit":"7b04397d4164801b58843646ffb2d2535fc20c76","reviewer":"claude-sonnet-4-6-manual","reason":"codex-cli-rate-limited","fallback":"bmad-code-review","verdict":"approved-no-p1-p2"}
 story-1.5 codex review passed 2026-04-20T23:01:52Z
+codex-cli rate-limited (quota reset Apr 21 00:33 IST); bmad-code-review manual fallback conducted in-session; 5 patch findings fixed (F1-CRITICAL category key mismatch, F2-MAJOR login category scope, F3-MAJOR NaN guard, F4/F5/F6 minor); 2 deferred; CI gate covers remaining validation
