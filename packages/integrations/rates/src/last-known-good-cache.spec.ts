@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import RedisMock from 'ioredis-mock';
 import type { Redis } from 'ioredis';
 import { LastKnownGoodCache } from './last-known-good-cache';
@@ -24,6 +24,10 @@ describe('LastKnownGoodCache', () => {
     // Flush the shared store before each test to ensure clean state.
     await redis.flushall();
     cache = new LastKnownGoodCache(redis);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('get() returns null when cache is empty', async () => {
@@ -57,8 +61,6 @@ describe('LastKnownGoodCache', () => {
     const result = await cache.get();
     expect(result).not.toBeNull();
     expect(result!.stale).toBe(false);
-
-    vi.useRealTimers();
   });
 
   it('stale=true when stored more than 30 minutes ago', async () => {
@@ -73,7 +75,5 @@ describe('LastKnownGoodCache', () => {
     const result = await cache.get();
     expect(result).not.toBeNull();
     expect(result!.stale).toBe(true);
-
-    vi.useRealTimers();
   });
 });

@@ -18,6 +18,7 @@ type SerializedRates = {
 export interface CachedRates {
   rates: PurityRates;
   stale: boolean;
+  storedAt: Date;
 }
 
 function serialize(rates: PurityRates): SerializedRates {
@@ -67,6 +68,7 @@ export class LastKnownGoodCache {
     return {
       rates: deserialize(entry.rates),
       stale,
+      storedAt,
     };
   }
 }

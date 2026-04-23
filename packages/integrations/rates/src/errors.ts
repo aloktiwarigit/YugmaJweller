@@ -2,7 +2,7 @@ export class RatesAdapterError extends Error {
   constructor(public readonly adapter: string, cause?: unknown) {
     super(`Rates adapter '${adapter}' failed`);
     this.name = 'RatesAdapterError';
-    if (cause instanceof Error) this.cause = cause;
+    if (cause !== undefined) this.cause = cause;
   }
 }
 

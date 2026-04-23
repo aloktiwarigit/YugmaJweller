@@ -34,7 +34,11 @@ export class CircuitBreaker implements RatesPort {
   }
 
   private async setState(state: CircuitState): Promise<void> {
-    await this.redis.set(this.keyState, state);
+    if (state === 'OPEN') {
+      await this.redis.set(this.keyState, state, 'EX', COOLDOWN_SEC * 4);
+    } else {
+      await this.redis.set(this.keyState, state);
+    }
   }
 
   private async resetFailures(): Promise<void> {
