@@ -120,5 +120,39 @@
     "errors": {
       "MAX_PIECES_RANGE": "Max pieces must be between 1 and 10"
     }
+  },
+  "custom_order_policy": {
+    "title": "Custom Order Policy",
+    "placeholder": "Write your custom order policy here...",
+    "save_success": "Changes saved ✓",
+    "errors": {
+      "save_failed": "Could not save. Please try again."
+    }
+  },
+  "return_policy": {
+    "title": "Return & Exchange Policy",
+    "placeholder": "Write your return policy here...",
+    "save_success": "Changes saved ✓",
+    "errors": {
+      "save_failed": "Could not save. Please try again."
+    }
+  },
+  "notification_prefs": {
+    "title": "Notification Preferences",
+    "save_success": "Changes saved ✓",
+    "channels": {
+      "push": "App notification",
+      "sms": "SMS"
+    },
+    "rows": {
+      "orderUpdates":    "Order Updates",
+      "loyaltyUpdates":  "Loyalty Updates",
+      "rateAlerts":      "Rate Alerts",
+      "staffActivity":   "Staff Activity",
+      "paymentReceipts": "Payment Receipts"
+    },
+    "errors": {
+      "save_failed": "Could not save. Please try again."
+    }
   }
 }

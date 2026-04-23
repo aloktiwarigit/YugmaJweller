@@ -5,10 +5,13 @@ import {
   PatchMakingChargesSchema, MAKING_CHARGE_DEFAULTS, PatchWastageSchema, WASTAGE_DEFAULTS,
   PatchRateLockSchema, RATE_LOCK_DEFAULT_DAYS,
   PatchTryAtHomeSchema, TRY_AT_HOME_DEFAULT_MAX_PIECES,
+  PatchCustomOrderPolicySchema, PatchReturnPolicySchema,
+  PatchNotificationPrefsSchema, NOTIFICATION_PREFS_DEFAULTS,
 } from '@goldsmith/shared';
 import type {
   PatchShopProfileDto, ShopProfileRow, MakingChargeConfig, PatchMakingChargesDto,
   WastageConfig, PatchWastageDto, PatchRateLockDto, PatchTryAtHomeDto, TryAtHomeRow,
+  PatchCustomOrderPolicyDto, PatchReturnPolicyDto, PatchNotificationPrefsDto, NotificationPrefsConfig,
 } from '@goldsmith/shared';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
@@ -112,6 +115,102 @@ export class SettingsService {
     }).catch(() => undefined);
 
     return { ok: true, config: parsed.data };
+  }
+
+  async getCustomOrderPolicy(): Promise<string | null> {
+    const hit = await this.cache.getCustomOrderPolicy();
+    if (hit !== undefined) return hit;
+    const stored = await this.repo.getCustomOrderPolicy();
+    await this.cache.setCustomOrderPolicy(stored);
+    return stored;
+  }
+
+  async updateCustomOrderPolicy(dto: PatchCustomOrderPolicyDto): Promise<string | null> {
+    const parsed = PatchCustomOrderPolicySchema.safeParse(dto);
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), code: i.message }));
+      throw new UnprocessableEntityException({ code: 'validation.failed', errors });
+    }
+    const { before, after } = await this.repo.updateCustomOrderPolicy(parsed.data.customOrderPolicyText);
+    await this.cache.invalidateCustomOrderPolicy();
+    void this.auditPolicyUpdate(AuditAction.SETTINGS_CUSTOM_ORDER_POLICY_UPDATED, before, after).catch(() => undefined);
+    return after;
+  }
+
+  async getReturnPolicy(): Promise<string | null> {
+    const hit = await this.cache.getReturnPolicy();
+    if (hit !== undefined) return hit;
+    const stored = await this.repo.getReturnPolicy();
+    await this.cache.setReturnPolicy(stored);
+    return stored;
+  }
+
+  async updateReturnPolicy(dto: PatchReturnPolicyDto): Promise<string | null> {
+    const parsed = PatchReturnPolicySchema.safeParse(dto);
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), code: i.message }));
+      throw new UnprocessableEntityException({ code: 'validation.failed', errors });
+    }
+    const { before, after } = await this.repo.updateReturnPolicy(parsed.data.returnPolicyText);
+    await this.cache.invalidateReturnPolicy();
+    void this.auditPolicyUpdate(AuditAction.SETTINGS_RETURN_POLICY_UPDATED, before, after).catch(() => undefined);
+    return after;
+  }
+
+  async getNotificationPrefs(): Promise<NotificationPrefsConfig> {
+    const hit = await this.cache.getNotificationPrefs();
+    if (hit !== undefined) return hit;
+    const stored = await this.repo.getNotificationPrefs();
+    const prefs = stored ?? NOTIFICATION_PREFS_DEFAULTS;
+    await this.cache.setNotificationPrefs(prefs);
+    return prefs;
+  }
+
+  async updateNotificationPrefs(dto: PatchNotificationPrefsDto): Promise<NotificationPrefsConfig> {
+    const parsed = PatchNotificationPrefsSchema.safeParse(dto);
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), code: i.message }));
+      throw new UnprocessableEntityException({ code: 'validation.failed', errors });
+    }
+    // Merge happens inside the repo transaction against a FOR UPDATE-locked row,
+    // so concurrent partial PATCHes on different keys never lose each other's changes.
+    const { before, after } = await this.repo.updateNotificationPrefs(parsed.data);
+    await this.cache.invalidateNotificationPrefs();
+    void this.auditNotificationPrefsUpdate(before, after).catch(() => undefined);
+    return after;
+  }
+
+  private async auditPolicyUpdate(
+    action: AuditAction,
+    before: string | null,
+    after: string | null,
+  ): Promise<void> {
+    const tc = tenantContext.current();
+    if (!tc) return;
+    await auditLog(this.pool, {
+      action,
+      subjectType: 'shop',
+      subjectId: tc.shopId,
+      actorUserId: tc.authenticated ? tc.userId : undefined,
+      before,
+      after,
+    });
+  }
+
+  private async auditNotificationPrefsUpdate(
+    before: NotificationPrefsConfig | null,
+    after: NotificationPrefsConfig,
+  ): Promise<void> {
+    const tc = tenantContext.current();
+    if (!tc) return;
+    await auditLog(this.pool, {
+      action: AuditAction.SETTINGS_NOTIFICATION_PREFS_UPDATED,
+      subjectType: 'shop',
+      subjectId: tc.shopId,
+      actorUserId: tc.authenticated ? tc.userId : undefined,
+      before,
+      after,
+    });
   }
 
   private static rupeesToPaise(rupees: string): number {

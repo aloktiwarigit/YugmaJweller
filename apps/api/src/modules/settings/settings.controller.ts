@@ -14,7 +14,7 @@ import type { Response } from 'express';
 import { createHash } from 'node:crypto';
 import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext } from '@goldsmith/tenant-context';
-import { PatchLoyaltySchema, PatchTryAtHomeSchema } from '@goldsmith/shared';
+import { PatchLoyaltySchema, PatchTryAtHomeSchema, PatchCustomOrderPolicySchema, PatchReturnPolicySchema, PatchNotificationPrefsSchema } from '@goldsmith/shared';
 import type {
   PatchShopProfileDto, PatchMakingChargesDto, PatchWastageDto, PatchRateLockDto,
 } from '@goldsmith/shared';
@@ -24,6 +24,7 @@ import type {
   ShopProfileResponseDto, LogoUploadUrlResponseDto, MakingChargesResponseDto,
   WastageResponseDto, RateLockResponseDto, LoyaltyResponseDto,
   TryAtHomeResponseDto, FeatureFlagsResponseDto,
+  CustomOrderPolicyResponseDto, ReturnPolicyResponseDto, NotificationPrefsResponseDto,
 } from './settings.dto';
 
 @Controller('/api/v1/settings')
@@ -224,6 +225,102 @@ export class SettingsController {
     const etag = `"${createHash('sha256').update(JSON.stringify(data)).digest('hex').slice(0, 16)}"`;
     res.setHeader('ETag', etag);
     return { ...data, etag };
+  }
+
+  @Get('/custom-order-policy')
+  async getCustomOrderPolicy(
+    @TenantContextDec() ctx: TenantContext,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<CustomOrderPolicyResponseDto> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (!['shop_admin', 'shop_manager'].includes(ctx.role)) throw new ForbiddenException({ code: 'auth.insufficient_role' });
+    const text = await this.svc.getCustomOrderPolicy();
+    const etag = `"${createHash('sha256').update(JSON.stringify(text)).digest('hex').slice(0, 16)}"`;
+    res.setHeader('ETag', etag);
+    return { customOrderPolicyText: text, etag };
+  }
+
+  @Patch('/custom-order-policy')
+  async updateCustomOrderPolicy(
+    @TenantContextDec() ctx: TenantContext,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<CustomOrderPolicyResponseDto> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (ctx.role !== 'shop_admin') throw new ForbiddenException({ code: 'auth.insufficient_role' });
+    const parsed = PatchCustomOrderPolicySchema.safeParse(body);
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), code: i.message }));
+      throw new UnprocessableEntityException({ code: 'validation.failed', errors });
+    }
+    const text = await this.svc.updateCustomOrderPolicy(parsed.data);
+    const etag = `"${createHash('sha256').update(JSON.stringify(text)).digest('hex').slice(0, 16)}"`;
+    res.setHeader('ETag', etag);
+    return { customOrderPolicyText: text, etag };
+  }
+
+  @Get('/return-policy')
+  async getReturnPolicy(
+    @TenantContextDec() ctx: TenantContext,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<ReturnPolicyResponseDto> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (!['shop_admin', 'shop_manager'].includes(ctx.role)) throw new ForbiddenException({ code: 'auth.insufficient_role' });
+    const text = await this.svc.getReturnPolicy();
+    const etag = `"${createHash('sha256').update(JSON.stringify(text)).digest('hex').slice(0, 16)}"`;
+    res.setHeader('ETag', etag);
+    return { returnPolicyText: text, etag };
+  }
+
+  @Patch('/return-policy')
+  async updateReturnPolicy(
+    @TenantContextDec() ctx: TenantContext,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<ReturnPolicyResponseDto> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (ctx.role !== 'shop_admin') throw new ForbiddenException({ code: 'auth.insufficient_role' });
+    const parsed = PatchReturnPolicySchema.safeParse(body);
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), code: i.message }));
+      throw new UnprocessableEntityException({ code: 'validation.failed', errors });
+    }
+    const text = await this.svc.updateReturnPolicy(parsed.data);
+    const etag = `"${createHash('sha256').update(JSON.stringify(text)).digest('hex').slice(0, 16)}"`;
+    res.setHeader('ETag', etag);
+    return { returnPolicyText: text, etag };
+  }
+
+  @Get('/notification-prefs')
+  async getNotificationPrefs(
+    @TenantContextDec() ctx: TenantContext,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<NotificationPrefsResponseDto> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (!['shop_admin', 'shop_manager'].includes(ctx.role)) throw new ForbiddenException({ code: 'auth.insufficient_role' });
+    const prefs = await this.svc.getNotificationPrefs();
+    const etag = `"${createHash('sha256').update(JSON.stringify(prefs)).digest('hex').slice(0, 16)}"`;
+    res.setHeader('ETag', etag);
+    return { ...prefs, etag };
+  }
+
+  @Patch('/notification-prefs')
+  async updateNotificationPrefs(
+    @TenantContextDec() ctx: TenantContext,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<NotificationPrefsResponseDto> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (ctx.role !== 'shop_admin') throw new ForbiddenException({ code: 'auth.insufficient_role' });
+    const parsed = PatchNotificationPrefsSchema.safeParse(body);
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), code: i.message }));
+      throw new UnprocessableEntityException({ code: 'validation.failed', errors });
+    }
+    const prefs = await this.svc.updateNotificationPrefs(parsed.data);
+    const etag = `"${createHash('sha256').update(JSON.stringify(prefs)).digest('hex').slice(0, 16)}"`;
+    res.setHeader('ETag', etag);
+    return { ...prefs, etag };
   }
 
   @Get('/feature-flags')

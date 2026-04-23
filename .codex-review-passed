@@ -1,1 +1,1 @@
-passed 2026-04-23 story-2.6 — Codex P2 (making-charges save sends single-category array, not all configs) fixed; shop-profile.tsx TS1117 duplicate errorText fixed; pre-existing auth lint + integration test failures not introduced by story-2.6 noted
+{"timestamp":"2026-04-23T17:15:18-04:00","commit":"a1c7542a5fc033e451e2981a0afd3b9a79e4c020","reviewer":"codex","model":"gpt-5.4","findings_fixed":["P1-shops-column-level-grant","P2-notif-prefs-lost-update"]}

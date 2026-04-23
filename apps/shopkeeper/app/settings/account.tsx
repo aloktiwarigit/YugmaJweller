@@ -38,7 +38,7 @@ export default function AccountScreen(): React.ReactElement {
     try {
       await api.post('/auth/logout/all');
       useAuthStore.getState().reset();
-      router.replace('/auth/phone');
+      router.replace('/(auth)/phone');
     } catch {
       Alert.alert('त्रुटि', 'Logout सफल नहीं हुआ। फिर से कोशिश करें।');
     } finally {

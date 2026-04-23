@@ -39,3 +39,22 @@ export interface FeatureFlagsResponseDto {
   try_at_home: boolean;
   max_pieces: number;
 }
+
+export interface CustomOrderPolicyResponseDto {
+  customOrderPolicyText: string | null;
+  etag: string;
+}
+
+export interface ReturnPolicyResponseDto {
+  returnPolicyText: string | null;
+  etag: string;
+}
+
+export interface NotificationPrefsResponseDto {
+  orderUpdates:    { push: boolean; sms: boolean };
+  loyaltyUpdates:  { push: boolean; sms: boolean };
+  rateAlerts:      { push: boolean; sms: boolean };
+  staffActivity:   { push: boolean };
+  paymentReceipts: { push: boolean; sms: boolean };
+  etag: string;
+}

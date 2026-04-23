@@ -82,3 +82,27 @@ export type {
   PatchTryAtHomeDto,
   TryAtHomeRow,
 } from './schemas/try-at-home.schema';
+
+export {
+  PatchCustomOrderPolicySchema,
+} from './schemas/custom-order-policy.schema';
+export type {
+  PatchCustomOrderPolicyDto,
+} from './schemas/custom-order-policy.schema';
+
+export {
+  PatchReturnPolicySchema,
+} from './schemas/return-policy.schema';
+export type {
+  PatchReturnPolicyDto,
+} from './schemas/return-policy.schema';
+
+export {
+  NotificationPrefsSchema,
+  PatchNotificationPrefsSchema,
+  NOTIFICATION_PREFS_DEFAULTS,
+} from './schemas/notification-prefs.schema';
+export type {
+  NotificationPrefsConfig,
+  PatchNotificationPrefsDto,
+} from './schemas/notification-prefs.schema';

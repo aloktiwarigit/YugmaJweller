@@ -1,6 +1,6 @@
 import type { Redis } from '@goldsmith/cache';
-import type { LoyaltyConfig, ShopProfileRow, MakingChargeConfig, WastageConfig } from '@goldsmith/shared';
-import { LoyaltyConfigSchema, ShopProfileRowSchema, MakingChargesArraySchema, WastageArraySchema } from '@goldsmith/shared';
+import type { LoyaltyConfig, ShopProfileRow, MakingChargeConfig, WastageConfig, NotificationPrefsConfig } from '@goldsmith/shared';
+import { LoyaltyConfigSchema, ShopProfileRowSchema, MakingChargesArraySchema, WastageArraySchema, NotificationPrefsSchema } from '@goldsmith/shared';
 import { tenantContext } from '@goldsmith/tenant-context';
 
 /**
@@ -147,6 +147,72 @@ export class SettingsCache {
     await this.redis.del(this.loyaltyKey());
   }
 
+  async getCustomOrderPolicy(): Promise<string | null | undefined> {
+    const key = this.customOrderPolicyKey();
+    try {
+      const raw = await this.redis.get(key);
+      if (raw === null) return undefined;
+      return JSON.parse(raw) as string | null;
+    } catch {
+      try { await this.redis.del(key); } catch { /* ignore del failure */ }
+      return undefined;
+    }
+  }
+
+  async setCustomOrderPolicy(value: string | null): Promise<void> {
+    await this.redis.set(this.customOrderPolicyKey(), JSON.stringify(value), 'EX', this.ttlSec);
+  }
+
+  async invalidateCustomOrderPolicy(): Promise<void> {
+    await this.redis.del(this.customOrderPolicyKey());
+  }
+
+  async getReturnPolicy(): Promise<string | null | undefined> {
+    const key = this.returnPolicyKey();
+    try {
+      const raw = await this.redis.get(key);
+      if (raw === null) return undefined;
+      return JSON.parse(raw) as string | null;
+    } catch {
+      try { await this.redis.del(key); } catch { /* ignore del failure */ }
+      return undefined;
+    }
+  }
+
+  async setReturnPolicy(value: string | null): Promise<void> {
+    await this.redis.set(this.returnPolicyKey(), JSON.stringify(value), 'EX', this.ttlSec);
+  }
+
+  async invalidateReturnPolicy(): Promise<void> {
+    await this.redis.del(this.returnPolicyKey());
+  }
+
+  async getNotificationPrefs(): Promise<NotificationPrefsConfig | undefined> {
+    const key = this.notificationPrefsKey();
+    try {
+      const raw = await this.redis.get(key);
+      if (raw === null) return undefined;
+      const parsed: unknown = JSON.parse(raw);
+      const result = NotificationPrefsSchema.safeParse(parsed);
+      if (!result.success) {
+        await this.redis.del(key);
+        return undefined;
+      }
+      return result.data;
+    } catch {
+      try { await this.redis.del(key); } catch { /* ignore del failure */ }
+      return undefined;
+    }
+  }
+
+  async setNotificationPrefs(prefs: NotificationPrefsConfig): Promise<void> {
+    await this.redis.set(this.notificationPrefsKey(), JSON.stringify(prefs), 'EX', this.ttlSec);
+  }
+
+  async invalidateNotificationPrefs(): Promise<void> {
+    await this.redis.del(this.notificationPrefsKey());
+  }
+
   private profileKey(): string {
     return `shop:${tenantContext.requireCurrent().shopId}:settings:profile`;
   }
@@ -165,5 +231,17 @@ export class SettingsCache {
 
   private loyaltyKey(): string {
     return `shop:${tenantContext.requireCurrent().shopId}:settings:loyalty`;
+  }
+
+  private customOrderPolicyKey(): string {
+    return `shop:${tenantContext.requireCurrent().shopId}:settings:custom_order_policy`;
+  }
+
+  private returnPolicyKey(): string {
+    return `shop:${tenantContext.requireCurrent().shopId}:settings:return_policy`;
+  }
+
+  private notificationPrefsKey(): string {
+    return `shop:${tenantContext.requireCurrent().shopId}:settings:notification_prefs`;
   }
 }
