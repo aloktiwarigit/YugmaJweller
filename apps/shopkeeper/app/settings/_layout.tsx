@@ -16,6 +16,8 @@ export default function SettingsLayout(): React.ReactElement {
       <Stack.Screen name="billing" options={{ title: 'बिलिंग' }} />
       <Stack.Screen name="reports" options={{ title: 'रिपोर्ट्स' }} />
       <Stack.Screen name="making-charges" options={{ title: 'मेकिंग चार्जेस' }} />
+      <Stack.Screen name="wastage" options={{ title: 'वेस्टेज' }} />
+      <Stack.Screen name="rate-lock" options={{ title: 'Rate Lock की अवधि' }} />
       <Stack.Screen name="loyalty" options={{ title: 'लॉयल्टी प्रोग्राम' }} />
       <Stack.Screen name="shop-profile" options={{ title: 'शॉप प्रोफाइल' }} />
     </Stack>

@@ -27,6 +27,7 @@ interface ShopProfile {
 
 export default function ShopProfileScreen(): React.ReactElement {
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [toast, setToast] = useState<{ message: string; variant: 'info' | 'error' } | null>(null);
   const [gstinError, setGstinError] = useState<string | null>(null);
 
@@ -55,7 +56,7 @@ export default function ShopProfileScreen(): React.ReactElement {
         setAddrState(p.address?.state ?? '');
         setPinCode(p.address?.pin_code ?? '');
       })
-      .catch(() => showToast('प्रोफ़ाइल लोड नहीं हो सकी।', 'error'))
+      .catch(() => { setLoadFailed(true); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -139,6 +140,15 @@ export default function ShopProfileScreen(): React.ReactElement {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>प्रोफ़ाइल लोड नहीं हो सकी।</Text>
+        <Text style={styles.retryHint}>वापस जाएं और दोबारा कोशिश करें।</Text>
       </View>
     );
   }
@@ -267,7 +277,7 @@ export default function ShopProfileScreen(): React.ReactElement {
               accessibilityLabel="GSTIN"
             />
             {gstinError !== null && (
-              <Text style={styles.errorText} accessibilityLiveRegion="polite">
+              <Text style={styles.inputErrorText} accessibilityLiveRegion="polite">
                 {gstinError}
               </Text>
             )}
@@ -339,7 +349,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   inputError: { borderColor: colors.error },
-  errorText: {
+  inputErrorText: {
     fontFamily: typography.body.family,
     fontSize: 14,
     color: colors.error,
@@ -351,5 +361,18 @@ const styles = StyleSheet.create({
     color: colors.inkMute,
     textAlign: 'right',
     marginTop: 4,
+  },
+  errorText: {
+    fontFamily: typography.body.family,
+    fontSize: 16,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  retryHint: {
+    fontFamily: typography.body.family,
+    fontSize: 14,
+    color: colors.inkMute,
+    textAlign: 'center',
   },
 });
