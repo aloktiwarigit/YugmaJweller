@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, ScrollView, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useTranslation } from '@goldsmith/i18n';
+import { t } from '@goldsmith/i18n';
 import { colors } from '@goldsmith/ui-tokens';
 import { WastageRow } from '../../src/features/settings/components/WastageRow';
 import { api } from '../../src/api/client';
@@ -16,7 +16,7 @@ interface WastageResponse {
 }
 
 export default function WastageScreen(): React.ReactElement {
-  const { t: translate } = useTranslation('settings');
+  const translate = (key: string) => t(`settings.${key}`);
 
   const { data, isLoading, error } = useQuery<WastageResponse>({
     queryKey: ['wastage'],
