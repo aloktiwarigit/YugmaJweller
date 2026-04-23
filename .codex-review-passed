@@ -1,1 +1,1 @@
-passed 2026-04-23 — P1 (making-charges error guard) + P2 (shop-profile error guard) fixed
+passed 2026-04-23 story-2.6 — Codex P2 (making-charges save sends single-category array, not all configs) fixed; shop-profile.tsx TS1117 duplicate errorText fixed; pre-existing auth lint + integration test failures not introduced by story-2.6 noted
