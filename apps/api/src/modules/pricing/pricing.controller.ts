@@ -29,7 +29,7 @@ interface CurrentRatesResponse {
 function toEntry(paise: bigint, fetchedAt: Date): PurityEntry {
   return {
     perGramPaise: paise.toString(),
-    perGramRupees: (Number(paise) / 100).toFixed(2),
+    perGramRupees: `${paise / 100n}.${String(paise % 100n).padStart(2, '0')}`,
     fetchedAt: fetchedAt.toISOString(),
   };
 }

@@ -81,19 +81,29 @@ export class PricingService {
     const cached = await this.redis.get(REDIS_KEY_CURRENT);
     if (cached !== null) {
       const parsed = deserializeRates(cached);
-      // Re-hydrate bigints
-      const rates: CurrentRatesResult = {
-        GOLD_24K: { perGramPaise: BigInt(parsed.GOLD_24K.perGramPaise), fetchedAt: new Date(parsed.GOLD_24K.fetchedAt) },
-        GOLD_22K: { perGramPaise: BigInt(parsed.GOLD_22K.perGramPaise), fetchedAt: new Date(parsed.GOLD_22K.fetchedAt) },
-        GOLD_20K: { perGramPaise: BigInt(parsed.GOLD_20K.perGramPaise), fetchedAt: new Date(parsed.GOLD_20K.fetchedAt) },
-        GOLD_18K: { perGramPaise: BigInt(parsed.GOLD_18K.perGramPaise), fetchedAt: new Date(parsed.GOLD_18K.fetchedAt) },
-        GOLD_14K: { perGramPaise: BigInt(parsed.GOLD_14K.perGramPaise), fetchedAt: new Date(parsed.GOLD_14K.fetchedAt) },
-        SILVER_999: { perGramPaise: BigInt(parsed.SILVER_999.perGramPaise), fetchedAt: new Date(parsed.SILVER_999.fetchedAt) },
-        SILVER_925: { perGramPaise: BigInt(parsed.SILVER_925.perGramPaise), fetchedAt: new Date(parsed.SILVER_925.fetchedAt) },
-        stale: parsed.stale,
-        source: parsed.source,
-      };
-      return rates;
+
+      // Guard: if any required purity key is missing (stale/incompatible schema from a
+      // previous deployment), treat as a cache miss rather than crashing with BigInt(undefined).
+      const requiredKeys = ['GOLD_24K', 'GOLD_22K', 'GOLD_20K', 'GOLD_18K', 'GOLD_14K', 'SILVER_999', 'SILVER_925'] as const;
+      if (requiredKeys.some(k => !parsed[k])) {
+        this.logger.warn('Cached rates schema is stale/incompatible — evicting and falling through to FallbackChain');
+        await this.redis.del(REDIS_KEY_CURRENT);
+        // Fall through to FallbackChain below
+      } else {
+        // Re-hydrate bigints
+        const rates: CurrentRatesResult = {
+          GOLD_24K: { perGramPaise: BigInt(parsed.GOLD_24K.perGramPaise), fetchedAt: new Date(parsed.GOLD_24K.fetchedAt) },
+          GOLD_22K: { perGramPaise: BigInt(parsed.GOLD_22K.perGramPaise), fetchedAt: new Date(parsed.GOLD_22K.fetchedAt) },
+          GOLD_20K: { perGramPaise: BigInt(parsed.GOLD_20K.perGramPaise), fetchedAt: new Date(parsed.GOLD_20K.fetchedAt) },
+          GOLD_18K: { perGramPaise: BigInt(parsed.GOLD_18K.perGramPaise), fetchedAt: new Date(parsed.GOLD_18K.fetchedAt) },
+          GOLD_14K: { perGramPaise: BigInt(parsed.GOLD_14K.perGramPaise), fetchedAt: new Date(parsed.GOLD_14K.fetchedAt) },
+          SILVER_999: { perGramPaise: BigInt(parsed.SILVER_999.perGramPaise), fetchedAt: new Date(parsed.SILVER_999.fetchedAt) },
+          SILVER_925: { perGramPaise: BigInt(parsed.SILVER_925.perGramPaise), fetchedAt: new Date(parsed.SILVER_925.fetchedAt) },
+          stale: parsed.stale,
+          source: parsed.source,
+        };
+        return rates;
+      }
     }
 
     // Cache miss — call FallbackChain (throws RatesUnavailableError if all sources fail)

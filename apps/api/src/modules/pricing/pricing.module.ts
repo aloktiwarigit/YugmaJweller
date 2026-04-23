@@ -23,16 +23,19 @@ import {
 // IST trading hours cron patterns (UTC+5:30)
 // 09:00–17:30 IST = 03:30–12:00 UTC
 //
-// Two mutually exclusive patterns:
-//   Trading hours  — every 15 min, Mon–Fri, UTC hours 03:00–11:59 (09:00–17:59 IST)
-//   Outside hours  — every hour at :00, UTC hours 12–23 and 0–2 (daily incl. weekends)
+// Three mutually exclusive patterns:
+//   Trading hours   — every 15 min, Mon–Fri, UTC hours 03:00–11:59 (09:00–17:59 IST)
+//   Weekend midday  — every hour at :00, Sat+Sun, UTC hours 03:00–11:59
+//   Outside hours   — every hour at :00, UTC hours 12–23 and 0–2 (daily incl. weekends)
 //
 // The patterns share no overlap:
 //   TRADING_HOURS_CRON covers hours 3–11 on weekdays only.
-//   OUTSIDE_HOURS_CRON covers hours 12–23 and 0–2 every day (weekday hours 3–11 are absent).
+//   WEEKEND_MIDDAY_CRON covers hours 3–11 on weekends only (was previously a gap — no refresh for ~8 hrs IST).
+//   OUTSIDE_HOURS_CRON covers hours 12–23 and 0–2 every day (weekday+weekend hours 3–11 are absent).
 // ---------------------------------------------------------------------------
-const TRADING_HOURS_CRON = '*/15 3-11 * * 1-5';      // every 15 min, Mon–Fri, UTC 03:00–11:59
-const OUTSIDE_HOURS_CRON = '0 12-23,0-2 * * *';       // every hour at :00, UTC 12–23 and 0–2, daily
+const TRADING_HOURS_CRON  = '*/15 3-11 * * 1-5';      // every 15 min, Mon–Fri, UTC 03:00–11:59
+const WEEKEND_MIDDAY_CRON = '0 3-11 * * 0,6';         // every hour at :00, Sat+Sun, UTC 03:00–11:59
+const OUTSIDE_HOURS_CRON  = '0 12-23,0-2 * * *';      // every hour at :00, UTC 12–23 and 0–2, daily
 
 @Module({
   imports: [
@@ -95,6 +98,12 @@ export class PricingModule implements OnModuleInit, OnModuleDestroy {
     await this.queue.upsertJobScheduler(
       'refresh-trading-hours',
       { pattern: TRADING_HOURS_CRON },
+      { name: 'refresh' },
+    );
+
+    await this.queue.upsertJobScheduler(
+      'refresh-weekend-midday',
+      { pattern: WEEKEND_MIDDAY_CRON },
       { name: 'refresh' },
     );
 
