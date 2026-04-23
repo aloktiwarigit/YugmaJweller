@@ -120,5 +120,39 @@
     "errors": {
       "MAX_PIECES_RANGE": "अधिकतम pieces 1 से 10 के बीच होने चाहिए"
     }
+  },
+  "custom_order_policy": {
+    "title": "Custom Order Policy",
+    "placeholder": "अपनी custom order policy यहाँ लिखें...",
+    "save_success": "बदलाव सहेज लिया ✓",
+    "errors": {
+      "save_failed": "बदलाव नहीं हो सका। दोबारा कोशिश करें।"
+    }
+  },
+  "return_policy": {
+    "title": "Return & Exchange Policy",
+    "placeholder": "अपनी return policy यहाँ लिखें...",
+    "save_success": "बदलाव सहेज लिया ✓",
+    "errors": {
+      "save_failed": "बदलाव नहीं हो सका। दोबारा कोशिश करें।"
+    }
+  },
+  "notification_prefs": {
+    "title": "Notification Preferences",
+    "save_success": "बदलाव सहेज लिया ✓",
+    "channels": {
+      "push": "App notification",
+      "sms": "SMS"
+    },
+    "rows": {
+      "orderUpdates":    "Order Updates",
+      "loyaltyUpdates":  "Loyalty Updates",
+      "rateAlerts":      "Rate Alerts",
+      "staffActivity":   "Staff Activity",
+      "paymentReceipts": "Payment Receipts"
+    },
+    "errors": {
+      "save_failed": "बदलाव नहीं हो सका। दोबारा कोशिश करें।"
+    }
   }
 }
