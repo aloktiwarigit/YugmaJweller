@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { auditLog, platformAuditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext, type Tenant, type AuthenticatedTenantContext, type ShopUserRole } from '@goldsmith/tenant-context';
@@ -88,17 +88,37 @@ export class AuthService {
     //    a Firebase quota/network failure doesn't leave a stale rate-limit row.
     await this.rateLimit.recordSuccess(args.phoneE164);
 
-    // 6. Set Firebase custom claims so subsequent ID tokens carry shop_id + role + user_id (DB UUID)
+    // 6. Re-check status immediately before writing claims — closes the race where a concurrent
+    //    revokeStaff() clears claims between our lookupByPhone and here. If the user was revoked
+    //    after our initial read, we must not restore stale shop_id/role claims.
+    const statusCheck = await this.repo.getStatusById(row.shopId, row.userId);
+    if (!statusCheck || statusCheck === 'REVOKED') {
+      throw new ForbiddenException({ code: 'auth.rejected' });
+    }
+
+    // 7. Set Firebase custom claims so subsequent ID tokens carry shop_id + role + user_id (DB UUID)
     await this.firebase.admin().auth().setCustomUserClaims(args.uid, {
       shop_id: row.shopId,
       role: row.role,
       user_id: row.userId,  // DB UUID — enables TenantInterceptor to propagate userId without extra query
     });
 
-    // 7. Audit verify-success
+    // 7a. Post-claims final check — minimises the window where a concurrent revokeStaff() could
+    //     have called markRevoked() between steps 6 and 7. If revoked, clear the claims we just
+    //     wrote and abort. A residual race smaller than this window is bounded by the network RTT
+    //     to Firebase; FirebaseJwtStrategy uses verifyIdToken(token, true) which enforces token
+    //     revocation checks, providing a second line of defence for that residual window.
+    const finalStatus = await this.repo.getStatusById(row.shopId, row.userId);
+    if (!finalStatus || finalStatus === 'REVOKED') {
+      await this.firebase.admin().auth().setCustomUserClaims(args.uid, {});
+      await this.firebase.admin().auth().revokeRefreshTokens(args.uid);
+      throw new ForbiddenException({ code: 'auth.rejected' });
+    }
+
+    // 8. Audit verify-success
     await this.auditVerifySuccess({ tenant, userId: row.userId, role: row.role, ip: args.ip, userAgent: args.userAgent, requestId: args.requestId });
 
-    // 8. Load display_name under tenant ctx
+    // 9. Load display_name under tenant ctx
     const user = await this.loadUserDisplayName({ tenant, userId: row.userId, role: row.role });
 
     return {
@@ -154,6 +174,53 @@ export class AuthService {
       actorUserId: userId,
       metadata: { deviceCount: 'all' },
     });
+  }
+
+  async revokeStaff(shopId: string, targetUserId: string, callerUserId: string): Promise<void> {
+    const row = await this.repo.revokeStaff(shopId, targetUserId);
+    if (!row) throw new NotFoundException({ code: 'auth.staff_not_found' });
+    if (targetUserId === callerUserId) throw new BadRequestException({ code: 'auth.self_revoke' });
+    if (row.role === 'shop_admin') throw new ForbiddenException({ code: 'auth.cannot_revoke_admin' });
+
+    if (row.firebaseUid !== null) {
+      // Clear custom claims before revoking tokens — ensures any new ID token minted after
+      // re-authentication carries no stale shop_id/role/user_id, so the tenant interceptor
+      // denies the request. We do NOT call updateUser({ disabled: true }) because the Firebase
+      // UID is tied to a phone number that may have an active membership in another shop;
+      // disabling would lock out those shops globally. Migration 0010 excludes REVOKED rows
+      // from auth_lookup_user_by_phone so the revoked user cannot call POST /session to obtain
+      // fresh claims for this shop.
+      await this.firebase.admin().auth().setCustomUserClaims(row.firebaseUid, {});
+      await this.firebase.admin().auth().revokeRefreshTokens(row.firebaseUid);
+    }
+
+    await this.repo.markRevoked(shopId, targetUserId, callerUserId);
+
+    // Post-revoke re-check: a concurrent /auth/session for an INVITED user (firebaseUid was null
+    // above) can call linkFirebaseUid between our initial SELECT and the UPDATE above. The
+    // status != 'REVOKED' guard on linkFirebaseUid closes the window going forward, but any UID
+    // linked just before our UPDATE would be missed by the pre-revoke snapshot. Re-reading after
+    // markRevoked (when status is definitively REVOKED) catches this race.
+    const latestUid = await this.repo.getFirebaseUid(shopId, targetUserId);
+    if (latestUid) {
+      await this.firebase.admin().auth().setCustomUserClaims(latestUid, {});
+      await this.firebase.admin().auth().revokeRefreshTokens(latestUid);
+    }
+
+    const tenant = await this.loadTenantById(shopId);
+    const ctx: AuthenticatedTenantContext = {
+      shopId, tenant,
+      authenticated: true, userId: callerUserId, role: 'shop_admin' as ShopUserRole,
+    };
+    await tenantContext.runWith(ctx, () =>
+      auditLog(this.pool, {
+        action: AuditAction.STAFF_REVOKED,
+        subjectType: 'shop_user',
+        subjectId: targetUserId,
+        actorUserId: callerUserId,
+        metadata: { before: { status: row.status }, after: { status: 'REVOKED' } },
+      }),
+    );
   }
 
   private async loadTenantById(id: string): Promise<Tenant> {

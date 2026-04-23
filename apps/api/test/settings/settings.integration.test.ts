@@ -11,14 +11,14 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Pool } from 'pg';
 import { resolve } from 'node:path';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
 import { createPool, runMigrations } from '@goldsmith/db';
 import { tenantContext, type Tenant, type AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { SettingsRepository } from '../../src/modules/settings/settings.repository';
 import { SettingsService } from '../../src/modules/settings/settings.service';
 import { SettingsCache } from '@goldsmith/tenant-config';
 import { DrizzleTenantLookup } from '../../src/drizzle-tenant-lookup';
-import { MAKING_CHARGE_DEFAULTS, WASTAGE_DEFAULTS } from '@goldsmith/shared';
+import { LOYALTY_DEFAULTS, MAKING_CHARGE_DEFAULTS, WASTAGE_DEFAULTS } from '@goldsmith/shared';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -33,21 +33,28 @@ const tenant: Tenant = {
 
 // Cache that always misses — forces DB reads so we can verify persistence.
 const mockCache = {
-  getProfile: async () => null,
-  setProfile: async () => undefined,
-  invalidate: async () => undefined,
-  getMakingCharges: async () => null,  // always miss → forces DB reads
-  setMakingCharges: async () => undefined,
+  getProfile:             async () => null,
+  setProfile:             async () => undefined,
+  invalidate:             async () => undefined,
+  getMakingCharges:       async () => null,
+  setMakingCharges:       async () => undefined,
   invalidateMakingCharges: async () => undefined,
-  getWastage: async () => null,       // always miss → forces DB reads
-  setWastage: async () => undefined,
-  invalidateWastage: async () => undefined,
+  getWastage:             async () => null,
+  setWastage:             async () => undefined,
+  invalidateWastage:      async () => undefined,
+  getRateLock:            async () => null,
+  setRateLock:            async () => undefined,
+  invalidateRateLock:     async () => undefined,
+  getLoyalty:             async () => null,
+  setLoyalty:             async () => undefined,
+  invalidateLoyalty:      async () => undefined,
 } as unknown as SettingsCache;
 
 // ─── Test harness ─────────────────────────────────────────────────────────────
 
 let container: StartedPostgreSqlContainer;
 let pool: Pool;
+let repo: SettingsRepository;
 let svc: SettingsService;
 
 beforeAll(async () => {
@@ -66,7 +73,7 @@ beforeAll(async () => {
   );
 
   // Inject pool directly — no NestJS DI container needed.
-  const repo = new SettingsRepository(pool as never);
+  repo = new SettingsRepository(pool as never);
 
   // DrizzleTenantLookup just needs the pool (for cache invalidation path).
   const tenantLookup = new DrizzleTenantLookup(pool as never);
@@ -152,6 +159,129 @@ describe('SettingsRepository + SettingsService integration', () => {
     );
 
     expect(profile.about_text).toBe('प्रीमियम सोना और आभूषण');
+  });
+
+  describe('loyalty', () => {
+    it('getLoyalty returns LOYALTY_DEFAULTS when shop has no loyalty_json set', async () => {
+      // shop_settings row may not exist yet for this shop; either way loyalty_json is null
+      const config = await tenantContext.runWith(makeCtx(), () =>
+        repo.getLoyalty(),
+      );
+      expect(config).toEqual(LOYALTY_DEFAULTS);
+    });
+
+    it('getLoyalty returns the stored config after upsertLoyalty', async () => {
+      const custom = {
+        ...LOYALTY_DEFAULTS,
+        earnRatePercentage: '2.00',
+      };
+      await tenantContext.runWith(makeCtx(), () =>
+        repo.upsertLoyalty(custom),
+      );
+      const config = await tenantContext.runWith(makeCtx(), () =>
+        repo.getLoyalty(),
+      );
+      expect(config.earnRatePercentage).toBe('2.00');
+      expect(config.tiers).toEqual(LOYALTY_DEFAULTS.tiers);
+    });
+
+    it('upsertLoyalty is idempotent — second call updates, no duplicate rows', async () => {
+      const v1 = { ...LOYALTY_DEFAULTS, earnRatePercentage: '3.00' };
+      const v2 = { ...LOYALTY_DEFAULTS, earnRatePercentage: '4.00' };
+      await tenantContext.runWith(makeCtx(), () => repo.upsertLoyalty(v1));
+      await tenantContext.runWith(makeCtx(), () => repo.upsertLoyalty(v2));
+
+      const r = await pool.query<{ count: string }>(
+        `SELECT COUNT(*) AS count FROM shop_settings WHERE shop_id = $1`,
+        [SHOP_A],
+      );
+      expect(Number(r.rows[0].count)).toBe(1);
+
+      const config = await tenantContext.runWith(makeCtx(), () =>
+        repo.getLoyalty(),
+      );
+      expect(config.earnRatePercentage).toBe('4.00');
+    });
+
+    it('stored thresholdPaise values are integers', async () => {
+      const config = await tenantContext.runWith(makeCtx(), () =>
+        repo.getLoyalty(),
+      );
+      for (const tier of config.tiers) {
+        expect(Number.isInteger(tier.thresholdPaise)).toBe(true);
+      }
+    });
+
+    it('updateLoyalty type=tier persists tier name and converts rupees to paise', async () => {
+      const result = await tenantContext.runWith(makeCtx(), () =>
+        svc.updateLoyalty({
+          type:            'tier',
+          index:           0,
+          name:            'Bronze',
+          thresholdRupees: '25000',
+          badgeColor:      '#CD7F32',
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+
+      const config = await tenantContext.runWith(makeCtx(), () =>
+        repo.getLoyalty(),
+      );
+      // 25000 rupees × 100 = 2,500,000 paise
+      expect(config.tiers[0].name).toBe('Bronze');
+      expect(config.tiers[0].thresholdPaise).toBe(2_500_000);
+      expect(config.tiers[0].badgeColor).toBe('#CD7F32');
+    });
+
+    it('updateLoyalty type=rate persists both earn and redemption rates', async () => {
+      const result = await tenantContext.runWith(makeCtx(), () =>
+        svc.updateLoyalty({
+          type:                     'rate',
+          earnRatePercentage:       '2.50',
+          redemptionRatePercentage: '0.50',
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+
+      const config = await tenantContext.runWith(makeCtx(), () =>
+        repo.getLoyalty(),
+      );
+      expect(config.earnRatePercentage).toBe('2.50');
+      expect(config.redemptionRatePercentage).toBe('0.50');
+    });
+
+    it('updateLoyalty type=tier returns TIER_ORDER_INVALID when order is violated', async () => {
+      // First reset to defaults so thresholds are predictable
+      await tenantContext.runWith(makeCtx(), () =>
+        repo.upsertLoyalty({
+          tiers: [
+            { name: 'Silver',  thresholdPaise: 5_000_000,  badgeColor: '#C0C0C0' },
+            { name: 'Gold',    thresholdPaise: 15_000_000,  badgeColor: '#FFD700' },
+            { name: 'Diamond', thresholdPaise: 50_000_000,  badgeColor: '#B9F2FF' },
+          ],
+          earnRatePercentage:       '1.00',
+          redemptionRatePercentage: '1.00',
+        }),
+      );
+
+      // tier[0] default is Rs 50,000; set tier[1] to Rs 40,000 — violates ascending order
+      const result = await tenantContext.runWith(makeCtx(), () =>
+        svc.updateLoyalty({
+          type:            'tier',
+          index:           1,
+          name:            'Gold',
+          thresholdRupees: '40000',
+          badgeColor:      '#FFD700',
+        }),
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toBe('TIER_ORDER_INVALID');
+      }
+    });
   });
 });
 
@@ -244,5 +374,64 @@ describe('getWastage / updateWastage integration', () => {
     );
     const stored = r.rows[0].wastage_json as Record<string, unknown>;
     expect(stored['CHAINS']).toBe('1.50');
+  });
+});
+
+describe('rate-lock', () => {
+  const rateLockCtx: AuthenticatedTenantContext = {
+    shopId: SHOP_A, tenant, authenticated: true, userId: 'u1', role: 'shop_admin',
+  };
+
+  it('returns default 7 when never configured', async () => {
+    const days = await tenantContext.runWith(rateLockCtx, () => svc.getRateLock());
+    expect(days).toBe(7);
+  });
+
+  it('PATCH 14 → GET returns 14', async () => {
+    await tenantContext.runWith(rateLockCtx, () =>
+      svc.updateRateLock({ rateLockDays: 14 }),
+    );
+    const days = await tenantContext.runWith(rateLockCtx, () => svc.getRateLock());
+    expect(days).toBe(14);
+  });
+
+  it('PATCH 30 → GET returns 30 (upper boundary)', async () => {
+    await tenantContext.runWith(rateLockCtx, () =>
+      svc.updateRateLock({ rateLockDays: 30 }),
+    );
+    const days = await tenantContext.runWith(rateLockCtx, () => svc.getRateLock());
+    expect(days).toBe(30);
+  });
+
+  it('PATCH 1 → GET returns 1 (lower boundary)', async () => {
+    await tenantContext.runWith(rateLockCtx, () =>
+      svc.updateRateLock({ rateLockDays: 1 }),
+    );
+    const days = await tenantContext.runWith(rateLockCtx, () => svc.getRateLock());
+    expect(days).toBe(1);
+  });
+
+  it('PATCH 31 → throws UnprocessableEntityException (422)', async () => {
+    await expect(
+      tenantContext.runWith(rateLockCtx, () =>
+        svc.updateRateLock({ rateLockDays: 31 }),
+      ),
+    ).rejects.toThrow(UnprocessableEntityException);
+  });
+
+  it('PATCH 0 → throws UnprocessableEntityException (422)', async () => {
+    await expect(
+      tenantContext.runWith(rateLockCtx, () =>
+        svc.updateRateLock({ rateLockDays: 0 }),
+      ),
+    ).rejects.toThrow(UnprocessableEntityException);
+  });
+
+  it('shop_manager role can read via service (role enforcement is at controller layer)', async () => {
+    const managerCtx: AuthenticatedTenantContext = {
+      shopId: SHOP_A, tenant, authenticated: true, userId: 'u2', role: 'shop_manager',
+    };
+    const days = await tenantContext.runWith(managerCtx, () => svc.getRateLock());
+    expect(days).toBe(1);
   });
 });

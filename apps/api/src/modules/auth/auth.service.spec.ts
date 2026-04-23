@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuditAction } from '@goldsmith/audit';
 import type { InviteStaffDto } from '@goldsmith/shared';
-import { tenantContext, type Tenant } from '@goldsmith/tenant-context';
+import { tenantContext, type Tenant, type ShopUserRole } from '@goldsmith/tenant-context';
 import type { AuditLogFilters } from './audit-log.repository';
 
 // ---------------------------------------------------------------------------
@@ -195,7 +195,6 @@ describe('AuthService.invite()', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // AuthService.getAuditLog()
 // ---------------------------------------------------------------------------
 describe('AuthService.getAuditLog()', () => {
@@ -326,5 +325,170 @@ describe('AuthService.logoutAll()', () => {
     expect(insertCall).toBeDefined();
     const actorUserId = insertCall![1][0] as string; // $1 = actor_user_id
     expect(actorUserId).toBe('user-123');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AuthService.revokeStaff() tests
+// ---------------------------------------------------------------------------
+const CALLER_ID    = 'owner-uuid-1';
+const TARGET_ID    = 'staff-uuid-1';
+const FIREBASE_UID = 'firebase-uid-staff';
+
+const fakeTenantRevoke: Tenant = {
+  id: SHOP_ID,
+  slug: 'test-shop',
+  display_name: 'Test Jewellers',
+  status: 'ACTIVE',
+};
+
+/**
+ * Pool mock for revokeStaff success path.
+ * connect() call 1 = tenantClient for loadTenantById
+ * connect() call 2 = auditClient for auditLog withTenantTx
+ */
+function makeRevokePoolMock() {
+  const tenantClient = {
+    query: vi.fn().mockResolvedValue({ rows: [fakeTenantRevoke], rowCount: 1 }),
+    release: vi.fn(),
+  };
+  const auditClient = {
+    query: vi.fn()
+      .mockResolvedValueOnce(undefined)  // BEGIN
+      .mockResolvedValueOnce(undefined)  // SET LOCAL ROLE app_user
+      .mockResolvedValueOnce(undefined)  // SET LOCAL app.current_shop_id
+      .mockResolvedValueOnce(undefined)  // INSERT audit_events
+      .mockResolvedValueOnce(undefined)  // COMMIT
+      .mockResolvedValueOnce(undefined), // POISON (finally)
+    release: vi.fn(),
+  };
+  const pool = {
+    connect: vi.fn()
+      .mockResolvedValueOnce(tenantClient)
+      .mockResolvedValueOnce(auditClient),
+  } as unknown as import('pg').Pool;
+  return { pool, auditClient };
+}
+
+function makeRevokeService(opts: {
+  targetRow: { firebaseUid: string | null; role: ShopUserRole; status?: string } | null;
+  getFirebaseUidResult?: string | null;
+}) {
+  const authRepo = {
+    revokeStaff: vi.fn().mockResolvedValue(opts.targetRow),
+    markRevoked: vi.fn().mockResolvedValue(undefined),
+    getFirebaseUid: vi.fn().mockResolvedValue(opts.getFirebaseUidResult ?? null),
+  };
+
+  const mockFirebaseAuth = {
+    setCustomUserClaims: vi.fn().mockResolvedValue(undefined),
+    revokeRefreshTokens: vi.fn().mockResolvedValue(undefined),
+    updateUser: vi.fn().mockResolvedValue(undefined),
+  };
+  const firebase = {
+    admin: vi.fn().mockReturnValue({ auth: vi.fn().mockReturnValue(mockFirebaseAuth) }),
+  };
+
+  const { pool, auditClient } = makeRevokePoolMock();
+  const rateLimit = {} as never;
+  const smsAdapter = { sendOtp: vi.fn(), sendInvite: vi.fn() } as never;
+  const auditLogRepo = { findPaginated: vi.fn() } as never;
+
+  const svc = new AuthService(pool, firebase as never, authRepo as never, rateLimit, smsAdapter, auditLogRepo);
+  return { svc, authRepo, mockFirebaseAuth, pool, auditClient };
+}
+
+describe('AuthService.revokeStaff()', () => {
+  it('calls markRevoked with correct args and revokeRefreshTokens with firebaseUid', async () => {
+    const { svc, authRepo, mockFirebaseAuth } = makeRevokeService({
+      targetRow: { firebaseUid: FIREBASE_UID, role: 'shop_staff' },
+    });
+
+    await svc.revokeStaff(SHOP_ID, TARGET_ID, CALLER_ID);
+
+    expect(authRepo.markRevoked).toHaveBeenCalledWith(SHOP_ID, TARGET_ID, CALLER_ID);
+    expect(mockFirebaseAuth.setCustomUserClaims).toHaveBeenCalledWith(FIREBASE_UID, {});
+    expect(mockFirebaseAuth.revokeRefreshTokens).toHaveBeenCalledWith(FIREBASE_UID);
+    // updateUser({ disabled: true }) is intentionally NOT called — disabling the Firebase
+    // account globally would break cross-shop users whose phone has an active membership elsewhere.
+    // Migration 0010 excludes REVOKED rows from phone lookup, closing that auth path at DB level.
+    expect(mockFirebaseAuth.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('skips revokeRefreshTokens when firebaseUid is null', async () => {
+    const { svc, mockFirebaseAuth, authRepo } = makeRevokeService({
+      targetRow: { firebaseUid: null, role: 'shop_staff' },
+    });
+
+    await svc.revokeStaff(SHOP_ID, TARGET_ID, CALLER_ID);
+
+    expect(authRepo.markRevoked).toHaveBeenCalledOnce();
+    expect(mockFirebaseAuth.setCustomUserClaims).not.toHaveBeenCalled();
+    expect(mockFirebaseAuth.revokeRefreshTokens).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFoundException(404) when target user not found', async () => {
+    const { svc } = makeRevokeService({ targetRow: null });
+
+    await expect(svc.revokeStaff(SHOP_ID, TARGET_ID, CALLER_ID))
+      .rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('throws BadRequestException(400) when caller tries to revoke themselves', async () => {
+    const { svc } = makeRevokeService({
+      targetRow: { firebaseUid: FIREBASE_UID, role: 'shop_staff' },
+    });
+
+    // TARGET_ID === CALLER_ID → self-revoke
+    await expect(svc.revokeStaff(SHOP_ID, TARGET_ID, TARGET_ID))
+      .rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('throws ForbiddenException(403) when target is a shop_admin', async () => {
+    const { svc } = makeRevokeService({
+      targetRow: { firebaseUid: FIREBASE_UID, role: 'shop_admin' },
+    });
+
+    await expect(svc.revokeStaff(SHOP_ID, TARGET_ID, CALLER_ID))
+      .rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('emits STAFF_REVOKED audit event with actual pre-revocation status', async () => {
+    const { svc, auditClient } = makeRevokeService({
+      targetRow: { firebaseUid: FIREBASE_UID, role: 'shop_staff', status: 'INVITED' },
+    });
+
+    await svc.revokeStaff(SHOP_ID, TARGET_ID, CALLER_ID);
+
+    const insertCall = (auditClient.query.mock.calls as [string, unknown[]][]).find(
+      ([sql]) => sql.includes('INSERT INTO audit_events'),
+    );
+    expect(insertCall).toBeDefined();
+    const action = insertCall![1][1] as string;
+    expect(action).toBe(AuditAction.STAFF_REVOKED);
+
+    // Verify metadata uses actual status from DB row, not hardcoded 'ACTIVE'
+    const metadataJson = insertCall![1][6] as string;
+    const metadata = JSON.parse(metadataJson) as Record<string, unknown>;
+    expect(metadata).toEqual({ before: { status: 'INVITED' }, after: { status: 'REVOKED' } });
+    expect(metadata).not.toHaveProperty('phone');
+    expect(metadata).not.toHaveProperty('firebaseUid');
+  });
+
+  it('revokes a UID linked concurrently between revokeStaff() read and markRevoked()', async () => {
+    // Simulates the race: initial read returns firebaseUid=null (INVITED user),
+    // but a concurrent /session links a UID just before markRevoked commits.
+    // Post-revoke getFirebaseUid() returns the newly linked UID — service must revoke it.
+    const RACE_UID = 'firebase-uid-race-linked';
+    const { svc, mockFirebaseAuth } = makeRevokeService({
+      targetRow: { firebaseUid: null, role: 'shop_staff', status: 'INVITED' },
+      getFirebaseUidResult: RACE_UID,
+    });
+
+    await svc.revokeStaff(SHOP_ID, TARGET_ID, CALLER_ID);
+
+    expect(mockFirebaseAuth.setCustomUserClaims).toHaveBeenCalledWith(RACE_UID, {});
+    expect(mockFirebaseAuth.revokeRefreshTokens).toHaveBeenCalledWith(RACE_UID);
+    expect(mockFirebaseAuth.updateUser).not.toHaveBeenCalled();
   });
 });

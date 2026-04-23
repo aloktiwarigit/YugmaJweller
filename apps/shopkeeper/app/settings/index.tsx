@@ -8,6 +8,8 @@ const items = [
   { key: 'shop_profile', label: 'शॉप प्रोफाइल', route: '/settings/shop-profile' },
   { key: 'staff', label: 'स्टाफ प्रबंधन', route: '/settings/staff' },
   { key: 'making_charges', label: 'मेकिंग चार्जेस', route: '/settings/making-charges' },
+  { key: 'rate_lock', label: 'Rate Lock की अवधि', route: '/settings/rate-lock' },
+  { key: 'loyalty', label: 'लॉयल्टी प्रोग्राम', route: '/settings/loyalty' },
   { key: 'billing', label: 'बिलिंग', route: '/settings/billing' },
   { key: 'reports', label: 'रिपोर्ट्स', route: '/settings/reports' },
   { key: 'audit_log', label: 'गतिविधि लॉग', route: '/settings/audit-log' },

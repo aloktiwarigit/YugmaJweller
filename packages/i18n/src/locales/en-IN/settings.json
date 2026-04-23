@@ -2,6 +2,18 @@
   "title": "Settings",
   "shop_profile": "Shop Profile",
   "staff": "Staff Management",
+  "staff_revoke": {
+    "button": "Remove",
+    "confirm_title": "Remove {{name}}?",
+    "confirm_body": "This action cannot be undone.",
+    "confirm_yes": "Yes, Remove",
+    "cancel": "Cancel",
+    "success_toast": "Staff member removed",
+    "error_self": "You cannot remove yourself",
+    "error_admin": "Cannot remove an admin",
+    "error_not_found": "Staff member not found",
+    "error_generic": "Could not remove. Please try again."
+  },
   "making_charges": "Making Charges",
   "permissions": "Permissions",
   "billing": "Billing",
@@ -66,6 +78,39 @@
       "VALUE_POSITIVE_REQUIRED": "Wastage must be greater than 0",
       "VALUE_FORMAT_INVALID": "Please enter a valid number",
       "wastage_high": "Wastage cannot exceed 30% — please enter a correct amount"
+    }
+  },
+  "rate_lock": {
+    "title": "Rate Lock Duration",
+    "label": "Rate Lock Duration (days)",
+    "description": "Customers can purchase at today's gold rate for this many days",
+    "save_success": "Changes saved ✓",
+    "errors": {
+      "RANGE_INVALID": "Duration must be between 1 and 30 days"
+    }
+  },
+  "loyalty": {
+    "title": "Loyalty Programme",
+    "tiers_section": "Tiers",
+    "rates_section": "Points Rate",
+    "tier_name": "Tier Name",
+    "threshold": "Minimum Purchase (₹)",
+    "badge_color": "Badge Colour",
+    "earn_rate": "Earn Rate (%)",
+    "redemption_rate": "Redemption Rate (%)",
+    "save": "Save",
+    "save_success": "Changes saved ✓",
+    "errors": {
+      "TIER_NAME_REQUIRED": "Tier name cannot be empty",
+      "TIER_NAME_TOO_LONG": "Name cannot exceed 20 characters",
+      "THRESHOLD_MUST_BE_INTEGER": "Minimum purchase must be a whole number",
+      "THRESHOLD_MIN": "Minimum purchase cannot be less than 0",
+      "THRESHOLD_MAX": "Amount is too large",
+      "THRESHOLD_OUT_OF_RANGE": "Amount must be between 0 and 1,00,00,000",
+      "BADGE_COLOR_INVALID": "Colour must be in #RRGGBB format",
+      "VALUE_FORMAT_INVALID": "Enter a valid number",
+      "RATE_OUT_OF_RANGE": "Rate must be between 0 and 100",
+      "TIER_ORDER_INVALID": "Tier order is invalid — minimum purchase must be in ascending order"
     }
   }
 }

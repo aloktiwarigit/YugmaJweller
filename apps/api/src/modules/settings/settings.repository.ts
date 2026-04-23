@@ -3,8 +3,8 @@ import type { Pool, PoolClient } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { ShopProfileRow, PatchShopProfileDto, AddressDto, OperatingHoursDto, MakingChargeConfig, WastageConfig } from '@goldsmith/shared';
-import { WASTAGE_DEFAULTS } from '@goldsmith/shared';
-import type { UpdateProfileResult, UpdateMakingChargesResult, UpdateWastageResult } from './settings.types';
+import { LoyaltyConfig, LoyaltyConfigSchema, LOYALTY_DEFAULTS, WASTAGE_DEFAULTS } from '@goldsmith/shared';
+import type { UpdateProfileResult, UpdateMakingChargesResult, UpdateWastageResult, UpdateRateLockResult } from './settings.types';
 
 interface ShopsRow {
   display_name: string;
@@ -100,7 +100,6 @@ export class SettingsRepository {
     return withTenantTx(this.pool, async (tx) => {
       const shopId = tenantContext.requireCurrent().shopId;
 
-      // Ensure row exists so SELECT FOR UPDATE always finds a row.
       await tx.query(
         `INSERT INTO shop_settings (shop_id) VALUES ($1) ON CONFLICT (shop_id) DO NOTHING`,
         [shopId],
@@ -135,6 +134,45 @@ export class SettingsRepository {
     });
   }
 
+  async getRateLockDays(): Promise<number | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+      const r = await tx.query<{ rate_lock_days: number | null }>(
+        `SELECT rate_lock_days FROM shop_settings WHERE shop_id = $1`,
+        [shopId],
+      );
+      return r.rows[0]?.rate_lock_days ?? null;
+    });
+  }
+
+  async updateRateLockDays(days: number): Promise<UpdateRateLockResult> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+
+      // Ensure row exists so SELECT FOR UPDATE always acquires a lock.
+      await tx.query(
+        `INSERT INTO shop_settings (shop_id) VALUES ($1) ON CONFLICT (shop_id) DO NOTHING`,
+        [shopId],
+      );
+
+      const beforeRow = await tx.query<{ rate_lock_days: number | null }>(
+        `SELECT rate_lock_days FROM shop_settings WHERE shop_id = $1 FOR UPDATE`,
+        [shopId],
+      );
+      const before = beforeRow.rows[0]?.rate_lock_days ?? null;
+
+      const r = await tx.query<{ rate_lock_days: number }>(
+        `UPDATE shop_settings
+            SET rate_lock_days = $1, updated_at = now()
+          WHERE shop_id = $2
+          RETURNING rate_lock_days`,
+        [days, shopId],
+      );
+
+      return { before, after: r.rows[0].rate_lock_days };
+    });
+  }
+
   async upsertMakingCharges(
     patchItems: MakingChargeConfig[],
     defaults: MakingChargeConfig[],
@@ -142,8 +180,6 @@ export class SettingsRepository {
     return withTenantTx(this.pool, async (tx) => {
       const shopId = tenantContext.requireCurrent().shopId;
 
-      // Ensure the row exists so SELECT FOR UPDATE always acquires a row-level lock,
-      // preventing lost-update races when two concurrent PATCHes arrive for a fresh shop.
       await tx.query(
         `INSERT INTO shop_settings (shop_id) VALUES ($1) ON CONFLICT (shop_id) DO NOTHING`,
         [shopId],
@@ -155,7 +191,6 @@ export class SettingsRepository {
       );
       const before = beforeRow.rows.length > 0 ? (beforeRow.rows[0].making_charges_json ?? null) : null;
 
-      // Merge stored over defaults so partial/legacy rows never produce < 6 categories.
       const storedMap = before ? new Map(before.map((c) => [c.category, c])) : null;
       const current = storedMap ? defaults.map((d) => storedMap.get(d.category) ?? d) : defaults;
       const patchMap = new Map(patchItems.map((c) => [c.category, c]));
@@ -172,6 +207,33 @@ export class SettingsRepository {
       const after = r.rows[0].making_charges_json;
 
       return { before, after };
+    });
+  }
+
+  async getLoyalty(): Promise<LoyaltyConfig> {
+    return withTenantTx(this.pool, async (tx) => {
+      const { shopId } = tenantContext.requireCurrent();
+      const r = await tx.query<{ loyalty_json: unknown }>(
+        `SELECT loyalty_json FROM shop_settings WHERE shop_id = $1`,
+        [shopId],
+      );
+      if (r.rows.length === 0 || r.rows[0].loyalty_json == null) {
+        return LOYALTY_DEFAULTS;
+      }
+      const parsed = LoyaltyConfigSchema.safeParse(r.rows[0].loyalty_json);
+      return parsed.success ? parsed.data : LOYALTY_DEFAULTS;
+    });
+  }
+
+  async upsertLoyalty(config: LoyaltyConfig): Promise<void> {
+    return withTenantTx(this.pool, async (tx) => {
+      const { shopId } = tenantContext.requireCurrent();
+      await tx.query(
+        `INSERT INTO shop_settings (shop_id, loyalty_json)
+         VALUES ($1, $2::jsonb)
+         ON CONFLICT (shop_id) DO UPDATE SET loyalty_json = EXCLUDED.loyalty_json, updated_at = now()`,
+        [shopId, JSON.stringify(config)],
+      );
     });
   }
 
