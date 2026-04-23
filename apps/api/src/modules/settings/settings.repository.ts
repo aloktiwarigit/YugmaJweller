@@ -2,9 +2,9 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import { tenantContext } from '@goldsmith/tenant-context';
-import type { ShopProfileRow, PatchShopProfileDto, AddressDto, OperatingHoursDto, MakingChargeConfig, WastageConfig } from '@goldsmith/shared';
+import type { ShopProfileRow, PatchShopProfileDto, AddressDto, OperatingHoursDto, MakingChargeConfig, WastageConfig, NotificationPrefsConfig } from '@goldsmith/shared';
 import { LoyaltyConfig, LoyaltyConfigSchema, LOYALTY_DEFAULTS, WASTAGE_DEFAULTS, TRY_AT_HOME_DEFAULT_MAX_PIECES } from '@goldsmith/shared';
-import type { UpdateProfileResult, UpdateMakingChargesResult, UpdateWastageResult, UpdateRateLockResult, UpdateTryAtHomeResult } from './settings.types';
+import type { UpdateProfileResult, UpdateMakingChargesResult, UpdateWastageResult, UpdateRateLockResult, UpdateTryAtHomeResult, UpdateCustomOrderPolicyResult, UpdateReturnPolicyResult, UpdateNotificationPrefsResult } from './settings.types';
 
 interface ShopsRow {
   display_name: string;
@@ -284,6 +284,121 @@ export class SettingsRepository {
           tryAtHomeMaxPieces: r.rows[0].try_at_home_max_pieces,
         },
       };
+    });
+  }
+
+  async getCustomOrderPolicy(): Promise<string | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+      const r = await tx.query<{ custom_order_policy_text: string | null }>(
+        `SELECT custom_order_policy_text FROM shop_settings WHERE shop_id = $1`,
+        [shopId],
+      );
+      return r.rows[0]?.custom_order_policy_text ?? null;
+    });
+  }
+
+  async updateCustomOrderPolicy(text: string): Promise<UpdateCustomOrderPolicyResult> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+
+      await tx.query(
+        `INSERT INTO shop_settings (shop_id) VALUES ($1) ON CONFLICT (shop_id) DO NOTHING`,
+        [shopId],
+      );
+
+      const beforeRow = await tx.query<{ custom_order_policy_text: string | null }>(
+        `SELECT custom_order_policy_text FROM shop_settings WHERE shop_id = $1 FOR UPDATE`,
+        [shopId],
+      );
+      const before = beforeRow.rows[0]?.custom_order_policy_text ?? null;
+
+      const r = await tx.query<{ custom_order_policy_text: string | null }>(
+        `UPDATE shop_settings
+            SET custom_order_policy_text = $1, updated_at = now()
+          WHERE shop_id = $2
+          RETURNING custom_order_policy_text`,
+        [text || null, shopId],
+      );
+
+      return { before, after: r.rows[0].custom_order_policy_text };
+    });
+  }
+
+  async getReturnPolicy(): Promise<string | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+      const r = await tx.query<{ return_policy_text: string | null }>(
+        `SELECT return_policy_text FROM shop_settings WHERE shop_id = $1`,
+        [shopId],
+      );
+      return r.rows[0]?.return_policy_text ?? null;
+    });
+  }
+
+  async updateReturnPolicy(text: string): Promise<UpdateReturnPolicyResult> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+
+      await tx.query(
+        `INSERT INTO shop_settings (shop_id) VALUES ($1) ON CONFLICT (shop_id) DO NOTHING`,
+        [shopId],
+      );
+
+      const beforeRow = await tx.query<{ return_policy_text: string | null }>(
+        `SELECT return_policy_text FROM shop_settings WHERE shop_id = $1 FOR UPDATE`,
+        [shopId],
+      );
+      const before = beforeRow.rows[0]?.return_policy_text ?? null;
+
+      const r = await tx.query<{ return_policy_text: string | null }>(
+        `UPDATE shop_settings
+            SET return_policy_text = $1, updated_at = now()
+          WHERE shop_id = $2
+          RETURNING return_policy_text`,
+        [text || null, shopId],
+      );
+
+      return { before, after: r.rows[0].return_policy_text };
+    });
+  }
+
+  async getNotificationPrefs(): Promise<NotificationPrefsConfig | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+      const r = await tx.query<{ notification_prefs_json: NotificationPrefsConfig | null }>(
+        `SELECT notification_prefs_json FROM shop_settings WHERE shop_id = $1`,
+        [shopId],
+      );
+      return r.rows[0]?.notification_prefs_json ?? null;
+    });
+  }
+
+  async updateNotificationPrefs(prefs: NotificationPrefsConfig): Promise<UpdateNotificationPrefsResult> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+
+      await tx.query(
+        `INSERT INTO shop_settings (shop_id) VALUES ($1) ON CONFLICT (shop_id) DO NOTHING`,
+        [shopId],
+      );
+
+      const beforeRow = await tx.query<{ notification_prefs_json: NotificationPrefsConfig | null }>(
+        `SELECT notification_prefs_json FROM shop_settings WHERE shop_id = $1 FOR UPDATE`,
+        [shopId],
+      );
+      const before = beforeRow.rows[0]?.notification_prefs_json ?? null;
+
+      const r = await tx.query<{ notification_prefs_json: NotificationPrefsConfig }>(
+        `INSERT INTO shop_settings (shop_id, notification_prefs_json)
+         VALUES ($1, $2::jsonb)
+         ON CONFLICT (shop_id)
+         DO UPDATE SET notification_prefs_json = EXCLUDED.notification_prefs_json, updated_at = now()
+         RETURNING notification_prefs_json`,
+        [shopId, JSON.stringify(prefs)],
+      );
+
+      return { before, after: r.rows[0].notification_prefs_json };
     });
   }
 
