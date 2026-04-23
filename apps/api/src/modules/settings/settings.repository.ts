@@ -3,8 +3,8 @@ import type { Pool, PoolClient } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { ShopProfileRow, PatchShopProfileDto, AddressDto, OperatingHoursDto, MakingChargeConfig, WastageConfig } from '@goldsmith/shared';
-import { LoyaltyConfig, LoyaltyConfigSchema, LOYALTY_DEFAULTS, WASTAGE_DEFAULTS } from '@goldsmith/shared';
-import type { UpdateProfileResult, UpdateMakingChargesResult, UpdateWastageResult, UpdateRateLockResult } from './settings.types';
+import { LoyaltyConfig, LoyaltyConfigSchema, LOYALTY_DEFAULTS, WASTAGE_DEFAULTS, TRY_AT_HOME_DEFAULT_MAX_PIECES } from '@goldsmith/shared';
+import type { UpdateProfileResult, UpdateMakingChargesResult, UpdateWastageResult, UpdateRateLockResult, UpdateTryAtHomeResult } from './settings.types';
 
 interface ShopsRow {
   display_name: string;
@@ -234,6 +234,56 @@ export class SettingsRepository {
          ON CONFLICT (shop_id) DO UPDATE SET loyalty_json = EXCLUDED.loyalty_json, updated_at = now()`,
         [shopId, JSON.stringify(config)],
       );
+    });
+  }
+
+  async getTryAtHome(): Promise<{ enabled: boolean; maxPieces: number | null }> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+      const r = await tx.query<{ try_at_home_enabled: boolean; try_at_home_max_pieces: number | null }>(
+        `SELECT try_at_home_enabled, try_at_home_max_pieces FROM shop_settings WHERE shop_id = $1`,
+        [shopId],
+      );
+      return {
+        enabled: r.rows[0]?.try_at_home_enabled ?? false,
+        maxPieces: r.rows[0]?.try_at_home_max_pieces ?? null,
+      };
+    });
+  }
+
+  async updateTryAtHome(enabled: boolean, maxPieces: number): Promise<UpdateTryAtHomeResult> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shopId = tenantContext.requireCurrent().shopId;
+
+      await tx.query(
+        `INSERT INTO shop_settings (shop_id) VALUES ($1) ON CONFLICT (shop_id) DO NOTHING`,
+        [shopId],
+      );
+
+      const beforeRow = await tx.query<{ try_at_home_enabled: boolean; try_at_home_max_pieces: number | null }>(
+        `SELECT try_at_home_enabled, try_at_home_max_pieces FROM shop_settings WHERE shop_id = $1 FOR UPDATE`,
+        [shopId],
+      );
+      const before = {
+        tryAtHomeEnabled: beforeRow.rows[0].try_at_home_enabled,
+        tryAtHomeMaxPieces: beforeRow.rows[0].try_at_home_max_pieces ?? TRY_AT_HOME_DEFAULT_MAX_PIECES,
+      };
+
+      const r = await tx.query<{ try_at_home_enabled: boolean; try_at_home_max_pieces: number }>(
+        `UPDATE shop_settings
+            SET try_at_home_enabled = $1, try_at_home_max_pieces = $2, updated_at = now()
+          WHERE shop_id = $3
+          RETURNING try_at_home_enabled, try_at_home_max_pieces`,
+        [enabled, maxPieces, shopId],
+      );
+
+      return {
+        before,
+        after: {
+          tryAtHomeEnabled: r.rows[0].try_at_home_enabled,
+          tryAtHomeMaxPieces: r.rows[0].try_at_home_max_pieces,
+        },
+      };
     });
   }
 

@@ -28,3 +28,14 @@ export interface LoyaltyResponseDto {
   redemptionRatePercentage: string;
   etag: string;
 }
+
+export interface TryAtHomeResponseDto {
+  tryAtHomeEnabled: boolean;
+  tryAtHomeMaxPieces: number;
+  etag: string;
+}
+
+export interface FeatureFlagsResponseDto {
+  try_at_home: boolean;
+  max_pieces: number;
+}
