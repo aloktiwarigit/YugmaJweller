@@ -32,8 +32,11 @@ describe('FallbackChain', () => {
   let primarySuccess: RatesPort;
   let adapterFail: RatesPort;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     redis = new RedisMock() as unknown as Redis;
+    // ioredis-mock shares context across instances with the same host:port/db.
+    // Flush the shared store before each test to ensure clean state.
+    await redis.flushall();
     lkg = new LastKnownGoodCache(redis);
     primarySuccess = makeAdapter('ibja', async () => STUB_RATES);
     adapterFail = makeAdapter('fail', async () => {

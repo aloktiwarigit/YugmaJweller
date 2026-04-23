@@ -18,8 +18,11 @@ describe('LastKnownGoodCache', () => {
   let redis: Redis;
   let cache: LastKnownGoodCache;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     redis = new RedisMock() as unknown as Redis;
+    // ioredis-mock shares context across instances with the same host:port/db.
+    // Flush the shared store before each test to ensure clean state.
+    await redis.flushall();
     cache = new LastKnownGoodCache(redis);
   });
 
