@@ -2,4 +2,5 @@ packages:
   - "apps/*"
   - "packages/*"
   - "packages/testing/*"
+  - "packages/integrations/*"
   - "ops/eslint-rules/*"
