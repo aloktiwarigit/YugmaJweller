@@ -106,3 +106,14 @@ export type {
   NotificationPrefsConfig,
   PatchNotificationPrefsDto,
 } from './schemas/notification-prefs.schema';
+
+export {
+  CreateProductSchema,
+  UpdateProductSchema,
+  ProductResponseSchema,
+} from './schemas/product.schema';
+export type {
+  CreateProductDto,
+  UpdateProductDto,
+  ProductResponse,
+} from './schemas/product.schema';
