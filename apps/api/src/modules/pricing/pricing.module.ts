@@ -22,11 +22,17 @@ import {
 // ---------------------------------------------------------------------------
 // IST trading hours cron patterns (UTC+5:30)
 // 09:00–17:30 IST = 03:30–12:00 UTC
-// Every 15 min during trading hours: */15 3-11 * * 1-5 + 30 12 (for 12:30 UTC = 18:00 IST, outside trading)
-// Every 60 min outside trading hours
+//
+// Two mutually exclusive patterns:
+//   Trading hours  — every 15 min, Mon–Fri, UTC hours 03:00–11:59 (09:00–17:59 IST)
+//   Outside hours  — every hour at :00, UTC hours 12–23 and 0–2 (daily incl. weekends)
+//
+// The patterns share no overlap:
+//   TRADING_HOURS_CRON covers hours 3–11 on weekdays only.
+//   OUTSIDE_HOURS_CRON covers hours 12–23 and 0–2 every day (weekday hours 3–11 are absent).
 // ---------------------------------------------------------------------------
-const TRADING_HOURS_CRON = '*/15 3-11 * * 1-5';   // 09:00–17:45 IST (Mon–Fri)
-const OUTSIDE_HOURS_CRON = '0 * * * *';             // Every hour, every day
+const TRADING_HOURS_CRON = '*/15 3-11 * * 1-5';      // every 15 min, Mon–Fri, UTC 03:00–11:59
+const OUTSIDE_HOURS_CRON = '0 12-23,0-2 * * *';       // every hour at :00, UTC 12–23 and 0–2, daily
 
 @Module({
   imports: [

@@ -182,8 +182,9 @@ export class PricingService {
                 gold_24k_paise, gold_22k_paise, gold_20k_paise, gold_18k_paise, gold_14k_paise,
                 silver_999_paise, silver_925_paise, stale, created_at
            FROM ibja_rate_snapshots
-          WHERE fetched_at >= NOW() - INTERVAL '${days} days'
+          WHERE fetched_at >= NOW() - ($1 * INTERVAL '1 day')
           ORDER BY fetched_at DESC`,
+        [days],
       );
       return result.rows;
     } finally {

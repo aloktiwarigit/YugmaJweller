@@ -1,6 +1,7 @@
 import { Logger, Inject } from '@nestjs/common';
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
+import type { Pool } from 'pg';
 import { AuditAction } from '@goldsmith/audit';
 import { PricingService } from '../modules/pricing/pricing.service';
 
@@ -10,6 +11,7 @@ export class RatesRefreshProcessor extends WorkerHost {
 
   constructor(
     @Inject(PricingService) private readonly pricingService: PricingService,
+    @Inject('PG_POOL') private readonly pool: Pool,
   ) {
     super();
   }
@@ -27,12 +29,32 @@ export class RatesRefreshProcessor extends WorkerHost {
       `rates-refresh job failed: jobId=${job?.id ?? 'unknown'} name=${job?.name ?? 'unknown'} error=${error.message}`,
       error.stack,
     );
-    // Fire-and-forget platform audit event for PRICING_RATES_FALLBACK
-    // We log to the logger; the DB insert is best-effort here since we cannot inject pool
-    // cleanly into the event handler decorator — the main refreshRates() already logs
-    // PRICING_RATES_REFRESHED on success; failures are observable via Sentry/logger.
-    this.logger.warn(
-      `Audit: ${AuditAction.PRICING_RATES_FALLBACK} — rates-refresh job failed; all sources exhausted`,
-    );
+    // Persist PRICING_RATES_FALLBACK audit event to DB (best-effort, async).
+    // Wrapped in void + try/catch so an audit DB failure never masks the original job failure.
+    void (async () => {
+      try {
+        const client = await this.pool.connect();
+        try {
+          await client.query(
+            `INSERT INTO platform_audit_events (action, metadata)
+             VALUES ($1, $2)`,
+            [
+              AuditAction.PRICING_RATES_FALLBACK,
+              JSON.stringify({
+                jobId: job?.id ?? 'unknown',
+                jobName: job?.name ?? 'unknown',
+                error: error.message,
+              }),
+            ],
+          );
+        } finally {
+          client.release();
+        }
+      } catch (auditErr) {
+        this.logger.warn(
+          `Failed to persist PRICING_RATES_FALLBACK audit event: ${(auditErr as Error).message}`,
+        );
+      }
+    })();
   }
 }
