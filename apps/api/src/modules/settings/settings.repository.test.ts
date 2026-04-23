@@ -424,4 +424,113 @@ describe('SettingsRepository', () => {
       expect(result.after).toBe(21);
     });
   });
+
+  // ─── 2.7 custom_order_policy_text ───────────────────────────────────────────
+  describe('SettingsRepository.getCustomOrderPolicy', () => {
+    it('returns null when column is null', async () => {
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') || sql.includes('SET')) return;
+          return { rows: [{ custom_order_policy_text: null }], rowCount: 1 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const pool2 = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const repo2 = new SettingsRepository(pool2);
+      const result = await tenantContext.runWith(ctxA, () => repo2.getCustomOrderPolicy());
+      expect(result).toBeNull();
+    });
+
+    it('returns stored text value', async () => {
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') || sql.includes('SET')) return;
+          return { rows: [{ custom_order_policy_text: 'Policy text' }], rowCount: 1 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const pool2 = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const repo2 = new SettingsRepository(pool2);
+      const result = await tenantContext.runWith(ctxA, () => repo2.getCustomOrderPolicy());
+      expect(result).toBe('Policy text');
+    });
+  });
+
+  describe('SettingsRepository.updateCustomOrderPolicy', () => {
+    it('returns before=null and after=new text', async () => {
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') || sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
+          if (sql.includes('ON CONFLICT')) return { rows: [], rowCount: 1 };
+          if (sql.includes('FOR UPDATE')) return { rows: [{ custom_order_policy_text: null }], rowCount: 1 };
+          if (sql.includes('UPDATE shop_settings')) return { rows: [{ custom_order_policy_text: 'New policy' }], rowCount: 1 };
+          return { rows: [], rowCount: 0 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const pool2 = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const repo2 = new SettingsRepository(pool2);
+      const result = await tenantContext.runWith(ctxA, () => repo2.updateCustomOrderPolicy('New policy'));
+      expect(result.before).toBeNull();
+      expect(result.after).toBe('New policy');
+    });
+  });
+
+  // ─── 2.8 return_policy_text ─────────────────────────────────────────────────
+  describe('SettingsRepository.updateReturnPolicy', () => {
+    it('returns before=null and after=new text', async () => {
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') || sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
+          if (sql.includes('ON CONFLICT')) return { rows: [], rowCount: 1 };
+          if (sql.includes('FOR UPDATE')) return { rows: [{ return_policy_text: null }], rowCount: 1 };
+          if (sql.includes('UPDATE shop_settings')) return { rows: [{ return_policy_text: 'Return policy' }], rowCount: 1 };
+          return { rows: [], rowCount: 0 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const pool2 = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const repo2 = new SettingsRepository(pool2);
+      const result = await tenantContext.runWith(ctxA, () => repo2.updateReturnPolicy('Return policy'));
+      expect(result.before).toBeNull();
+      expect(result.after).toBe('Return policy');
+    });
+  });
+
+  // ─── 2.9 notification_prefs_json ────────────────────────────────────────────
+  describe('SettingsRepository.getNotificationPrefs', () => {
+    it('returns null when column is null', async () => {
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') || sql.includes('SET')) return;
+          return { rows: [{ notification_prefs_json: null }], rowCount: 1 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const pool2 = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const repo2 = new SettingsRepository(pool2);
+      expect(await tenantContext.runWith(ctxA, () => repo2.getNotificationPrefs())).toBeNull();
+    });
+  });
+
+  // ─── Tenant isolation ───────────────────────────────────────────────────────
+  describe('Tenant isolation — policy + notif prefs', () => {
+    it('getCustomOrderPolicy uses shopId from tenant context only', async () => {
+      const capturedParams: unknown[][] = [];
+      const mockClient = {
+        query: vi.fn().mockImplementation(async (sql: string, params?: unknown[]) => {
+          if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK') || sql.includes('SET')) return;
+          if (params) capturedParams.push(params);
+          return { rows: [{ custom_order_policy_text: null }], rowCount: 1 };
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      const pool2 = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as Pool;
+      const repo2 = new SettingsRepository(pool2);
+      await tenantContext.runWith(ctxA, () => repo2.getCustomOrderPolicy());
+      const shopIdArgs = capturedParams.flatMap((p) => p).filter((v): v is string => typeof v === 'string' && v.length === 36);
+      expect(shopIdArgs.length).toBeGreaterThan(0);
+      expect(shopIdArgs.every((id) => id === SHOP_A)).toBe(true);
+    });
+  });
 });
