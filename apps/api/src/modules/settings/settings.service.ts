@@ -172,15 +172,9 @@ export class SettingsService {
       const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), code: i.message }));
       throw new UnprocessableEntityException({ code: 'validation.failed', errors });
     }
-    const existing = await this.getNotificationPrefs();
-    const merged: NotificationPrefsConfig = {
-      orderUpdates:    parsed.data.orderUpdates    ? { ...existing.orderUpdates,    ...parsed.data.orderUpdates    } : existing.orderUpdates,
-      loyaltyUpdates:  parsed.data.loyaltyUpdates  ? { ...existing.loyaltyUpdates,  ...parsed.data.loyaltyUpdates  } : existing.loyaltyUpdates,
-      rateAlerts:      parsed.data.rateAlerts      ? { ...existing.rateAlerts,      ...parsed.data.rateAlerts      } : existing.rateAlerts,
-      staffActivity:   parsed.data.staffActivity   ? { ...existing.staffActivity,   ...parsed.data.staffActivity   } : existing.staffActivity,
-      paymentReceipts: parsed.data.paymentReceipts ? { ...existing.paymentReceipts, ...parsed.data.paymentReceipts } : existing.paymentReceipts,
-    };
-    const { before, after } = await this.repo.updateNotificationPrefs(merged);
+    // Merge happens inside the repo transaction against a FOR UPDATE-locked row,
+    // so concurrent partial PATCHes on different keys never lose each other's changes.
+    const { before, after } = await this.repo.updateNotificationPrefs(parsed.data);
     await this.cache.invalidateNotificationPrefs();
     void this.auditNotificationPrefsUpdate(before, after).catch(() => undefined);
     return after;

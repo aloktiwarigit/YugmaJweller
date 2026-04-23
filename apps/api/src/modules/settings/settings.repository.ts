@@ -2,8 +2,8 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import { tenantContext } from '@goldsmith/tenant-context';
-import type { ShopProfileRow, PatchShopProfileDto, AddressDto, OperatingHoursDto, MakingChargeConfig, WastageConfig, NotificationPrefsConfig } from '@goldsmith/shared';
-import { LoyaltyConfig, LoyaltyConfigSchema, LOYALTY_DEFAULTS, WASTAGE_DEFAULTS, TRY_AT_HOME_DEFAULT_MAX_PIECES } from '@goldsmith/shared';
+import type { ShopProfileRow, PatchShopProfileDto, AddressDto, OperatingHoursDto, MakingChargeConfig, WastageConfig, NotificationPrefsConfig, PatchNotificationPrefsDto } from '@goldsmith/shared';
+import { LoyaltyConfig, LoyaltyConfigSchema, LOYALTY_DEFAULTS, WASTAGE_DEFAULTS, TRY_AT_HOME_DEFAULT_MAX_PIECES, NOTIFICATION_PREFS_DEFAULTS } from '@goldsmith/shared';
 import type { UpdateProfileResult, UpdateMakingChargesResult, UpdateWastageResult, UpdateRateLockResult, UpdateTryAtHomeResult, UpdateCustomOrderPolicyResult, UpdateReturnPolicyResult, UpdateNotificationPrefsResult } from './settings.types';
 
 interface ShopsRow {
@@ -374,7 +374,10 @@ export class SettingsRepository {
     });
   }
 
-  async updateNotificationPrefs(prefs: NotificationPrefsConfig): Promise<UpdateNotificationPrefsResult> {
+  // Accepts a partial patch and merges it against the current DB row inside
+  // a single FOR UPDATE transaction so concurrent partial patches on different
+  // keys are serialised and never lose each other's changes.
+  async updateNotificationPrefs(patch: PatchNotificationPrefsDto): Promise<UpdateNotificationPrefsResult> {
     return withTenantTx(this.pool, async (tx) => {
       const shopId = tenantContext.requireCurrent().shopId;
 
@@ -383,11 +386,22 @@ export class SettingsRepository {
         [shopId],
       );
 
+      // Lock the row so concurrent partial PATCHes are serialised.
       const beforeRow = await tx.query<{ notification_prefs_json: NotificationPrefsConfig | null }>(
         `SELECT notification_prefs_json FROM shop_settings WHERE shop_id = $1 FOR UPDATE`,
         [shopId],
       );
       const before = beforeRow.rows[0]?.notification_prefs_json ?? null;
+      const existing = before ?? NOTIFICATION_PREFS_DEFAULTS;
+
+      // Merge the partial patch against the locked current value.
+      const merged: NotificationPrefsConfig = {
+        orderUpdates:    patch.orderUpdates    ? { ...existing.orderUpdates,    ...patch.orderUpdates    } : existing.orderUpdates,
+        loyaltyUpdates:  patch.loyaltyUpdates  ? { ...existing.loyaltyUpdates,  ...patch.loyaltyUpdates  } : existing.loyaltyUpdates,
+        rateAlerts:      patch.rateAlerts      ? { ...existing.rateAlerts,      ...patch.rateAlerts      } : existing.rateAlerts,
+        staffActivity:   patch.staffActivity   ? { ...existing.staffActivity,   ...patch.staffActivity   } : existing.staffActivity,
+        paymentReceipts: patch.paymentReceipts ? { ...existing.paymentReceipts, ...patch.paymentReceipts } : existing.paymentReceipts,
+      };
 
       const r = await tx.query<{ notification_prefs_json: NotificationPrefsConfig }>(
         `INSERT INTO shop_settings (shop_id, notification_prefs_json)
@@ -395,7 +409,7 @@ export class SettingsRepository {
          ON CONFLICT (shop_id)
          DO UPDATE SET notification_prefs_json = EXCLUDED.notification_prefs_json, updated_at = now()
          RETURNING notification_prefs_json`,
-        [shopId, JSON.stringify(prefs)],
+        [shopId, JSON.stringify(merged)],
       );
 
       return { before, after: r.rows[0].notification_prefs_json };

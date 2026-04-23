@@ -8,8 +8,13 @@
 -- SELECT remains unrestricted (platform-global read is intentional — auth
 -- lookups need to read all shops).
 
--- Grant UPDATE on shops to app_user (needed for shopkeeper profile edits).
-GRANT UPDATE ON shops TO app_user;
+-- Column-level UPDATE on shops for app_user (shopkeeper profile edits only).
+-- Sensitive columns (slug, status, kek_key_arn, config) are intentionally
+-- excluded — only platform_admin can change those.
+GRANT UPDATE (
+  display_name, address_json, gstin, bis_registration, contact_phone,
+  operating_hours_json, about_text, logo_url, years_in_business, updated_at
+) ON shops TO app_user;
 
 -- Enable RLS on shops and force it even for table owners.
 ALTER TABLE shops ENABLE ROW LEVEL SECURITY;

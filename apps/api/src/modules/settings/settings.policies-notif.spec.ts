@@ -162,46 +162,51 @@ describe('SettingsService.getNotificationPrefs', () => {
   });
 });
 
-describe('SettingsService.updateNotificationPrefs — deep merge', () => {
-  const existing: NotificationPrefsConfig = { ...NOTIFICATION_PREFS_DEFAULTS };
+describe('SettingsService.updateNotificationPrefs — passes patch to repo', () => {
+  // The service now delegates the merge to the repo (inside a FOR UPDATE transaction)
+  // to prevent lost-update races on concurrent partial PATCHes.
+  // These tests verify that:
+  //   1. The service passes the raw validated patch to repo.updateNotificationPrefs.
+  //   2. The cache is invalidated after a successful update.
+  //   3. The service returns whatever the repo returns as `after`.
+
+  const mergedResult: NotificationPrefsConfig = {
+    ...NOTIFICATION_PREFS_DEFAULTS,
+    rateAlerts: { push: false, sms: false },
+  };
 
   beforeEach(() => {
-    repoMock.getNotificationPrefs.mockResolvedValue(existing);
-    repoMock.updateNotificationPrefs.mockImplementation(async (prefs) =>
-      ({ before: existing, after: prefs }),
-    );
+    repoMock.updateNotificationPrefs.mockResolvedValue({
+      before: NOTIFICATION_PREFS_DEFAULTS,
+      after: mergedResult,
+    });
   });
 
   it('partial key patch does not overwrite untouched keys', async () => {
     const svc = makeService();
-    await svc.updateNotificationPrefs({ rateAlerts: { push: false, sms: false } });
-    expect(repoMock.updateNotificationPrefs).toHaveBeenCalledWith(
-      expect.objectContaining({
-        orderUpdates:    existing.orderUpdates,
-        loyaltyUpdates:  existing.loyaltyUpdates,
-        staffActivity:   existing.staffActivity,
-        paymentReceipts: existing.paymentReceipts,
-        rateAlerts:      { push: false, sms: false },
-      }),
-    );
+    const patch = { rateAlerts: { push: false, sms: false } };
+    const result = await svc.updateNotificationPrefs(patch);
+    // Service passes the raw patch — merge happens in the repo transaction.
+    expect(repoMock.updateNotificationPrefs).toHaveBeenCalledWith(patch);
     expect(cacheMock.invalidateNotificationPrefs).toHaveBeenCalled();
+    // Returns what repo returned as `after`.
+    expect(result).toEqual(mergedResult);
   });
 
-  it('partial channel patch preserves untouched channel within the key', async () => {
+  it('partial channel patch is forwarded to repo', async () => {
     const svc = makeService();
-    await svc.updateNotificationPrefs({ orderUpdates: { push: false } });
-    expect(repoMock.updateNotificationPrefs).toHaveBeenCalledWith(
-      expect.objectContaining({
-        orderUpdates: { push: false, sms: false },
-      }),
-    );
+    const patch = { orderUpdates: { push: false } };
+    await svc.updateNotificationPrefs(patch);
+    expect(repoMock.updateNotificationPrefs).toHaveBeenCalledWith(patch);
   });
 
-  it('empty patch object returns existing prefs unchanged', async () => {
+  it('empty patch object is forwarded to repo', async () => {
+    repoMock.updateNotificationPrefs.mockResolvedValue({
+      before: NOTIFICATION_PREFS_DEFAULTS,
+      after: NOTIFICATION_PREFS_DEFAULTS,
+    });
     const svc = makeService();
     await svc.updateNotificationPrefs({});
-    expect(repoMock.updateNotificationPrefs).toHaveBeenCalledWith(
-      expect.objectContaining(existing),
-    );
+    expect(repoMock.updateNotificationPrefs).toHaveBeenCalledWith({});
   });
 });
