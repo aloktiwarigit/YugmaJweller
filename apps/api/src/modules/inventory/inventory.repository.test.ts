@@ -154,4 +154,22 @@ describe('InventoryRepository', () => {
       expect(result.failedRows[0]?.error).toContain('duplicate key');
     });
   });
+
+  describe('listProductsForValuation', () => {
+    it('returns products with category_name resolved', async () => {
+      const row = {
+        id: 'prod-1111', metal: 'GOLD', purity: '22K', net_weight_g: '9.0000',
+        making_charge_override_pct: null, category_id: 'cat-1', category_name: 'अंगूठी',
+      };
+      const client = makeClient([row]);
+      pool = { connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
+      const mockSyncLogger = { logInTx: vi.fn().mockResolvedValue(1n) };
+      repo = new InventoryRepository(pool, mockSyncLogger as never);
+
+      const result = await tenantContext.runWith(ctxA, () => repo.listProductsForValuation());
+      expect(result).toHaveLength(1);
+      expect(result[0]?.category_name).toBe('अंगूठी');
+      expect(result[0]?.purity).toBe('22K');
+    });
+  });
 });
