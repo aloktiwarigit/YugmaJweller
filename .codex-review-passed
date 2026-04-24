@@ -1,8 +1,1 @@
-story: 3.3-barcode-labels
-date: 2026-04-24
-reviewer: codex (gpt-5.4)
-branch: feat/story-3.3-barcode-labels
-base: main
-p1-fixed: print-labels axios to authenticated api client
-p1-preexisting: pricing controller tenant-skip (not story 3.3)
-status: PASSED
+.codex-review-passed
