@@ -64,8 +64,17 @@ export class AuthController {
     });
   }
 
+  @TenantWalkerRoute({
+    verify: (body, tenant) => {
+      const b = body as { tenant?: { id?: string }; user?: { id?: string } } | null;
+      if (b?.tenant?.id !== tenant.id) {
+        return `cross-tenant leak: tenant ${tenant.id} saw ${b?.tenant?.id}`;
+      }
+      if (b?.user?.id === '') return 'empty user.id';
+      return null;
+    },
+  })
   @Get('/me')
-  @TenantWalkerRoute()
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   async me(@TenantContextDec() ctx: TenantContext) {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
@@ -76,6 +85,7 @@ export class AuthController {
     };
   }
 
+  @TenantWalkerRoute({ expectedStatus: 201, body: { phone: '+919876543210', role: 'shop_staff', display_name: 'Test Staff' } })
   @Post('/invite')
   @Roles('shop_admin', 'shop_manager')
   @UseGuards(PolicyGuard)
@@ -89,6 +99,7 @@ export class AuthController {
     return this.svc.invite(auth.shopId, dto, auth.userId);
   }
 
+  @TenantWalkerRoute()
   @Get('/users')
   @Roles('shop_admin', 'shop_manager')
   async listUsers(): Promise<Array<{
@@ -101,6 +112,7 @@ export class AuthController {
     return this.authRepo.listUsers(auth.shopId);
   }
 
+  @TenantWalkerRoute({ pathParams: { role: 'shop_manager' } })
   @Get('/roles/:role/permissions')
   @Roles('shop_admin')
   async getPermissions(@Param('role') role: string): Promise<Record<string, boolean>> {
@@ -110,6 +122,7 @@ export class AuthController {
     return this.permissionsRepo.getPermissions(auth.shopId, role as import('@goldsmith/tenant-context').ShopUserRole);
   }
 
+  @TenantWalkerRoute({ expectedStatus: 200, body: { permission_key: 'billing.create', is_enabled: true }, pathParams: { role: 'shop_manager' } })
   @Put('/roles/:role/permissions')
   @Roles('shop_admin')
   async updatePermission(

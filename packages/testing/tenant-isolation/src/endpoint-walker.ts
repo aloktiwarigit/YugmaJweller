@@ -1,6 +1,9 @@
 import type { INestApplication } from '@nestjs/common';
+import { RequestMethod } from '@nestjs/common';
+import { DiscoveryService, MetadataScanner, Reflector } from '@nestjs/core';
 import request from 'supertest';
 import { TENANT_WALKER_ROUTE } from './tenant-walker-route.decorator';
+import type { TenantWalkerRouteOptions } from './tenant-walker-route.decorator';
 
 export interface SeededTenantToken {
   id: string;
@@ -29,6 +32,8 @@ export interface RouteEntry {
   body?: Record<string, unknown>;
   /** Expected HTTP success status (defaults to 200). */
   expectedStatus?: number;
+  /** Concrete substitutions for path parameter segments. */
+  pathParams?: Record<string, string>;
   /**
    * Optional extra verification against the response body.
    * Return a failure reason string when isolation is violated, or null on pass.
@@ -38,6 +43,69 @@ export interface RouteEntry {
   metadataKey?: string;
 }
 
+const HTTP_METHOD_MAP: Partial<Record<number, RouteEntry['method']>> = {
+  [RequestMethod.GET]:    'GET',
+  [RequestMethod.POST]:  'POST',
+  [RequestMethod.PUT]:   'PUT',
+  [RequestMethod.PATCH]: 'PATCH',
+  [RequestMethod.DELETE]: 'DELETE',
+};
+
+function resolvePathParams(path: string, params: Record<string, string>): string {
+  return path.replace(/:([a-zA-Z_]+)/g, (_: string, key: string) => params[key] ?? `:${key}`);
+}
+
+async function discoverWalkerRoutes(app: INestApplication): Promise<RouteEntry[]> {
+  const discovery = app.get(DiscoveryService);
+  const scanner   = app.get(MetadataScanner);
+  const reflector = app.get(Reflector);
+  const routes: RouteEntry[] = [];
+
+  for (const wrapper of discovery.getControllers()) {
+    const { instance, metatype } = wrapper;
+    if (!instance || typeof instance !== 'object' || !metatype) continue;
+
+    const controllerPath =
+      (Reflect.getMetadata('path', metatype) as string | undefined) ?? '';
+
+    scanner.scanFromPrototype(
+      instance,
+      Object.getPrototypeOf(instance) as object,
+      (methodKey: string) => {
+        const handler = (instance as Record<string, unknown>)[methodKey];
+        if (typeof handler !== 'function') return;
+
+        const opts = reflector.get<TenantWalkerRouteOptions | undefined>(
+          TENANT_WALKER_ROUTE,
+          handler as (...args: unknown[]) => unknown,
+        );
+        if (opts === undefined) return;
+
+        const handlerPath =
+          (Reflect.getMetadata('path', handler as object) as string | undefined) ?? '';
+        const methodCode =
+          (Reflect.getMetadata('method', handler as object) as number | undefined) ?? RequestMethod.GET;
+
+        const rawPath = `/${controllerPath}/${handlerPath}`.replace(/\/+/g, '/');
+        const resolvedPath = opts.pathParams
+          ? resolvePathParams(rawPath, opts.pathParams)
+          : rawPath;
+
+        routes.push({
+          method:         HTTP_METHOD_MAP[methodCode] ?? 'GET',
+          path:           resolvedPath,
+          expectedStatus: opts.expectedStatus,
+          body:           opts.body,
+          verify:         opts.verify,
+          metadataKey:    TENANT_WALKER_ROUTE,
+        });
+      },
+    );
+  }
+
+  return routes;
+}
+
 /**
  * Walk every registered tenant-scoped endpoint and assert:
  * - Each tenant's token receives the expected success status (no server errors,
@@ -45,91 +113,32 @@ export interface RouteEntry {
  * - Optional per-route `verify` callbacks can assert deeper response-body
  *   invariants (e.g. the `/auth/me` tenant.id round-trip).
  *
- * The `knownRoutes` list is the canonical registry. Add new entries here when
- * a new tenant-scoped endpoint lands.
- *
- * TODO(Story 1.2+): wire up DiscoveryService to auto-discover @TenantWalkerRoute()
- * decorated handlers rather than maintaining a hardcoded list.
+ * Routes are auto-discovered via DiscoveryService by scanning all controllers
+ * for handlers decorated with @TenantWalkerRoute().
  */
-export async function walkTenantScopedEndpoints(app: INestApplication, input: WalkerInput): Promise<void> {
+export async function walkTenantScopedEndpoints(
+  app: INestApplication,
+  input: WalkerInput,
+): Promise<void> {
   const failures: WalkFailure[] = [];
-
   const server = app.getHttpServer();
+  const routes = await discoverWalkerRoutes(app);
 
-  // ─── Registered tenant-scoped endpoints ──────────────────────────────────
-  // Add new entries here when a tenant-scoped endpoint is introduced.
-  // The walker fires each entry for every seeded tenant and asserts:
-  //   1. Response status matches `expectedStatus` (default 200).
-  //   2. `verify` callback (if present) returns null (no isolation violation).
-  const knownRoutes: RouteEntry[] = [
-    // Story 1.1 — /auth/me: deep tenant.id round-trip check.
-    {
-      path: '/api/v1/auth/me',
-      method: 'GET',
-      metadataKey: TENANT_WALKER_ROUTE,
-      verify: (body, tenant) => {
-        const b = body as Record<string, unknown> | null;
-        if ((b as { tenant?: { id?: string } } | null)?.tenant?.id !== tenant.id) {
-          return `cross-tenant leak: tenant ${tenant.id} saw ${(b as { tenant?: { id?: string } } | null)?.tenant?.id}`;
-        }
-        if ((b as { user?: { id?: string } } | null)?.user?.id === '') {
-          return 'empty user.id';
-        }
-        return null;
-      },
-    },
-
-    // Story 1.2 — POST /auth/invite: shop_admin can invite staff; response
-    // must be scoped to the calling tenant (shop_id enforced by service layer).
-    {
-      path: '/api/v1/auth/invite',
-      method: 'POST',
-      expectedStatus: 201,
-      body: { phone: '+919876543210', role: 'shop_staff', display_name: 'Test Staff' },
-    },
-
-    // Story 1.2 — GET /auth/users: list users scoped to calling tenant.
-    // RLS + service-layer shopId binding ensures no cross-tenant rows leak.
-    {
-      path: '/api/v1/auth/users',
-      method: 'GET',
-      expectedStatus: 200,
-    },
-
-    // Story 1.3 — GET /auth/roles/:role/permissions: tenant-scoped permission
-    // lookup; response is a flat key→boolean map for the given role.
-    {
-      path: '/api/v1/auth/roles/shop_manager/permissions',
-      method: 'GET',
-      expectedStatus: 200,
-    },
-
-    // Story 1.3 — PUT /auth/roles/:role/permissions: upsert one permission for
-    // the calling tenant; 200 on success (void body).
-    {
-      path: '/api/v1/auth/roles/shop_manager/permissions',
-      method: 'PUT',
-      expectedStatus: 200,
-      body: { permission_key: 'billing.create', is_enabled: true },
-    },
-  ];
-  // ─────────────────────────────────────────────────────────────────────────
-
-  for (const route of knownRoutes) {
+  for (const route of routes) {
     for (const tenant of input.tenants) {
       const expectedStatus = route.expectedStatus ?? 200;
-      let req = request(server)[route.method.toLowerCase() as Lowercase<RouteEntry['method']>](route.path)
+      let req = request(server)
+        [route.method.toLowerCase() as Lowercase<RouteEntry['method']>](route.path)
         .set('Authorization', `Bearer ${tenant.token}`);
-      if (route.body !== undefined) {
-        req = req.send(route.body);
-      }
+      if (route.body !== undefined) req = req.send(route.body);
+
       const res = await req;
 
       if (res.status !== expectedStatus) {
         failures.push({
           tenantId: tenant.id,
-          route: `${route.method} ${route.path}`,
-          reason: `status ${res.status} (expected ${expectedStatus}): ${JSON.stringify(res.body)}`,
+          route:    `${route.method} ${route.path}`,
+          reason:   `status ${res.status} (expected ${expectedStatus}): ${JSON.stringify(res.body)}`,
         });
         continue;
       }
@@ -144,6 +153,9 @@ export async function walkTenantScopedEndpoints(app: INestApplication, input: Wa
   }
 
   if (failures.length > 0) {
-    throw new Error(`endpoint-walker found ${failures.length} failures:\n${failures.map(f => `  ${f.tenantId} @ ${f.route}: ${f.reason}`).join('\n')}`);
+    throw new Error(
+      `endpoint-walker found ${failures.length} failures:\n` +
+      failures.map((f) => `  ${f.tenantId} @ ${f.route}: ${f.reason}`).join('\n'),
+    );
   }
 }
