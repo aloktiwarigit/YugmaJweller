@@ -18,6 +18,7 @@ import { InventoryBulkImportService } from './inventory.bulk-import.service';
 import { InventorySearchService } from './inventory.search.service';
 import { SearchIndexerProcessor } from '../../workers/search-indexer.processor';
 import { BarcodeService } from './barcode.service';
+import { InventoryDeadStockService } from './inventory.dead-stock.service';
 import { SyncModule } from '../sync/sync.module';
 
 const QUEUE_NAME = 'inventory-bulk-import';
@@ -39,6 +40,7 @@ const QUEUE_NAME = 'inventory-bulk-import';
     InventoryBulkImportProcessor,
     InventoryBulkImportService,
     InventorySearchService,
+    InventoryDeadStockService,
     SearchIndexerProcessor,
     {
       provide: 'INVENTORY_REDIS',
