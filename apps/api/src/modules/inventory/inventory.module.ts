@@ -28,7 +28,8 @@ const QUEUE_NAME = 'inventory-bulk-import';
     InventoryBulkImportService,
     {
       provide: 'INVENTORY_REDIS',
-      useFactory: () => new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379'),
+      // maxRetriesPerRequest: null is required by BullMQ Workers (blocking BZPOPMIN semantics).
+      useFactory: () => new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', { maxRetriesPerRequest: null }),
     },
     {
       provide: 'BULK_IMPORT_QUEUE',
