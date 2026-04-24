@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { assertValidTransition } from './state-machine';
 import type { ProductStatus } from './state-machine';
 import type { Pool } from 'pg';
@@ -126,8 +126,13 @@ export class InventoryService {
 
     assertValidTransition(existing.status as ProductStatus, dto.status);
 
-    const row = await this.repo.updateStatus(productId, dto.status);
-    if (!row) throw new NotFoundException({ code: 'inventory.product_not_found' });
+    const row = await this.repo.updateStatusAtomic(productId, existing.status, dto.status);
+    if (!row) {
+      throw new ConflictException({
+        code: 'inventory.status_conflict',
+        message: 'Product status was changed concurrently; please refresh and try again',
+      });
+    }
 
     const ctx = tenantContext.current();
     const actorUserId = ctx?.authenticated ? (ctx as AuthenticatedTenantContext).userId : undefined;

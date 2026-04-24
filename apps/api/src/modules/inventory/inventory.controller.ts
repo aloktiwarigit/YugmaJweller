@@ -41,7 +41,7 @@ export class InventoryController {
   }
 
   @Get('/products')
-  @Roles('shop_admin', 'shop_manager')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
   async listProducts(
     @TenantContextDec() ctx: TenantContext,
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
@@ -55,7 +55,7 @@ export class InventoryController {
   }
 
   @Get('/products/:id')
-  @Roles('shop_admin', 'shop_manager')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
   async getProduct(
     @TenantContextDec() ctx: TenantContext,
     @Param('id', ParseUUIDPipe) id: string,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BadRequestException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { tenantContext } from '@goldsmith/tenant-context';
 
@@ -31,7 +31,7 @@ const repoMock = {
   getProduct: vi.fn().mockResolvedValue(productRow),
   listProducts: vi.fn().mockResolvedValue([productRow]),
   updateProduct: vi.fn().mockResolvedValue(productRow),
-  updateStatus: vi.fn().mockResolvedValue({ ...productRow, status: 'RESERVED' }),
+  updateStatusAtomic: vi.fn().mockResolvedValue({ ...productRow, status: 'RESERVED' }),
 };
 
 const storageMock = {
@@ -121,7 +121,7 @@ describe('InventoryService', () => {
       const svc = makeService();
       const result = await svc.updateStatus('prod-abc', { status: 'RESERVED' });
       expect(result.status).toBe('RESERVED');
-      expect(repoMock.updateStatus).toHaveBeenCalledWith('prod-abc', 'RESERVED');
+      expect(repoMock.updateStatusAtomic).toHaveBeenCalledWith('prod-abc', 'IN_STOCK', 'RESERVED');
     });
 
     it('throws NotFoundException when product not found', async () => {
@@ -138,19 +138,25 @@ describe('InventoryService', () => {
       );
     });
 
-    it('does NOT call repo.updateStatus when transition is invalid', async () => {
+    it('does NOT call repo.updateStatusAtomic when transition is invalid', async () => {
       repoMock.getProduct.mockResolvedValueOnce({ ...productRow, status: 'SOLD' });
       const svc = makeService();
       await expect(svc.updateStatus('prod-abc', { status: 'RESERVED' })).rejects.toThrow();
-      expect(repoMock.updateStatus).not.toHaveBeenCalled();
+      expect(repoMock.updateStatusAtomic).not.toHaveBeenCalled();
     });
 
     it('allows WITH_KARIGAR → IN_STOCK', async () => {
       repoMock.getProduct.mockResolvedValueOnce({ ...productRow, status: 'WITH_KARIGAR' });
-      repoMock.updateStatus.mockResolvedValueOnce({ ...productRow, status: 'IN_STOCK' });
+      repoMock.updateStatusAtomic.mockResolvedValueOnce({ ...productRow, status: 'IN_STOCK' });
       const svc = makeService();
       const result = await svc.updateStatus('prod-abc', { status: 'IN_STOCK' });
       expect(result.status).toBe('IN_STOCK');
+    });
+
+    it('throws ConflictException when concurrent update wins (0 rows returned)', async () => {
+      repoMock.updateStatusAtomic.mockResolvedValueOnce(null);
+      const svc = makeService();
+      await expect(svc.updateStatus('prod-abc', { status: 'RESERVED' })).rejects.toThrow(ConflictException);
     });
   });
 });
