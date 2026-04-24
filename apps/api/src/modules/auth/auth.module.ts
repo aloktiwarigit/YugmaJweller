@@ -13,7 +13,6 @@ import { FirebaseAdminProvider } from './firebase-admin.provider';
 import { FirebaseJwtStrategy } from './firebase-jwt.strategy';
 import { MockSmsAdapter } from './sms/mock-sms.adapter';
 import { SMS_ADAPTER } from './sms/sms-adapter.interface';
-import { PolicyGuard } from './guards/policy.guard';
 
 @Module({
   imports: [PassportModule],
@@ -32,7 +31,6 @@ import { PolicyGuard } from './guards/policy.guard';
       useFactory: (redis: Redis) => new PermissionsCache(redis),
       inject: ['AUTH_REDIS'],
     },
-    PolicyGuard,
     FirebaseAdminProvider,
     FirebaseJwtStrategy,
     AuthService,
@@ -42,7 +40,7 @@ import { PolicyGuard } from './guards/policy.guard';
     AuthRateLimitService,
     { provide: SMS_ADAPTER, useClass: MockSmsAdapter },
   ],
-  exports: [FirebaseAdminProvider, 'PG_POOL', PermissionsCache, PermissionsRepository, PolicyGuard],
+  exports: [FirebaseAdminProvider, 'PG_POOL', PermissionsCache, PermissionsRepository],
 })
 export class AuthModule implements OnModuleDestroy {
   constructor(@Inject('AUTH_REDIS') private readonly redis: Redis) {}
