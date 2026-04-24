@@ -98,6 +98,7 @@ export default function RateOverrideScreen(): React.ReactElement {
     onSuccess: (_data, payload) => {
       void queryClient.invalidateQueries({ queryKey: ['rates'] });
       setLastSetOverride({ purity: payload.purity, rupees: payload.overrideRupees });
+      setToastMessage(null); // clear any stale error toast from a prior failed attempt
       // Cycle false→true so consecutive saves within the 2s window each get a fresh toast
       setShowToast(false);
       setTimeout(() => setShowToast(true), 0);
