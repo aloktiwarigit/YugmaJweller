@@ -282,4 +282,18 @@ describe('SettingsService.updateLoyalty', () => {
     // Settle the deferred audit to avoid unhandled rejection
     resolveAudit();
   });
+
+  describe('rupeesToPaise precision', () => {
+    const toPaise = (s: string): number =>
+      (SettingsService as unknown as { rupeesToPaise(s: string): number }).rupeesToPaise(s);
+
+    it('integer rupees', () => { expect(toPaise('100')).toBe(10000); });
+    it('half rupee', () => { expect(toPaise('100.50')).toBe(10050); });
+    it('single paise', () => { expect(toPaise('0.01')).toBe(1); });
+    it('IEEE-754 drift case 26214.03', () => { expect(toPaise('26214.03')).toBe(2621403); });
+    it('upper limit exact', () => { expect(toPaise('10000000')).toBe(1_000_000_000); });
+    it('above limit throws', () => { expect(() => toPaise('10000000.01')).toThrow(); });
+    it('negative throws', () => { expect(() => toPaise('-1')).toThrow(); });
+    it('non-numeric throws', () => { expect(() => toPaise('abc')).toThrow(); });
+  });
 });

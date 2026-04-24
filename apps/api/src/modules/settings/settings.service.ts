@@ -214,8 +214,11 @@ export class SettingsService {
   }
 
   private static rupeesToPaise(rupees: string): number {
-    const paise = Math.round(parseFloat(rupees) * 100);
-    if (!Number.isInteger(paise) || paise < 0 || paise > 1_000_000_000) {
+    const [whole = '0', frac = ''] = rupees.split('.');
+    const wholePaise = parseInt(whole, 10) * 100;
+    const fracPaise = parseInt(frac.slice(0, 2).padEnd(2, '0'), 10);
+    const paise = wholePaise + fracPaise;
+    if (!Number.isFinite(paise) || paise < 0 || paise > 1_000_000_000) {
       throw new UnprocessableEntityException({ code: 'settings.threshold_out_of_range' });
     }
     return paise;
