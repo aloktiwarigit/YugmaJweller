@@ -1,1 +1,1 @@
-{"timestamp":"2026-04-23T17:15:18-04:00","commit":"a1c7542a5fc033e451e2981a0afd3b9a79e4c020","reviewer":"codex","model":"gpt-5.4","findings_fixed":["P1-shops-column-level-grant","P2-notif-prefs-lost-update"]}
+story-3.1 codex review passed 2026-04-24T00:17:35Z — P1: SKU input missing (fixed), P2: empty-HUID PATCH (fixed), P2: weight schema validation (fixed)
