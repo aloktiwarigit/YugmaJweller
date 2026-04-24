@@ -4,6 +4,11 @@ import type { Redis } from '@goldsmith/cache';
 import { FallbackChain } from '@goldsmith/rates';
 import type { PurityRates } from '@goldsmith/rates';
 import { AuditAction } from '@goldsmith/audit';
+import { withTenantTx } from '@goldsmith/db';
+import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
+import { Decimal } from 'decimal.js';
+import type { PurityKey } from '@goldsmith/shared';
+
 export interface RateSnapshotRow {
   id: string;
   fetched_at: Date;
@@ -23,11 +28,25 @@ const REDIS_KEY_CURRENT = 'rates:current';
 const TTL_CURRENT_CACHE_SEC = 900;   // 15 min — on cache miss, after FallbackChain call
 const TTL_REFRESH_SEC = 1800;        // 30 min — on explicit refreshRates()
 
+// Redis TTL cap for override cache entries (10 minutes)
+const TTL_OVERRIDE_MAX_SEC = 600;
+
+// IST is UTC+5:30
+const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+
+function endOfDayIST(): Date {
+  const nowIST = new Date(Date.now() + IST_OFFSET_MS);
+  nowIST.setUTCHours(23, 59, 59, 999);
+  return new Date(nowIST.getTime() - IST_OFFSET_MS);
+}
+
+function overrideRedisKey(ctx: AuthenticatedTenantContext, purity: string): string {
+  return `rates:override:${ctx.shopId}:${purity}`;
+}
+
 // ---------------------------------------------------------------------------
 // Serialization helpers (bigint cannot be JSON.stringify'd natively)
 // ---------------------------------------------------------------------------
-
-type PurityKey = keyof PurityRates;
 
 interface SerializedEntry {
   perGramPaise: string;
@@ -75,6 +94,23 @@ function deserializeRates(raw: string): CachedCurrentRates {
 export interface CurrentRatesResult extends PurityRates {
   stale: boolean;
   source: string;
+}
+
+export interface ActiveOverride {
+  overridePaise: bigint;
+  validUntil: Date;
+  reason: string;
+}
+
+export interface TenantRatesResult extends CurrentRatesResult {
+  overriddenPurities: PurityKey[];
+}
+
+export interface SetOverrideDto {
+  purity: PurityKey;
+  overrideRupees: string;
+  reason: string;
+  validUntilIso?: string;
 }
 
 @Injectable()
@@ -256,5 +292,156 @@ export class PricingService {
     } finally {
       client.release();
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // setOverride — shopkeeper manually overrides a purity rate for today
+  // -------------------------------------------------------------------------
+  async setOverride(
+    ctx: AuthenticatedTenantContext,
+    dto: SetOverrideDto,
+  ): Promise<void> {
+    const paise = BigInt(new Decimal(dto.overrideRupees).mul(100).toFixed(0));
+    const validUntil = dto.validUntilIso ? new Date(dto.validUntilIso) : endOfDayIST();
+
+    // Get current IBJA rate for before-value in audit log (best-effort; non-fatal)
+    let beforePaise: string | null = null;
+    try {
+      const baseRates = await this.getCurrentRates();
+      beforePaise = baseRates[dto.purity].perGramPaise.toString();
+    } catch {
+      // Non-fatal — audit still written, just without before value
+    }
+
+    await withTenantTx(this.pool, async (tx) => {
+      await tx.query(
+        `INSERT INTO shop_rate_overrides
+           (shop_id, purity, override_paise, reason, set_by_user_id, valid_until)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [ctx.shopId, dto.purity, paise, dto.reason, ctx.userId, validUntil],
+      );
+      await tx.query(
+        `INSERT INTO audit_events
+           (shop_id, actor_user_id, action, subject_type, subject_id, before, after)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          ctx.shopId,
+          ctx.userId,
+          AuditAction.PRICING_RATE_OVERRIDE_SET,
+          'rate_override',
+          dto.purity,
+          beforePaise !== null ? JSON.stringify({ perGramPaise: beforePaise }) : null,
+          JSON.stringify({ perGramPaise: paise.toString(), reason: dto.reason }),
+        ],
+      );
+    });
+
+    // Invalidate cached override for this shop+purity (best-effort)
+    this.redis.del(overrideRedisKey(ctx, dto.purity)).catch((e: unknown) =>
+      this.logger.warn(`Override cache eviction failed: ${String(e)}`),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // getActiveOverride — fetch the current active override for a shop+purity
+  // -------------------------------------------------------------------------
+  async getActiveOverride(
+    ctx: AuthenticatedTenantContext,
+    purity: PurityKey,
+  ): Promise<ActiveOverride | null> {
+    const key = overrideRedisKey(ctx, purity);
+
+    // Redis hit
+    let cached: string | null = null;
+    try {
+      cached = await this.redis.get(key);
+    } catch {
+      // Redis unavailable — fall through to DB
+    }
+    if (cached !== null) {
+      try {
+        const parsed = JSON.parse(cached) as { overridePaise: string; validUntil: string; reason: string };
+        return {
+          overridePaise: BigInt(parsed.overridePaise),
+          validUntil: new Date(parsed.validUntil),
+          reason: parsed.reason,
+        };
+      } catch {
+        // Malformed — evict and fall through
+        this.redis.del(key).catch(() => undefined);
+      }
+    }
+
+    // DB query through withTenantTx (RLS-enforced)
+    const row = await withTenantTx(this.pool, async (tx) => {
+      const result = await tx.query<{ override_paise: bigint; valid_until: Date; reason: string }>(
+        `SELECT override_paise, valid_until, reason
+           FROM shop_rate_overrides
+          WHERE purity = $1
+            AND valid_until > now()
+          ORDER BY valid_from DESC
+          LIMIT 1`,
+        [purity],
+      );
+      return result.rows[0] ?? null;
+    });
+
+    if (row === null) return null;
+
+    const override: ActiveOverride = {
+      overridePaise: BigInt(row.override_paise),
+      validUntil: row.valid_until,
+      reason: row.reason,
+    };
+
+    // Cache result until validUntil (capped at TTL_OVERRIDE_MAX_SEC)
+    const ttlSec = Math.min(
+      Math.max(0, Math.floor((override.validUntil.getTime() - Date.now()) / 1000)),
+      TTL_OVERRIDE_MAX_SEC,
+    );
+    if (ttlSec > 0) {
+      this.redis
+        .setex(
+          key,
+          ttlSec,
+          JSON.stringify({
+            overridePaise: override.overridePaise.toString(),
+            validUntil: override.validUntil.toISOString(),
+            reason: override.reason,
+          }),
+        )
+        .catch((e: unknown) =>
+          this.logger.warn(`Override cache write failed: ${String(e)}`),
+        );
+    }
+
+    return override;
+  }
+
+  // -------------------------------------------------------------------------
+  // getCurrentRatesForTenant — base rates with per-tenant overrides applied
+  // -------------------------------------------------------------------------
+  async getCurrentRatesForTenant(ctx: AuthenticatedTenantContext): Promise<TenantRatesResult> {
+    const base = await this.getCurrentRates();
+    const purities: PurityKey[] = [
+      'GOLD_24K', 'GOLD_22K', 'GOLD_20K', 'GOLD_18K', 'GOLD_14K', 'SILVER_999', 'SILVER_925',
+    ];
+
+    const overrides = await Promise.all(
+      purities.map((p) => this.getActiveOverride(ctx, p)),
+    );
+
+    const merged = { ...base };
+    const overriddenPurities: PurityKey[] = [];
+
+    purities.forEach((purity, i) => {
+      const ov = overrides[i];
+      if (ov !== null) {
+        merged[purity] = { perGramPaise: ov.overridePaise, fetchedAt: base[purity].fetchedAt };
+        overriddenPurities.push(purity);
+      }
+    });
+
+    return { ...merged, overriddenPurities };
   }
 }

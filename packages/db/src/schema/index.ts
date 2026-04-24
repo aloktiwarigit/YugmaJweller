@@ -11,3 +11,4 @@ export * from './product-categories';
 export * from './products';
 export * from './product-images';
 export * from './ibja-rate-snapshots';
+export * from './shop-rate-overrides';
