@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import type { Pool } from 'pg';
 import type { Redis } from '@goldsmith/cache';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
@@ -7,6 +8,7 @@ import type { StoragePort } from '@goldsmith/integrations-storage';
 import { STORAGE_PORT } from '@goldsmith/integrations-storage';
 import type { TenantQueue } from '@goldsmith/queue';
 import type { BulkImportJobStatus } from '@goldsmith/shared';
+import { auditLog, AuditAction } from '@goldsmith/audit';
 import type { BulkImportJobData } from './inventory.bulk-import.processor';
 
 interface BulkImportMeta {
@@ -21,6 +23,7 @@ export class InventoryBulkImportService {
     @Inject(STORAGE_PORT) private readonly storage: StoragePort,
     @Inject('INVENTORY_REDIS') private readonly redis: Redis,
     @Inject('BULK_IMPORT_QUEUE') private readonly queue: TenantQueue<BulkImportJobData>,
+    @Inject('PG_POOL') private readonly pool: Pool,
   ) {}
 
   async createUploadUrl(idempotencyKey: string): Promise<{ uploadUrl: string; jobId: string }> {
@@ -54,6 +57,14 @@ export class InventoryBulkImportService {
     };
 
     await this.queue.add(ctx, 'import', jobData, { jobId });
+
+    void auditLog(this.pool, {
+      action: AuditAction.INVENTORY_BULK_IMPORT_STARTED,
+      subjectType: 'bulk_import_job',
+      subjectId: jobId,
+      actorUserId: userId,
+      after: { jobId, storageKey: meta.storageKey },
+    });
 
     return { jobId, message: 'Import started' };
   }

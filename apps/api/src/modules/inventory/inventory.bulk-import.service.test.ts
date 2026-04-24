@@ -33,8 +33,8 @@ function makeRedis(
 
 const queueMock = { add: vi.fn().mockResolvedValue(undefined) };
 
-function makeService(redis = makeRedis()) {
-  return new InventoryBulkImportService(storageMock as never, redis, queueMock as never);
+function makeService(redis = makeRedis(), pool = {}) {
+  return new InventoryBulkImportService(storageMock as never, redis, queueMock as never, pool as never);
 }
 
 beforeEach(() => {
@@ -101,6 +101,17 @@ describe('InventoryBulkImportService', () => {
       const result = await svc.triggerJob(JOB_ID, USER_ID);
       expect(queueMock.add).toHaveBeenCalled();
       expect(result.jobId).toBe(JOB_ID);
+    });
+
+    it('calls pool.connect for audit log on successful trigger', async () => {
+      const meta = JSON.stringify({ shopId: SHOP_ID, storageKey: 'upload/test.csv', idempotencyKey: 'idem-1' });
+      const redis = makeRedis(meta);
+      const mockClient = { query: vi.fn().mockResolvedValue({ rows: [] }), release: vi.fn() };
+      const mockPool = { connect: vi.fn().mockResolvedValue(mockClient) };
+      vi.spyOn(tenantContext, 'current').mockReturnValue(ctx as never);
+      const svc = makeService(redis, mockPool);
+      await svc.triggerJob(JOB_ID, USER_ID);
+      expect(mockPool.connect).toHaveBeenCalled();
     });
   });
 
