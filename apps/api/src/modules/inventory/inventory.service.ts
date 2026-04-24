@@ -1,4 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { assertValidTransition } from './state-machine';
+import type { ProductStatus } from './state-machine';
 import type { Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
 import { tenantContext } from '@goldsmith/tenant-context';
@@ -110,6 +112,33 @@ export class InventoryService {
       actorUserId: ctx?.authenticated ? (ctx as AuthenticatedTenantContext).userId : undefined,
       before: existing,
       after: row,
+    }).catch(() => undefined);
+
+    return mapRow(row);
+  }
+
+  async updateStatus(
+    productId: string,
+    dto: { status: ProductStatus; note?: string },
+  ): Promise<ProductResponse> {
+    const existing = await this.repo.getProduct(productId);
+    if (!existing) throw new NotFoundException({ code: 'inventory.product_not_found' });
+
+    assertValidTransition(existing.status as ProductStatus, dto.status);
+
+    const row = await this.repo.updateStatus(productId, dto.status);
+    if (!row) throw new NotFoundException({ code: 'inventory.product_not_found' });
+
+    const ctx = tenantContext.current();
+    const actorUserId = ctx?.authenticated ? (ctx as AuthenticatedTenantContext).userId : undefined;
+
+    void auditLog(this.pool, {
+      action: AuditAction.INVENTORY_STATUS_CHANGED,
+      subjectType: 'product',
+      subjectId: row.id,
+      actorUserId,
+      before: { status: existing.status },
+      after: { status: dto.status, note: dto.note },
     }).catch(() => undefined);
 
     return mapRow(row);

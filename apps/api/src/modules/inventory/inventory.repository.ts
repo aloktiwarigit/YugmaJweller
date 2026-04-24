@@ -192,6 +192,16 @@ export class InventoryRepository {
     });
   }
 
+  async updateStatus(id: string, status: string): Promise<ProductRow | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query<ProductRow>(
+        `UPDATE products SET status = $1, updated_at = now() WHERE id = $2 RETURNING ${SELECT_COLS}`,
+        [status, id],
+      );
+      return r.rows[0] ?? null;
+    });
+  }
+
   async updateProduct(id: string, patch: UpdateProductDto): Promise<ProductRow | null> {
     return withTenantTx(this.pool, async (tx) => {
       const sets: string[] = [];
