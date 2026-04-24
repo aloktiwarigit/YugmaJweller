@@ -4,7 +4,20 @@ import type { Redis } from '@goldsmith/cache';
 import { FallbackChain } from '@goldsmith/rates';
 import type { PurityRates } from '@goldsmith/rates';
 import { AuditAction } from '@goldsmith/audit';
-import { ibjaRateSnapshots } from '@goldsmith/db/src/schema/ibja-rate-snapshots';
+export interface RateSnapshotRow {
+  id: string;
+  fetched_at: Date;
+  source: string;
+  gold_24k_paise: bigint;
+  gold_22k_paise: bigint;
+  gold_20k_paise: bigint;
+  gold_18k_paise: bigint;
+  gold_14k_paise: bigint;
+  silver_999_paise: bigint;
+  silver_925_paise: bigint;
+  stale: boolean;
+  created_at: Date;
+}
 
 const REDIS_KEY_CURRENT = 'rates:current';
 const TTL_CURRENT_CACHE_SEC = 900;   // 15 min — on cache miss, after FallbackChain call
@@ -182,11 +195,11 @@ export class PricingService {
   // -------------------------------------------------------------------------
   // getRateHistory — query ibja_rate_snapshots for historical data
   // -------------------------------------------------------------------------
-  async getRateHistory(range: '30d' | '90d' | '365d'): Promise<typeof ibjaRateSnapshots.$inferSelect[]> {
+  async getRateHistory(range: '30d' | '90d' | '365d'): Promise<RateSnapshotRow[]> {
     const days = range === '30d' ? 30 : range === '90d' ? 90 : 365;
     const client = await this.pool.connect();
     try {
-      const result = await client.query<typeof ibjaRateSnapshots.$inferSelect>(
+      const result = await client.query<RateSnapshotRow>(
         `SELECT id, fetched_at, source,
                 gold_24k_paise, gold_22k_paise, gold_20k_paise, gold_18k_paise, gold_14k_paise,
                 silver_999_paise, silver_925_paise, stale, created_at

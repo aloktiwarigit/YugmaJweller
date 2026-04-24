@@ -34,10 +34,17 @@ class ConditionalTenantInterceptor implements NestInterceptor {
 @Module({
   imports: [
     BullModule.forRoot({
-      connection: {
-        host: new URL(process.env['REDIS_URL'] ?? 'redis://localhost:6379').hostname,
-        port: Number(new URL(process.env['REDIS_URL'] ?? 'redis://localhost:6379').port || 6379),
-      },
+      connection: (() => {
+        const u = new URL(process.env['REDIS_URL'] ?? 'redis://localhost:6379');
+        return {
+          host: u.hostname,
+          port: Number(u.port || 6379),
+          ...(u.password ? { password: decodeURIComponent(u.password) } : {}),
+          ...(u.username ? { username: decodeURIComponent(u.username) } : {}),
+          ...(u.pathname && u.pathname !== '/' ? { db: Number(u.pathname.slice(1)) } : {}),
+          ...(u.protocol === 'rediss:' ? { tls: {} } : {}),
+        };
+      })(),
     }),
     AuthModule,
     TenantBootModule,
