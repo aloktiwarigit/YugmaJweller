@@ -87,6 +87,12 @@ export class PricingService {
     @Inject('PRICING_REDIS') private readonly redis: Redis,
   ) {}
 
+  private evictCache(): void {
+    this.redis.del(REDIS_KEY_CURRENT).catch((e: unknown) =>
+      this.logger.warn(`Cache eviction failed (best-effort): ${String(e)}`),
+    );
+  }
+
   // -------------------------------------------------------------------------
   // getCurrentRates — try Redis cache first, fall back to FallbackChain
   // -------------------------------------------------------------------------
@@ -104,7 +110,7 @@ export class PricingService {
       } catch {
         // Malformed JSON — treat as cache miss and evict
         this.logger.warn('Cached rates entry is malformed — evicting and falling through to FallbackChain');
-        await this.redis.del(REDIS_KEY_CURRENT);
+        this.evictCache();
       }
 
       if (parsed !== null) {
@@ -113,7 +119,7 @@ export class PricingService {
       const requiredKeys = ['GOLD_24K', 'GOLD_22K', 'GOLD_20K', 'GOLD_18K', 'GOLD_14K', 'SILVER_999', 'SILVER_925'] as const;
       if (requiredKeys.some(k => !parsed[k])) {
         this.logger.warn('Cached rates schema is stale/incompatible — evicting and falling through to FallbackChain');
-        await this.redis.del(REDIS_KEY_CURRENT);
+        this.evictCache();
         // Fall through to FallbackChain below
       } else {
         // Re-hydrate bigints; treat invalid values as cache miss
@@ -132,7 +138,7 @@ export class PricingService {
           return rates;
         } catch {
           this.logger.warn('Cached rates contain invalid field values — evicting and falling through to FallbackChain');
-          await this.redis.del(REDIS_KEY_CURRENT);
+          this.evictCache();
         }
       }
       } // end if (parsed !== null)
