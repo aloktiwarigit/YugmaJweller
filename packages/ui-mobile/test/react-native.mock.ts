@@ -49,6 +49,7 @@ export const View = passthrough('view');
 export const Text = passthrough('text');
 export const Pressable = PressableMock;
 export const TextInput = TextInputMock;
+export const ScrollView = passthrough('scrollview');
 export const StyleSheet = {
   create: <T>(s: T): T => s,
   flatten: (s: unknown): Record<string, unknown> =>
@@ -57,4 +58,28 @@ export const StyleSheet = {
       : ((s ?? {}) as Record<string, unknown>),
   // Match the iOS/Android value so components using StyleSheet.hairlineWidth compile/run in tests
   hairlineWidth: 0.5,
+};
+
+// Minimal Animated mock — no-op animations, passthrough View for rendering
+const noopAnimation = { start: (_cb?: () => void) => {}, stop: () => {}, reset: () => {} };
+export const Animated = {
+  Value: class {
+    constructor(_v: number) {}
+    stopAnimation(_cb?: () => void) {}
+    setValue(_v: number) {}
+    addListener(_cb: (_v: { value: number }) => void): string { return ''; }
+    removeAllListeners() {}
+  },
+  View: passthrough('animated-view'),
+  timing: (_val: unknown, _config: unknown) => noopAnimation,
+  loop: (_animation: typeof noopAnimation) => noopAnimation,
+  sequence: (_animations: unknown[]) => noopAnimation,
+  parallel: (_animations: unknown[]) => noopAnimation,
+  spring: (_val: unknown, _config: unknown) => noopAnimation,
+  delay: (_ms: number) => noopAnimation,
+};
+
+export const AccessibilityInfo = {
+  isReduceMotionEnabled: () => Promise.resolve(false),
+  addEventListener: (_event: string, _handler: () => void) => ({ remove: () => {} }),
 };
