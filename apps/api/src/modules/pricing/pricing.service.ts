@@ -91,7 +91,12 @@ export class PricingService {
   // getCurrentRates — try Redis cache first, fall back to FallbackChain
   // -------------------------------------------------------------------------
   async getCurrentRates(): Promise<CurrentRatesResult> {
-    const cached = await this.redis.get(REDIS_KEY_CURRENT);
+    let cached: string | null = null;
+    try {
+      cached = await this.redis.get(REDIS_KEY_CURRENT);
+    } catch (redisErr) {
+      this.logger.warn(`Redis unavailable in getCurrentRates — falling through to FallbackChain: ${String(redisErr)}`);
+    }
     if (cached !== null) {
       let parsed: CachedCurrentRates | null = null;
       try {
@@ -153,9 +158,13 @@ export class PricingService {
       return;
     }
 
-    // 1. Write to Redis 'rates:current' with 30-min TTL (live data only)
-    const serialized = serializeRates(rates, stale, source);
-    await this.redis.setex(REDIS_KEY_CURRENT, TTL_REFRESH_SEC, serialized);
+    // 1. Write to Redis 'rates:current' with 30-min TTL (live data only); non-fatal if Redis is down
+    try {
+      const serialized = serializeRates(rates, stale, source);
+      await this.redis.setex(REDIS_KEY_CURRENT, TTL_REFRESH_SEC, serialized);
+    } catch (redisErr) {
+      this.logger.warn(`Redis write failed in refreshRates — continuing to persist snapshot: ${String(redisErr)}`);
+    }
 
     const snapshotValues = {
       fetched_at: rates.GOLD_24K.fetchedAt,

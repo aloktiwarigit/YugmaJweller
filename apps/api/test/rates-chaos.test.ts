@@ -203,7 +203,7 @@ describe('Chaos: Redis unavailable → PricingService degrades gracefully', () =
     await expect(service.getCurrentRates()).rejects.toBeInstanceOf(Error);
   });
 
-  it('refreshRates() rejects with a typed Error when Redis.setex() fails — no unhandled crash', async () => {
+  it('refreshRates() completes (logs warning) when Redis.setex() fails — DB insert still runs', async () => {
     const brokenRedis: Redis = {
       get: vi.fn().mockRejectedValue(new Error('Redis down')),
       setex: vi.fn().mockRejectedValue(new Error('Redis down')),
@@ -218,7 +218,7 @@ describe('Chaos: Redis unavailable → PricingService degrades gracefully', () =
 
     const service = new PricingService(pool, fallbackChain as never, brokenRedis);
 
-    // refreshRates() calls redis.setex first — expect typed Error, not a crash
-    await expect(service.refreshRates()).rejects.toBeInstanceOf(Error);
+    // refreshRates() now treats Redis failure as non-fatal — logs warning and continues to DB insert
+    await expect(service.refreshRates()).resolves.toBeUndefined();
   });
 });
