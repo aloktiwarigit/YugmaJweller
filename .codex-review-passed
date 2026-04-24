@@ -1,13 +1,1 @@
-story: 3.4 — Product Status State Machine
-reviewed-at: 2026-04-24
-model: gpt-5.4
-base: main
-p1-issues: 2 (TOCTOU race + staff role gap) — both fixed
-p2-issues: 0
-result: PASSED (after P1 fixes)
-
-story-4.3-rate-history: PASSED 2026-04-24
-  model: gpt-5.4
-  P2 fix: date_trunc lower bound (full calendar day)
-  P3 fix: conditional "आज" label (only when last point = today)
-  P1: none
+{"timestamp":"2026-04-24T12:35:46-04:00","commit":"601583b50afa5d25e49d814e4bc35c2271a857dc","reviewer":"codex","model":"gpt-5.4","story":"3.5"}

@@ -26,12 +26,18 @@ const productRow = {
   updated_at: new Date('2026-04-23'),
 };
 
+const publishedRow = { ...productRow, published_at: new Date('2026-04-24'), published_by_user_id: USER_ID };
+
 const repoMock = {
   createProduct: vi.fn().mockResolvedValue(productRow),
   getProduct: vi.fn().mockResolvedValue(productRow),
   listProducts: vi.fn().mockResolvedValue([productRow]),
   updateProduct: vi.fn().mockResolvedValue(productRow),
   updateStatusAtomic: vi.fn().mockResolvedValue({ ...productRow, status: 'RESERVED' }),
+  countImages: vi.fn().mockResolvedValue(1),
+  publishProduct: vi.fn().mockResolvedValue(publishedRow),
+  unpublishProduct: vi.fn().mockResolvedValue(productRow),
+  insertImageRecord: vi.fn().mockResolvedValue(undefined),
 };
 
 const storageMock = {
@@ -114,6 +120,16 @@ describe('InventoryService', () => {
       const svc = makeService();
       await expect(svc.getImageUploadUrl('other-prod', 'image/jpeg')).rejects.toThrow(NotFoundException);
     });
+
+    it('inserts image record so countImages returns > 0 after upload URL is issued', async () => {
+      const svc = makeService();
+      await svc.getImageUploadUrl('prod-abc', 'image/jpeg');
+      // Allow the fire-and-forget void to settle
+      await new Promise((r) => setTimeout(r, 0));
+      expect(repoMock.insertImageRecord).toHaveBeenCalledWith(
+        SHOP_ID, 'prod-abc', expect.stringContaining(`tenants/${SHOP_ID}/products/prod-abc/`),
+      );
+    });
   });
 
   describe('updateStatus', () => {
@@ -157,6 +173,48 @@ describe('InventoryService', () => {
       repoMock.updateStatusAtomic.mockResolvedValueOnce(null);
       const svc = makeService();
       await expect(svc.updateStatus('prod-abc', { status: 'RESERVED' })).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('publish', () => {
+    it('happy path: calls publishProduct and returns product with publishedAt set', async () => {
+      const svc = makeService();
+      const result = await svc.publish('prod-abc');
+      expect(repoMock.publishProduct).toHaveBeenCalledWith('prod-abc', USER_ID);
+      expect(result.publishedAt).not.toBeNull();
+    });
+
+    it('throws UnprocessableEntityException when hallmarked product has empty HUID string', async () => {
+      repoMock.getProduct.mockResolvedValueOnce({ ...productRow, huid: '' });
+      const svc = makeService();
+      await expect(svc.publish('prod-abc')).rejects.toThrow(UnprocessableEntityException);
+    });
+
+    it('throws UnprocessableEntityException when product has no images', async () => {
+      repoMock.countImages.mockResolvedValueOnce(0);
+      const svc = makeService();
+      await expect(svc.publish('prod-abc')).rejects.toThrow(UnprocessableEntityException);
+    });
+
+    it('throws NotFoundException when product does not belong to tenant', async () => {
+      repoMock.getProduct.mockResolvedValueOnce(null);
+      const svc = makeService();
+      await expect(svc.publish('prod-abc')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('unpublish', () => {
+    it('calls unpublishProduct and returns product with null publishedAt', async () => {
+      const svc = makeService();
+      const result = await svc.unpublish('prod-abc');
+      expect(repoMock.unpublishProduct).toHaveBeenCalledWith('prod-abc');
+      expect(result.publishedAt).toBeNull();
+    });
+
+    it('throws NotFoundException when product not found', async () => {
+      repoMock.getProduct.mockResolvedValueOnce(null);
+      const svc = makeService();
+      await expect(svc.unpublish('prod-abc')).rejects.toThrow(NotFoundException);
     });
   });
 });

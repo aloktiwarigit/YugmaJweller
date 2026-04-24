@@ -64,6 +64,7 @@ export const ProductResponseSchema = z.object({
   huid:                     z.string().nullable(),
   status:                   STATUS,
   publishedAt:              z.string().nullable(),
+  publishedByUserId:        z.string().uuid().nullable(),
   createdByUserId:          z.string().uuid(),
   createdAt:                z.string(),
   updatedAt:                z.string(),

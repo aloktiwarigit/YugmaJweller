@@ -10,6 +10,7 @@ import { PuritySelector } from '../../../src/features/inventory/components/Purit
 import { HuidInput } from '../../../src/features/inventory/components/HuidInput';
 import { StatusChipGroup } from '../../../src/features/inventory/components/StatusChipGroup';
 import type { ProductStatus } from '../../../src/features/inventory/components/StatusChipGroup';
+import { PublishToggle } from '../../../src/features/inventory/components/PublishToggle';
 import { api } from '../../../src/api/client';
 
 type Metal = 'GOLD' | 'SILVER' | 'PLATINUM';
@@ -36,7 +37,7 @@ export default function EditProductScreen(): React.ReactElement {
     queryKey: ['product', id],
     queryFn: async () => {
       const res = await api.get(`/api/v1/inventory/products/${id}`);
-      return res.data as FormState & { metal: Metal; status: ProductStatus };
+      return res.data as FormState & { metal: Metal; status: ProductStatus; publishedAt: string | null };
     },
   });
 
@@ -130,6 +131,16 @@ export default function EditProductScreen(): React.ReactElement {
             currentStatus={data.status}
             onSelect={(newStatus) => statusMutation.mutate(newStatus)}
             disabled={statusMutation.isPending}
+          />
+        </>
+      )}
+
+      {id != null && (
+        <>
+          <Text style={styles.sectionLabel}>कैटलॉग में प्रकाशन</Text>
+          <PublishToggle
+            productId={id}
+            publishedAt={data?.publishedAt ?? null}
           />
         </>
       )}

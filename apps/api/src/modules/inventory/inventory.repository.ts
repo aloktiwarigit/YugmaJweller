@@ -18,6 +18,7 @@ export interface ProductRow {
   huid: string | null;
   status: string;
   published_at: Date | null;
+  published_by_user_id: string | null;
   created_by_user_id: string;
   created_at: Date;
   updated_at: Date;
@@ -46,7 +47,7 @@ export interface FailedRow {
 const SELECT_COLS = `
   id, shop_id, category_id, sku, metal, purity,
   gross_weight_g, net_weight_g, stone_weight_g, stone_details,
-  making_charge_override_pct, huid, status, published_at,
+  making_charge_override_pct, huid, status, published_at, published_by_user_id,
   created_by_user_id, created_at, updated_at
 `;
 
@@ -241,6 +242,53 @@ export class InventoryRepository {
         params,
       );
       return r.rows[0] ?? null;
+    });
+  }
+
+  async countImages(productId: string): Promise<number> {
+    return withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM product_images WHERE product_id = $1`,
+        [productId],
+      );
+      return parseInt(r.rows[0]?.count ?? '0', 10);
+    });
+  }
+
+  async publishProduct(productId: string, userId: string): Promise<ProductRow | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query<ProductRow>(
+        `UPDATE products
+         SET published_at = now(), published_by_user_id = $1, updated_at = now()
+         WHERE id = $2
+         RETURNING ${SELECT_COLS}`,
+        [userId, productId],
+      );
+      return r.rows[0] ?? null;
+    });
+  }
+
+  async unpublishProduct(productId: string): Promise<ProductRow | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query<ProductRow>(
+        `UPDATE products
+         SET published_at = null, published_by_user_id = null, updated_at = now()
+         WHERE id = $1
+         RETURNING ${SELECT_COLS}`,
+        [productId],
+      );
+      return r.rows[0] ?? null;
+    });
+  }
+
+  async insertImageRecord(shopId: string, productId: string, storageKey: string): Promise<void> {
+    await withTenantTx(this.pool, async (tx) => {
+      await tx.query(
+        `INSERT INTO product_images (shop_id, product_id, storage_key)
+         VALUES ($1, $2, $3)
+         ON CONFLICT DO NOTHING`,
+        [shopId, productId, storageKey],
+      );
     });
   }
 }
