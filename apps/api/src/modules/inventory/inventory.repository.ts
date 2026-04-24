@@ -37,6 +37,12 @@ export interface ListProductsFilter {
   purity?: string;
 }
 
+export interface FailedRow {
+  rowNumber: number;
+  row: CreateProductInput;
+  error: string;
+}
+
 const SELECT_COLS = `
   id, shop_id, category_id, sku, metal, purity,
   gross_weight_g, net_weight_g, stone_weight_g, stone_details,
@@ -108,6 +114,60 @@ export class InventoryRepository {
       );
       return r.rows;
     });
+  }
+
+  async createMany(
+    rows: CreateProductInput[],
+  ): Promise<{ succeeded: number; failedRows: FailedRow[] }> {
+    let succeeded = 0;
+    const failedRows: FailedRow[] = [];
+    const BATCH = 50;
+
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const chunk = rows.slice(i, i + BATCH);
+
+      await withTenantTx(this.pool, async (tx) => {
+        for (let j = 0; j < chunk.length; j++) {
+          const row = chunk[j] as CreateProductInput;
+          const rowNumber = i + j + 1;
+          await tx.query(`SAVEPOINT sp_row_${j}`);
+          try {
+            await tx.query<ProductRow>(
+              `INSERT INTO products
+                 (shop_id, category_id, sku, metal, purity,
+                  gross_weight_g, net_weight_g, stone_weight_g, stone_details,
+                  making_charge_override_pct, huid, status, created_by_user_id)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+              [
+                row.shopId,
+                row.categoryId ?? null,
+                row.sku,
+                row.metal,
+                row.purity,
+                row.grossWeightG,
+                row.netWeightG,
+                row.stoneWeightG ?? '0.0000',
+                row.stoneDetails ?? null,
+                row.makingChargeOverridePct ?? null,
+                row.huid ?? null,
+                row.status ?? 'IN_STOCK',
+                row.createdByUserId,
+              ],
+            );
+            succeeded++;
+          } catch (err) {
+            await tx.query(`ROLLBACK TO SAVEPOINT sp_row_${j}`);
+            failedRows.push({
+              rowNumber,
+              row,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+      });
+    }
+
+    return { succeeded, failedRows };
   }
 
   async updateProduct(id: string, patch: UpdateProductDto): Promise<ProductRow | null> {

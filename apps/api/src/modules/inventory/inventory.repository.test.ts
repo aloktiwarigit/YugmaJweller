@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Pool, PoolClient } from 'pg';
 import { tenantContext, type Tenant, type UnauthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { InventoryRepository } from './inventory.repository';
+import type { CreateProductInput } from './inventory.repository';
 
 const SHOP_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const tenantA: Tenant = { id: SHOP_A, slug: 'a', display_name: 'Test', status: 'ACTIVE' };
@@ -101,6 +102,55 @@ describe('InventoryRepository', () => {
         repo.updateProduct('prod-1111', { status: 'SOLD' }),
       );
       expect(result?.status).toBe('SOLD');
+    });
+  });
+
+  describe('createMany', () => {
+    it('returns succeeded count equal to valid rows', async () => {
+      const client = makeClient([dbProduct]);
+      pool = { connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
+      repo = new InventoryRepository(pool);
+
+      const input: CreateProductInput = {
+        shopId: SHOP_A,
+        createdByUserId: 'user-1',
+        sku: 'RING-001', metal: 'GOLD', purity: '22K',
+        grossWeightG: '10.5000', netWeightG: '9.0000',
+      };
+
+      const result = await tenantContext.runWith(ctxA, () =>
+        repo.createMany([input]),
+      );
+      expect(result.succeeded).toBe(1);
+      expect(result.failedRows).toHaveLength(0);
+    });
+
+    it('collects row into failedRows when DB insert throws', async () => {
+      const errorClient = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (['BEGIN', 'COMMIT', 'ROLLBACK'].some((k) => sql.includes(k))) return;
+          if (sql.includes('SET LOCAL') || sql.includes('SET app.')) return;
+          if (sql.includes('SAVEPOINT')) return;
+          throw new Error('duplicate key value violates unique constraint');
+        }),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+      pool = { connect: vi.fn().mockResolvedValue(errorClient) } as unknown as Pool;
+      repo = new InventoryRepository(pool);
+
+      const input: CreateProductInput = {
+        shopId: SHOP_A, createdByUserId: 'user-1',
+        sku: 'DUP-001', metal: 'GOLD', purity: '22K',
+        grossWeightG: '10.0000', netWeightG: '9.0000',
+      };
+
+      const result = await tenantContext.runWith(ctxA, () =>
+        repo.createMany([input]),
+      );
+      expect(result.succeeded).toBe(0);
+      expect(result.failedRows).toHaveLength(1);
+      expect(result.failedRows[0]?.rowNumber).toBe(1);
+      expect(result.failedRows[0]?.error).toContain('duplicate key');
     });
   });
 });
