@@ -29,7 +29,7 @@ export function useOffline(): OfflineContextValue {
 
 const SYNC_INTERVAL_MS = 30_000;
 
-export function OfflineProvider({ children }: { children: React.ReactNode }) {
+export function OfflineProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const [isOnline, setIsOnline] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
