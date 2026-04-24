@@ -22,8 +22,8 @@ export interface RequestLike {
     uid?: string;
     shop_id?: string;
     role?: ShopUserRole;
-    /** DB UUID from the user_id custom claim; undefined on very first /session call */
-    user_id?: string;
+    /** DB UUID from the goldsmith_uid custom claim; undefined on very first /session call */
+    goldsmith_uid?: string;
   };
 }
 
@@ -90,14 +90,15 @@ export class TenantInterceptor implements NestInterceptor {
     if (!tenant) throw new UnauthorizedException('tenant.not_found');
     if (tenant.status !== 'ACTIVE') throw new ForbiddenException('tenant.inactive');
 
-    // req.user.user_id is the DB UUID from the Firebase custom claim.
-    // On the very first /session call the token has no custom claims yet — user_id is undefined,
+    // req.user.goldsmith_uid is the DB UUID from the Firebase custom claim.
+    // On the very first /session call the token has no custom claims yet — goldsmith_uid is undefined,
     // so we fall through to UnauthenticatedTenantContext. /session responds requires_token_refresh: true;
-    // the client force-refreshes and subsequent calls carry user_id.
-    if (req.user?.uid && req.user.role && req.user.shop_id === shopId && req.user.user_id) {
+    // the client force-refreshes and subsequent calls carry goldsmith_uid.
+    // NOTE: "user_id" is a reserved Firebase claim — it gets overridden with the Firebase UID.
+    if (req.user?.uid && req.user.role && req.user.shop_id === shopId && req.user.goldsmith_uid) {
       return {
         shopId: tenant.id, tenant,
-        authenticated: true, userId: req.user.user_id, role: req.user.role,
+        authenticated: true, userId: req.user.goldsmith_uid, role: req.user.role,
       };
     }
     return { shopId: tenant.id, tenant, authenticated: false };

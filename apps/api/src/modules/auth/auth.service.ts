@@ -96,11 +96,13 @@ export class AuthService {
       throw new ForbiddenException({ code: 'auth.rejected' });
     }
 
-    // 7. Set Firebase custom claims so subsequent ID tokens carry shop_id + role + user_id (DB UUID)
+    // 7. Set Firebase custom claims so subsequent ID tokens carry shop_id + role + goldsmith_uid (DB UUID).
+    // NOTE: "user_id" is a reserved Firebase claim (overridden with Firebase UID by the SDK).
+    // Use the namespaced "goldsmith_uid" key instead.
     await this.firebase.admin().auth().setCustomUserClaims(args.uid, {
       shop_id: row.shopId,
       role: row.role,
-      user_id: row.userId,  // DB UUID — enables TenantInterceptor to propagate userId without extra query
+      goldsmith_uid: row.userId,  // DB UUID — enables TenantInterceptor to propagate userId without extra DB query
     });
 
     // 7a. Post-claims final check — minimises the window where a concurrent revokeStaff() could

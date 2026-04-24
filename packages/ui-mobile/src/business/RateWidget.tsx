@@ -109,7 +109,6 @@ export function RateWidget({ variant, rates, loading = false, onPress }: RateWid
     return () => {
       translateX.setValue(0);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rates, reduceMotion, variant]);
 
   if (loading) {

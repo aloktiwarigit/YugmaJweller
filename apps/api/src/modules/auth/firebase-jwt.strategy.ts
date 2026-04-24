@@ -11,7 +11,7 @@ export interface FirebaseUserClaims {
   phone_number: string | undefined;
   shop_id?: string;
   role?: 'shop_admin' | 'shop_manager' | 'shop_staff' | 'platform_admin';
-  user_id?: string;  // DB UUID propagated via custom claim; undefined on very first /session call
+  goldsmith_uid?: string;  // DB UUID propagated via custom claim; undefined on very first /session call
 }
 
 type AdminLike = FirebaseAdminProvider | admin.app.App;
@@ -37,7 +37,7 @@ export class FirebaseJwtStrategy extends PassportStrategy(BearerStrategy, 'fireb
         phone_number: (decoded['phone_number'] ?? decoded['phoneNumber']) as string | undefined,
         shop_id: decoded['shop_id'] as string | undefined,
         role: decoded['role'] as FirebaseUserClaims['role'],
-        user_id: decoded['user_id'] as string | undefined,
+        goldsmith_uid: decoded['goldsmith_uid'] as string | undefined,
       };
     } catch (err) {
       const firebaseCode = (err as { code?: string })?.code;
