@@ -6,7 +6,7 @@ export interface TenantWalkerRouteOptions {
   expectedStatus?: number;
   body?: Record<string, unknown>;
   pathParams?: Record<string, string>;
-  verify?: (body: unknown, tenant: { id: string; slug: string; token: string }) => string | null;
+  verify?: (body: unknown, tenant: { id: string; slug: string; firebaseUid: string; token: string }) => string | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type

@@ -1,4 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
+import type { SeededTenantToken } from './endpoint-walker';
 
 // String key must match apps/api/src/common/decorators/tenant-walker-route.decorator.ts.
 export const TENANT_WALKER_ROUTE = 'tenant-walker-route';
@@ -17,7 +18,7 @@ export interface TenantWalkerRouteOptions {
    * Optional extra verification against the response body.
    * Return a failure reason string when isolation is violated, or null on pass.
    */
-  verify?: (body: unknown, tenant: { id: string; slug: string; token: string }) => string | null;
+  verify?: (body: unknown, tenant: SeededTenantToken) => string | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type

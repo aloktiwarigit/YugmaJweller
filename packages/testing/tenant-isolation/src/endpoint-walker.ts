@@ -124,6 +124,13 @@ export async function walkTenantScopedEndpoints(
   const server = app.getHttpServer();
   const routes = await discoverWalkerRoutes(app);
 
+  if (routes.length === 0) {
+    throw new Error(
+      'endpoint-walker discovered zero @TenantWalkerRoute routes — ' +
+      'either no handlers are decorated or DiscoveryModule is missing from the test module.',
+    );
+  }
+
   for (const route of routes) {
     for (const tenant of input.tenants) {
       const expectedStatus = route.expectedStatus ?? 200;
