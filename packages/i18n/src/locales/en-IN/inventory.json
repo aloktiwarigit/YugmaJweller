@@ -27,6 +27,7 @@
   "status_reserved": "Reserved",
   "status_on_approval": "On Approval",
   "status_with_karigar": "With Karigar",
+  "error_sku_required": "SKU is required",
   "error_weight_format": "Enter weight as a number (e.g. 10.5000)",
   "error_gross_lt_net": "Gross weight cannot be less than net + stone weight",
   "error_huid_format": "HUID must be 6 characters (A-Z, 0-9)",

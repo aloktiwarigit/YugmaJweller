@@ -53,7 +53,13 @@ export default function EditProductScreen(): React.ReactElement {
 
   const mutation = useMutation({
     mutationFn: async (patch: Partial<FormState>) => {
-      const res = await api.patch(`/api/v1/inventory/products/${id}`, patch);
+      // Strip empty optional strings so we don't send '' for fields like huid
+      // that have strict format validation — undefined means "don't change it".
+      const cleaned: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(patch)) {
+        if (v !== '' && v !== undefined) cleaned[k] = v;
+      }
+      const res = await api.patch(`/api/v1/inventory/products/${id}`, cleaned);
       return res.data;
     },
     onSuccess: () => {

@@ -27,6 +27,7 @@
   "status_reserved": "आरक्षित",
   "status_on_approval": "अनुमोदन पर",
   "status_with_karigar": "कारीगर के पास",
+  "error_sku_required": "SKU खाली नहीं छोड़ सकते",
   "error_weight_format": "वज़न अंकों में दर्ज करें (जैसे 10.5000)",
   "error_gross_lt_net": "सकल वज़न नेट + पत्थर वज़न से कम नहीं हो सकता",
   "error_huid_format": "HUID 6 अक्षर (A-Z, 0-9) होना चाहिए",

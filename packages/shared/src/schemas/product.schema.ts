@@ -2,13 +2,14 @@ import { z } from 'zod';
 
 const weightString = z
   .string()
-  .regex(/^\d+(\.\d{1,4})?$/, 'WEIGHT_FORMAT_INVALID');
+  .regex(/^\d+(\.\d{1,4})?$/, 'WEIGHT_FORMAT_INVALID')
+  .refine((v) => parseFloat(v) > 0, 'WEIGHT_MUST_BE_POSITIVE');
 
 const METAL = z.enum(['GOLD', 'SILVER', 'PLATINUM']);
 const STATUS = z.enum(['IN_STOCK', 'SOLD', 'RESERVED', 'ON_APPROVAL', 'WITH_KARIGAR']);
 const HUID = z.string().regex(/^[A-Z0-9]{6}$/, 'HUID_FORMAT_INVALID');
 
-export const CreateProductSchema = z.object({
+const ProductBaseSchema = z.object({
   categoryId:               z.string().uuid().optional(),
   sku:                      z.string().min(1).max(100),
   metal:                    METAL,
@@ -22,9 +23,30 @@ export const CreateProductSchema = z.object({
   status:                   STATUS.optional().default('IN_STOCK'),
 });
 
+export const CreateProductSchema = ProductBaseSchema.superRefine((data, ctx) => {
+  const gross = parseFloat(data.grossWeightG);
+  const net = parseFloat(data.netWeightG);
+  const stone = parseFloat(data.stoneWeightG ?? '0.0000');
+  if (!isNaN(gross) && !isNaN(net) && net > gross) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'NET_WEIGHT_EXCEEDS_GROSS', path: ['netWeightG'] });
+  }
+  if (!isNaN(gross) && !isNaN(net) && !isNaN(stone) && net + stone > gross) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'NET_PLUS_STONE_EXCEEDS_GROSS', path: ['stoneWeightG'] });
+  }
+});
 export type CreateProductDto = z.input<typeof CreateProductSchema>;
 
-export const UpdateProductSchema = CreateProductSchema.partial();
+export const UpdateProductSchema = ProductBaseSchema.partial().superRefine((data, ctx) => {
+  const gross = data.grossWeightG !== undefined ? parseFloat(data.grossWeightG) : NaN;
+  const net = data.netWeightG !== undefined ? parseFloat(data.netWeightG) : NaN;
+  const stone = data.stoneWeightG !== undefined ? parseFloat(data.stoneWeightG) : NaN;
+  if (!isNaN(gross) && !isNaN(net) && net > gross) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'NET_WEIGHT_EXCEEDS_GROSS', path: ['netWeightG'] });
+  }
+  if (!isNaN(gross) && !isNaN(net) && !isNaN(stone) && net + stone > gross) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'NET_PLUS_STONE_EXCEEDS_GROSS', path: ['stoneWeightG'] });
+  }
+});
 export type UpdateProductDto = z.infer<typeof UpdateProductSchema>;
 
 export const ProductResponseSchema = z.object({

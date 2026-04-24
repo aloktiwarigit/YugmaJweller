@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Text, Pressable, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { ScrollView, View, Text, TextInput, Pressable, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { colors, spacing, typography } from '@goldsmith/ui-tokens';
@@ -25,6 +25,7 @@ interface FormState {
 }
 
 interface FormErrors {
+  sku?: string;
   grossWeightG?: string;
   netWeightG?: string;
   stoneWeightG?: string;
@@ -37,6 +38,7 @@ function validateForm(form: FormState): FormErrors {
   const nw = parseFloat(form.netWeightG);
   const sw = parseFloat(form.stoneWeightG || '0');
 
+  if (!form.sku.trim()) errors.sku = t('inventory.error_sku_required');
   if (isNaN(gw)) errors.grossWeightG = t('inventory.error_weight_format');
   if (isNaN(nw)) errors.netWeightG = t('inventory.error_weight_format');
   if (isNaN(sw)) errors.stoneWeightG = t('inventory.error_weight_format');
@@ -100,6 +102,20 @@ export default function NewProductScreen(): React.ReactElement {
         onChange={(p) => setForm((prev) => ({ ...prev, purity: p }))}
       />
 
+      <View style={styles.fieldContainer}>
+        <Text style={styles.sectionLabel}>{t('inventory.label_sku')}</Text>
+        <TextInput
+          style={[styles.textInput, errors.sku ? styles.inputError : null]}
+          value={form.sku}
+          onChangeText={(v) => setForm((p) => ({ ...p, sku: v }))}
+          autoCapitalize="characters"
+          placeholder="RING-001"
+          placeholderTextColor={colors.textSecondary}
+          accessibilityLabel={t('inventory.label_sku')}
+        />
+        {errors.sku ? <Text style={styles.errorText} accessibilityRole="alert">{errors.sku}</Text> : null}
+      </View>
+
       <WeightField
         label={t('inventory.label_gross_weight')}
         value={form.grossWeightG}
@@ -151,4 +167,11 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.6 },
   saveBtnText: { color: colors.white, fontSize: 18, fontWeight: '600' },
+  fieldContainer: { marginBottom: spacing.md },
+  textInput: {
+    borderWidth: 1, borderColor: colors.border, borderRadius: 8,
+    padding: spacing.sm, minHeight: 48, fontSize: 16, color: colors.textPrimary,
+  },
+  inputError: { borderColor: colors.error },
+  errorText: { color: colors.error, fontSize: 13, marginTop: spacing.xs },
 });
