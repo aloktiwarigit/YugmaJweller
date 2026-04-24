@@ -28,5 +28,9 @@ export type { Code128Result } from './primitives/code128';
 
 export { RateHistoryChart } from './business/RateHistoryChart';
 export type { RateHistoryChartProps, RateHistoryPoint } from './business/RateHistoryChart';
+
 export { RateWidget } from './business/RateWidget';
 export type { RateWidgetProps, PublicRatesResponse, PublicRateEntry } from './business/RateWidget';
+
+export { RateUpdateToast } from './business/RateUpdateToast';
+export type { RateUpdateToastProps } from './business/RateUpdateToast';

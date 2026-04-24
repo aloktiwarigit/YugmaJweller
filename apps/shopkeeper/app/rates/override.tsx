@@ -7,12 +7,11 @@ import {
   Pressable,
   ActivityIndicator,
   StyleSheet,
-  AccessibilityInfo,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { colors, spacing, typography, radii } from '@goldsmith/ui-tokens';
-import { Toast } from '@goldsmith/ui-mobile';
+import { Toast, RateUpdateToast } from '@goldsmith/ui-mobile';
 import { useAuthStore } from '../../src/stores/authStore';
 import { api } from '../../src/api/client';
 import type { PurityKey } from '@goldsmith/shared';
@@ -72,6 +71,7 @@ export default function RateOverrideScreen(): React.ReactElement {
   const [selectedPurity, setSelectedPurity] = useState<PurityKey>('GOLD_22K');
   const [overrideInput, setOverrideInput] = useState('');
   const [reason, setReason] = useState('');
+  const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastVariant, setToastVariant] = useState<'info' | 'error'>('info');
   const [inputError, setInputError] = useState<string | null>(null);
@@ -98,11 +98,9 @@ export default function RateOverrideScreen(): React.ReactElement {
     onSuccess: (_data, payload) => {
       void queryClient.invalidateQueries({ queryKey: ['rates'] });
       setLastSetOverride({ purity: payload.purity, rupees: payload.overrideRupees });
-      setToastMessage('दर सफलतापूर्वक सेट की गई');
-      setToastVariant('info');
+      setShowToast(true);
       setOverrideInput('');
       setReason('');
-      AccessibilityInfo.announceForAccessibility('दर सफलतापूर्वक सेट की गई');
     },
     onError: () => {
       setToastMessage('त्रुटि: दर सेट करने में समस्या हुई');
@@ -147,6 +145,7 @@ export default function RateOverrideScreen(): React.ReactElement {
   const diff = ibjaRupees && overrideInput ? parseDiff(ibjaRupees, overrideInput) : null;
 
   return (
+    <View style={styles.screen}>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Purity selector */}
       <Text style={styles.sectionLabel} accessibilityRole="header">
@@ -272,13 +271,15 @@ export default function RateOverrideScreen(): React.ReactElement {
         </View>
       )}
 
-      {/* Toast feedback */}
+      {/* Error toast */}
       {toastMessage && (
         <View style={styles.toastWrapper}>
           <Toast message={toastMessage} variant={toastVariant} />
         </View>
       )}
     </ScrollView>
+    <RateUpdateToast visible={showToast} onDismiss={() => setShowToast(false)} />
+    </View>
   );
 }
 
@@ -287,6 +288,9 @@ export default function RateOverrideScreen(): React.ReactElement {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.bg,
