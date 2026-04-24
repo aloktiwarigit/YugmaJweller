@@ -33,7 +33,7 @@ export class RatesRefreshProcessor extends WorkerHost {
     // Wrapped in void + try/catch so an audit DB failure never masks the original job failure.
     void (async () => {
       try {
-        const client = await this.pool.connect();
+        const client = await this.pool.connect(); // nosemgrep: goldsmith.require-tenant-transaction -- platform_audit_events is global
         try {
           await client.query(
             `INSERT INTO platform_audit_events (action, metadata)

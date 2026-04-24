@@ -1,6 +1,5 @@
 import { Module, OnModuleDestroy, Inject } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
-import { Reflector } from '@nestjs/core';
 import { Redis } from '@goldsmith/cache';
 import { createPool } from '@goldsmith/db';
 import { PermissionsCache } from '@goldsmith/tenant-config';
@@ -33,12 +32,7 @@ import { PolicyGuard } from './guards/policy.guard';
       useFactory: (redis: Redis) => new PermissionsCache(redis),
       inject: ['AUTH_REDIS'],
     },
-    {
-      provide: PolicyGuard,
-      useFactory: (reflector: Reflector, cache: PermissionsCache, repo: PermissionsRepository) =>
-        new PolicyGuard(reflector, cache, repo),
-      inject: [Reflector, PermissionsCache, PermissionsRepository],
-    },
+    PolicyGuard,
     FirebaseAdminProvider,
     FirebaseJwtStrategy,
     AuthService,
