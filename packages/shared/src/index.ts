@@ -126,3 +126,21 @@ export type {
   BulkImportRow,
   BulkImportJobStatus,
 } from './schemas/bulk-import.schema';
+
+export {
+  PURITY_VALUES,
+  SetRateOverrideDtoSchema,
+} from './schemas/rate-override.schema';
+export type {
+  PurityKey,
+  SetRateOverrideDto,
+} from './schemas/rate-override.schema';
+
+export {
+  BarcodeDataSchema,
+  GenerateBarcodesRequestSchema,
+} from './schemas/barcode.schema';
+export type {
+  BarcodeData,
+  GenerateBarcodesRequest,
+} from './schemas/barcode.schema';

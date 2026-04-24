@@ -19,3 +19,9 @@ export { ThemeProvider, useTheme } from './providers/ThemeProvider';
 export type { Theme } from './providers/ThemeProvider';
 
 export { toHaveMinTouchTarget } from './matchers/toHaveMinTouchTarget';
+
+export { BarcodeLabel } from './primitives/BarcodeLabel';
+export type { BarcodeLabelProps } from './primitives/BarcodeLabel';
+
+export { encodeCode128B } from './primitives/code128';
+export type { Code128Result } from './primitives/code128';

@@ -14,18 +14,20 @@ import {
 } from '@nestjs/common';
 import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext, AuthenticatedTenantContext } from '@goldsmith/tenant-context';
-import { CreateProductSchema, UpdateProductSchema } from '@goldsmith/shared';
-import type { CreateProductDto, UpdateProductDto, ProductResponse, BulkImportJobStatus } from '@goldsmith/shared';
+import { CreateProductSchema, UpdateProductSchema, GenerateBarcodesRequestSchema } from '@goldsmith/shared';
+import type { CreateProductDto, UpdateProductDto, ProductResponse, BulkImportJobStatus, BarcodeData } from '@goldsmith/shared';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { InventoryService } from './inventory.service';
 import { InventoryBulkImportService } from './inventory.bulk-import.service';
+import { BarcodeService } from './barcode.service';
 
 @Controller('/api/v1/inventory')
 export class InventoryController {
   constructor(
     private readonly svc: InventoryService,
     private readonly bulkImportSvc: InventoryBulkImportService,
+    private readonly barcodeSvc: BarcodeService,
   ) {}
 
   @Post('/products')
@@ -85,6 +87,17 @@ export class InventoryController {
     if (!contentType) throw new NotFoundException({ code: 'inventory.content_type_required' });
     const uploadUrl = await this.svc.getImageUploadUrl(id, contentType);
     return { uploadUrl };
+  }
+
+  @Post('/products/barcodes')
+  @HttpCode(200)
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async generateBarcodes(
+    @TenantContextDec() ctx: TenantContext,
+    @Body(new ZodValidationPipe(GenerateBarcodesRequestSchema)) body: { productIds: string[] },
+  ): Promise<BarcodeData[]> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.barcodeSvc.generateBarcodes(body.productIds);
   }
 
   @Post('/bulk-import')

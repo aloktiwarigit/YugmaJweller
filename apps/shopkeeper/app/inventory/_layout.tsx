@@ -13,6 +13,7 @@ export default function InventoryLayout(): React.ReactElement {
     >
       <Stack.Screen name="new" options={{ title: t('inventory.title_new') }} />
       <Stack.Screen name="[id]/edit" options={{ title: t('inventory.title_edit') }} />
+      <Stack.Screen name="print-labels" options={{ title: 'लेबल प्रिंट करें' }} />
     </Stack>
   );
 }
