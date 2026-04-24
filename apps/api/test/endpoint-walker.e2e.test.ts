@@ -80,11 +80,11 @@ describeFn('endpoint-walker — real tenant-scoped assertions (E2-S1 deferral #4
         user = await admin.auth(fbApp).getUserByPhoneNumber(phone);
       }
 
-      // Set custom claims so the ID token carries shop_id + role + user_id (TenantInterceptor contract)
+      // Set custom claims so the ID token carries shop_id + role + goldsmith_uid (TenantInterceptor contract)
       await admin.auth(fbApp).setCustomUserClaims(user.uid, {
         shop_id: fixture.id,
         role: 'shop_admin',
-        user_id: dbUserId,
+        goldsmith_uid: dbUserId,
       });
 
       const custom = await admin.auth(fbApp).createCustomToken(user.uid);
