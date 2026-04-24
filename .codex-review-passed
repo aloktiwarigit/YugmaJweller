@@ -1,1 +1,1 @@
-story-3.1 codex review passed 2026-04-24T00:17:35Z — P1: SKU input missing (fixed), P2: empty-HUID PATCH (fixed), P2: weight schema validation (fixed)
+{"timestamp":"2026-04-23T22:47:09-04:00","commit":"dfc4e5667427216149368b01bffc5d8a09683a32","reviewer":"codex","model":"gpt-5.4","findings_fixed":["P1-tenant-isolation","P1-terminal-failed-state","P2-category-mapping"],"findings_accepted":["P1-storage-adapters-stub-only: deferred per ADR-0015, adapters throw explicitly"]}
