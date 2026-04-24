@@ -112,7 +112,9 @@ export async function push(
   ctx: TenantContext,
   req: PushRequest,
 ): Promise<PushResponse> {
-  const idempotencyKey = `sync:idempotency:${req.idempotencyKey}`;
+  // Key is tenant-scoped to prevent cross-tenant cache poisoning:
+  // without shopId prefix, Tenant B could receive Tenant A's cached conflicts (which contain serverState product data).
+  const idempotencyKey = `sync:idempotency:${ctx.shopId}:${req.idempotencyKey}`;
   const cached = await redis.get(idempotencyKey);
   if (cached) {
     const parsed = JSON.parse(cached) as { cursor: string; conflicts: ConflictRecord[] };

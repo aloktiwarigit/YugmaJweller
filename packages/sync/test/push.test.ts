@@ -41,7 +41,7 @@ describe('push — idempotency cache hit', () => {
 
     expect(result.cursor).toBe(100n);
     expect(result.conflicts).toEqual([]);
-    expect(redis.get).toHaveBeenCalledWith('sync:idempotency:idempotent-key-1');
+    expect(redis.get).toHaveBeenCalledWith('sync:idempotency:shop-1:idempotent-key-1');
     expect(pool.connect).not.toHaveBeenCalled();
   });
 });
