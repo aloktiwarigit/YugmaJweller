@@ -5,3 +5,9 @@ base: main
 p1-issues: 2 (TOCTOU race + staff role gap) — both fixed
 p2-issues: 0
 result: PASSED (after P1 fixes)
+
+story-4.3-rate-history: PASSED 2026-04-24
+  model: gpt-5.4
+  P2 fix: date_trunc lower bound (full calendar day)
+  P3 fix: conditional "आज" label (only when last point = today)
+  P1: none
