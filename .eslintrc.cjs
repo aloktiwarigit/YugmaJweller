@@ -45,6 +45,11 @@ module.exports = {
         'apps/api/src/modules/inventory/inventory.repository.ts',
         // Catalog controller reads tenantId from X-Tenant-Id header on a @SkipTenant() endpoint.
         'apps/api/src/modules/catalog/catalog.controller.ts',
+        // packages/sync server functions take shopId as an explicit param — they ARE the data layer
+        // (cursor/push/sync-logger work inside withTenantTx, shopId passed from ctx at call-site).
+        'packages/sync/src/server/cursor.ts',
+        'packages/sync/src/server/push.ts',
+        'packages/sync/src/server/sync-logger.ts',
       ],
       rules: { 'goldsmith/no-raw-shop-id-param': 'off' },
     },

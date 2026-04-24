@@ -46,7 +46,8 @@ describe('InventoryRepository', () => {
   beforeEach(() => {
     const client = makeClient([dbProduct]);
     pool = { connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
-    repo = new InventoryRepository(pool);
+    const mockSyncLogger = { logInTx: vi.fn().mockResolvedValue(1n) };
+    repo = new InventoryRepository(pool, mockSyncLogger as never);
   });
 
   describe('createProduct', () => {
@@ -76,7 +77,7 @@ describe('InventoryRepository', () => {
     it('returns null when not found', async () => {
       const emptyClient = makeClient([]);
       pool = { connect: vi.fn().mockResolvedValue(emptyClient) } as unknown as Pool;
-      repo = new InventoryRepository(pool);
+      repo = new InventoryRepository(pool, { logInTx: () => Promise.resolve(1n) } as never);
       const result = await tenantContext.runWith(ctxA, () => repo.getProduct('not-exist'));
       expect(result).toBeNull();
     });
@@ -97,7 +98,7 @@ describe('InventoryRepository', () => {
       const updated = { ...dbProduct, status: 'SOLD' };
       const client = makeClient([updated]);
       pool = { connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
-      repo = new InventoryRepository(pool);
+      repo = new InventoryRepository(pool, { logInTx: () => Promise.resolve(1n) } as never);
       const result = await tenantContext.runWith(ctxA, () =>
         repo.updateProduct('prod-1111', { status: 'SOLD' }),
       );
@@ -109,7 +110,7 @@ describe('InventoryRepository', () => {
     it('returns succeeded count equal to valid rows', async () => {
       const client = makeClient([dbProduct]);
       pool = { connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
-      repo = new InventoryRepository(pool);
+      repo = new InventoryRepository(pool, { logInTx: () => Promise.resolve(1n) } as never);
 
       const input: CreateProductInput = {
         shopId: SHOP_A,
@@ -136,7 +137,7 @@ describe('InventoryRepository', () => {
         release: vi.fn(),
       } as unknown as PoolClient;
       pool = { connect: vi.fn().mockResolvedValue(errorClient) } as unknown as Pool;
-      repo = new InventoryRepository(pool);
+      repo = new InventoryRepository(pool, { logInTx: () => Promise.resolve(1n) } as never);
 
       const input: CreateProductInput = {
         shopId: SHOP_A, createdByUserId: 'user-1',

@@ -22,7 +22,7 @@ describe('publish/unpublish — smoke test against real Postgres', () => {
     container = await new PostgreSqlContainer('postgres:15.6').start();
     pool = createPool({ connectionString: container.getConnectionUri() });
     await runMigrations(pool, resolve(__dirname, '../../../packages/db/src/migrations'));
-    repo = new InventoryRepository(pool);
+    repo = new InventoryRepository(pool, { logInTx: () => Promise.resolve(1n) } as never);
 
     await pool.query(
       `INSERT INTO shops (id, slug, display_name, status) VALUES ($1, $2, $3, 'ACTIVE')`,
