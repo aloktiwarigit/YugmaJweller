@@ -173,6 +173,52 @@ describe('InventorySearchService', () => {
       expect(params).toContain('GOLD');
     });
 
+    it('applies purity filter in postgres fallback', async () => {
+      const searchPort = makeSearchPortMock();
+      searchPort.search.mockRejectedValueOnce(new MeilisearchUnavailableError('down'));
+
+      const pool = makePoolMock([], 0);
+      const { svc } = makeService(searchPort, pool);
+
+      await svc.search(makeAuthCtx(), { q: '', filters: { purity: '22K' }, limit: 10, offset: 0 });
+
+      const sql: string = (pool._client.query as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      const params: unknown[] = (pool._client.query as ReturnType<typeof vi.fn>).mock.calls[0][1] as unknown[];
+
+      expect(sql).toContain('p.purity = ');
+      expect(params).toContain('22K');
+    });
+
+    it('applies status filter in postgres fallback', async () => {
+      const searchPort = makeSearchPortMock();
+      searchPort.search.mockRejectedValueOnce(new MeilisearchUnavailableError('down'));
+
+      const pool = makePoolMock([], 0);
+      const { svc } = makeService(searchPort, pool);
+
+      await svc.search(makeAuthCtx(), { q: '', filters: { status: 'SOLD' }, limit: 10, offset: 0 });
+
+      const sql: string = (pool._client.query as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      const params: unknown[] = (pool._client.query as ReturnType<typeof vi.fn>).mock.calls[0][1] as unknown[];
+
+      expect(sql).toContain('p.status = ');
+      expect(params).toContain('SOLD');
+    });
+
+    it('applies published=true filter in postgres fallback', async () => {
+      const searchPort = makeSearchPortMock();
+      searchPort.search.mockRejectedValueOnce(new MeilisearchUnavailableError('down'));
+
+      const pool = makePoolMock([], 0);
+      const { svc } = makeService(searchPort, pool);
+
+      await svc.search(makeAuthCtx(), { q: '', filters: { published: true }, limit: 10, offset: 0 });
+
+      const sql: string = (pool._client.query as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+
+      expect(sql).toContain('IS NOT NULL');
+    });
+
     it('falls back to Postgres for unauthenticated context without calling adapter', async () => {
       const searchPort = makeSearchPortMock();
       const pool = makePoolMock([], 0);

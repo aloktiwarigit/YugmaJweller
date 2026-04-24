@@ -1,4 +1,5 @@
 import { Module, OnModuleDestroy, OnModuleInit, Inject } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { Worker } from '@goldsmith/queue';
 import { Redis } from '@goldsmith/cache';
 import { TenantQueue, createTenantWorker } from '@goldsmith/queue';
@@ -15,15 +16,21 @@ import { InventoryBulkImportProcessor } from './inventory.bulk-import.processor'
 import type { BulkImportJobData } from './inventory.bulk-import.processor';
 import { InventoryBulkImportService } from './inventory.bulk-import.service';
 import { InventorySearchService } from './inventory.search.service';
-import type { SearchIndexerJobData } from '../../workers/search-indexer.processor';
+import { SearchIndexerProcessor } from '../../workers/search-indexer.processor';
 import { BarcodeService } from './barcode.service';
 import { SyncModule } from '../sync/sync.module';
 
 const QUEUE_NAME = 'inventory-bulk-import';
-const SEARCH_INDEXER_QUEUE_NAME = 'search-indexer';
 
 @Module({
-  imports: [AuthModule, TenantLookupModule, StorageModule, SearchModule, SyncModule],
+  imports: [
+    AuthModule,
+    TenantLookupModule,
+    StorageModule,
+    SearchModule,
+    SyncModule,
+    BullModule.registerQueue({ name: 'search-indexer' }),
+  ],
   controllers: [InventoryController],
   providers: [
     InventoryService,
@@ -32,6 +39,7 @@ const SEARCH_INDEXER_QUEUE_NAME = 'search-indexer';
     InventoryBulkImportProcessor,
     InventoryBulkImportService,
     InventorySearchService,
+    SearchIndexerProcessor,
     {
       provide: 'INVENTORY_REDIS',
       // maxRetriesPerRequest: null is required by BullMQ Workers (blocking BZPOPMIN semantics).
@@ -45,21 +53,13 @@ const SEARCH_INDEXER_QUEUE_NAME = 'search-indexer';
       useFactory: (redis: Redis) => new TenantQueue<BulkImportJobData>(QUEUE_NAME, redis),
       inject: ['INVENTORY_REDIS'],
     },
-    {
-      provide: 'SEARCH_INDEXER_QUEUE',
-      useFactory: (redis: Redis) =>
-        new TenantQueue<SearchIndexerJobData>(SEARCH_INDEXER_QUEUE_NAME, redis),
-      inject: ['INVENTORY_REDIS'],
-    },
   ],
 })
 export class InventoryModule implements OnModuleInit, OnModuleDestroy {
   private worker?: Worker<JobPayload<BulkImportJobData>>;
-  private searchWorker?: Worker<JobPayload<SearchIndexerJobData>>;
 
   constructor(
     private readonly processor: InventoryBulkImportProcessor,
-    private readonly inventorySearchService: InventorySearchService,
     @Inject('INVENTORY_REDIS') private readonly redis: Redis,
     private readonly tenants: DrizzleTenantLookup,
   ) {}
@@ -71,19 +71,10 @@ export class InventoryModule implements OnModuleInit, OnModuleDestroy {
       this.tenants,
       this.redis,
     );
-    this.searchWorker = createTenantWorker<SearchIndexerJobData>(
-      SEARCH_INDEXER_QUEUE_NAME,
-      (_ctx, data) =>
-        data.operation === 'index'
-          ? this.inventorySearchService.indexProduct(data.shopId, data.productId)
-          : this.inventorySearchService.removeFromIndex(data.shopId, data.productId),
-      this.tenants,
-      this.redis,
-    );
   }
 
   async onModuleDestroy(): Promise<void> {
-    await Promise.all([this.worker?.close(), this.searchWorker?.close()]);
+    await this.worker?.close();
     await this.redis.quit();
   }
 }
