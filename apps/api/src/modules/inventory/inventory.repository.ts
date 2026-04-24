@@ -116,6 +116,16 @@ export class InventoryRepository {
     });
   }
 
+  async findCategoryByName(name: string): Promise<string | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query<{ id: string }>(
+        `SELECT id FROM product_categories WHERE name = $1 LIMIT 1`,
+        [name],
+      );
+      return r.rows[0]?.id ?? null;
+    });
+  }
+
   async createMany(
     rows: CreateProductInput[],
   ): Promise<{ succeeded: number; failedRows: FailedRow[] }> {

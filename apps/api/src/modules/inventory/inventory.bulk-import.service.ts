@@ -10,6 +10,7 @@ import type { BulkImportJobStatus } from '@goldsmith/shared';
 import type { BulkImportJobData } from './inventory.bulk-import.processor';
 
 interface BulkImportMeta {
+  shopId: string;
   storageKey: string;
   idempotencyKey: string;
 }
@@ -28,7 +29,7 @@ export class InventoryBulkImportService {
     const storageKey = `tenants/${ctx.shopId}/bulk-import/${jobId}/input.csv`;
     const uploadUrl = await this.storage.getPresignedUploadUrl(storageKey, 'text/csv');
 
-    const meta: BulkImportMeta = { storageKey, idempotencyKey };
+    const meta: BulkImportMeta = { shopId: ctx.shopId, storageKey, idempotencyKey };
     await this.redis.set(`bulk-import-meta:${jobId}`, JSON.stringify(meta), 'EX', 3600);
     await this.redis.hset(`bulk-import:${jobId}`, {
       jobId, status: 'pending', total: 0, processed: 0, succeeded: 0, failed: 0,
@@ -43,6 +44,8 @@ export class InventoryBulkImportService {
     if (!raw) throw new NotFoundException({ code: 'inventory.bulk_import_job_not_found' });
 
     const meta = JSON.parse(raw) as BulkImportMeta;
+    if (meta.shopId !== ctx.shopId) throw new NotFoundException({ code: 'inventory.bulk_import_job_not_found' });
+
     const jobData: BulkImportJobData = {
       jobId,
       storageKey: meta.storageKey,
@@ -56,6 +59,13 @@ export class InventoryBulkImportService {
   }
 
   async getJobStatus(jobId: string): Promise<BulkImportJobStatus> {
+    const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
+    const raw = await this.redis.get(`bulk-import-meta:${jobId}`);
+    // Return 404 if job belongs to a different tenant (leak-proof: same response as "not found")
+    if (!raw) throw new NotFoundException({ code: 'inventory.bulk_import_job_not_found' });
+    const meta = JSON.parse(raw) as BulkImportMeta;
+    if (meta.shopId !== ctx.shopId) throw new NotFoundException({ code: 'inventory.bulk_import_job_not_found' });
+
     const hash = await this.redis.hgetall(`bulk-import:${jobId}`);
     if (!hash || Object.keys(hash).length === 0) {
       throw new NotFoundException({ code: 'inventory.bulk_import_job_not_found' });

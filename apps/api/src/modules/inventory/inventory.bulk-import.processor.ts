@@ -60,20 +60,49 @@ export class InventoryBulkImportProcessor {
     const cached = await this.redis.get(iKey);
     if (cached) {
       const prev = JSON.parse(cached) as BulkImportJobStatus;
-      await this.redis.hset(`bulk-import:${data.jobId}`, prev as unknown as Record<string, string | number>);
-      return;
+      // Only short-circuit on a completed result — not on the in-progress placeholder
+      if (prev.status === 'completed' || prev.status === 'failed') {
+        await this.redis.hset(`bulk-import:${data.jobId}`, prev as unknown as Record<string, string | number>);
+        return;
+      }
     }
 
-    await this.redis.set(iKey, JSON.stringify({ jobId: data.jobId }), 'EX', 86400);
     await this.redis.hset(`bulk-import:${data.jobId}`, {
       jobId: data.jobId, status: 'processing', total: 0, processed: 0, succeeded: 0, failed: 0,
     });
+
+    try {
+      await this.processImport(ctx, data, iKey);
+    } catch (err) {
+      const failedStatus: BulkImportJobStatus = {
+        jobId: data.jobId,
+        status: 'failed',
+        total: 0, processed: 0, succeeded: 0, failed: 0,
+      };
+      await this.redis.hset(`bulk-import:${data.jobId}`, failedStatus as unknown as Record<string, string | number>);
+      // Clear placeholder so retries can reprocess
+      await this.redis.del(iKey);
+      throw err;
+    }
+  }
+
+  private async processImport(
+    ctx: AuthenticatedTenantContext,
+    data: BulkImportJobData,
+    iKey: string,
+  ): Promise<void> {
+    // Set in-progress idempotency marker (cleared on failure, replaced with result on success)
+    await this.redis.set(iKey, JSON.stringify({ jobId: data.jobId, status: 'processing' }), 'EX', 86400);
 
     const buf = await this.storage.downloadBuffer(data.storageKey);
 
     const validRows: CreateProductInput[] = [];
     const invalidRows: InvalidRow[] = [];
     let rowNumber = 0;
+
+    // Collect unique category names for batch lookup
+    const categoryNames = new Set<string>();
+    const rawRows: Array<{ rowNumber: number; raw: Record<string, string> }> = [];
 
     const readable = Readable.from(buf);
     const parser = readable.pipe(parse({ columns: true, skip_empty_lines: true, trim: true }));
@@ -89,10 +118,26 @@ export class InventoryBulkImportProcessor {
         });
         continue;
       }
+      categoryNames.add(parsed.data.category);
+      rawRows.push({ rowNumber, raw });
+    }
+
+    // Resolve category names → UUIDs (one lookup per unique name)
+    const categoryIdMap = new Map<string, string | null>();
+    for (const name of categoryNames) {
+      const id = await this.repo.findCategoryByName(name);
+      categoryIdMap.set(name, id);
+    }
+
+    // Build CreateProductInput for valid rows
+    for (const { rowNumber: rn, raw } of rawRows) {
+      const parsed = BulkImportRowSchema.safeParse(raw);
+      if (!parsed.success) continue; // already collected above
       const r = parsed.data;
       validRows.push({
         shopId: ctx.shopId,
         createdByUserId: data.userId,
+        categoryId: categoryIdMap.get(r.category) ?? undefined,
         sku: r.sku,
         metal: r.metal,
         purity: r.purity,
@@ -103,6 +148,7 @@ export class InventoryBulkImportProcessor {
         makingChargeOverridePct: r.making_charge_override,
         huid: r.huid,
       });
+      void rn; // rowNumber used for ordering; valid rows tracked by position
     }
 
     const total = rowNumber;

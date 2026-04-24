@@ -79,8 +79,20 @@ describe('InventoryBulkImportService', () => {
       await expect(svc.triggerJob(JOB_ID, USER_ID)).rejects.toThrow(NotFoundException);
     });
 
-    it('enqueues job when meta found', async () => {
+    it('throws NotFoundException if jobId belongs to a different tenant', async () => {
       const meta = JSON.stringify({
+        shopId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', // different tenant
+        storageKey: `tenants/other/bulk-import/${JOB_ID}/input.csv`,
+        idempotencyKey: IKEY,
+      });
+      const redis = makeRedis(meta);
+      const svc = makeService(redis);
+      await expect(svc.triggerJob(JOB_ID, USER_ID)).rejects.toThrow(NotFoundException);
+    });
+
+    it('enqueues job when meta found and shopId matches', async () => {
+      const meta = JSON.stringify({
+        shopId: SHOP_ID,
         storageKey: `tenants/${SHOP_ID}/bulk-import/${JOB_ID}/input.csv`,
         idempotencyKey: IKEY,
       });
@@ -93,17 +105,28 @@ describe('InventoryBulkImportService', () => {
   });
 
   describe('getJobStatus', () => {
-    it('throws NotFoundException when job not found in Redis', async () => {
+    it('throws NotFoundException when meta not found in Redis', async () => {
       const svc = makeService(makeRedis(null, null));
       await expect(svc.getJobStatus(JOB_ID)).rejects.toThrow(NotFoundException);
     });
 
+    it('throws NotFoundException when jobId belongs to a different tenant', async () => {
+      const meta = JSON.stringify({
+        shopId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+        storageKey: 'tenants/other/bulk-import/job/input.csv',
+        idempotencyKey: IKEY,
+      });
+      const svc = makeService(makeRedis(meta, {}));
+      await expect(svc.getJobStatus(JOB_ID)).rejects.toThrow(NotFoundException);
+    });
+
     it('returns numeric fields correctly from Redis hash strings', async () => {
+      const meta = JSON.stringify({ shopId: SHOP_ID, storageKey: 'key', idempotencyKey: IKEY });
       const hash = {
         jobId: JOB_ID, status: 'completed',
         total: '10', processed: '10', succeeded: '9', failed: '1',
       };
-      const svc = makeService(makeRedis(null, hash));
+      const svc = makeService(makeRedis(meta, hash));
       const result = await svc.getJobStatus(JOB_ID);
       expect(result.status).toBe('completed');
       expect(result.total).toBe(10);

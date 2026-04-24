@@ -26,6 +26,7 @@ const INVALID_CSV = Buffer.from(
 
 const repoMock = {
   createMany: vi.fn().mockResolvedValue({ succeeded: 1, failedRows: [] }),
+  findCategoryByName: vi.fn().mockResolvedValue(null),
 };
 
 const storageMock = {
@@ -41,6 +42,7 @@ function makeRedis(get: string | null = null) {
     get: vi.fn().mockResolvedValue(get),
     set: vi.fn().mockResolvedValue('OK'),
     hset: vi.fn().mockResolvedValue(1),
+    del: vi.fn().mockResolvedValue(1),
   } as unknown as import('ioredis').default;
 }
 
@@ -145,6 +147,53 @@ describe('InventoryBulkImportProcessor', () => {
         `bulk-import:${JOB_ID}`,
         expect.objectContaining({ status: 'completed' }),
       );
+    });
+  });
+
+  describe('handle — failure state', () => {
+    it('writes failed status and clears idempotency key when processing throws', async () => {
+      storageMock.downloadBuffer.mockRejectedValueOnce(new Error('storage unavailable'));
+      const redis = makeRedis();
+      const proc = makeProcessor(redis);
+
+      await expect(
+        tenantContext.runWith(ctx, () =>
+          proc.handle({ jobId: JOB_ID, storageKey: 'key', idempotencyKey: IKEY, userId: USER_ID }),
+        ),
+      ).rejects.toThrow('storage unavailable');
+
+      expect(redis.hset).toHaveBeenCalledWith(
+        `bulk-import:${JOB_ID}`,
+        expect.objectContaining({ status: 'failed' }),
+      );
+      expect(redis.del).toHaveBeenCalledWith(`idempotency:bulk-import:${IKEY}`);
+    });
+  });
+
+  describe('handle — category mapping', () => {
+    it('maps category name to categoryId via findCategoryByName', async () => {
+      repoMock.findCategoryByName.mockResolvedValueOnce('cat-uuid-1234');
+      const proc = makeProcessor();
+
+      await tenantContext.runWith(ctx, () =>
+        proc.handle({ jobId: JOB_ID, storageKey: 'key', idempotencyKey: IKEY, userId: USER_ID }),
+      );
+
+      expect(repoMock.findCategoryByName).toHaveBeenCalledWith('Rings');
+      const [rows] = (repoMock.createMany as ReturnType<typeof vi.fn>).mock.calls[0] as [Array<{ categoryId: string }>];
+      expect(rows[0]?.categoryId).toBe('cat-uuid-1234');
+    });
+
+    it('sets categoryId to undefined when category name not found', async () => {
+      repoMock.findCategoryByName.mockResolvedValueOnce(null);
+      const proc = makeProcessor();
+
+      await tenantContext.runWith(ctx, () =>
+        proc.handle({ jobId: JOB_ID, storageKey: 'key', idempotencyKey: IKEY, userId: USER_ID }),
+      );
+
+      const [rows] = (repoMock.createMany as ReturnType<typeof vi.fn>).mock.calls[0] as [Array<{ categoryId?: string }>];
+      expect(rows[0]?.categoryId).toBeUndefined();
     });
   });
 
