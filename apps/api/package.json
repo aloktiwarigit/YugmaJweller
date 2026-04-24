@@ -27,6 +27,7 @@
     "@goldsmith/compliance": "workspace:*",
     "@goldsmith/db": "workspace:*",
     "@goldsmith/rates": "workspace:*",
+    "@goldsmith/integrations-search": "workspace:*",
     "@goldsmith/integrations-storage": "workspace:*",
     "@goldsmith/shared": "workspace:*",
     "@goldsmith/tenant-context": "workspace:*",
