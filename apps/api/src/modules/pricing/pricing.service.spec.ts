@@ -336,6 +336,106 @@ describe('PricingService', () => {
   });
 
   // -------------------------------------------------------------------------
+  // getRateHistory()
+  // -------------------------------------------------------------------------
+  describe('getRateHistory()', () => {
+    function makeSnapshot(fetched_at: Date, extra: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+      return {
+        fetched_at,
+        source: 'ibja',
+        stale: false,
+        gold_24k_paise: 735000n,
+        gold_22k_paise: 673750n,
+        gold_20k_paise: 612500n,
+        gold_18k_paise: 551250n,
+        gold_14k_paise: 428750n,
+        silver_999_paise: 9500n,
+        silver_925_paise: 8788n,
+        ...extra,
+      };
+    }
+
+    it('buckets multiple snapshots per day to last-of-day (highest fetched_at per day)', async () => {
+      // Simulate the DB returning already-bucketed rows (the DISTINCT ON handles this in DB).
+      // We verify the service maps them to RateHistoryPoint with the correct paise value.
+      const day1 = new Date('2026-03-26T18:00:00Z'); // last snapshot of the day
+      pool._client.query.mockResolvedValueOnce({ rows: [makeSnapshot(day1)] });
+
+      const result = await service.getRateHistory('30d', 'GOLD_22K');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].date).toBe('2026-03-26');
+      expect(result[0].perGramPaise).toBe('673750');
+      expect(result[0].source).toBe('ibja');
+      expect(result[0].stale).toBe(false);
+    });
+
+    it('selects the correct paise column for each purity key', async () => {
+      const row = makeSnapshot(new Date('2026-03-26T10:00:00Z'));
+      pool._client.query.mockResolvedValue({ rows: [row] });
+
+      const cases: Array<[import('@goldsmith/shared').PurityKey, string]> = [
+        ['GOLD_24K', '735000'],
+        ['GOLD_22K', '673750'],
+        ['GOLD_20K', '612500'],
+        ['GOLD_18K', '551250'],
+        ['GOLD_14K', '428750'],
+        ['SILVER_999', '9500'],
+        ['SILVER_925', '8788'],
+      ];
+
+      for (const [purity, expected] of cases) {
+        pool._client.query.mockResolvedValue({ rows: [row] });
+        const result = await service.getRateHistory('30d', purity);
+        expect(result[0].perGramPaise).toBe(expected);
+      }
+    });
+
+    it('maps range to correct number of days in the query parameter', async () => {
+      pool._client.query.mockResolvedValue({ rows: [] });
+
+      await service.getRateHistory('30d', 'GOLD_22K');
+      let calls = (pool._client.query as import('vitest').Mock).mock.calls;
+      expect(calls[calls.length - 1][1][0]).toBe(30);
+
+      pool._client.query.mockResolvedValue({ rows: [] });
+      await service.getRateHistory('90d', 'GOLD_22K');
+      calls = (pool._client.query as import('vitest').Mock).mock.calls;
+      expect(calls[calls.length - 1][1][0]).toBe(90);
+
+      pool._client.query.mockResolvedValue({ rows: [] });
+      await service.getRateHistory('365d', 'GOLD_22K');
+      calls = (pool._client.query as import('vitest').Mock).mock.calls;
+      expect(calls[calls.length - 1][1][0]).toBe(365);
+    });
+
+    it('formats perGramRupees as Indian number format', async () => {
+      const row = makeSnapshot(new Date('2026-03-26T10:00:00Z'), { gold_22k_paise: 673750n });
+      pool._client.query.mockResolvedValue({ rows: [row] });
+
+      const result = await service.getRateHistory('30d', 'GOLD_22K');
+
+      // 673750 paise = ₹6737.50 → en-IN format: "6,737.50"
+      expect(result[0].perGramRupees).toBe('6,737.50');
+    });
+
+    it('returns multiple points sorted by date ASC', async () => {
+      const rows = [
+        makeSnapshot(new Date('2026-03-26T10:00:00Z'), { gold_22k_paise: 673750n }),
+        makeSnapshot(new Date('2026-03-27T10:00:00Z'), { gold_22k_paise: 675000n }),
+      ];
+      pool._client.query.mockResolvedValue({ rows });
+
+      const result = await service.getRateHistory('30d', 'GOLD_22K');
+
+      expect(result).toHaveLength(2);
+      expect(result[0].date).toBe('2026-03-26');
+      expect(result[1].date).toBe('2026-03-27');
+      expect(result[1].perGramPaise).toBe('675000');
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // getCurrentRatesForTenant()
   // -------------------------------------------------------------------------
   describe('getCurrentRatesForTenant()', () => {

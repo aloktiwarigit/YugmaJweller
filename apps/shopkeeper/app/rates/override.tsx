@@ -9,6 +9,7 @@ import {
   StyleSheet,
   AccessibilityInfo,
 } from 'react-native';
+import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { colors, spacing, typography, radii } from '@goldsmith/ui-tokens';
 import { Toast } from '@goldsmith/ui-mobile';
@@ -170,6 +171,16 @@ export default function RateOverrideScreen(): React.ReactElement {
           );
         })}
       </View>
+
+      {/* History link */}
+      <Pressable
+        onPress={() => router.push('/rates/history' as Parameters<typeof router.push>[0])}
+        style={styles.historyLink}
+        accessibilityRole="link"
+        accessibilityLabel="भाव इतिहास देखें"
+      >
+        <Text style={styles.historyLinkText}>इतिहास देखें →</Text>
+      </Pressable>
 
       {/* Current IBJA rate display */}
       <View style={styles.card}>
@@ -421,5 +432,15 @@ const styles = StyleSheet.create({
   },
   toastWrapper: {
     marginTop: spacing.md,
+  },
+  historyLink: {
+    alignSelf: 'flex-end',
+    marginTop: spacing.sm ?? 8,
+    padding: 4,
+  },
+  historyLinkText: {
+    fontFamily: typography.body.family,
+    fontSize: 13,
+    color: colors.primary,
   },
 });

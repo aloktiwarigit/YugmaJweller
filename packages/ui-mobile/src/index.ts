@@ -25,3 +25,6 @@ export type { BarcodeLabelProps } from './primitives/BarcodeLabel';
 
 export { encodeCode128B } from './primitives/code128';
 export type { Code128Result } from './primitives/code128';
+
+export { RateHistoryChart } from './business/RateHistoryChart';
+export type { RateHistoryChartProps, RateHistoryPoint } from './business/RateHistoryChart';

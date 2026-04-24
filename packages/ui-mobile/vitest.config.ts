@@ -23,6 +23,8 @@ export default defineConfig({
       // This alias is applied by Vite's transformer for both our source files
       // and any inlined node_modules (see server.deps.inline above).
       'react-native': path.join(__dirname, './test/react-native.mock.ts'),
+      // Map react-native-svg to a passthrough mock — native SVG is unavailable in jsdom.
+      'react-native-svg': path.join(__dirname, './test/react-native-svg.mock.ts'),
     },
   },
 });

@@ -24,6 +24,33 @@ export interface RateSnapshotRow {
   created_at: Date;
 }
 
+export interface RateHistoryPoint {
+  date: string;          // 'YYYY-MM-DD'
+  perGramPaise: string;  // bigint serialised as string
+  perGramRupees: string; // formatted for display, e.g. "6,842.00"
+  source: string;
+  stale: boolean;
+}
+
+// Maps PurityKey → the corresponding column name in ibja_rate_snapshots.
+// No dynamic SQL — we always SELECT all columns and pick here.
+const PURITY_TO_COLUMN = {
+  GOLD_24K: 'gold_24k_paise',
+  GOLD_22K: 'gold_22k_paise',
+  GOLD_20K: 'gold_20k_paise',
+  GOLD_18K: 'gold_18k_paise',
+  GOLD_14K: 'gold_14k_paise',
+  SILVER_999: 'silver_999_paise',
+  SILVER_925: 'silver_925_paise',
+} as const satisfies Record<PurityKey, keyof RateSnapshotRow>;
+
+function formatRupees(paise: bigint): string {
+  return new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(paise) / 100);
+}
+
 const REDIS_KEY_CURRENT = 'rates:current';
 const TTL_CURRENT_CACHE_SEC = 900;   // 15 min — on cache miss, after FallbackChain call
 const TTL_REFRESH_SEC = 1800;        // 30 min — on explicit refreshRates()
@@ -273,22 +300,44 @@ export class PricingService {
   }
 
   // -------------------------------------------------------------------------
-  // getRateHistory — query ibja_rate_snapshots for historical data
+  // getRateHistory — last snapshot per calendar day for the requested range
   // -------------------------------------------------------------------------
-  async getRateHistory(range: '30d' | '90d' | '365d'): Promise<RateSnapshotRow[]> {
+  async getRateHistory(
+    range: '30d' | '90d' | '365d',
+    purity: PurityKey = 'GOLD_22K',
+  ): Promise<RateHistoryPoint[]> {
     const days = range === '30d' ? 30 : range === '90d' ? 90 : 365;
+    const column = PURITY_TO_COLUMN[purity];
+
     const client = await this.pool.connect();
     try {
+      // DISTINCT ON picks the last snapshot of each calendar day (ORDER DESC by fetched_at).
+      // Outer ORDER BY date ASC gives chronological output.
       const result = await client.query<RateSnapshotRow>(
-        `SELECT id, fetched_at, source,
-                gold_24k_paise, gold_22k_paise, gold_20k_paise, gold_18k_paise, gold_14k_paise,
-                silver_999_paise, silver_925_paise, stale, created_at
-           FROM ibja_rate_snapshots
-          WHERE fetched_at >= NOW() - ($1 * INTERVAL '1 day')
-          ORDER BY fetched_at DESC`,
+        `SELECT *
+           FROM (
+             SELECT DISTINCT ON (date_trunc('day', fetched_at))
+               fetched_at, source, stale,
+               gold_24k_paise, gold_22k_paise, gold_20k_paise, gold_18k_paise, gold_14k_paise,
+               silver_999_paise, silver_925_paise
+             FROM ibja_rate_snapshots
+             WHERE fetched_at >= NOW() - ($1 * INTERVAL '1 day')
+             ORDER BY date_trunc('day', fetched_at) ASC, fetched_at DESC
+           ) AS bucketed
+           ORDER BY fetched_at ASC`,
         [days],
       );
-      return result.rows;
+
+      return result.rows.map((row) => {
+        const paise = row[column] as bigint;
+        return {
+          date: row.fetched_at.toISOString().slice(0, 10),
+          perGramPaise: paise.toString(),
+          perGramRupees: formatRupees(paise),
+          source: row.source,
+          stale: row.stale,
+        };
+      });
     } finally {
       client.release();
     }
