@@ -59,7 +59,7 @@ export default function NotificationPrefsScreen(): React.ReactElement {
   });
 
   async function handleChange(key: keyof NotificationPrefsConfig, channels: ChannelUpdate): Promise<void> {
-    setPrefs((prev) => ({ ...prev, [key]: { ...(prev[key] as ChannelUpdate), ...channels } }));
+    setPrefs((prev: NotificationPrefsConfig) => ({ ...prev, [key]: { ...(prev[key] as ChannelUpdate), ...channels } }));
     if (!mountedRef.current) return;
     setSaving(true);
     setError(null);

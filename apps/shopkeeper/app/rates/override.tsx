@@ -117,7 +117,7 @@ export default function RateOverrideScreen(): React.ReactElement {
   const ibjaRupees = selectedPurityEntry ? selectedPurityEntry.perGramRupees : null;
 
   // Show banner only when the shopkeeper just set an override this session
-  const activeBanner = lastSetOverride?.purity === selectedPurity
+  const activeBanner = lastSetOverride !== null && lastSetOverride.purity === selectedPurity
     ? { rupees: lastSetOverride.rupees }
     : null;
 
