@@ -1,1 +1,1 @@
-{"timestamp":"2026-04-24T15:09:16-04:00","commit":"9d1ae81cc2ed8eca7cb82172f6755be5e7cf7667","reviewer":"security-review","result":"clean","notes":"pure_domain_logic_no_io_surface"}
+security review passed — story 3.6: 1 real finding fixed (idempotency key tenant-scoped); 5 false positives filtered. Prior story 4.6 security marker preserved.
