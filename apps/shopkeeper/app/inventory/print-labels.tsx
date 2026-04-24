@@ -6,8 +6,7 @@ import axios from 'axios';
 import { BarcodeLabel } from '@goldsmith/ui-mobile';
 import { encodeCode128B } from '@goldsmith/ui-mobile';
 import type { BarcodeData } from '@goldsmith/shared';
-
-const API_BASE = process.env['EXPO_PUBLIC_API_URL'] ?? 'http://10.0.2.2:3000';
+import { api } from '../../src/api/client';
 
 function barcodeSvg(value: string, height: number): string {
   let widths: number[];
@@ -105,8 +104,8 @@ export default function PrintLabelsScreen(): React.JSX.Element {
 
     void (async () => {
       try {
-        const response = await axios.post<BarcodeData[]>(
-          `${API_BASE}/api/v1/inventory/products/barcodes`,
+        const response = await api.post<BarcodeData[]>(
+          '/api/v1/inventory/products/barcodes',
           { productIds },
         );
         if (!mountedRef.current) return;
@@ -123,8 +122,8 @@ export default function PrintLabelsScreen(): React.JSX.Element {
           const retryIds = productIds.filter((id) => id !== failedId);
           if (retryIds.length > 0) {
             try {
-              const retryResp = await axios.post<BarcodeData[]>(
-                `${API_BASE}/api/v1/inventory/products/barcodes`,
+              const retryResp = await api.post<BarcodeData[]>(
+                '/api/v1/inventory/products/barcodes',
                 { productIds: retryIds },
               );
               if (!mountedRef.current) return;
