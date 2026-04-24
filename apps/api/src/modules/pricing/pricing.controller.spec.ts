@@ -13,26 +13,6 @@ import { PricingService } from './pricing.service';
 import type { TenantContext, AuthenticatedTenantContext, UnauthenticatedTenantContext } from '@goldsmith/tenant-context';
 
 // ---------------------------------------------------------------------------
-// Mock tenant context ALS — getCurrent reads from tenantContextAls.current()
-// vi.hoisted() ensures the mock is created before vi.mock() hoisting runs.
-// ---------------------------------------------------------------------------
-const { mockTenantContextCurrent } = vi.hoisted(() => ({
-  mockTenantContextCurrent: vi.fn<[], TenantContext | undefined>().mockReturnValue(undefined),
-}));
-
-vi.mock('@goldsmith/tenant-context', async (importActual) => {
-  const actual = await importActual<typeof import('@goldsmith/tenant-context')>();
-  return {
-    ...actual,
-    tenantContext: {
-      current: mockTenantContextCurrent,
-      requireCurrent: vi.fn(),
-      runWith: vi.fn(),
-    },
-  };
-});
-
-// ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
@@ -72,7 +52,6 @@ const authCtx: AuthenticatedTenantContext = {
 
 const mockPricingService = {
   getCurrentRates: vi.fn(),
-  getCurrentRatesForTenant: vi.fn(),
   setOverride: vi.fn(),
 };
 
@@ -85,7 +64,6 @@ describe('PricingController', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockTenantContextCurrent.mockReturnValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PricingController],
@@ -98,14 +76,12 @@ describe('PricingController', () => {
   });
 
   describe('GET /api/v1/rates/current', () => {
-    it('returns base IBJA rates when no tenant context (public call)', async () => {
-      mockTenantContextCurrent.mockReturnValue(undefined);
+    it('returns base IBJA rates (paise as strings, source, stale)', async () => {
       (mockPricingService.getCurrentRates as Mock).mockResolvedValue(fakeRatesResult);
 
       const result = await controller.getCurrent();
 
       expect(mockPricingService.getCurrentRates).toHaveBeenCalled();
-      expect(mockPricingService.getCurrentRatesForTenant).not.toHaveBeenCalled();
       expect(result.GOLD_24K.perGramPaise).toBe('735000');
       expect(result.GOLD_24K.perGramRupees).toBe('7350.00');
       expect(result.GOLD_24K.fetchedAt).toBe(NOW.toISOString());
@@ -113,37 +89,7 @@ describe('PricingController', () => {
       expect(result.source).toBe('ibja');
     });
 
-    it('returns base rates for unauthenticated tenant context', async () => {
-      mockTenantContextCurrent.mockReturnValue(unauthCtx);
-      (mockPricingService.getCurrentRates as Mock).mockResolvedValue(fakeRatesResult);
-
-      const result = await controller.getCurrent();
-
-      expect(mockPricingService.getCurrentRates).toHaveBeenCalled();
-      expect(result.GOLD_24K.perGramPaise).toBe('735000');
-    });
-
-    it('returns override-applied rates for authenticated shopkeeper', async () => {
-      mockTenantContextCurrent.mockReturnValue(authCtx);
-      const overriddenRates = {
-        ...fakeRatesResult,
-        GOLD_22K: { perGramPaise: 700000n, fetchedAt: NOW },
-        overriddenPurities: ['GOLD_22K' as const],
-      };
-      (mockPricingService.getCurrentRatesForTenant as Mock).mockResolvedValue(overriddenRates);
-
-      const result = await controller.getCurrent();
-
-      expect(mockPricingService.getCurrentRatesForTenant).toHaveBeenCalledWith(authCtx);
-      expect(mockPricingService.getCurrentRates).not.toHaveBeenCalled();
-      expect(result.GOLD_22K.perGramPaise).toBe('700000');
-      expect(result.GOLD_22K.overridden).toBe(true);
-      expect(result.GOLD_24K.overridden).toBeUndefined();
-      expect(result.overriddenPurities).toContain('GOLD_22K');
-    });
-
     it('returns 503 when PricingService.getCurrentRates throws RatesUnavailableError', async () => {
-      mockTenantContextCurrent.mockReturnValue(undefined);
       (mockPricingService.getCurrentRates as Mock).mockRejectedValue(new RatesUnavailableError());
 
       await expect(controller.getCurrent()).rejects.toBeInstanceOf(HttpException);

@@ -10,15 +10,15 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { SkipAuth } from '../../common/decorators/skip-auth.decorator';
+import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { PricingService } from './pricing.service';
 import { RatesUnavailableError } from '@goldsmith/rates';
-import { TenantContextDec, tenantContext as tenantContextAls } from '@goldsmith/tenant-context';
+import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext, AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { SetRateOverrideDtoSchema } from '@goldsmith/shared';
 import type { SetRateOverrideDto } from '@goldsmith/shared';
-import type { PurityKey } from '@goldsmith/shared';
 
 // ---------------------------------------------------------------------------
 // Response shape helpers
@@ -28,7 +28,6 @@ interface PurityEntry {
   perGramPaise: string;
   perGramRupees: string;
   fetchedAt: string;
-  overridden?: boolean;
 }
 
 interface CurrentRatesResponse {
@@ -41,17 +40,14 @@ interface CurrentRatesResponse {
   SILVER_925: PurityEntry;
   stale: boolean;
   source: string;
-  overriddenPurities?: PurityKey[];
 }
 
-function toEntry(paise: bigint, fetchedAt: Date, overridden?: boolean): PurityEntry {
-  const entry: PurityEntry = {
+function toEntry(paise: bigint, fetchedAt: Date): PurityEntry {
+  return {
     perGramPaise: paise.toString(),
     perGramRupees: `${paise / 100n}.${String(paise % 100n).padStart(2, '0')}`,
     fetchedAt: fetchedAt.toISOString(),
   };
-  if (overridden) entry.overridden = true;
-  return entry;
 }
 
 // ---------------------------------------------------------------------------
@@ -64,35 +60,15 @@ export class PricingController {
 
   /**
    * GET /api/v1/rates/current
-   * Public (no Firebase auth required). Tenant context optional.
-   * Authenticated shopkeeper calls return override-applied rates.
-   * All other callers receive base IBJA rates.
+   * Public endpoint — no Firebase auth or tenant required.
+   * Always returns base IBJA market rates (no per-tenant overrides applied here).
+   * Per-tenant overrides are applied in billing/invoice calculations via PricingService.getCurrentRatesForTenant().
    */
   @Get('current')
   @SkipAuth()
+  @SkipTenant()
   async getCurrent(): Promise<CurrentRatesResponse> {
-    // Read optional tenant context from ALS (set by TenantInterceptor when tenant is resolved).
-    // Falls back to base rates when context is absent (public consumers, minimal test modules).
-    const ctx = tenantContextAls.current();
     try {
-      if (ctx?.authenticated) {
-        const auth = ctx as AuthenticatedTenantContext;
-        const rates = await this.pricingService.getCurrentRatesForTenant(auth);
-        return {
-          GOLD_24K: toEntry(rates.GOLD_24K.perGramPaise, rates.GOLD_24K.fetchedAt, rates.overriddenPurities.includes('GOLD_24K')),
-          GOLD_22K: toEntry(rates.GOLD_22K.perGramPaise, rates.GOLD_22K.fetchedAt, rates.overriddenPurities.includes('GOLD_22K')),
-          GOLD_20K: toEntry(rates.GOLD_20K.perGramPaise, rates.GOLD_20K.fetchedAt, rates.overriddenPurities.includes('GOLD_20K')),
-          GOLD_18K: toEntry(rates.GOLD_18K.perGramPaise, rates.GOLD_18K.fetchedAt, rates.overriddenPurities.includes('GOLD_18K')),
-          GOLD_14K: toEntry(rates.GOLD_14K.perGramPaise, rates.GOLD_14K.fetchedAt, rates.overriddenPurities.includes('GOLD_14K')),
-          SILVER_999: toEntry(rates.SILVER_999.perGramPaise, rates.SILVER_999.fetchedAt, rates.overriddenPurities.includes('SILVER_999')),
-          SILVER_925: toEntry(rates.SILVER_925.perGramPaise, rates.SILVER_925.fetchedAt, rates.overriddenPurities.includes('SILVER_925')),
-          stale: rates.stale,
-          source: rates.source,
-          overriddenPurities: rates.overriddenPurities,
-        };
-      }
-
-      // Unauthenticated or no tenant context — base IBJA rates only
       const rates = await this.pricingService.getCurrentRates();
       return {
         GOLD_24K: toEntry(rates.GOLD_24K.perGramPaise, rates.GOLD_24K.fetchedAt),

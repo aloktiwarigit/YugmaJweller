@@ -16,6 +16,7 @@ import { useAuthStore } from '../../src/stores/authStore';
 import { api } from '../../src/api/client';
 import type { PurityKey } from '@goldsmith/shared';
 
+
 // ---------------------------------------------------------------------------
 // Purity options
 // ---------------------------------------------------------------------------
@@ -34,26 +35,16 @@ const PURITY_OPTIONS: { key: PurityKey; label: string }[] = [
 // Helpers
 // ---------------------------------------------------------------------------
 
+// GET /rates/current always returns base IBJA rates (no tenant overrides).
+// Correct — the override screen must show the real market price as the baseline.
 interface CurrentRatesResponse {
   [purity: string]: {
     perGramPaise: string;
     perGramRupees: string;
     fetchedAt: string;
-    overridden?: boolean;
-  } | boolean | string | PurityKey[];
+  } | boolean | string;
   stale: boolean;
   source: string;
-}
-
-interface ActiveOverrideBanner {
-  purity: PurityKey;
-  perGramRupees: string;
-  validUntil?: string;
-}
-
-function formatRupees(perGramPaise: string): string {
-  const n = Number(BigInt(perGramPaise)) / 100;
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(n);
 }
 
 function parseDiff(ibjaRupees: string, overrideInput: string): string | null {
@@ -83,6 +74,8 @@ export default function RateOverrideScreen(): React.ReactElement {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastVariant, setToastVariant] = useState<'info' | 'error'>('info');
   const [inputError, setInputError] = useState<string | null>(null);
+  // Track the last successfully-set override per purity (for the active banner)
+  const [lastSetOverride, setLastSetOverride] = useState<{ purity: PurityKey; rupees: string } | null>(null);
 
   const { data: ratesData, isLoading: ratesLoading } = useQuery<CurrentRatesResponse>({
     queryKey: ['rates', 'current'],
@@ -101,8 +94,9 @@ export default function RateOverrideScreen(): React.ReactElement {
     }) => {
       await api.post('/api/v1/rates/override', payload);
     },
-    onSuccess: () => {
+    onSuccess: (_data, payload) => {
       void queryClient.invalidateQueries({ queryKey: ['rates'] });
+      setLastSetOverride({ purity: payload.purity, rupees: payload.overrideRupees });
       setToastMessage('दर सफलतापूर्वक सेट की गई');
       setToastVariant('info');
       setOverrideInput('');
@@ -116,18 +110,15 @@ export default function RateOverrideScreen(): React.ReactElement {
   });
 
   const selectedPurityEntry = ratesData?.[selectedPurity] as
-    | { perGramPaise: string; perGramRupees: string; overridden?: boolean }
+    | { perGramPaise: string; perGramRupees: string }
     | undefined;
+  // Always base IBJA rate — GET /rates/current never applies tenant overrides
   const ibjaRupees = selectedPurityEntry ? selectedPurityEntry.perGramRupees : null;
 
-  const overriddenPurities = ratesData?.['overriddenPurities'] as PurityKey[] | undefined;
-  const activeBanner: ActiveOverrideBanner | null =
-    overriddenPurities?.includes(selectedPurity) && selectedPurityEntry?.overridden
-      ? {
-          purity: selectedPurity,
-          perGramRupees: selectedPurityEntry.perGramRupees,
-        }
-      : null;
+  // Show banner only when the shopkeeper just set an override this session
+  const activeBanner = lastSetOverride?.purity === selectedPurity
+    ? { rupees: lastSetOverride.rupees }
+    : null;
 
   const validateInput = useCallback((val: string): boolean => {
     if (!/^\d+(\.\d{1,2})?$/.test(val)) {
@@ -196,7 +187,7 @@ export default function RateOverrideScreen(): React.ReactElement {
       {activeBanner && (
         <View style={styles.overrideBanner} accessible accessibilityLiveRegion="polite">
           <Text style={styles.overrideBannerText}>
-            सक्रिय override: {activeBanner.perGramRupees} / ग्राम
+            Override सेट: ₹{activeBanner.rupees} / ग्राम (इस सत्र में)
           </Text>
         </View>
       )}
