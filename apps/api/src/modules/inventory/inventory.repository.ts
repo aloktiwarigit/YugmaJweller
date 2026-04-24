@@ -1,7 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
+import { tenantContext } from '@goldsmith/tenant-context';
 import type { CreateProductDto, UpdateProductDto } from '@goldsmith/shared';
+import { SyncLogger } from '@goldsmith/sync';
 
 export interface ProductRow {
   id: string;
@@ -53,7 +55,10 @@ const SELECT_COLS = `
 
 @Injectable()
 export class InventoryRepository {
-  constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
+  constructor(
+    @Inject('PG_POOL') private readonly pool: Pool,
+    private readonly syncLogger: SyncLogger,
+  ) {}
 
   async createProduct(input: CreateProductInput): Promise<ProductRow> {
     return withTenantTx(this.pool, async (tx) => {
@@ -80,7 +85,9 @@ export class InventoryRepository {
           input.createdByUserId,
         ],
       );
-      return r.rows[0] as ProductRow;
+      const row = r.rows[0] as ProductRow;
+      await this.syncLogger.logInTx(tx, input.shopId, 'products', row.id, 'INSERT', row as unknown as Record<string, unknown>);
+      return row;
     });
   }
 
@@ -207,7 +214,12 @@ export class InventoryRepository {
          RETURNING ${SELECT_COLS}`,
         [newStatus, id, expectedStatus],
       );
-      return r.rows[0] ?? null;
+      const row = r.rows[0] ?? null;
+      if (row) {
+        const ctx = tenantContext.requireCurrent();
+        await this.syncLogger.logInTx(tx, ctx.shopId, 'products', row.id, 'UPDATE', row as unknown as Record<string, unknown>);
+      }
+      return row;
     });
   }
 

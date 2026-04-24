@@ -14,11 +14,12 @@ import { InventoryBulkImportProcessor } from './inventory.bulk-import.processor'
 import type { BulkImportJobData } from './inventory.bulk-import.processor';
 import { InventoryBulkImportService } from './inventory.bulk-import.service';
 import { BarcodeService } from './barcode.service';
+import { SyncModule } from '../sync/sync.module';
 
 const QUEUE_NAME = 'inventory-bulk-import';
 
 @Module({
-  imports: [AuthModule, TenantLookupModule, StorageModule],
+  imports: [AuthModule, TenantLookupModule, StorageModule, SyncModule],
   controllers: [InventoryController],
   providers: [
     InventoryService,
