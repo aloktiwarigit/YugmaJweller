@@ -15,7 +15,7 @@ export function OfflineBadge({
   pendingCount,
   conflictCount,
   onConflictPress,
-}: OfflineBadgeProps) {
+}: OfflineBadgeProps): React.ReactElement | null {
   if (isOnline && !isSyncing && conflictCount === 0) return null;
 
   if (conflictCount > 0) {

@@ -41,7 +41,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
   const refreshPendingCount = useCallback(async () => {
     try {
       const products = await database.get('products').query().fetch();
-      setPendingCount((products as Array<{ pendingSync: boolean }>).filter((p) => p.pendingSync).length);
+      setPendingCount((products as unknown as Array<{ pendingSync: boolean }>).filter((p) => p.pendingSync).length);
     } catch {
       // non-critical
     }

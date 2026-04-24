@@ -18,6 +18,7 @@ rules:
         - "packages/audit/src/platform-audit-log.ts" # platform-global: writes to platform_audit_events (no tenant ctx)
         - "apps/api/src/modules/pricing/pricing.service.ts" # platform-global: ibja_rate_snapshots + platform_audit_events reads/writes
         - "apps/api/src/workers/rates-refresh.processor.ts" # platform-global: platform_audit_events write in fallback handler
+        - "packages/sync/**"                       # sync package: cursor/push/sync-logger use withTenantTx internally, false-positive on tx.query inside the callback
         - "ops/semgrep/tests/**"
         - "scripts/**"                           # seed/migration scripts run as superuser, not in tenant context
     patterns:
