@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { ScrollView, Text, Pressable, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { colors, spacing, typography } from '@goldsmith/ui-tokens';
 import { t } from '@goldsmith/i18n';
 import { WeightField } from '../../../src/features/inventory/components/WeightField';
 import { MetalSelector } from '../../../src/features/inventory/components/MetalSelector';
 import { PuritySelector } from '../../../src/features/inventory/components/PuritySelector';
 import { HuidInput } from '../../../src/features/inventory/components/HuidInput';
+import { StatusChipGroup } from '../../../src/features/inventory/components/StatusChipGroup';
+import type { ProductStatus } from '../../../src/features/inventory/components/StatusChipGroup';
 import { api } from '../../../src/api/client';
 
 type Metal = 'GOLD' | 'SILVER' | 'PLATINUM';
@@ -24,6 +26,7 @@ interface FormState {
 
 export default function EditProductScreen(): React.ReactElement {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>({
     sku: '', metal: undefined, purity: '',
     grossWeightG: '', netWeightG: '', stoneWeightG: '', huid: '',
@@ -33,7 +36,7 @@ export default function EditProductScreen(): React.ReactElement {
     queryKey: ['product', id],
     queryFn: async () => {
       const res = await api.get(`/api/v1/inventory/products/${id}`);
-      return res.data as FormState & { metal: Metal };
+      return res.data as FormState & { metal: Metal; status: ProductStatus };
     },
   });
 
@@ -50,6 +53,23 @@ export default function EditProductScreen(): React.ReactElement {
       });
     }
   }, [data]);
+
+  const statusMutation = useMutation({
+    mutationFn: async (newStatus: ProductStatus) => {
+      const res = await api.patch(`/api/v1/inventory/products/${id}/status`, { status: newStatus });
+      return res.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['product', id] });
+      Alert.alert('', 'स्थिति अपडेट हो गई');
+    },
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        'स्थिति बदलना संभव नहीं';
+      Alert.alert('', msg);
+    },
+  });
 
   const mutation = useMutation({
     mutationFn: async (patch: Partial<FormState>) => {
@@ -102,6 +122,17 @@ export default function EditProductScreen(): React.ReactElement {
         value={form.huid}
         onChangeText={(v) => setForm((p) => ({ ...p, huid: v }))}
       />
+
+      {data?.status != null && (
+        <>
+          <Text style={styles.sectionLabel}>स्थिति बदलें</Text>
+          <StatusChipGroup
+            currentStatus={data.status}
+            onSelect={(newStatus) => statusMutation.mutate(newStatus)}
+            disabled={statusMutation.isPending}
+          />
+        </>
+      )}
 
       <Pressable
         style={[styles.saveBtn, mutation.isPending && styles.saveBtnDisabled]}
