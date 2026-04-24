@@ -134,8 +134,8 @@ export async function walkTenantScopedEndpoints(
   for (const route of routes) {
     for (const tenant of input.tenants) {
       const expectedStatus = route.expectedStatus ?? 200;
-      let req = request(server)
-        [route.method.toLowerCase() as Lowercase<RouteEntry['method']>](route.path)
+      const method = route.method.toLowerCase() as Lowercase<RouteEntry['method']>;
+      let req = request(server)[method](route.path)
         .set('Authorization', `Bearer ${tenant.token}`);
       if (route.body !== undefined) req = req.send(route.body);
 
