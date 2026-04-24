@@ -1,9 +1,11 @@
 rules:
   - id: goldsmith-no-float-on-weight-or-price
-    patterns:
+    pattern-either:
       - pattern: parseFloat(...)
       - pattern: Math.round(...)
-      - pattern: Number($X * ...)
+      - pattern: Number($X) * $Y
+      - pattern: $X * Number($Y)
+      - pattern: Number($X * $Y)
     message: >
       Use packages/money Weight/MoneyInPaise or BigInt arithmetic.
       No float arithmetic on weight or price fields.
