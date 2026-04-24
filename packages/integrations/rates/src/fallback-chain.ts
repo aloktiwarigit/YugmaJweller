@@ -25,8 +25,10 @@ export class FallbackChain implements RatesPort {
     try {
       const result = await this.primary.getRatesByPurity();
       this.logger.log(`Rates served by primary (${this.primary.getName()})`);
-      // Update LKG cache on success
-      await this.lastKnownGoodCache.update(result.rates);
+      // LKG update is best-effort — Redis failure must not fail the rate fetch
+      this.lastKnownGoodCache.update(result.rates).catch((e: unknown) =>
+        this.logger.warn(`LKG cache update failed (primary): ${String(e)}`),
+      );
       return result;
     } catch (primaryErr) {
       this.logger.warn(
@@ -38,7 +40,9 @@ export class FallbackChain implements RatesPort {
     try {
       const result = await this.secondary.getRatesByPurity();
       this.logger.log(`Rates served by secondary (${this.secondary.getName()})`);
-      await this.lastKnownGoodCache.update(result.rates);
+      this.lastKnownGoodCache.update(result.rates).catch((e: unknown) =>
+        this.logger.warn(`LKG cache update failed (secondary): ${String(e)}`),
+      );
       return result;
     } catch (secondaryErr) {
       this.logger.warn(

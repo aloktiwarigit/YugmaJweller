@@ -137,10 +137,14 @@ export class PricingService {
     const liveResult = await this.fallbackChain.getRatesByPurity();
     const { rates: liveRates, source, stale } = liveResult;
 
-    // Only cache live rates — skip Redis write for LKG to avoid locking in stale data
+    // Only cache live rates — skip Redis write for LKG; non-fatal if Redis write fails
     if (source !== 'last_known_good') {
-      const serialized = serializeRates(liveRates, stale, source);
-      await this.redis.setex(REDIS_KEY_CURRENT, TTL_CURRENT_CACHE_SEC, serialized);
+      try {
+        const serialized = serializeRates(liveRates, stale, source);
+        await this.redis.setex(REDIS_KEY_CURRENT, TTL_CURRENT_CACHE_SEC, serialized);
+      } catch (redisErr) {
+        this.logger.warn(`Redis write failed in getCurrentRates — returning live rates without caching: ${String(redisErr)}`);
+      }
     }
 
     return { ...liveRates, stale, source };

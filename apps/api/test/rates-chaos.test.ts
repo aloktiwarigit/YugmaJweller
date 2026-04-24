@@ -181,7 +181,7 @@ describe('Chaos: Both adapters fail → LKG cache', () => {
 // ---------------------------------------------------------------------------
 
 describe('Chaos: Redis unavailable → PricingService degrades gracefully', () => {
-  it('getCurrentRates() rejects with a typed Error when Redis.get() fails — no unhandled crash', async () => {
+  it('getCurrentRates() returns live rates when Redis.get() fails — no unhandled crash', async () => {
     // Mock Redis that rejects every call
     const brokenRedis: Redis = {
       get: vi.fn().mockRejectedValue(new Error('Redis connection refused')),
@@ -191,7 +191,6 @@ describe('Chaos: Redis unavailable → PricingService degrades gracefully', () =
     } as unknown as Redis;
 
     const pool = makeNullPool();
-    // FallbackChain mock returns valid rates so we isolate to the Redis failure path
     const fallbackChain = {
       getRatesByPurity: vi.fn().mockResolvedValue({ rates: fakePurityRates, source: 'ibja', stale: false }),
       getName: vi.fn().mockReturnValue('ibja'),
@@ -199,8 +198,10 @@ describe('Chaos: Redis unavailable → PricingService degrades gracefully', () =
 
     const service = new PricingService(pool, fallbackChain as never, brokenRedis);
 
-    // getCurrentRates() calls redis.get — rejects with Error, not an unhandled rejection
-    await expect(service.getCurrentRates()).rejects.toBeInstanceOf(Error);
+    // Redis failure is non-fatal — falls through to FallbackChain and returns live rates
+    const result = await service.getCurrentRates();
+    expect(result.GOLD_24K.perGramPaise).toBe(fakePurityRates.GOLD_24K.perGramPaise);
+    expect(result.source).toBe('ibja');
   });
 
   it('refreshRates() completes (logs warning) when Redis.setex() fails — DB insert still runs', async () => {
