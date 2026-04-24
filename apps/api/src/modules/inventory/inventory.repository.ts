@@ -280,4 +280,15 @@ export class InventoryRepository {
       return r.rows[0] ?? null;
     });
   }
+
+  async insertImageRecord(shopId: string, productId: string, storageKey: string): Promise<void> {
+    await withTenantTx(this.pool, async (tx) => {
+      await tx.query(
+        `INSERT INTO product_images (shop_id, product_id, storage_key)
+         VALUES ($1, $2, $3)
+         ON CONFLICT DO NOTHING`,
+        [shopId, productId, storageKey],
+      );
+    });
+  }
 }

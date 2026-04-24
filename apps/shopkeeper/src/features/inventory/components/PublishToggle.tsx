@@ -63,9 +63,9 @@ export function PublishToggle({
           accessibilityLabel={isPublished ? 'अप्रकाशित करें' : 'प्रकाशित करें'}
         >
           {mutation.isPending ? (
-            <ActivityIndicator color={colors.white} size="small" />
+            <ActivityIndicator color={isPublished ? colors.textPrimary : colors.white} size="small" />
           ) : (
-            <Text style={styles.buttonText}>
+            <Text style={[styles.buttonText, isPublished && styles.buttonTextUnpublish]}>
               {isPublished ? 'अप्रकाशित करें' : 'प्रकाशित करें'}
             </Text>
           )}
@@ -137,6 +137,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: 'NotoSansDevanagari_400Regular',
     color: colors.white,
+  },
+  buttonTextUnpublish: {
+    color: colors.textPrimary,
   },
   errorText: {
     ...typography.body,

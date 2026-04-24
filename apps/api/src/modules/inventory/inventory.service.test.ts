@@ -37,6 +37,7 @@ const repoMock = {
   countImages: vi.fn().mockResolvedValue(1),
   publishProduct: vi.fn().mockResolvedValue(publishedRow),
   unpublishProduct: vi.fn().mockResolvedValue(productRow),
+  insertImageRecord: vi.fn().mockResolvedValue(undefined),
 };
 
 const storageMock = {
@@ -118,6 +119,16 @@ describe('InventoryService', () => {
       repoMock.getProduct.mockResolvedValueOnce(null);
       const svc = makeService();
       await expect(svc.getImageUploadUrl('other-prod', 'image/jpeg')).rejects.toThrow(NotFoundException);
+    });
+
+    it('inserts image record so countImages returns > 0 after upload URL is issued', async () => {
+      const svc = makeService();
+      await svc.getImageUploadUrl('prod-abc', 'image/jpeg');
+      // Allow the fire-and-forget void to settle
+      await new Promise((r) => setTimeout(r, 0));
+      expect(repoMock.insertImageRecord).toHaveBeenCalledWith(
+        SHOP_ID, 'prod-abc', expect.stringContaining(`tenants/${SHOP_ID}/products/prod-abc/`),
+      );
     });
   });
 

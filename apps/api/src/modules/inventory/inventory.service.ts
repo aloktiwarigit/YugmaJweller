@@ -209,6 +209,12 @@ export class InventoryService {
     const ctx = tenantContext.requireCurrent();
     const ext = contentType.split('/')[1] ?? 'bin';
     const key = `tenants/${ctx.shopId}/products/${productId}/${randomUUID()}.${ext}`;
-    return this.storage.getPresignedUploadUrl(key, contentType);
+    const uploadUrl = await this.storage.getPresignedUploadUrl(key, contentType);
+
+    // Register the image record now so countImages() returns > 0 after first upload URL is issued.
+    // Optimistic pre-insert: the image row exists regardless of whether the client completes the upload.
+    void this.repo.insertImageRecord(ctx.shopId, productId, key).catch(() => undefined);
+
+    return uploadUrl;
   }
 }
