@@ -1,4 +1,3 @@
-import { Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { advanceCursor } from './cursor';
 import type { SyncTable } from '../protocol';
@@ -6,7 +5,8 @@ import type { SyncTable } from '../protocol';
 // Logs a syncable write to sync_change_log.
 // MUST be called inside an open withTenantTx — shares the caller's transaction
 // to ensure atomicity between the application write and the change log entry.
-@Injectable()
+// @Injectable() is applied in InventoryModule provider config, not here,
+// to avoid NestJS decorator transform requirement in the sync package tests.
 export class SyncLogger {
   async logInTx(
     tx: PoolClient,
