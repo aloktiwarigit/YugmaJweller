@@ -106,3 +106,23 @@ export type {
   NotificationPrefsConfig,
   PatchNotificationPrefsDto,
 } from './schemas/notification-prefs.schema';
+
+export {
+  CreateProductSchema,
+  UpdateProductSchema,
+  ProductResponseSchema,
+} from './schemas/product.schema';
+export type {
+  CreateProductDto,
+  UpdateProductDto,
+  ProductResponse,
+} from './schemas/product.schema';
+
+export {
+  BulkImportRowSchema,
+  BulkImportJobStatusSchema,
+} from './schemas/bulk-import.schema';
+export type {
+  BulkImportRow,
+  BulkImportJobStatus,
+} from './schemas/bulk-import.schema';

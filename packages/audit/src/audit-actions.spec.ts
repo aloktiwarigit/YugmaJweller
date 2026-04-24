@@ -3,6 +3,8 @@ import { AuditAction } from './audit-actions';
 
 describe('AuditAction — backfilled values', () => {
   it.each([
+    'INVENTORY_BULK_IMPORT_STARTED',
+    'INVENTORY_BULK_IMPORT_COMPLETED',
     'STAFF_REVOKED',
     'STAFF_ACTIVATED',
     'ACCESS_DENIED',

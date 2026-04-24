@@ -15,6 +15,7 @@ import { TenantBootModule } from './modules/tenant-boot/tenant-boot.module';
 import { TenantLookupModule } from './modules/tenant-lookup/tenant-lookup.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { PricingModule } from './modules/pricing/pricing.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
 import { DrizzleTenantLookup } from './drizzle-tenant-lookup';
 import { TenantAuditReporter } from './modules/tenant-boot/tenant-audit-reporter';
 
@@ -43,8 +44,8 @@ class ConditionalTenantInterceptor implements NestInterceptor {
           ...(u.username ? { username: decodeURIComponent(u.username) } : {}),
           ...(u.pathname && u.pathname !== '/' ? { db: Number(u.pathname.slice(1)) } : {}),
           ...(u.protocol === 'rediss:' ? { tls: {} } : {}),
-          lazyConnect: true,      // don't fail bootstrap if Redis is transiently unavailable
-          enableReadyCheck: false, // connect in background; first op triggers reconnect
+          lazyConnect: true,
+          enableReadyCheck: false,
         };
       })(),
     }),
@@ -52,6 +53,7 @@ class ConditionalTenantInterceptor implements NestInterceptor {
     TenantBootModule,
     TenantLookupModule,
     SettingsModule,
+    InventoryModule,
     PricingModule,
   ],
   controllers: [HealthController],

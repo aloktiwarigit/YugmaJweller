@@ -1,0 +1,12 @@
+# Semgrep rule: flag any inline HUID regex outside packages/compliance.
+# Single source of truth is packages/compliance/src/huid/validate.ts.
+rules:
+  - id: goldsmith-huid-inline-regex
+    patterns:
+      - pattern: /[A-Z0-9]{6}/
+    message: "Inline HUID regex detected. Use validateHuidFormat() from @goldsmith/compliance instead."
+    languages: [typescript]
+    severity: WARNING
+    paths:
+      exclude:
+        - packages/compliance/**

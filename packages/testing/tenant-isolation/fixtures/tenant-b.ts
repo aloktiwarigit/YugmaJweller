@@ -26,6 +26,12 @@ fixtureRegistry.add({
           [id, `seed.b.${i}`],
         );
       }
+      await c.query(
+        `INSERT INTO products
+           (shop_id, sku, metal, purity, gross_weight_g, net_weight_g, stone_weight_g, status, created_by_user_id)
+         VALUES ($1, 'CHAIN-B-001', 'SILVER', '999', '5.0000', '4.5000', '0.0000', 'IN_STOCK', $1)`,
+        [id],
+      );
     } finally {
       await c.query('RESET ROLE').catch(() => undefined);
       c.release();

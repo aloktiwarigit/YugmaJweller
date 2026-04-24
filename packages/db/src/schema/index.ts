@@ -7,4 +7,7 @@ export * from './platform-audit-events';
 export { tableRegistry } from './_helpers/registry';
 export type { TableMeta, TableKind } from './_helpers/registry';
 export * from './role-permissions';
+export * from './product-categories';
+export * from './products';
+export * from './product-images';
 export * from './ibja-rate-snapshots';
