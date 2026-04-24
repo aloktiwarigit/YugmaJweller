@@ -117,3 +117,12 @@ export type {
   UpdateProductDto,
   ProductResponse,
 } from './schemas/product.schema';
+
+export {
+  BulkImportRowSchema,
+  BulkImportJobStatusSchema,
+} from './schemas/bulk-import.schema';
+export type {
+  BulkImportRow,
+  BulkImportJobStatus,
+} from './schemas/bulk-import.schema';
