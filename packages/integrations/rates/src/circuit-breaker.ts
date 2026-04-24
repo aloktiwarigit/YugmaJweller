@@ -74,7 +74,13 @@ export class CircuitBreaker implements RatesPort {
   }
 
   async getRatesByPurity(): Promise<RatesResult> {
-    const state = await this.getState();
+    // Default to CLOSED when Redis is unavailable — let the adapter attempt proceed
+    let state: CircuitState = 'CLOSED';
+    try {
+      state = await this.getState();
+    } catch {
+      // Redis down — assume CLOSED and call through; adapter failure will be recorded normally
+    }
 
     if (state === 'OPEN') {
       const elapsed = await this.checkCooldownElapsed();
