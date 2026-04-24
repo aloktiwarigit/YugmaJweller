@@ -10,3 +10,4 @@ export * from './role-permissions';
 export * from './product-categories';
 export * from './products';
 export * from './product-images';
+export * from './ibja-rate-snapshots';

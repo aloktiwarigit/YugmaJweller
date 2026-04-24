@@ -1,5 +1,6 @@
 import { Module, type ExecutionContext, type CallHandler, Injectable, type NestInterceptor } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
+import { BullModule } from '@nestjs/bullmq';
 import { Observable } from 'rxjs';
 import { TenantInterceptor } from '@goldsmith/tenant-context';
 import { HealthController } from './health.controller';
@@ -13,6 +14,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { TenantBootModule } from './modules/tenant-boot/tenant-boot.module';
 import { TenantLookupModule } from './modules/tenant-lookup/tenant-lookup.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { PricingModule } from './modules/pricing/pricing.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { DrizzleTenantLookup } from './drizzle-tenant-lookup';
 import { TenantAuditReporter } from './modules/tenant-boot/tenant-audit-reporter';
@@ -31,7 +33,29 @@ class ConditionalTenantInterceptor implements NestInterceptor {
 }
 
 @Module({
-  imports: [AuthModule, TenantBootModule, TenantLookupModule, SettingsModule, InventoryModule],
+  imports: [
+    BullModule.forRoot({
+      connection: (() => {
+        const u = new URL(process.env['REDIS_URL'] ?? 'redis://localhost:6379');
+        return {
+          host: u.hostname,
+          port: Number(u.port || 6379),
+          ...(u.password ? { password: decodeURIComponent(u.password) } : {}),
+          ...(u.username ? { username: decodeURIComponent(u.username) } : {}),
+          ...(u.pathname && u.pathname !== '/' ? { db: Number(u.pathname.slice(1)) } : {}),
+          ...(u.protocol === 'rediss:' ? { tls: {} } : {}),
+          lazyConnect: true,
+          enableReadyCheck: false,
+        };
+      })(),
+    }),
+    AuthModule,
+    TenantBootModule,
+    TenantLookupModule,
+    SettingsModule,
+    InventoryModule,
+    PricingModule,
+  ],
   controllers: [HealthController],
   providers: [
     HttpTenantResolver,

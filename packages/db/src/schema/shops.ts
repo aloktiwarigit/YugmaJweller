@@ -1,9 +1,12 @@
 import { uuid, text, timestamp, jsonb, pgEnum, integer } from 'drizzle-orm/pg-core';
-import { platformGlobalTable } from './_helpers/platformGlobalTable';
+import { platformGlobalTableWithRls } from './_helpers/platformGlobalTable';
 
 export const shopStatusEnum = pgEnum('shop_status', ['PROVISIONING', 'ACTIVE', 'SUSPENDED', 'TERMINATED']);
 
-export const shops = platformGlobalTable('shops', {
+// shops is platform-global for SELECT (auth lookups read all shops) but has
+// RLS enabled for UPDATE so shopkeepers can only update their own shop row
+// (migration 0013). Use platformGlobalTableWithRls to register as 'global-rls'.
+export const shops = platformGlobalTableWithRls('shops', {
   id: uuid('id').primaryKey().defaultRandom(),
   slug: text('slug').notNull().unique(),
   display_name: text('display_name').notNull(),

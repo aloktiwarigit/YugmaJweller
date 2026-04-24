@@ -51,6 +51,8 @@ export async function assertRlsInvariants(pool: Pool): Promise<AssertResult> {
       } else if (meta.kind === 'global') {
         if (relrowsecurity) fails.push(`${meta.name}: RLS enabled on platformGlobalTable (invariant 3)`);
       }
+      // 'global-rls' tables (e.g. shops) intentionally have RLS for scoped DML;
+      // no invariant check needed — the migration is authoritative for their policy.
     }
 
     const app = await c.query(`SELECT rolbypassrls, rolsuper FROM pg_roles WHERE rolname='app_user'`);
