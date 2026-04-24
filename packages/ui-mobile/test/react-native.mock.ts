@@ -50,6 +50,7 @@ export const Text = passthrough('text');
 export const Pressable = PressableMock;
 export const TextInput = TextInputMock;
 export const ScrollView = passthrough('scrollview');
+export const ActivityIndicator = passthrough('activityindicator');
 export const StyleSheet = {
   create: <T>(s: T): T => s,
   flatten: (s: unknown): Record<string, unknown> =>
@@ -60,26 +61,38 @@ export const StyleSheet = {
   hairlineWidth: 0.5,
 };
 
-// Minimal Animated mock — no-op animations, passthrough View for rendering
-const noopAnimation = { start: (_cb?: () => void) => {}, stop: () => {}, reset: () => {} };
+// Animated — lightweight stub sufficient for jsdom unit tests.
+// AnimatedValue tracks _value and supports interpolate() for backgroundColor animations.
+class AnimatedValue {
+  _value: number;
+  constructor(v: number) { this._value = v; }
+  setValue(v: number) { this._value = v; }
+  interpolate(_cfg: unknown) { return this._value; }
+  stopAnimation(_cb?: () => void) {}
+  addListener(_cb: (_v: { value: number }) => void): string { return ''; }
+  removeAllListeners() {}
+}
+
+const noopAnim = {
+  start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }),
+  stop: () => {},
+  reset: () => {},
+};
+
 export const Animated = {
-  Value: class {
-    constructor(_v: number) {}
-    stopAnimation(_cb?: () => void) {}
-    setValue(_v: number) {}
-    addListener(_cb: (_v: { value: number }) => void): string { return ''; }
-    removeAllListeners() {}
-  },
-  View: passthrough('animated-view'),
-  timing: (_val: unknown, _config: unknown) => noopAnimation,
-  loop: (_animation: typeof noopAnimation) => noopAnimation,
-  sequence: (_animations: unknown[]) => noopAnimation,
-  parallel: (_animations: unknown[]) => noopAnimation,
-  spring: (_val: unknown, _config: unknown) => noopAnimation,
-  delay: (_ms: number) => noopAnimation,
+  Value: AnimatedValue,
+  // Use 'animatedview' tag — tests query container.querySelector('animatedview')
+  View: passthrough('animatedview'),
+  timing: (_v: unknown, _cfg: unknown) => noopAnim,
+  parallel: (_anims: unknown[]) => noopAnim,
+  sequence: (_anims: unknown[]) => noopAnim,
+  spring: (_v: unknown, _cfg: unknown) => noopAnim,
+  loop: (_anim: typeof noopAnim) => noopAnim,
+  delay: (_ms: number) => noopAnim,
 };
 
 export const AccessibilityInfo = {
   isReduceMotionEnabled: () => Promise.resolve(false),
   addEventListener: (_event: string, _handler: () => void) => ({ remove: () => {} }),
+  announceForAccessibility: (_msg: string) => undefined,
 };
