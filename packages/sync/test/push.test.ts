@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Pool } from 'pg';
 import { buildConflict } from '../src/server/push';
-import type { SyncTable } from '../src/protocol';
 
 // Push integration tests (with real Postgres) live in test/integration/.
 // Here we unit-test the pure logic that doesn't require a DB connection.
