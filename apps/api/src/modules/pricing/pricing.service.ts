@@ -93,8 +93,16 @@ export class PricingService {
   async getCurrentRates(): Promise<CurrentRatesResult> {
     const cached = await this.redis.get(REDIS_KEY_CURRENT);
     if (cached !== null) {
-      const parsed = deserializeRates(cached);
+      let parsed: CachedCurrentRates | null = null;
+      try {
+        parsed = deserializeRates(cached);
+      } catch {
+        // Malformed JSON — treat as cache miss and evict
+        this.logger.warn('Cached rates entry is malformed — evicting and falling through to FallbackChain');
+        await this.redis.del(REDIS_KEY_CURRENT);
+      }
 
+      if (parsed !== null) {
       // Guard: if any required purity key is missing (stale/incompatible schema from a
       // previous deployment), treat as a cache miss rather than crashing with BigInt(undefined).
       const requiredKeys = ['GOLD_24K', 'GOLD_22K', 'GOLD_20K', 'GOLD_18K', 'GOLD_14K', 'SILVER_999', 'SILVER_925'] as const;
@@ -117,6 +125,7 @@ export class PricingService {
         };
         return rates;
       }
+      } // end if (parsed !== null)
     }
 
     // Cache miss — call FallbackChain (throws RatesUnavailableError if all sources fail)
@@ -140,7 +149,12 @@ export class PricingService {
     const serialized = serializeRates(rates, stale, source);
     await this.redis.setex(REDIS_KEY_CURRENT, TTL_REFRESH_SEC, serialized);
 
-    // 2. Insert snapshot into ibja_rate_snapshots (platform-global table, no tenant context)
+    // 2. Insert snapshot only for live fetches — LKG cache hits are stale and would skew history
+    if (source === 'last_known_good') {
+      this.logger.warn(`Rates served from last_known_good cache (stale=${String(stale)}) — skipping snapshot insert`);
+      return;
+    }
+
     const snapshotValues = {
       fetched_at: rates.GOLD_24K.fetchedAt,
       source,
