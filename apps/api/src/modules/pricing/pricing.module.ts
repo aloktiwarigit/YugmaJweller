@@ -3,6 +3,7 @@ import {
   OnModuleInit,
   OnModuleDestroy,
   Inject,
+  Logger,
 } from '@nestjs/common';
 import { BullModule, InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
@@ -95,24 +96,26 @@ export class PricingModule implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    // Register repeatable jobs — upsert so restarts are idempotent
-    await this.queue.upsertJobScheduler(
-      'refresh-trading-hours',
-      { pattern: TRADING_HOURS_CRON, tz: 'UTC' },
-      { name: 'refresh' },
-    );
-
-    await this.queue.upsertJobScheduler(
-      'refresh-weekend-midday',
-      { pattern: WEEKEND_MIDDAY_CRON, tz: 'UTC' },
-      { name: 'refresh' },
-    );
-
-    await this.queue.upsertJobScheduler(
-      'refresh-outside-hours',
-      { pattern: OUTSIDE_HOURS_CRON, tz: 'UTC' },
-      { name: 'refresh' },
-    );
+    // Register repeatable jobs — best-effort: Redis may be transiently unavailable at boot
+    try {
+      await this.queue.upsertJobScheduler(
+        'refresh-trading-hours',
+        { pattern: TRADING_HOURS_CRON, tz: 'UTC' },
+        { name: 'refresh' },
+      );
+      await this.queue.upsertJobScheduler(
+        'refresh-weekend-midday',
+        { pattern: WEEKEND_MIDDAY_CRON, tz: 'UTC' },
+        { name: 'refresh' },
+      );
+      await this.queue.upsertJobScheduler(
+        'refresh-outside-hours',
+        { pattern: OUTSIDE_HOURS_CRON, tz: 'UTC' },
+        { name: 'refresh' },
+      );
+    } catch (err) {
+      new Logger(PricingModule.name).warn(`Rate refresh job schedulers could not be registered at boot — will retry on next restart: ${String(err)}`);
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
