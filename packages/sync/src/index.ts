@@ -1,7 +1,3 @@
 // packages/sync/src/index.ts
-export * from './protocol';
-export * from './server/cursor';
-export * from './server/conflict-resolver';
-export * from './server/pull';
-export * from './server/push';
-export * from './server/sync-logger';
+// Exports added incrementally as tasks land. Do not re-add stubs for unimplemented modules.
+export type { SyncTable, PullRequest, PullResponse, TableChanges, PushRequest, ConflictRecord, PushResponse } from './protocol';
