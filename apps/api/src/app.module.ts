@@ -16,6 +16,7 @@ import { TenantLookupModule } from './modules/tenant-lookup/tenant-lookup.module
 import { SettingsModule } from './modules/settings/settings.module';
 import { PricingModule } from './modules/pricing/pricing.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
 import { DrizzleTenantLookup } from './drizzle-tenant-lookup';
 import { TenantAuditReporter } from './modules/tenant-boot/tenant-audit-reporter';
 
@@ -55,6 +56,7 @@ class ConditionalTenantInterceptor implements NestInterceptor {
     SettingsModule,
     InventoryModule,
     PricingModule,
+    CatalogModule,
   ],
   controllers: [HealthController],
   providers: [

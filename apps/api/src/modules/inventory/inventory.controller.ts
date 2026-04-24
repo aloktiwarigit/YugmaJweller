@@ -100,6 +100,28 @@ export class InventoryController {
     return { uploadUrl };
   }
 
+  @Post('/products/:id/publish')
+  @HttpCode(200)
+  @Roles('shop_admin', 'shop_manager')
+  async publishProduct(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ProductResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.svc.publish(id);
+  }
+
+  @Post('/products/:id/unpublish')
+  @HttpCode(200)
+  @Roles('shop_admin', 'shop_manager')
+  async unpublishProduct(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ProductResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.svc.unpublish(id);
+  }
+
   @Post('/products/barcodes')
   @HttpCode(200)
   @Roles('shop_admin', 'shop_manager', 'shop_staff')

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { assertValidTransition } from './state-machine';
 import type { ProductStatus } from './state-machine';
 import type { Pool } from 'pg';
@@ -29,6 +29,7 @@ function mapRow(row: ProductRow): ProductResponse {
     huid: row.huid,
     status: row.status as ProductResponse['status'],
     publishedAt: row.published_at?.toISOString() ?? null,
+    publishedByUserId: row.published_by_user_id ?? null,
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
@@ -146,6 +147,58 @@ export class InventoryService {
       after: { status: dto.status, note: dto.note },
     }).catch(() => undefined);
 
+    return mapRow(row);
+  }
+
+  async publish(productId: string): Promise<ProductResponse> {
+    const existing = await this.repo.getProduct(productId);
+    if (!existing) throw new NotFoundException({ code: 'inventory.product_not_found' });
+
+    // Hallmarked products must have a valid non-empty HUID before publish
+    if (existing.huid !== null && existing.huid.trim() === '') {
+      throw new UnprocessableEntityException({ code: 'catalog.product_missing_huid' });
+    }
+
+    const imageCount = await this.repo.countImages(productId);
+    if (imageCount === 0) {
+      throw new UnprocessableEntityException({ code: 'catalog.product_missing_images' });
+    }
+
+    const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
+    const row = await this.repo.publishProduct(productId, ctx.userId);
+    if (!row) throw new NotFoundException({ code: 'inventory.product_not_found' });
+
+    void auditLog(this.pool, {
+      action: AuditAction.INVENTORY_PRODUCT_PUBLISHED,
+      subjectType: 'product',
+      subjectId: productId,
+      actorUserId: ctx.userId,
+      before: { published_at: null },
+      after: { published_at: row.published_at },
+    }).catch(() => undefined);
+
+    // TODO Epic 7: emit domain event inventory.product_published
+    return mapRow(row);
+  }
+
+  async unpublish(productId: string): Promise<ProductResponse> {
+    const existing = await this.repo.getProduct(productId);
+    if (!existing) throw new NotFoundException({ code: 'inventory.product_not_found' });
+
+    const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
+    const row = await this.repo.unpublishProduct(productId);
+    if (!row) throw new NotFoundException({ code: 'inventory.product_not_found' });
+
+    void auditLog(this.pool, {
+      action: AuditAction.INVENTORY_PRODUCT_UNPUBLISHED,
+      subjectType: 'product',
+      subjectId: productId,
+      actorUserId: ctx.userId,
+      before: { published_at: existing.published_at },
+      after: { published_at: null },
+    }).catch(() => undefined);
+
+    // TODO Epic 7: emit domain event inventory.product_unpublished
     return mapRow(row);
   }
 
