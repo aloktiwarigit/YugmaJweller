@@ -99,14 +99,14 @@ describe('SettingsService', () => {
       expect(tenantLookup.invalidate).toHaveBeenCalledWith(SHOP_A);
     });
 
-    it('does NOT invalidate DrizzleTenantLookup when name unchanged', async () => {
+    it('invalidates tenantLookup even when display_name does not change', async () => {
       const { svc, repo, tenantLookup } = makeSvc();
       (repo.updateShopProfile as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         before: profileBefore,
-        after: { ...profileBefore, gstin: '09AAACR5055K1Z5' },
+        after: { ...profileBefore, about_text: 'New bio' },
       });
-      await tenantContext.runWith(ctx, () => svc.updateProfile({ gstin: '09AAACR5055K1Z5' }));
-      expect(tenantLookup.invalidate).not.toHaveBeenCalled();
+      await tenantContext.runWith(ctx, () => svc.updateProfile({ about_text: 'New bio' }));
+      expect(tenantLookup.invalidate).toHaveBeenCalledWith(SHOP_A);
     });
 
     it('throws BadRequestException for invalid GSTIN', async () => {

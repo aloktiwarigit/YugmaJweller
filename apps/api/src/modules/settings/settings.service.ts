@@ -51,9 +51,7 @@ export class SettingsService {
     await this.cache.invalidate();
 
     const shopId = tenantContext.requireCurrent().shopId;
-    if (before.name !== after.name) {
-      this.tenantLookup.invalidate(shopId);
-    }
+    this.tenantLookup.invalidate(shopId);
 
     void this.auditProfileUpdate(before, after).catch(() => undefined);
 
