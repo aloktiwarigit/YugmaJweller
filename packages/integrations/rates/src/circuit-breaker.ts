@@ -118,8 +118,8 @@ export class CircuitBreaker implements RatesPort {
   private async callAdapter(): Promise<RatesResult> {
     try {
       const result = await this.adapter.getRatesByPurity();
-      // Success in CLOSED — reset failures
-      await this.redis.del(this.keyFailures);
+      // Success — reset failures counter (best-effort; Redis failure must not mask adapter success)
+      this.redis.del(this.keyFailures).catch(() => {});
       return result;
     } catch (err) {
       await this.recordFailure();

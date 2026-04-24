@@ -43,6 +43,8 @@ class ConditionalTenantInterceptor implements NestInterceptor {
           ...(u.username ? { username: decodeURIComponent(u.username) } : {}),
           ...(u.pathname && u.pathname !== '/' ? { db: Number(u.pathname.slice(1)) } : {}),
           ...(u.protocol === 'rediss:' ? { tls: {} } : {}),
+          lazyConnect: true,      // don't fail bootstrap if Redis is transiently unavailable
+          enableReadyCheck: false, // connect in background; first op triggers reconnect
         };
       })(),
     }),
