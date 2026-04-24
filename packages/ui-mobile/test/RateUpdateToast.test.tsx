@@ -60,15 +60,18 @@ describe('RateUpdateToast', () => {
   it('reduced-motion: Animated.parallel is not called when isReduceMotionEnabled=true', async () => {
     vi.spyOn(RNMock.AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
     const parallelSpy = vi.spyOn(RNMock.Animated, 'parallel');
+    const setValueSpy = vi.spyOn(RNMock.Animated.Value.prototype, 'setValue');
 
     await act(async () => {
       render(<RateUpdateToast visible={true} onDismiss={vi.fn()} />);
-      // Flush the microtask queue so the isReduceMotionEnabled promise resolves
+      // Flush microtasks so the isReduceMotionEnabled promise resolves
       await Promise.resolve();
       await Promise.resolve();
     });
 
     expect(parallelSpy).not.toHaveBeenCalled();
+    // translateY must be reset to 0 so the toast is on-screen (not off at y=80)
+    expect(setValueSpy).toHaveBeenCalledWith(0);
   });
 
   it('animation runs when isReduceMotionEnabled=false', async () => {

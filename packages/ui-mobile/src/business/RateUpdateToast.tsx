@@ -40,7 +40,11 @@ export function RateUpdateToast({
     let cancelled = false;
 
     void AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
-      if (cancelled || reduce) return;
+      if (cancelled) return;
+      if (reduce) {
+        translateY.setValue(0); // static appearance — no animation, but must reset to be on-screen
+        return;
+      }
       translateY.setValue(80);
       bgAnim.setValue(0);
       Animated.parallel([

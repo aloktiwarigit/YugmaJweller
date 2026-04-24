@@ -98,7 +98,9 @@ export default function RateOverrideScreen(): React.ReactElement {
     onSuccess: (_data, payload) => {
       void queryClient.invalidateQueries({ queryKey: ['rates'] });
       setLastSetOverride({ purity: payload.purity, rupees: payload.overrideRupees });
-      setShowToast(true);
+      // Cycle false→true so consecutive saves within the 2s window each get a fresh toast
+      setShowToast(false);
+      setTimeout(() => setShowToast(true), 0);
       setOverrideInput('');
       setReason('');
     },
