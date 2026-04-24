@@ -133,6 +133,8 @@ function buildFilterString(filters?: SearchFilters): string | null {
   if (filters.purity !== undefined)    parts.push(`purity = "${filters.purity}"`);
   if (filters.status !== undefined)    parts.push(`status = "${filters.status}"`);
   if (filters.published !== undefined) parts.push(`published = ${String(filters.published)}`);
+  // Meilisearch filter DSL has no STARTS WITH — huidPrefix matches exact value.
+  // For partial HUID lookup, use the q field (searchableAttributes includes 'huid').
   if (filters.huidPrefix !== undefined) parts.push(`huid = "${filters.huidPrefix}"`);
 
   if (filters.weightMin !== undefined) parts.push(`weightG >= "${filters.weightMin}"`);

@@ -1,9 +1,8 @@
 import { Module } from '@nestjs/common';
 import type { SearchPort } from './search.port';
+import { SEARCH_PORT } from './search.port';
 import { StubSearchAdapter } from './adapters/stub.adapter';
 import { MeilisearchAdapter } from './adapters/meilisearch.adapter';
-
-export const SEARCH_PORT = 'SEARCH_PORT';
 
 @Module({
   providers: [

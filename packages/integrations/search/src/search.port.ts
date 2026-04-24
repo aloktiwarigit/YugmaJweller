@@ -18,6 +18,11 @@ export interface SearchFilters {
   published?:  boolean;
   weightMin?:  string;
   weightMax?:  string;
+  /**
+   * Performs an **exact** HUID match via Meilisearch filter DSL (no STARTS WITH support).
+   * For prefix / partial HUID lookup, pass the partial value via `q` instead —
+   * `huid` is included in searchableAttributes.
+   */
   huidPrefix?: string;
 }
 
@@ -51,3 +56,6 @@ export class MeilisearchUnavailableError extends Error {
     this.cause = cause;
   }
 }
+
+/** Injection token for the {@link SearchPort} provider. Single source of truth. */
+export const SEARCH_PORT = 'SEARCH_PORT' as const;
