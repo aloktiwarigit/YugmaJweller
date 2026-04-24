@@ -104,6 +104,9 @@ function makeNullPool(): Pool {
 // ---------------------------------------------------------------------------
 
 describe('Chaos: IBJA times out (5s) → MetalsDev fallback within 10s', () => {
+  // This test intentionally takes ≥5 seconds because it uses a REAL wall-clock timer —
+  // not fake timers. vi.useFakeTimers() would prevent the elapsed-time assertion
+  // (elapsedMs > 5000) from ever being true. Do NOT add fake timers to this test.
   it('returns MetalsDev rates within 10 seconds after IBJA 5s timeout fires', async () => {
     const chain = buildChain(new SlowIbjaAdapter(), new MetalsDevAdapter());
 

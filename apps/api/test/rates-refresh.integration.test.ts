@@ -95,9 +95,12 @@ describe('PricingService.refreshRates() — happy path', () => {
   beforeAll(async () => {
     // Clean slate: remove any rates keys left by previous test groups
     await sharedRedis.flushall();
+    // Truncate snapshot table so rowCount assertions are exact (not cumulative across groups)
+    await pool.query('TRUNCATE ibja_rate_snapshots');
   });
 
   it('writes rates:current to Redis and inserts a snapshot row with source=ibja', async () => {
+    // IbjaAdapter and MetalsDevAdapter are MVP stubs (no live HTTP) — always return GOLD_24K = 735000n paise
     const service = buildService();
 
     await service.refreshRates();
@@ -131,9 +134,12 @@ describe('PricingService.refreshRates() — happy path', () => {
 describe('PricingService.refreshRates() — IBJA fails, MetalsDev serves', () => {
   beforeAll(async () => {
     await sharedRedis.flushall();
+    // Truncate snapshot table so rowCount assertions are exact (not cumulative across groups)
+    await pool.query('TRUNCATE ibja_rate_snapshots');
   });
 
   it('inserts snapshot and caches valid rates when IBJA adapter throws', async () => {
+    // IbjaAdapter and MetalsDevAdapter are MVP stubs (no live HTTP) — always return GOLD_24K = 735000n paise
     const service = buildService(new FailingIbjaAdapter());
 
     await service.refreshRates();
@@ -152,7 +158,7 @@ describe('PricingService.refreshRates() — IBJA fails, MetalsDev serves', () =>
     const rows = await pool.query<{ source: string; gold_24k_paise: string }>(
       `SELECT source, gold_24k_paise FROM ibja_rate_snapshots ORDER BY fetched_at DESC LIMIT 1`,
     );
-    expect(rows.rowCount).toBeGreaterThanOrEqual(1);
+    expect(rows.rowCount).toBe(1);
     expect(rows.rows[0].source).toBe('metalsdev');
     expect(rows.rows[0].gold_24k_paise).toBe('735000');
   });
