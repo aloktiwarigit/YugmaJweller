@@ -44,6 +44,24 @@ const STATUS_CHIP: Record<string, ChipConfig> = {
     text: '#F57F17',
     border: '#FFD54F',
   },
+  RESERVED: {
+    label: 'आरक्षित',
+    bg: '#EDE7F6',
+    text: '#4527A0',
+    border: '#B39DDB',
+  },
+  ON_APPROVAL: {
+    label: 'स्वीकृति में',
+    bg: '#FFF3E0',
+    text: '#E65100',
+    border: '#FFCC02',
+  },
+  WITH_KARIGAR: {
+    label: 'कारीगर के पास',
+    bg: '#E0F2F1',
+    text: '#00695C',
+    border: '#80CBC4',
+  },
 };
 
 function getChipConfig(status: string): ChipConfig {

@@ -110,7 +110,7 @@ export function InventorySearch({ onResults }: InventorySearchProps): React.Reac
 
   const keyExtractor = useCallback((item: SearchHit) => item.id, []);
 
-  const showDegradedNotice = source === 'postgres' && results.length >= 0 && searched;
+  const showDegradedNotice = source === 'postgres' && results.length > 0 && searched;
 
   return (
     <View style={styles.container}>
