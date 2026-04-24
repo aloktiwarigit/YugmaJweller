@@ -478,6 +478,9 @@ importers:
 
   packages/money:
     dependencies:
+      '@goldsmith/compliance':
+        specifier: workspace:*
+        version: link:../compliance
       decimal.js:
         specifier: ^10.4.3
         version: 10.6.0
@@ -641,6 +644,22 @@ importers:
       testcontainers:
         specifier: ^10.8.0
         version: 10.28.0
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.4.0
+        version: 1.6.1(@types/node@22.19.17)(jsdom@24.1.3)(terser@5.46.1)
+
+  packages/testing/weight-precision:
+    dependencies:
+      '@goldsmith/money':
+        specifier: workspace:*
+        version: link:../../money
+      decimal.js:
+        specifier: ^10.4.3
+        version: 10.6.0
+    devDependencies:
       typescript:
         specifier: ^5.4.0
         version: 5.9.3
@@ -2118,7 +2137,7 @@ packages:
 
   '@expo/bunyan@4.0.1':
     resolution: {integrity: sha512-+Lla7nYSiHZirgK+U/uYzsLv/X+HaJienbD5AKX1UQZHYfWaP+9uuQluRB4GrEVWF0GZ7vEVp/jzaOT9k/SQlg==}
-    engines: {'0': node >=0.10.0}
+    engines: {node: '>=0.10.0'}
 
   '@expo/cli@0.18.31':
     resolution: {integrity: sha512-v9llw9fT3Uv+TCM6Xllo54t672CuYtinEQZ2LPJ2EJsCwuTc4Cd2gXQaouuIVD21VoeGQnr5JtJuWbF97sBKzQ==}
