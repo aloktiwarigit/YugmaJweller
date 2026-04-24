@@ -27,6 +27,7 @@ export class IbjaAdapter implements RatesPort {
     const TIMEOUT_MS = 5000;
     let timer: ReturnType<typeof setTimeout>;
     const timeoutPromise = new Promise<never>((_, reject) => {
+      // nosemgrep: goldsmith.als-boundary-preserved -- HTTP timeout detaches intentionally; no tenant context needed
       timer = setTimeout(
         () => reject(new RatesAdapterError(this.getName(), new Error('Request timeout'))),
         TIMEOUT_MS,

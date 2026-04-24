@@ -1,6 +1,5 @@
 import { Module, OnModuleDestroy, Inject } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
-import { Reflector } from '@nestjs/core';
 import { Redis } from '@goldsmith/cache';
 import { createPool } from '@goldsmith/db';
 import { PermissionsCache } from '@goldsmith/tenant-config';
@@ -14,7 +13,6 @@ import { FirebaseAdminProvider } from './firebase-admin.provider';
 import { FirebaseJwtStrategy } from './firebase-jwt.strategy';
 import { MockSmsAdapter } from './sms/mock-sms.adapter';
 import { SMS_ADAPTER } from './sms/sms-adapter.interface';
-import { PolicyGuard } from './guards/policy.guard';
 
 @Module({
   imports: [PassportModule],
@@ -33,12 +31,6 @@ import { PolicyGuard } from './guards/policy.guard';
       useFactory: (redis: Redis) => new PermissionsCache(redis),
       inject: ['AUTH_REDIS'],
     },
-    {
-      provide: PolicyGuard,
-      useFactory: (reflector: Reflector, cache: PermissionsCache, repo: PermissionsRepository) =>
-        new PolicyGuard(reflector, cache, repo),
-      inject: [Reflector, PermissionsCache, PermissionsRepository],
-    },
     FirebaseAdminProvider,
     FirebaseJwtStrategy,
     AuthService,
@@ -48,7 +40,7 @@ import { PolicyGuard } from './guards/policy.guard';
     AuthRateLimitService,
     { provide: SMS_ADAPTER, useClass: MockSmsAdapter },
   ],
-  exports: [FirebaseAdminProvider, 'PG_POOL', PermissionsCache, PermissionsRepository, PolicyGuard],
+  exports: [FirebaseAdminProvider, 'PG_POOL', PermissionsCache, PermissionsRepository],
 })
 export class AuthModule implements OnModuleDestroy {
   constructor(@Inject('AUTH_REDIS') private readonly redis: Redis) {}

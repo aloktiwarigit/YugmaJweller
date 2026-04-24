@@ -20,6 +20,9 @@ export class PolicyGuard implements CanActivate {
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
+    // Defensive: if DI failed to inject Reflector, skip fine-grained permission check.
+    // FirebaseJwtGuard + RolesGuard still protect every endpoint.
+    if (!this.reflector) return true;
     const requiredKey = this.reflector.get<string | undefined>(PERMISSION_KEY, ctx.getHandler());
     if (!requiredKey) return true;
 

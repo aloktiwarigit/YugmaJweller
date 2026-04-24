@@ -10,7 +10,7 @@ export class ZodValidationPipe implements PipeTransform {
     if (!result.success) {
       throw new BadRequestException({
         errorCode: 'validation_error',
-        errors: (result.error as ZodError).errors.map((e) => ({
+        errors: (result.error as ZodError).errors.map((e: ZodError['errors'][number]) => ({
           path: e.path.join('.'),
           message: e.message,
         })),

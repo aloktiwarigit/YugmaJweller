@@ -256,7 +256,7 @@ export class PricingService {
       silver_925_paise: rates.SILVER_925.perGramPaise,
       stale,
     };
-    const client = await this.pool.connect();
+    const client = await this.pool.connect(); // nosemgrep: goldsmith.require-tenant-transaction -- ibja_rate_snapshots is platform-global, not tenant-scoped
     try {
       await client.query('BEGIN');
       await client.query(
@@ -309,7 +309,7 @@ export class PricingService {
     const days = range === '30d' ? 30 : range === '90d' ? 90 : 365;
     const column = PURITY_TO_COLUMN[purity];
 
-    const client = await this.pool.connect();
+    const client = await this.pool.connect(); // nosemgrep: goldsmith.require-tenant-transaction -- ibja_rate_snapshots is platform-global read
     try {
       // DISTINCT ON picks the last snapshot of each calendar day (ORDER DESC by fetched_at).
       // Outer ORDER BY date ASC gives chronological output.

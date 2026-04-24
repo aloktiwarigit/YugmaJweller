@@ -11,6 +11,7 @@ export default function InventoryLayout(): React.ReactElement {
         headerTitleStyle: { fontFamily: 'NotoSansDevanagari', fontSize: 18 },
       }}
     >
+      <Stack.Screen name="index" options={{ title: 'इन्वेंटरी' }} />
       <Stack.Screen name="new" options={{ title: t('inventory.title_new') }} />
       <Stack.Screen name="[id]/edit" options={{ title: t('inventory.title_edit') }} />
       <Stack.Screen name="print-labels" options={{ title: 'लेबल प्रिंट करें' }} />

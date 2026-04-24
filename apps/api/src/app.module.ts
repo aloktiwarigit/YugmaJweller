@@ -10,6 +10,8 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { FirebaseJwtGuard } from './common/guards/firebase-jwt.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { PolicyGuard } from './modules/auth/guards/policy.guard';
+import { PermissionsCache } from '@goldsmith/tenant-config';
+import { PermissionsRepository } from './modules/auth/permissions.repository';
 import { AuthModule } from './modules/auth/auth.module';
 import { TenantBootModule } from './modules/tenant-boot/tenant-boot.module';
 import { TenantLookupModule } from './modules/tenant-lookup/tenant-lookup.module';
@@ -79,7 +81,9 @@ class ConditionalTenantInterceptor implements NestInterceptor {
     },
     {
       provide: APP_GUARD,
-      useExisting: PolicyGuard,
+      useFactory: (reflector: Reflector, cache: PermissionsCache, repo: PermissionsRepository) =>
+        new PolicyGuard(reflector, cache, repo),
+      inject: [Reflector, PermissionsCache, PermissionsRepository],
     },
     {
       provide: APP_INTERCEPTOR,

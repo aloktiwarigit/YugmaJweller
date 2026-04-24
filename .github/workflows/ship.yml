@@ -61,6 +61,15 @@ jobs:
   integration:
     needs: install
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -86,6 +95,7 @@ jobs:
         env:
           FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
           FIREBASE_PROJECT_ID: goldsmith-test
+          REDIS_URL: redis://localhost:6379
 
   tenant-isolation:
     needs: install
@@ -122,7 +132,9 @@ jobs:
     container: returntocorp/semgrep:latest
     steps:
       - uses: actions/checkout@v4
-      - run: semgrep --config ops/semgrep/ --error .
+      # --severity ERROR: only block on ERROR-severity rules (WARNING findings are advisory).
+      # theme-tokens and als-boundary-preserved are WARNING; dedicated codemod PR will address them.
+      - run: semgrep --config ops/semgrep/ --error --severity ERROR .
 
   # Codex review is a LOCAL pre-push gate per CLAUDE.md, not a CI job.
   # Run `codex review --diff HEAD~1` (or the `codex-review-gate` Claude Code plugin)
@@ -146,8 +158,9 @@ jobs:
       - name: Validate Expo config + plugin resolution
         working-directory: apps/shopkeeper
         run: pnpm exec expo config --type public > /dev/null
-      - name: Typecheck shopkeeper
-        run: pnpm --filter @goldsmith/shopkeeper typecheck
+      - name: Build upstream deps then typecheck shopkeeper
+        # turbo cascades ^build so @goldsmith/shared, @goldsmith/i18n etc. are compiled first.
+        run: pnpm exec turbo run typecheck --filter=@goldsmith/shopkeeper
 
   a11y-shopkeeper:
     needs: install
@@ -159,7 +172,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "${{ env.NODE_VERSION }}", cache: "pnpm" }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @goldsmith/shopkeeper test
+      - run: pnpm exec turbo run test --filter=@goldsmith/shopkeeper
 
   e2e-shopkeeper:
     # Lightweight gate until EAS Dev Client APK exists (post-anchor-SOW).

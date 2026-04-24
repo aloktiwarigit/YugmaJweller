@@ -41,6 +41,10 @@ module.exports = {
         'apps/api/src/modules/auth/auth.repository.ts',
         'apps/api/src/modules/auth/auth.service.ts',
         'apps/api/src/modules/auth/permissions.repository.ts',
+        // Inventory repository is a data-layer method (shopId from tenant context at call-site).
+        'apps/api/src/modules/inventory/inventory.repository.ts',
+        // Catalog controller reads tenantId from X-Tenant-Id header on a @SkipTenant() endpoint.
+        'apps/api/src/modules/catalog/catalog.controller.ts',
       ],
       rules: { 'goldsmith/no-raw-shop-id-param': 'off' },
     },
