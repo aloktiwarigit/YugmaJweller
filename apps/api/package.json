@@ -35,6 +35,7 @@
     "@goldsmith/tenant-config": "workspace:*",
     "@goldsmith/cache": "workspace:*",
     "@goldsmith/queue": "workspace:*",
+    "decimal.js": "^10.4.3",
     "csv-parse": "^5.5.0",
     "@azure/storage-blob": "^12.17.0",
     "firebase-admin": "^12.0.0",

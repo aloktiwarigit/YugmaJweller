@@ -1,8 +1,24 @@
-import { Controller, Get, HttpException, HttpStatus, Inject } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Post,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { SkipAuth } from '../../common/decorators/skip-auth.decorator';
 import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { PricingService } from './pricing.service';
 import { RatesUnavailableError } from '@goldsmith/rates';
+import { TenantContextDec } from '@goldsmith/tenant-context';
+import type { TenantContext, AuthenticatedTenantContext } from '@goldsmith/tenant-context';
+import { SetRateOverrideDtoSchema } from '@goldsmith/shared';
+import type { SetRateOverrideDto } from '@goldsmith/shared';
 
 // ---------------------------------------------------------------------------
 // Response shape helpers
@@ -44,8 +60,9 @@ export class PricingController {
 
   /**
    * GET /api/v1/rates/current
-   * Public endpoint — no Firebase auth required.
-   * Returns per-gram rates for all 7 purities (paise as strings to avoid bigint serialisation issues).
+   * Public endpoint — no Firebase auth or tenant required.
+   * Always returns base IBJA market rates (no per-tenant overrides applied here).
+   * Per-tenant overrides are applied in billing/invoice calculations via PricingService.getCurrentRatesForTenant().
    */
   @Get('current')
   @SkipAuth()
@@ -73,5 +90,20 @@ export class PricingController {
       }
       throw err;
     }
+  }
+
+  /**
+   * POST /api/v1/rates/override
+   * OWNER only — manually override today's gold/silver rate for a specific purity.
+   */
+  @Post('override')
+  @HttpCode(204)
+  @Roles('shop_admin')
+  async setOverride(
+    @TenantContextDec() ctx: TenantContext,
+    @Body(new ZodValidationPipe(SetRateOverrideDtoSchema)) dto: SetRateOverrideDto,
+  ): Promise<void> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    await this.pricingService.setOverride(ctx as AuthenticatedTenantContext, dto);
   }
 }
