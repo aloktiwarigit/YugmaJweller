@@ -1,13 +1,27 @@
 import type { StoragePort } from '../storage.port';
 
 export class StubStorageAdapter implements StoragePort {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private readonly blobs = new Map<string, Buffer>();
+
   async getPresignedUploadUrl(key: string, _contentType: string): Promise<string> {
-    // TODO: wire Azure Blob SAS URL when AZURE_STORAGE_CONNECTION_STRING set
     return `https://stub-storage.local/${key}?sas=STUB`;
   }
 
   async getPublicUrl(key: string): Promise<string> {
     return `https://stub-storage.local/${key}`;
+  }
+
+  async downloadBuffer(key: string): Promise<Buffer> {
+    const buf = this.blobs.get(key);
+    if (!buf) throw new Error(`stub.storage: key not found: ${key}`);
+    return buf;
+  }
+
+  async uploadBuffer(key: string, data: Buffer, _contentType: string): Promise<void> {
+    this.blobs.set(key, data);
+  }
+
+  async getPresignedReadUrl(key: string): Promise<string> {
+    return `https://stub-storage.local/${key}?sas=READ_STUB`;
   }
 }
