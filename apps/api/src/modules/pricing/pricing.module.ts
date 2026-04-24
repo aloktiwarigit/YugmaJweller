@@ -98,19 +98,19 @@ export class PricingModule implements OnModuleInit, OnModuleDestroy {
     // Register repeatable jobs — upsert so restarts are idempotent
     await this.queue.upsertJobScheduler(
       'refresh-trading-hours',
-      { pattern: TRADING_HOURS_CRON },
+      { pattern: TRADING_HOURS_CRON, tz: 'UTC' },
       { name: 'refresh' },
     );
 
     await this.queue.upsertJobScheduler(
       'refresh-weekend-midday',
-      { pattern: WEEKEND_MIDDAY_CRON },
+      { pattern: WEEKEND_MIDDAY_CRON, tz: 'UTC' },
       { name: 'refresh' },
     );
 
     await this.queue.upsertJobScheduler(
       'refresh-outside-hours',
-      { pattern: OUTSIDE_HOURS_CRON },
+      { pattern: OUTSIDE_HOURS_CRON, tz: 'UTC' },
       { name: 'refresh' },
     );
   }
