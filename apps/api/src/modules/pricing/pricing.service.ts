@@ -141,9 +141,8 @@ export class PricingService {
     await this.redis.setex(REDIS_KEY_CURRENT, TTL_REFRESH_SEC, serialized);
 
     // 2. Insert snapshot into ibja_rate_snapshots (platform-global table, no tenant context)
-    const now = new Date();
     const snapshotValues = {
-      fetched_at: now,
+      fetched_at: rates.GOLD_24K.fetchedAt,
       source,
       gold_24k_paise: rates.GOLD_24K.perGramPaise,
       gold_22k_paise: rates.GOLD_22K.perGramPaise,
@@ -182,14 +181,14 @@ export class PricingService {
          VALUES ($1, $2)`,
         [
           AuditAction.PRICING_RATES_REFRESHED,
-          JSON.stringify({ source, fetchedAt: now.toISOString() }),
+          JSON.stringify({ source, fetchedAt: rates.GOLD_24K.fetchedAt.toISOString() }),
         ],
       );
     } finally {
       client.release();
     }
 
-    this.logger.log(`Rates refreshed from ${source} at ${now.toISOString()}`);
+    this.logger.log(`Rates refreshed from ${source} at ${rates.GOLD_24K.fetchedAt.toISOString()}`);
   }
 
   // -------------------------------------------------------------------------
