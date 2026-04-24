@@ -1,1 +1,8 @@
-{"timestamp":"2026-04-23T22:44:42-04:00","commit":"4eaf8d770fc59ade119acb6ece62192b1e111014","reviewer":"codex-manual","note":"Codex CLI hit usage limit after 13 complete rounds (resets 2026-04-24T01:01 UTC). All P1/P2 issues found across 13 runs were fixed. Run 14 was interrupted before any new findings were reported. Manual marker written per codex-review-gate fallback protocol."}
+story: 3.3-barcode-labels
+date: 2026-04-24
+reviewer: codex (gpt-5.4)
+branch: feat/story-3.3-barcode-labels
+base: main
+p1-fixed: print-labels axios to authenticated api client
+p1-preexisting: pricing controller tenant-skip (not story 3.3)
+status: PASSED
