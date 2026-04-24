@@ -46,6 +46,16 @@ export interface FailedRow {
   error: string;
 }
 
+export interface ValuationProductRow {
+  id: string;
+  metal: string;
+  purity: string;
+  net_weight_g: string;
+  making_charge_override_pct: string | null;
+  category_id: string | null;
+  category_name: string;
+}
+
 const SELECT_COLS = `
   id, shop_id, category_id, sku, metal, purity,
   gross_weight_g, net_weight_g, stone_weight_g, stone_details,
@@ -301,6 +311,26 @@ export class InventoryRepository {
          ON CONFLICT DO NOTHING`,
         [shopId, productId, storageKey],
       );
+    });
+  }
+
+  async listProductsForValuation(): Promise<ValuationProductRow[]> {
+    return withTenantTx(this.pool, async (tx) => {
+      const result = await tx.query<ValuationProductRow>(
+        `SELECT
+           p.id,
+           p.metal,
+           p.purity,
+           p.net_weight_g,
+           p.making_charge_override_pct,
+           p.category_id,
+           COALESCE(c.name, 'अन्य') AS category_name
+         FROM products p
+         LEFT JOIN product_categories c ON c.id = p.category_id
+         WHERE p.status != 'SOLD'
+           AND p.status != 'SCRAPPED'`,
+      );
+      return result.rows;
     });
   }
 }

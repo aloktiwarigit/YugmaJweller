@@ -36,6 +36,7 @@
     "@goldsmith/cache": "workspace:*",
     "@goldsmith/queue": "workspace:*",
     "@goldsmith/sync": "workspace:*",
+    "@goldsmith/money": "workspace:*",
     "decimal.js": "^10.4.3",
     "csv-parse": "^5.5.0",
     "@azure/storage-blob": "^12.17.0",

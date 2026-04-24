@@ -70,6 +70,9 @@ importers:
       '@goldsmith/integrations-storage':
         specifier: workspace:*
         version: link:../../packages/integrations/storage
+      '@goldsmith/money':
+        specifier: workspace:*
+        version: link:../../packages/money
       '@goldsmith/observability':
         specifier: workspace:*
         version: link:../../packages/observability
