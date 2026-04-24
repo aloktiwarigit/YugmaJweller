@@ -38,6 +38,9 @@ export default defineConfig({
       'expo-haptics': fileURLToPath(
         new URL('./test/expo-haptics.mock.ts', import.meta.url),
       ),
+      'react-native-svg': fileURLToPath(
+        new URL('../../packages/ui-mobile/test/react-native-svg.mock.ts', import.meta.url),
+      ),
       '@goldsmith/shared': fileURLToPath(
         new URL('../../packages/shared/src/index.ts', import.meta.url),
       ),

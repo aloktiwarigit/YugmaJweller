@@ -139,7 +139,6 @@ export default function PrintLabelsScreen(): React.JSX.Element {
         if (mountedRef.current) setLoading(false);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handlePrint = async (): Promise<void> => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { colors, spacing, typography } from '@goldsmith/ui-tokens';
 
 export type ProductStatus =
