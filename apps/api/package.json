@@ -54,6 +54,8 @@
     "supertest": "^7.0.0",
     "testcontainers": "^10.8.0",
     "vitest": "^1.4.0",
+    "ioredis-mock": "^8.9.0",
+    "@types/ioredis-mock": "^8.2.7",
     "typescript": "^5.4.0",
     "@types/passport-http-bearer": "^1.0.41"
   }
