@@ -86,6 +86,8 @@ export function RateHistoryChart({
 
   const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(' ');
   const todayPt = points[points.length - 1];
+  const todayDate = new Date().toISOString().slice(0, 10);
+  const lastPointIsToday = todayPt?.date === todayDate;
 
   return (
     <View onLayout={onLayout} style={styles.wrapper}>
@@ -117,7 +119,7 @@ export function RateHistoryChart({
             textAnchor="middle"
             fontFamily={typography.body.family}
           >
-            {`आज ₹${todayPt.perGramRupees}`}
+            {lastPointIsToday ? `आज ₹${todayPt.perGramRupees}` : `₹${todayPt.perGramRupees}`}
           </SvgText>
         )}
 

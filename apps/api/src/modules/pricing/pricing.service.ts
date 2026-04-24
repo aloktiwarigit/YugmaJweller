@@ -313,6 +313,8 @@ export class PricingService {
     try {
       // DISTINCT ON picks the last snapshot of each calendar day (ORDER DESC by fetched_at).
       // Outer ORDER BY date ASC gives chronological output.
+      // Lower bound = midnight UTC today minus N days — ensures the first calendar
+      // day is included in full regardless of what time of day the request arrives.
       const result = await client.query<RateSnapshotRow>(
         `SELECT *
            FROM (
@@ -321,7 +323,7 @@ export class PricingService {
                gold_24k_paise, gold_22k_paise, gold_20k_paise, gold_18k_paise, gold_14k_paise,
                silver_999_paise, silver_925_paise
              FROM ibja_rate_snapshots
-             WHERE fetched_at >= NOW() - ($1 * INTERVAL '1 day')
+             WHERE fetched_at >= date_trunc('day', NOW()) - ($1 * INTERVAL '1 day')
              ORDER BY date_trunc('day', fetched_at) ASC, fetched_at DESC
            ) AS bucketed
            ORDER BY fetched_at ASC`,
