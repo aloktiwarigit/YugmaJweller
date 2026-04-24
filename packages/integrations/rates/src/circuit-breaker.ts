@@ -58,7 +58,8 @@ export class CircuitBreaker implements RatesPort {
     if (count >= FAILURE_THRESHOLD) {
       const alreadyOpen = await this.redis.get(this.keyState);
       if (alreadyOpen !== 'OPEN') {
-        await this.redis.set(this.keyOpenedAt, String(Date.now()), 'NX');
+        // NX prevents concurrent double-write; EX ensures stale key can't survive past next state TTL
+        await this.redis.set(this.keyOpenedAt, String(Date.now()), 'EX', COOLDOWN_SEC * 4 + FAILURE_WINDOW_SEC, 'NX');
         await this.setState('OPEN');
       }
     }

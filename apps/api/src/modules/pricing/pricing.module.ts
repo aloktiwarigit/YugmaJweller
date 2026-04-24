@@ -21,11 +21,12 @@ import {
 
 // ---------------------------------------------------------------------------
 // IST trading hours cron patterns (UTC+5:30)
-// 09:00–17:30 IST = 03:30–12:00 UTC
+// Note: cron pattern '3-11' fires from 03:00 UTC (= 08:30 IST), 30 min before IBJA's
+// 09:00 IST open. Pre-market fetches are harmless — stub/real adapter returns current rate.
 //
 // Three mutually exclusive patterns:
-//   Trading hours   — every 15 min, Mon–Fri, UTC hours 03:00–11:59 (09:00–17:59 IST)
-//   Weekend midday  — every hour at :00, Sat+Sun, UTC hours 03:00–11:59
+//   Trading hours   — every 15 min, Mon–Fri, UTC hours 03:00–11:59 (08:30–17:29 IST)
+//   Weekend midday  — every hour at :00, Sat+Sun, UTC hours 03:00–11:59 (08:30–17:29 IST)
 //   Outside hours   — every hour at :00, UTC hours 12–23 and 0–2 (daily incl. weekends)
 //
 // The patterns share no overlap:
