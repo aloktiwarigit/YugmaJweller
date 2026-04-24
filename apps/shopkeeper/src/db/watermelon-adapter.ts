@@ -33,6 +33,32 @@ async function collectPendingChanges(database: Database): Promise<Partial<Record
   };
 }
 
+// After a successful push, mark created rows as synced so they are not re-pushed.
+// Server uses the client-provided ID as the product row ID.
+async function clearPendingCreates(
+  database: Database,
+  changes: Partial<Record<string, TableChanges>>,
+): Promise<void> {
+  const created = changes['products']?.created ?? [];
+  if (created.length === 0) return;
+
+  await database.write(async () => {
+    const col = database.get<Product>('products');
+    for (const row of created) {
+      const r = row as Record<string, unknown>;
+      try {
+        const local = await col.find(String(r['id']));
+        await local.update((p) => {
+          p.serverId = String(r['id']); // server adopted the client-provided ID
+          p.pendingSync = false;
+        });
+      } catch {
+        // Record not found locally — should not happen; skip silently
+      }
+    }
+  });
+}
+
 async function applyPulledChanges(database: Database, changes: PullResponse['changes']): Promise<void> {
   const productChanges = changes['products'];
   if (!productChanges) return;
@@ -43,6 +69,17 @@ async function applyPulledChanges(database: Database, changes: PullResponse['cha
 
     for (const raw of productChanges.created) {
       const r = raw as Record<string, unknown>;
+      // If the record already exists locally (our own previously pushed row coming back
+      // from the server), update its sync state instead of creating a duplicate.
+      const existing = allLocal.find((p) => p.serverId === String(r['id']));
+      if (existing) {
+        await existing.update((p) => {
+          p.pendingSync = false;
+          p.serverUpdatedAt = r['updated_at'] ? new Date(String(r['updated_at'])).getTime() : p.serverUpdatedAt;
+        });
+        continue;
+      }
+      // New record from another device — create locally
       await col.create((p) => {
         p.serverId = String(r['id']);
         p.sku = String(r['sku'] ?? '');
@@ -82,6 +119,7 @@ export async function syncWithServer(
   apiClient: AxiosInstance,
   lastCursor: bigint,
 ): Promise<{ cursor: bigint; conflicts: PushResponse['conflicts'] }> {
+  // Collect pending creates BEFORE pulling so we know what to clear after push.
   const pendingChanges = await collectPendingChanges(database);
 
   const pullResp = await apiClient.get<PullWire>('/api/v1/sync/pull', {
@@ -98,8 +136,16 @@ export async function syncWithServer(
       changes: pendingChanges,
       idempotencyKey: uuidv4(),
     });
+
+    // Mark pushed creates as synced so they are not re-pushed on the next cycle.
+    await clearPendingCreates(database, pendingChanges);
+
+    // Use the pull cursor (not push cursor) as the new lastCursor so that the next
+    // pull picks up any concurrent changes from other devices that arrived between
+    // our pull and push. Our own pushed rows come back via pull and are reconciled
+    // by applyPulledChanges (existing serverId → update instead of create).
     return {
-      cursor: BigInt(pushResp.data.cursor),
+      cursor: BigInt(pullResp.data.cursor),
       conflicts: pushResp.data.conflicts,
     };
   }

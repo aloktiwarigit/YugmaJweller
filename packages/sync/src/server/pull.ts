@@ -1,7 +1,6 @@
 import type { Pool } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import type { TenantContext } from '@goldsmith/tenant-context';
-import { getCurrentCursor } from './cursor';
 import type { PullRequest, PullResponse, SyncTable, TableChanges } from '../protocol';
 
 interface ChangeLogRow {
@@ -44,8 +43,12 @@ export async function pull(
   ctx: TenantContext,
   req: PullRequest,
 ): Promise<PullResponse> {
-  const rows = await withTenantTx(pool, async (tx) => {
-    const r = await tx.query<ChangeLogRow>(
+  // Read the change log rows AND the cursor inside the same transaction snapshot.
+  // If we read the cursor after the transaction, concurrent writes between the two reads
+  // would produce a cursor higher than the last row we returned, causing those rows to
+  // be skipped on the client's next pull.
+  const { rows, cursor } = await withTenantTx(pool, async (tx) => {
+    const changeRows = await tx.query<ChangeLogRow>(
       `SELECT seq, table_name, row_id, operation, payload
        FROM sync_change_log
        WHERE seq > $1
@@ -53,10 +56,15 @@ export async function pull(
        ORDER BY seq ASC`,
       [req.lastCursor.toString(), req.tables],
     );
-    return r.rows;
+    // tenant_sync_cursors has no RLS; app_user has SELECT grant — safe inside tx
+    const cursorRow = await tx.query<{ cursor: string }>(
+      `SELECT cursor FROM tenant_sync_cursors WHERE shop_id = $1`,
+      [ctx.shopId],
+    );
+    const snapshotCursor = cursorRow.rows[0] ? BigInt(cursorRow.rows[0].cursor) : req.lastCursor;
+    return { rows: changeRows.rows, cursor: snapshotCursor };
   });
 
   const changes = groupChangeRows(rows, req.tables);
-  const cursor = await getCurrentCursor(pool, ctx.shopId);
   return { changes, cursor };
 }
