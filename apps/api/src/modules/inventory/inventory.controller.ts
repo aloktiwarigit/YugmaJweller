@@ -13,16 +13,20 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { TenantContextDec } from '@goldsmith/tenant-context';
-import type { TenantContext } from '@goldsmith/tenant-context';
+import type { TenantContext, AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { CreateProductSchema, UpdateProductSchema } from '@goldsmith/shared';
-import type { CreateProductDto, UpdateProductDto, ProductResponse } from '@goldsmith/shared';
+import type { CreateProductDto, UpdateProductDto, ProductResponse, BulkImportJobStatus } from '@goldsmith/shared';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { InventoryService } from './inventory.service';
+import { InventoryBulkImportService } from './inventory.bulk-import.service';
 
 @Controller('/api/v1/inventory')
 export class InventoryController {
-  constructor(private readonly svc: InventoryService) {}
+  constructor(
+    private readonly svc: InventoryService,
+    private readonly bulkImportSvc: InventoryBulkImportService,
+  ) {}
 
   @Post('/products')
   @Roles('shop_admin', 'shop_manager')
@@ -81,5 +85,39 @@ export class InventoryController {
     if (!contentType) throw new NotFoundException({ code: 'inventory.content_type_required' });
     const uploadUrl = await this.svc.getImageUploadUrl(id, contentType);
     return { uploadUrl };
+  }
+
+  @Post('/bulk-import')
+  @HttpCode(200)
+  @Roles('shop_admin', 'shop_manager')
+  async createBulkImportUrl(
+    @TenantContextDec() ctx: TenantContext,
+    @Body('idempotencyKey') idempotencyKey: string,
+  ): Promise<{ uploadUrl: string; jobId: string }> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (!idempotencyKey) throw new NotFoundException({ code: 'inventory.idempotency_key_required' });
+    return this.bulkImportSvc.createUploadUrl(idempotencyKey);
+  }
+
+  @Post('/bulk-import/:jobId/trigger')
+  @HttpCode(202)
+  @Roles('shop_admin', 'shop_manager')
+  async triggerBulkImport(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('jobId', ParseUUIDPipe) jobId: string,
+  ): Promise<{ jobId: string; message: string }> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    const authCtx = ctx as AuthenticatedTenantContext;
+    return this.bulkImportSvc.triggerJob(jobId, authCtx.userId);
+  }
+
+  @Get('/bulk-import/:jobId')
+  @Roles('shop_admin', 'shop_manager')
+  async getBulkImportStatus(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('jobId', ParseUUIDPipe) jobId: string,
+  ): Promise<BulkImportJobStatus> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.bulkImportSvc.getJobStatus(jobId);
   }
 }
