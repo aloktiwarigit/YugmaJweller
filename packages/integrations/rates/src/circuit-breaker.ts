@@ -100,9 +100,9 @@ export class CircuitBreaker implements RatesPort {
       await this.resetFailures();
       return result;
     } catch (err) {
-      // Failure → back to OPEN
+      // Failure → back to OPEN; reset opened_at with TTL (fresh 120s cooldown)
       await this.setState('OPEN');
-      await this.redis.set(this.keyOpenedAt, String(Date.now()));
+      await this.redis.set(this.keyOpenedAt, String(Date.now()), 'EX', COOLDOWN_SEC * 4 + FAILURE_WINDOW_SEC);
       if (err instanceof RatesAdapterError) throw err;
       throw new RatesAdapterError(this.adapter.getName(), err);
     }

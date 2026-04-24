@@ -132,9 +132,11 @@ export class PricingService {
     const liveResult = await this.fallbackChain.getRatesByPurity();
     const { rates: liveRates, source, stale } = liveResult;
 
-    // Cache the result with 15-min TTL
-    const serialized = serializeRates(liveRates, stale, source);
-    await this.redis.setex(REDIS_KEY_CURRENT, TTL_CURRENT_CACHE_SEC, serialized);
+    // Only cache live rates — skip Redis write for LKG to avoid locking in stale data
+    if (source !== 'last_known_good') {
+      const serialized = serializeRates(liveRates, stale, source);
+      await this.redis.setex(REDIS_KEY_CURRENT, TTL_CURRENT_CACHE_SEC, serialized);
+    }
 
     return { ...liveRates, stale, source };
   }
