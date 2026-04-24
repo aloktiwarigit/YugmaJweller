@@ -1,0 +1,17 @@
+rules:
+  - id: goldsmith-no-float-on-weight-or-price
+    patterns:
+      - pattern: parseFloat(...)
+      - pattern: Math.round(...)
+      - pattern: Number($X * ...)
+    message: >
+      Use packages/money Weight/MoneyInPaise or BigInt arithmetic.
+      No float arithmetic on weight or price fields.
+    languages: [typescript]
+    severity: ERROR
+    paths:
+      include:
+        - "packages/money/**"
+        - "packages/compliance/**"
+        - "apps/api/src/modules/pricing/**"
+        - "apps/api/src/modules/inventory/**"
