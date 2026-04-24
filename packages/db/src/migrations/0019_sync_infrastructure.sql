@@ -26,17 +26,19 @@ CREATE TABLE sync_change_log (
 GRANT SELECT, INSERT ON sync_change_log TO app_user;
 GRANT USAGE, SELECT ON SEQUENCE sync_change_log_id_seq TO app_user;
 
--- Index for efficient cursor-based pulls per tenant
-CREATE INDEX idx_sync_change_log_shop_seq ON sync_change_log (shop_id, seq);
+-- Unique index for efficient cursor-based pulls; uniqueness enforces the monotonic-seq invariant
+CREATE UNIQUE INDEX idx_sync_change_log_shop_seq ON sync_change_log (shop_id, seq);
 
 -- RLS — same pattern as audit_events
 ALTER TABLE sync_change_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sync_change_log FORCE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS rls_sync_change_log_tenant_isolation ON sync_change_log;
+
 CREATE POLICY rls_sync_change_log_tenant_isolation ON sync_change_log
   FOR ALL
-  USING  (shop_id = current_setting('app.current_shop_id', true)::uuid)
-  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  USING  (shop_id = current_setting('app.current_shop_id')::uuid)
+  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
 
 -- 3. Seed a cursor row for all existing shops
 INSERT INTO tenant_sync_cursors (shop_id, cursor)
