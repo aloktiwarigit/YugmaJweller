@@ -63,8 +63,8 @@ export class InventoryBulkImportService {
       subjectType: 'bulk_import_job',
       subjectId: jobId,
       actorUserId: userId,
-      after: { jobId, storageKey: meta.storageKey },
-    });
+      after: { jobId, storageKey: meta.storageKey, shopId: ctx.shopId },
+    }).catch(() => undefined);
 
     return { jobId, message: 'Import started' };
   }
