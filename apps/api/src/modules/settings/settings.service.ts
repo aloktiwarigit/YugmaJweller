@@ -214,6 +214,9 @@ export class SettingsService {
   }
 
   private static rupeesToPaise(rupees: string): number {
+    if (!/^\d+(\.\d{1,2})?$/.test(rupees)) {
+      throw new UnprocessableEntityException({ code: 'settings.threshold_out_of_range' });
+    }
     const [whole = '0', frac = ''] = rupees.split('.');
     const wholePaise = parseInt(whole, 10) * 100;
     const fracPaise = parseInt(frac.slice(0, 2).padEnd(2, '0'), 10);

@@ -295,5 +295,8 @@ describe('SettingsService.updateLoyalty', () => {
     it('above limit throws', () => { expect(() => toPaise('10000000.01')).toThrow(); });
     it('negative throws', () => { expect(() => toPaise('-1')).toThrow(); });
     it('non-numeric throws', () => { expect(() => toPaise('abc')).toThrow(); });
+    it('scientific notation throws', () => { expect(() => toPaise('1e2')).toThrow(); });
+    it('multiple decimals throws', () => { expect(() => toPaise('1.2.3')).toThrow(); });
+    it('whitespace throws', () => { expect(() => toPaise(' 100 ')).toThrow(); });
   });
 });
