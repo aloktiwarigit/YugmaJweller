@@ -147,15 +147,15 @@ export class PricingService {
   async refreshRates(): Promise<void> {
     const { rates, source, stale } = await this.fallbackChain.getRatesByPurity();
 
-    // 1. Write to Redis 'rates:current' with 30-min TTL
-    const serialized = serializeRates(rates, stale, source);
-    await this.redis.setex(REDIS_KEY_CURRENT, TTL_REFRESH_SEC, serialized);
-
-    // 2. Insert snapshot only for live fetches — LKG cache hits are stale and would skew history
+    // Skip Redis write and snapshot insert for LKG — stale data would pollute cache and history
     if (source === 'last_known_good') {
-      this.logger.warn(`Rates served from last_known_good cache (stale=${String(stale)}) — skipping snapshot insert`);
+      this.logger.warn(`Rates served from last_known_good cache (stale=${String(stale)}) — skipping Redis write and snapshot insert`);
       return;
     }
+
+    // 1. Write to Redis 'rates:current' with 30-min TTL (live data only)
+    const serialized = serializeRates(rates, stale, source);
+    await this.redis.setex(REDIS_KEY_CURRENT, TTL_REFRESH_SEC, serialized);
 
     const snapshotValues = {
       fetched_at: rates.GOLD_24K.fetchedAt,
