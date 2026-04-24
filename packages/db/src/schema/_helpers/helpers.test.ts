@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { uuid, text } from 'drizzle-orm/pg-core';
 import { tenantScopedTable } from './tenantScopedTable';
 import { tenantSingletonTable } from './tenantSingletonTable';
-import { platformGlobalTable } from './platformGlobalTable';
+import { platformGlobalTable, platformGlobalTableWithRls } from './platformGlobalTable';
 import { tableRegistry } from './registry';
 
 beforeEach(() => tableRegistry.clear());
@@ -35,6 +35,15 @@ describe('platformGlobalTable', () => {
     platformGlobalTable('rates', { id: uuid('id').primaryKey() });
     expect(tableRegistry.list()).toEqual([
       { name: 'rates', kind: 'global', encryptedColumns: [] },
+    ]);
+  });
+});
+
+describe('platformGlobalTableWithRls', () => {
+  it('registers metadata with kind=global-rls', () => {
+    platformGlobalTableWithRls('shops', { id: uuid('id').primaryKey() });
+    expect(tableRegistry.list()).toEqual([
+      { name: 'shops', kind: 'global-rls', encryptedColumns: [] },
     ]);
   });
 });
