@@ -1,4 +1,4 @@
-import type { Redis } from 'ioredis';
+import type { Redis } from '@goldsmith/cache';
 import type { PurityRates } from './port';
 
 const REDIS_KEY = 'rates:last_known_good';

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import RedisMock from 'ioredis-mock';
-import type { Redis } from 'ioredis';
+import type { Redis } from '@goldsmith/cache';
 import { FallbackChain } from './fallback-chain';
 import { LastKnownGoodCache } from './last-known-good-cache';
 import { RatesAdapterError, RatesUnavailableError } from './errors';

@@ -11,6 +11,8 @@ const ALLOWED_PATH_FRAGMENTS = [
   'packages/crypto-envelope/',
   '/packages/cache/',
   'packages/cache/',
+  '/packages/tenant-config/',
+  'packages/tenant-config/',
   '/scripts/',
   'scripts/',
   '/migrations/',

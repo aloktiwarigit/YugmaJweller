@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { BullModule, InjectQueue } from '@nestjs/bullmq';
-import type { Queue } from 'bullmq';
+import type { Queue } from '@goldsmith/queue';
 import { Redis } from '@goldsmith/cache';
 import { AuthModule } from '../auth/auth.module';
 import { PricingService } from './pricing.service';

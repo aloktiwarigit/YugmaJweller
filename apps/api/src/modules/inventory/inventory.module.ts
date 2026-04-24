@@ -1,5 +1,5 @@
 import { Module, OnModuleDestroy, OnModuleInit, Inject } from '@nestjs/common';
-import { Worker } from 'bullmq';
+import { Worker } from '@goldsmith/queue';
 import { Redis } from '@goldsmith/cache';
 import { TenantQueue, createTenantWorker } from '@goldsmith/queue';
 import type { JobPayload } from '@goldsmith/queue';

@@ -16,7 +16,7 @@ interface WastageResponse {
 }
 
 export default function WastageScreen(): React.ReactElement {
-  const translate = (key: string) => t(`settings.${key}`);
+  const translate = (key: string): string => t(`settings.${key}`);
 
   const { data, isLoading, error } = useQuery<WastageResponse>({
     queryKey: ['wastage'],

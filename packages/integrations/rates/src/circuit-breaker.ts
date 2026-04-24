@@ -1,4 +1,4 @@
-import type { Redis } from 'ioredis';
+import type { Redis } from '@goldsmith/cache';
 import type { RatesPort, RatesResult } from './port';
 import { CircuitOpenError, RatesAdapterError } from './errors';
 

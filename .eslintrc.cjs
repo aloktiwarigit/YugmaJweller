@@ -13,6 +13,7 @@ module.exports = {
   rules: {
     '@typescript-eslint/no-explicit-any': 'error',
     '@typescript-eslint/explicit-function-return-type': ['error', { allowExpressions: true }],
+    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     'goldsmith/no-raw-shop-id-param': 'error',
     'no-restricted-imports': ['error', {
       patterns: [
@@ -25,6 +26,45 @@ module.exports = {
   settings: { 'import/resolver': { typescript: true } },
   ignorePatterns: ['dist', 'node_modules', '*.js.map'],
   overrides: [
+    // Test/spec files: relax return-type and shopId-param rules — factory functions
+    // and helpers in tests don't benefit from strict return-type annotations.
+    {
+      files: ['**/*.spec.ts', '**/*.test.ts'],
+      rules: {
+        '@typescript-eslint/explicit-function-return-type': 'off',
+        'goldsmith/no-raw-shop-id-param': 'off',
+      },
+    },
+    // Auth module repos + services use raw shopId internally (equivalent to packages/db layer).
+    {
+      files: [
+        'apps/api/src/modules/auth/auth.repository.ts',
+        'apps/api/src/modules/auth/auth.service.ts',
+        'apps/api/src/modules/auth/permissions.repository.ts',
+      ],
+      rules: { 'goldsmith/no-raw-shop-id-param': 'off' },
+    },
+    // NestJS framework wiring files need @nestjs/bullmq for DI module registration.
+    // bullmq restriction lifted; ioredis still restricted.
+    {
+      files: [
+        'apps/api/src/app.module.ts',
+        '**/apps/api/src/app.module.ts',
+        'apps/api/src/workers/**/*.ts',
+        '**/apps/api/src/workers/**/*.ts',
+        'apps/api/src/modules/pricing/pricing.module.ts',
+        '**/apps/api/src/modules/pricing/pricing.module.ts',
+        'apps/api/src/modules/inventory/inventory.module.ts',
+        '**/apps/api/src/modules/inventory/inventory.module.ts',
+      ],
+      rules: {
+        'no-restricted-imports': ['error', {
+          patterns: [
+            { group: ['ioredis', 'ioredis/*'], message: 'Import ioredis only from packages/cache.' },
+          ],
+        }],
+      },
+    },
     {
       files: ['packages/tenant-context/**/*.ts', '**/packages/tenant-context/**/*.ts'],
       rules: { 'no-restricted-imports': ['error', { patterns: [

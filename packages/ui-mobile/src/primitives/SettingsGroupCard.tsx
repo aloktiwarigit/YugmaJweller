@@ -8,7 +8,7 @@ interface SettingsGroupCardProps {
   style?: ViewStyle;
 }
 
-export function SettingsGroupCard({ title, children, testID, style }: SettingsGroupCardProps) {
+export function SettingsGroupCard({ title, children, testID, style }: SettingsGroupCardProps): React.ReactElement {
   return (
     <View
       testID={testID}

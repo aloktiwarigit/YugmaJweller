@@ -10,6 +10,9 @@ import { UnauthorizedException } from '@nestjs/common';
 import { createPool, runMigrations } from '@goldsmith/db';
 import { AuthController } from '../src/modules/auth/auth.controller';
 import { AuthService } from '../src/modules/auth/auth.service';
+import { AuthRepository } from '../src/modules/auth/auth.repository';
+import { PermissionsRepository } from '../src/modules/auth/permissions.repository';
+import { PermissionsCache } from '@goldsmith/tenant-config';
 
 describe('AuthController.session — missing phone_number claim → 401', () => {
   let container: StartedPostgreSqlContainer;
@@ -26,11 +29,19 @@ describe('AuthController.session — missing phone_number claim → 401', () => 
 
   afterAll(async () => { await pool?.end(); await container?.stop(); });
 
+  // Stub deps that AuthController needs but aren't exercised by guard-only tests
+  const stubDeps = [
+    { provide: AuthRepository,       useValue: {} },
+    { provide: PermissionsRepository, useValue: {} },
+    { provide: PermissionsCache,      useValue: {} },
+    { provide: 'PG_POOL',             useValue: {} },
+  ];
+
   it('user without phone_number on req.user throws UnauthorizedException auth.missing', async () => {
     const mockSvc = { session: async () => ({ user: {}, tenant: {}, requires_token_refresh: false }) };
     const mod = await Test.createTestingModule({
       controllers: [AuthController],
-      providers: [{ provide: AuthService, useValue: mockSvc }],
+      providers: [{ provide: AuthService, useValue: mockSvc }, ...stubDeps],
     }).compile();
     const controller = mod.get(AuthController);
 
@@ -46,7 +57,7 @@ describe('AuthController.session — missing phone_number claim → 401', () => 
     const mockSvc = { session: async () => ({ user: {}, tenant: {}, requires_token_refresh: false }) };
     const mod = await Test.createTestingModule({
       controllers: [AuthController],
-      providers: [{ provide: AuthService, useValue: mockSvc }],
+      providers: [{ provide: AuthService, useValue: mockSvc }, ...stubDeps],
     }).compile();
     const controller = mod.get(AuthController);
 
@@ -59,7 +70,7 @@ describe('AuthController.session — missing phone_number claim → 401', () => 
     const mockSvc = { session: async () => ({ user: {}, tenant: {}, requires_token_refresh: false }) };
     const mod = await Test.createTestingModule({
       controllers: [AuthController],
-      providers: [{ provide: AuthService, useValue: mockSvc }],
+      providers: [{ provide: AuthService, useValue: mockSvc }, ...stubDeps],
     }).compile();
     const controller = mod.get(AuthController);
 

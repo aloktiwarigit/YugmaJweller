@@ -3,6 +3,7 @@ import { tableRegistry } from './registry';
 
 type ColumnBuilders = Record<string, PgColumnBuilderBase>;
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function tenantSingletonTable<N extends string, C extends Omit<ColumnBuilders, 'shop_id'>>(
   name: N,
   columns: C,

@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Readable } from 'node:stream';
 import { parse } from 'csv-parse';
 import type { Pool } from 'pg';
-import type Redis from 'ioredis';
+import type { Redis } from '@goldsmith/cache';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { auditLog, AuditAction } from '@goldsmith/audit';

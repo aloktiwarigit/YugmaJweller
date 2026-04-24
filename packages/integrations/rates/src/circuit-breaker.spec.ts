@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import RedisMock from 'ioredis-mock';
-import type { Redis } from 'ioredis';
+import type { Redis } from '@goldsmith/cache';
 import { CircuitBreaker } from './circuit-breaker';
 import { CircuitOpenError, RatesAdapterError } from './errors';
 import type { RatesPort, PurityRates, RatesResult } from './port';

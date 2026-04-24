@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import RedisMock from 'ioredis-mock';
-import type { Redis } from 'ioredis';
+import type { Redis } from '@goldsmith/cache';
 import { LastKnownGoodCache } from './last-known-good-cache';
 import type { PurityRates } from './port';
 

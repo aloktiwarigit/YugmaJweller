@@ -1,6 +1,6 @@
 import { Logger, Inject } from '@nestjs/common';
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
-import type { Job } from 'bullmq';
+import type { Job } from '@goldsmith/queue';
 import type { Pool } from 'pg';
 import { AuditAction } from '@goldsmith/audit';
 import { PricingService } from '../modules/pricing/pricing.service';

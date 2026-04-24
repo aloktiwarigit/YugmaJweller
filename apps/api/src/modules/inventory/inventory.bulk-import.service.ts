@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import type Redis from 'ioredis';
+import type { Redis } from '@goldsmith/cache';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import type { StoragePort } from '@goldsmith/integrations-storage';
