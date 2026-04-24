@@ -118,7 +118,8 @@
     "max_pieces_label": "अधिकतम pieces per booking",
     "save_success": "बदलाव सहेज लिया ✓",
     "errors": {
-      "MAX_PIECES_RANGE": "अधिकतम pieces 1 से 10 के बीच होने चाहिए"
+      "MAX_PIECES_RANGE": "अधिकतम pieces 1 से 10 के बीच होने चाहिए",
+      "save_failed": "बदलाव नहीं हो सका। दोबारा कोशिश करें।"
     }
   },
   "custom_order_policy": {

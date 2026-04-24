@@ -72,7 +72,7 @@ export function TryAtHomeToggle({ enabled, maxPieces, onSave }: Props): React.Re
       }, 2000);
     } catch {
       if (!mountedRef.current) return;
-      setError('बदलाव नहीं हो सका। दोबारा कोशिश करें।');
+      setError(t('settings.try_at_home.errors.save_failed'));
     } finally {
       if (mountedRef.current) setSaving(false);
     }
