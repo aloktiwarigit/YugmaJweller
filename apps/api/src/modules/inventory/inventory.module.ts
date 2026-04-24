@@ -13,6 +13,7 @@ import { InventoryRepository } from './inventory.repository';
 import { InventoryBulkImportProcessor } from './inventory.bulk-import.processor';
 import type { BulkImportJobData } from './inventory.bulk-import.processor';
 import { InventoryBulkImportService } from './inventory.bulk-import.service';
+import { BarcodeService } from './barcode.service';
 
 const QUEUE_NAME = 'inventory-bulk-import';
 
@@ -22,6 +23,7 @@ const QUEUE_NAME = 'inventory-bulk-import';
   providers: [
     InventoryService,
     InventoryRepository,
+    BarcodeService,
     InventoryBulkImportProcessor,
     InventoryBulkImportService,
     {

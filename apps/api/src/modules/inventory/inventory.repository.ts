@@ -180,6 +180,18 @@ export class InventoryRepository {
     return { succeeded, failedRows };
   }
 
+  async getProductsByIds(ids: string[]): Promise<ProductRow[]> {
+    if (ids.length === 0) return [];
+    return withTenantTx(this.pool, async (tx) => {
+      const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
+      const r = await tx.query<ProductRow>(
+        `SELECT ${SELECT_COLS} FROM products WHERE id IN (${placeholders})`,
+        ids,
+      );
+      return r.rows;
+    });
+  }
+
   async updateProduct(id: string, patch: UpdateProductDto): Promise<ProductRow | null> {
     return withTenantTx(this.pool, async (tx) => {
       const sets: string[] = [];
