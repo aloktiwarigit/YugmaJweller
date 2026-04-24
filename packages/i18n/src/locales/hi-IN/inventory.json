@@ -32,5 +32,18 @@
   "error_gross_lt_net": "सकल वज़न नेट + पत्थर वज़न से कम नहीं हो सकता",
   "error_huid_format": "HUID 6 अक्षर (A-Z, 0-9) होना चाहिए",
   "success_created": "उत्पाद सफलतापूर्वक जोड़ा गया",
-  "success_updated": "उत्पाद सफलतापूर्वक अपडेट किया गया"
+  "success_updated": "उत्पाद सफलतापूर्वक अपडेट किया गया",
+  "bulk_import_title": "बल्क आयात",
+  "bulk_import_step1_label": "टेम्पलेट",
+  "bulk_import_step2_label": "CSV फ़ाइल चुनें",
+  "bulk_import_step3_label": "अपलोड हो रहा है...",
+  "bulk_import_step4_label": "{processed} में से {succeeded} प्रोडक्ट आयात हुए",
+  "bulk_import_step5_label": "आयात पूर्ण",
+  "bulk_import_btn_download_template": "टेम्पलेट डाउनलोड करें",
+  "bulk_import_btn_pick_file": "CSV फ़ाइल चुनें",
+  "bulk_import_btn_start": "आयात शुरू करें",
+  "bulk_import_btn_download_errors": "त्रुटि रिपोर्ट डाउनलोड करें",
+  "bulk_import_error_no_file": "पहले CSV फ़ाइल चुनें",
+  "bulk_import_summary_success": "{succeeded} प्रोडक्ट सफलतापूर्वक जोड़े गए",
+  "bulk_import_summary_failed": "{failed} पंक्तियाँ विफल हुईं"
 }

@@ -32,5 +32,18 @@
   "error_gross_lt_net": "Gross weight cannot be less than net + stone weight",
   "error_huid_format": "HUID must be 6 characters (A-Z, 0-9)",
   "success_created": "Product added successfully",
-  "success_updated": "Product updated successfully"
+  "success_updated": "Product updated successfully",
+  "bulk_import_title": "Bulk Import",
+  "bulk_import_step1_label": "Template",
+  "bulk_import_step2_label": "Select CSV File",
+  "bulk_import_step3_label": "Uploading...",
+  "bulk_import_step4_label": "Imported {succeeded} of {processed} products",
+  "bulk_import_step5_label": "Import Complete",
+  "bulk_import_btn_download_template": "Download Template",
+  "bulk_import_btn_pick_file": "Select CSV File",
+  "bulk_import_btn_start": "Start Import",
+  "bulk_import_btn_download_errors": "Download Error Report",
+  "bulk_import_error_no_file": "Please select a CSV file first",
+  "bulk_import_summary_success": "{succeeded} products added successfully",
+  "bulk_import_summary_failed": "{failed} rows failed"
 }
