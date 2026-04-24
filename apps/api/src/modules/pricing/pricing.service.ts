@@ -171,6 +171,7 @@ export class PricingService {
     };
     const client = await this.pool.connect();
     try {
+      await client.query('BEGIN');
       await client.query(
         `INSERT INTO ibja_rate_snapshots
            (fetched_at, source,
@@ -200,6 +201,10 @@ export class PricingService {
           JSON.stringify({ source, fetchedAt: rates.GOLD_24K.fetchedAt.toISOString() }),
         ],
       );
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
     } finally {
       client.release();
     }

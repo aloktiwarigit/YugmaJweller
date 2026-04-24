@@ -58,8 +58,9 @@ export class CircuitBreaker implements RatesPort {
     if (count >= FAILURE_THRESHOLD) {
       const alreadyOpen = await this.redis.get(this.keyState);
       if (alreadyOpen !== 'OPEN') {
-        // NX prevents concurrent double-write; EX ensures stale key can't survive past next state TTL
-        await this.redis.set(this.keyOpenedAt, String(Date.now()), 'EX', COOLDOWN_SEC * 4 + FAILURE_WINDOW_SEC, 'NX');
+        // Unconditional SET (no NX) so a re-opened circuit always gets a fresh cooldown start.
+        // The alreadyOpen guard above provides sufficient concurrent double-write protection.
+        await this.redis.set(this.keyOpenedAt, String(Date.now()), 'EX', COOLDOWN_SEC * 4 + FAILURE_WINDOW_SEC);
         await this.setState('OPEN');
       }
     }
