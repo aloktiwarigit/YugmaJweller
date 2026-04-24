@@ -14,8 +14,8 @@ import {
 } from '@nestjs/common';
 import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext, AuthenticatedTenantContext } from '@goldsmith/tenant-context';
-import { CreateProductSchema, UpdateProductSchema, GenerateBarcodesRequestSchema } from '@goldsmith/shared';
-import type { CreateProductDto, UpdateProductDto, ProductResponse, BulkImportJobStatus, BarcodeData } from '@goldsmith/shared';
+import { CreateProductSchema, UpdateProductSchema, UpdateStatusDtoSchema, GenerateBarcodesRequestSchema } from '@goldsmith/shared';
+import type { CreateProductDto, UpdateProductDto, UpdateStatusDto, ProductResponse, BulkImportJobStatus, BarcodeData } from '@goldsmith/shared';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { InventoryService } from './inventory.service';
@@ -41,7 +41,7 @@ export class InventoryController {
   }
 
   @Get('/products')
-  @Roles('shop_admin', 'shop_manager')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
   async listProducts(
     @TenantContextDec() ctx: TenantContext,
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
@@ -55,7 +55,7 @@ export class InventoryController {
   }
 
   @Get('/products/:id')
-  @Roles('shop_admin', 'shop_manager')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
   async getProduct(
     @TenantContextDec() ctx: TenantContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -73,6 +73,17 @@ export class InventoryController {
   ): Promise<ProductResponse> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.svc.updateProduct(id, dto);
+  }
+
+  @Patch('/products/:id/status')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async updateProductStatus(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(UpdateStatusDtoSchema)) dto: UpdateStatusDto,
+  ): Promise<ProductResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.svc.updateStatus(id, dto);
   }
 
   @Post('/products/:id/images/upload-url')

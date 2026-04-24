@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Inject,
   Post,
+  Query,
   UnauthorizedException,
 } from '@nestjs/common';
 import { SkipAuth } from '../../common/decorators/skip-auth.decorator';
@@ -14,11 +15,12 @@ import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { PricingService } from './pricing.service';
+import type { RateHistoryPoint } from './pricing.service';
 import { RatesUnavailableError } from '@goldsmith/rates';
 import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext, AuthenticatedTenantContext } from '@goldsmith/tenant-context';
-import { SetRateOverrideDtoSchema } from '@goldsmith/shared';
-import type { SetRateOverrideDto } from '@goldsmith/shared';
+import { SetRateOverrideDtoSchema, PURITY_VALUES } from '@goldsmith/shared';
+import type { SetRateOverrideDto, PurityKey } from '@goldsmith/shared';
 
 // ---------------------------------------------------------------------------
 // Response shape helpers
@@ -90,6 +92,36 @@ export class PricingController {
       }
       throw err;
     }
+  }
+
+  /**
+   * GET /api/v1/rates/history
+   * Authenticated (any role) — last snapshot per calendar day for the requested range.
+   * ibja_rate_snapshots is platform-global; no tenant context required.
+   */
+  @Get('history')
+  @SkipTenant()
+  async getRateHistory(
+    @Query('range') range = '30d',
+    @Query('purity') purity = 'GOLD_22K',
+  ): Promise<RateHistoryPoint[]> {
+    const validRanges = ['30d', '90d', '365d'];
+    if (!validRanges.includes(range)) {
+      throw new HttpException(
+        { code: 'rates.invalid_range', message: 'range must be 30d, 90d, or 365d' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (!(PURITY_VALUES as readonly string[]).includes(purity)) {
+      throw new HttpException(
+        { code: 'rates.invalid_purity', message: 'purity must be a valid purity key' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    return this.pricingService.getRateHistory(
+      range as '30d' | '90d' | '365d',
+      purity as PurityKey,
+    );
   }
 
   /**

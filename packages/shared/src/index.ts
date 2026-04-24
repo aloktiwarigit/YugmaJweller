@@ -110,11 +110,13 @@ export type {
 export {
   CreateProductSchema,
   UpdateProductSchema,
+  UpdateStatusDtoSchema,
   ProductResponseSchema,
 } from './schemas/product.schema';
 export type {
   CreateProductDto,
   UpdateProductDto,
+  UpdateStatusDto,
   ProductResponse,
 } from './schemas/product.schema';
 

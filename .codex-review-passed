@@ -1,1 +1,7 @@
-.codex-review-passed
+story: 3.4 — Product Status State Machine
+reviewed-at: 2026-04-24
+model: gpt-5.4
+base: main
+p1-issues: 2 (TOCTOU race + staff role gap) — both fixed
+p2-issues: 0
+result: PASSED (after P1 fixes)

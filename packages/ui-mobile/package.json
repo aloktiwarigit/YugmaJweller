@@ -10,7 +10,8 @@
   },
   "peerDependencies": {
     "react": "18.x",
-    "react-native": "0.74.x || 0.75.x || 0.76.x"
+    "react-native": "0.74.x || 0.75.x || 0.76.x",
+    "react-native-svg": "^15.0.0"
   },
   "dependencies": {
     "@goldsmith/ui-tokens": "workspace:*"
@@ -21,6 +22,7 @@
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-native": "0.74.0",
+    "react-native-svg": "^15.2.0",
     "jsdom": "^24.0.0",
     "vitest": "^1.4.0",
     "typescript": "^5.4.0"

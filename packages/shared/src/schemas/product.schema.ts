@@ -70,3 +70,9 @@ export const ProductResponseSchema = z.object({
 });
 
 export type ProductResponse = z.infer<typeof ProductResponseSchema>;
+
+export const UpdateStatusDtoSchema = z.object({
+  status: STATUS,
+  note: z.string().max(500).optional(),
+});
+export type UpdateStatusDto = z.infer<typeof UpdateStatusDtoSchema>;

@@ -53,6 +53,7 @@ const authCtx: AuthenticatedTenantContext = {
 const mockPricingService = {
   getCurrentRates: vi.fn(),
   setOverride: vi.fn(),
+  getRateHistory: vi.fn(),
 };
 
 // ---------------------------------------------------------------------------
@@ -105,6 +106,57 @@ describe('PricingController', () => {
     it('is a public endpoint — controller metadata has SkipAuth', () => {
       const metadata = Reflect.getMetadata('skip-auth', controller.getCurrent);
       expect(metadata).toBe(true);
+    });
+  });
+
+  describe('GET /api/v1/rates/history', () => {
+    const fakeHistory = [
+      { date: '2026-03-26', perGramPaise: '673750', perGramRupees: '6,737.50', source: 'ibja', stale: false },
+    ];
+
+    it('calls pricingService.getRateHistory with validated range and purity', async () => {
+      (mockPricingService.getRateHistory as Mock).mockResolvedValue(fakeHistory);
+
+      const result = await controller.getRateHistory('30d', 'GOLD_22K');
+
+      expect(mockPricingService.getRateHistory).toHaveBeenCalledWith('30d', 'GOLD_22K');
+      expect(result).toEqual(fakeHistory);
+    });
+
+    it('uses defaults when range and purity are omitted', async () => {
+      (mockPricingService.getRateHistory as Mock).mockResolvedValue([]);
+
+      await controller.getRateHistory(undefined as unknown as string, undefined as unknown as string);
+
+      expect(mockPricingService.getRateHistory).toHaveBeenCalledWith('30d', 'GOLD_22K');
+    });
+
+    it('returns 400 for invalid range', async () => {
+      await expect(controller.getRateHistory('7d', 'GOLD_22K')).rejects.toBeInstanceOf(HttpException);
+
+      try {
+        await controller.getRateHistory('7d', 'GOLD_22K');
+      } catch (err) {
+        expect((err as HttpException).getStatus()).toBe(400);
+      }
+    });
+
+    it('returns 400 for invalid purity', async () => {
+      await expect(controller.getRateHistory('30d', 'PLATINUM_24K')).rejects.toBeInstanceOf(HttpException);
+
+      try {
+        await controller.getRateHistory('30d', 'PLATINUM_24K');
+      } catch (err) {
+        expect((err as HttpException).getStatus()).toBe(400);
+      }
+    });
+
+    it('accepts all three valid ranges', async () => {
+      (mockPricingService.getRateHistory as Mock).mockResolvedValue([]);
+
+      for (const range of ['30d', '90d', '365d']) {
+        await expect(controller.getRateHistory(range, 'GOLD_22K')).resolves.toBeDefined();
+      }
     });
   });
 

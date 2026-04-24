@@ -192,6 +192,24 @@ export class InventoryRepository {
     });
   }
 
+  async updateStatusAtomic(
+    id: string,
+    expectedStatus: string,
+    newStatus: string,
+  ): Promise<ProductRow | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      // Conditional UPDATE: only succeeds if the current status still matches.
+      // Closes the TOCTOU race between the transition check and the write.
+      const r = await tx.query<ProductRow>(
+        `UPDATE products SET status = $1, updated_at = now()
+         WHERE id = $2 AND status = $3
+         RETURNING ${SELECT_COLS}`,
+        [newStatus, id, expectedStatus],
+      );
+      return r.rows[0] ?? null;
+    });
+  }
+
   async updateProduct(id: string, patch: UpdateProductDto): Promise<ProductRow | null> {
     return withTenantTx(this.pool, async (tx) => {
       const sets: string[] = [];

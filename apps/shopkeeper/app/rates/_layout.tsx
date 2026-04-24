@@ -11,6 +11,7 @@ export default function RatesLayout(): React.ReactElement {
       }}
     >
       <Stack.Screen name="override" options={{ title: 'दर ओवरराइड' }} />
+      <Stack.Screen name="history" options={{ title: 'भाव इतिहास' }} />
     </Stack>
   );
 }
