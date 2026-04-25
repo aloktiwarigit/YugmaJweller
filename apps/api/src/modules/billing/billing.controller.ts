@@ -4,16 +4,20 @@ import {
 } from '@nestjs/common';
 import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext } from '@goldsmith/tenant-context';
-import { CreateInvoiceSchema } from '@goldsmith/shared';
-import type { CreateInvoiceDtoType, InvoiceResponse } from '@goldsmith/shared';
+import { CreateInvoiceSchema, RecordCashPaymentSchema } from '@goldsmith/shared';
+import type { CreateInvoiceDtoType, InvoiceResponse, RecordCashPaymentDto } from '@goldsmith/shared';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { TenantWalkerRoute } from '../../common/decorators/tenant-walker-route.decorator';
 import { BillingService } from './billing.service';
+import { PaymentService } from './payment.service';
 
 @Controller('/api/v1/billing')
 export class BillingController {
-  constructor(private readonly svc: BillingService) {}
+  constructor(
+    private readonly svc: BillingService,
+    private readonly payments: PaymentService,
+  ) {}
 
   // Walker: missing idempotency-key header → service throws 400 BadRequest.
   // This is the expected status — it proves auth/RLS succeeded (not 401/403/500)
@@ -70,6 +74,24 @@ export class BillingController {
   ): Promise<InvoiceResponse> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.svc.getInvoice(id);
+  }
+
+  // Section 269ST cash-cap: all roles can attempt a cash payment; STAFF cannot use override.
+  // Returns 422 ComplianceHardBlockError when daily cash would exceed Rs 1,99,999 and no override.
+  @TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-0000-0000-000000000000' } })
+  @Post('/invoices/:id/payments/cash')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async recordCashPayment(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) invoiceId: string,
+    @Body(new ZodValidationPipe(RecordCashPaymentSchema)) dto: RecordCashPaymentDto,
+  ): Promise<void> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.payments.recordCashPayment(
+      invoiceId,
+      BigInt(dto.amountPaise),
+      dto.override,
+    );
   }
 
   // Tax-audit PAN decryption — OWNER only, rate-limited 10 req/hr per shop.

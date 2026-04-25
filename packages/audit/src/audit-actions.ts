@@ -38,4 +38,5 @@ export enum AuditAction {
   INVOICE_CREATED                  = 'INVOICE_CREATED',
   INVOICE_ISSUED                   = 'INVOICE_ISSUED',
   INVOICE_PAN_ACCESSED             = 'INVOICE_PAN_ACCESSED',
+  COMPLIANCE_OVERRIDE_269ST        = 'COMPLIANCE_OVERRIDE_269ST',
 }

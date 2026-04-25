@@ -12,3 +12,9 @@ export {
   validateForm60,
 } from './pan/rule-114b';
 export type { PanEnforcementInput } from './pan/rule-114b';
+export {
+  SECTION_269ST_LIMIT_PAISE,
+  enforce269ST,
+  buildCashCapOverride,
+} from './cash-cap/section-269st';
+export type { CashCapCheckInput, CashCapOverride, OverrideInput } from './cash-cap/section-269st';

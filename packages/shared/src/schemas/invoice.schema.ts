@@ -90,3 +90,13 @@ export const InvoiceResponseSchema = z.object({
 
 export type InvoiceItemResponse = z.infer<typeof InvoiceItemResponseSchema>;
 export type InvoiceResponse     = z.infer<typeof InvoiceResponseSchema>;
+
+export const RecordCashPaymentSchema = z.object({
+  // Paise value as string to avoid JavaScript precision loss with large integers
+  amountPaise: PaiseString,
+  override: z.object({
+    justification: z.string().min(1).max(1000),
+  }).optional(),
+});
+
+export type RecordCashPaymentDto = z.infer<typeof RecordCashPaymentSchema>;

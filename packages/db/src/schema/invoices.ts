@@ -1,4 +1,4 @@
-import { uuid, text, bigint, timestamp, customType } from 'drizzle-orm/pg-core';
+import { uuid, text, bigint, timestamp, jsonb, customType } from 'drizzle-orm/pg-core';
 import { tenantScopedTable } from './_helpers/tenantScopedTable';
 
 const bytea = customType<{ data: Buffer }>({
@@ -25,6 +25,8 @@ export const invoices = tenantScopedTable('invoices', {
   pan_key_id:           text('pan_key_id'),
   form60_encrypted:     bytea('form60_encrypted'),
   form60_key_id:        text('form60_key_id'),
+  // Section 269ST supervisor override metadata — stored when OWNER/MANAGER overrides cash-cap block
+  compliance_overrides_jsonb: jsonb('compliance_overrides_jsonb'),
   created_at:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updated_at:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

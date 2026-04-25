@@ -162,10 +162,12 @@ export {
   InvoiceLineSchema,
   InvoiceResponseSchema,
   InvoiceItemResponseSchema,
+  RecordCashPaymentSchema,
 } from './schemas/invoice.schema';
 export type {
   CreateInvoiceDtoType,
   InvoiceLineDtoType,
   InvoiceResponse,
   InvoiceItemResponse,
+  RecordCashPaymentDto,
 } from './schemas/invoice.schema';

@@ -9,6 +9,7 @@ import { SettingsRepository } from '../settings/settings.repository';
 import { BillingController } from './billing.controller';
 import { BillingService }    from './billing.service';
 import { BillingRepository } from './billing.repository';
+import { PaymentService }    from './payment.service';
 
 @Module({
   imports: [AuthModule, InventoryModule, PricingModule],
@@ -16,6 +17,7 @@ import { BillingRepository } from './billing.repository';
   providers: [
     BillingService,
     BillingRepository,
+    PaymentService,
     SettingsRepository,
     {
       provide: 'BILLING_REDIS',
