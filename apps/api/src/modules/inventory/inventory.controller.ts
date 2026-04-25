@@ -69,6 +69,7 @@ export class InventoryController {
     return this.deadStockSvc.getDeadStock(ctx);
   }
 
+
   @Post('/products')
   @Roles('shop_admin', 'shop_manager')
   async createProduct(
