@@ -92,6 +92,28 @@ export class InventoryService {
     return mapRow(row);
   }
 
+  /**
+   * Returns the raw product row (NOT mapped) — used by BillingService so it
+   * can read `huid`, `metal`, `purity`, `net_weight_g` exactly as stored.
+   * 404 if missing or RLS-hidden.
+   */
+  async getProductRowForBilling(id: string): Promise<{
+    id: string; shop_id: string; metal: string; purity: string;
+    net_weight_g: string; huid: string | null; status: string;
+  }> {
+    const row = await this.repo.getProduct(id);
+    if (!row) throw new NotFoundException({ code: 'inventory.product_not_found' });
+    return {
+      id:           row.id,
+      shop_id:      row.shop_id,
+      metal:        row.metal,
+      purity:       row.purity,
+      net_weight_g: row.net_weight_g,
+      huid:         row.huid,
+      status:       row.status,
+    };
+  }
+
   async updateProduct(id: string, dto: UpdateProductDto): Promise<ProductResponse> {
     if (dto.huid) {
       const v = validateHuidFormat(dto.huid);
