@@ -14,15 +14,28 @@ export const InvoiceLineSchema = z.object({
   metalType:         z.enum(['GOLD', 'SILVER', 'PLATINUM']).optional(),
   purity:            z.string().max(16).optional(),
   netWeightG:        DecimalWeight.optional(),
-  makingChargePct:   DecimalPct.default('12.00'),
+  makingChargePct:   DecimalPct.optional(),
   stoneChargesPaise: PaiseString.default('0'),
   hallmarkFeePaise:  PaiseString.default('0'),
+});
+
+// PAN: AAAAA9999A — 5 uppercase alpha + 4 digits + 1 uppercase alpha (Rule 114B)
+const PanString = z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]$/, 'Invalid PAN format — e.g. ABCDE1234F');
+
+export const Form60Schema = z.object({
+  name:                       z.string().min(2),
+  address:                    z.string().min(10),
+  reasonForNoPan:             z.string().min(5),
+  estimatedAnnualIncomePaise: z.string().regex(/^\d+$/, 'Must be a non-negative integer string'),
 });
 
 export const CreateInvoiceSchema = z.object({
   customerName:  z.string().min(1).max(200),
   customerPhone: PhoneIndia.optional(),
   lines:         z.array(InvoiceLineSchema).min(1).max(50),
+  // PAN Rule 114B — required when total >= Rs 2,00,000; normalised to uppercase before sending
+  pan:           PanString.optional(),
+  form60Data:    Form60Schema.optional(),
 });
 
 export type CreateInvoiceDtoType = z.infer<typeof CreateInvoiceSchema>;

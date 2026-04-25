@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
 import { BillingService } from './billing.service';
 import { ComplianceHardBlockError } from '@goldsmith/compliance';
+import type { MakingChargeConfig } from '@goldsmith/shared';
 
 const SHOP = '0a1b2c3d-4e5f-4000-8000-000000000000';
 const USER = '11111111-2222-4000-8000-000000000000';
@@ -59,6 +60,19 @@ function fakeInventory() {
   };
 }
 
+function fakeSettingsCache(configs: MakingChargeConfig[] | null = null) {
+  return {
+    getMakingCharges: vi.fn(async () => configs),
+    setMakingCharges: vi.fn(async () => undefined),
+  };
+}
+
+function fakeSettingsRepo(configs: MakingChargeConfig[] | null = null) {
+  return {
+    getMakingCharges: vi.fn(async () => configs),
+  };
+}
+
 function fakeRepo() {
   return {
     insertInvoice: vi.fn(async (input: any) => ({
@@ -112,6 +126,7 @@ describe('BillingService.createInvoice', () => {
     const svc  = new BillingService(
       repo as any, inv as any, fakePricing() as any,
       fakeRedis() as any, fakePool(),
+      undefined as any, undefined as any, undefined as any,
     );
 
     await expect(
@@ -148,7 +163,7 @@ describe('BillingService.createInvoice', () => {
     };
     const redis = fakeRedis({ [`invoice:idempotency:${SHOP}:idem-cached`]: JSON.stringify(cached) });
 
-    const svc = new BillingService(repo as any, inv as any, fakePricing() as any, redis as any, fakePool());
+    const svc = new BillingService(repo as any, inv as any, fakePricing() as any, redis as any, fakePool(), undefined as any, undefined as any, undefined as any);
     const out = await svc.createInvoice(
       { customerName: 'Smoke', lines: [{ description: 'x', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any] },
       'idem-cached',
@@ -164,6 +179,7 @@ describe('BillingService.createInvoice', () => {
     const svc  = new BillingService(
       repo as any, inv as any, fakePricing() as any,
       fakeRedis() as any, fakePool(),
+      undefined as any, undefined as any, undefined as any,
     );
 
     // Request line has no huid; product on record DOES (hallmarked) → must hard-block
@@ -178,7 +194,7 @@ describe('BillingService.createInvoice', () => {
   it('rejects when idempotencyKey is empty', async () => {
     const repo = fakeRepo();
     const inv  = fakeInventory();
-    const svc  = new BillingService(repo as any, inv as any, fakePricing() as any, fakeRedis() as any, fakePool());
+    const svc  = new BillingService(repo as any, inv as any, fakePricing() as any, fakeRedis() as any, fakePool(), undefined as any, undefined as any, undefined as any);
 
     await expect(
       svc.createInvoice(
@@ -206,6 +222,7 @@ describe('BillingService.createInvoice', () => {
     const svc = new BillingService(
       repo as any, inv as any, fakePricing() as any,
       fakeRedis() as any, fakePool(),
+      undefined as any, undefined as any, undefined as any,
     );
 
     await expect(
@@ -252,6 +269,7 @@ describe('BillingService.createInvoice', () => {
     const svc = new BillingService(
       repo as any, inv as any, fakePricing() as any,
       fakeRedis() as any, fakePool(),
+      undefined as any, undefined as any, undefined as any,
     );
 
     await expect(
@@ -274,5 +292,123 @@ describe('BillingService.createInvoice', () => {
       code: 'invoice.insufficient_quantity',
       productId: 'prod-xyz',
     });
+  });
+});
+
+describe('BillingService.createInvoice — making charges from shop settings', () => {
+  function fakeInventoryWithCategory(category: string | null) {
+    return {
+      getProductRowForBilling: vi.fn(async (id: string) => ({
+        id,
+        shop_id: SHOP,
+        metal: 'GOLD',
+        purity: 'GOLD_22K',
+        net_weight_g: '10.0000',
+        huid: null,
+        status: 'IN_STOCK',
+        category,
+      })),
+    };
+  }
+
+  it('uses category making charge from shop settings when DTO omits makingChargePct', async () => {
+    const repo = fakeRepo();
+    const sc = fakeSettingsCache([{ category: 'BRIDAL', type: 'percent', value: '14.00' }]);
+    const svc = new BillingService(
+      repo as any,
+      fakeInventoryWithCategory('BRIDAL') as any,
+      fakePricing() as any,
+      fakeRedis() as any,
+      fakePool(),
+      undefined as any,
+      sc as any,
+      fakeSettingsRepo() as any,
+    );
+
+    await svc.createInvoice(
+      { customerName: 'राम', lines: [
+        { productId: 'p1', description: 'Bridal Set', huid: 'AB12CD', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
+      ]},
+      'idem-bridal',
+    );
+
+    const item = (repo.insertInvoice.mock.calls[0][0] as any).items[0];
+    expect(item.makingChargePct).toBe('14.00');
+  });
+
+  it('falls back to 12.00 when category has no matching config in shop settings', async () => {
+    const repo = fakeRepo();
+    const svc = new BillingService(
+      repo as any,
+      fakeInventoryWithCategory('RINGS') as any,
+      fakePricing() as any,
+      fakeRedis() as any,
+      fakePool(),
+      undefined as any,
+      fakeSettingsCache([{ category: 'CHAINS', type: 'percent', value: '10.00' }]) as any,
+      fakeSettingsRepo() as any,
+    );
+
+    await svc.createInvoice(
+      { customerName: 'राम', lines: [
+        { productId: 'p1', description: 'Ring', huid: 'AB12CD', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
+      ]},
+      'idem-rings-fallback',
+    );
+
+    const item = (repo.insertInvoice.mock.calls[0][0] as any).items[0];
+    expect(item.makingChargePct).toBe('12.00');
+  });
+
+  it('DTO makingChargePct wins over shop settings', async () => {
+    const repo = fakeRepo();
+    const svc = new BillingService(
+      repo as any,
+      fakeInventoryWithCategory('BRIDAL') as any,
+      fakePricing() as any,
+      fakeRedis() as any,
+      fakePool(),
+      undefined as any,
+      fakeSettingsCache([{ category: 'BRIDAL', type: 'percent', value: '14.00' }]) as any,
+      fakeSettingsRepo() as any,
+    );
+
+    await svc.createInvoice(
+      { customerName: 'राम', lines: [
+        { productId: 'p1', description: 'Bridal Override', huid: 'AB12CD', makingChargePct: '8.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
+      ]},
+      'idem-dto-override',
+    );
+
+    const item = (repo.insertInvoice.mock.calls[0][0] as any).items[0];
+    expect(item.makingChargePct).toBe('8.00');
+  });
+
+  it('cache miss → fetches from DB via settingsRepo → uses DB value and warms cache', async () => {
+    const repo = fakeRepo();
+    const sc = fakeSettingsCache(null); // cache miss
+    const sr = fakeSettingsRepo([{ category: 'CHAINS', type: 'percent', value: '10.00' }]);
+    const svc = new BillingService(
+      repo as any,
+      fakeInventoryWithCategory('CHAINS') as any,
+      fakePricing() as any,
+      fakeRedis() as any,
+      fakePool(),
+      undefined as any,
+      sc as any,
+      sr as any,
+    );
+
+    await svc.createInvoice(
+      { customerName: 'राम', lines: [
+        { productId: 'p1', description: 'Chain', huid: 'AB12CD', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
+      ]},
+      'idem-cache-miss',
+    );
+
+    const item = (repo.insertInvoice.mock.calls[0][0] as any).items[0];
+    expect(item.makingChargePct).toBe('10.00');
+    expect(sr.getMakingCharges).toHaveBeenCalled();
+    expect(sc.setMakingCharges).toHaveBeenCalledWith([{ category: 'CHAINS', type: 'percent', value: '10.00' }]);
   });
 });

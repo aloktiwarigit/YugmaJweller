@@ -64,6 +64,9 @@ importers:
       '@goldsmith/compliance':
         specifier: workspace:*
         version: link:../../packages/compliance
+      '@goldsmith/crypto-envelope':
+        specifier: workspace:*
+        version: link:../../packages/crypto-envelope
       '@goldsmith/db':
         specifier: workspace:*
         version: link:../../packages/db

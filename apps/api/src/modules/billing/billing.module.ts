@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { Redis } from '@goldsmith/cache';
+import { LocalKMS } from '@goldsmith/crypto-envelope';
+import { SettingsCache } from '@goldsmith/tenant-config';
 import { AuthModule }      from '../auth/auth.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { PricingModule }   from '../pricing/pricing.module';
+import { SettingsRepository } from '../settings/settings.repository';
 import { BillingController } from './billing.controller';
 import { BillingService }    from './billing.service';
 import { BillingRepository } from './billing.repository';
@@ -13,12 +16,22 @@ import { BillingRepository } from './billing.repository';
   providers: [
     BillingService,
     BillingRepository,
+    SettingsRepository,
     {
       provide: 'BILLING_REDIS',
       useFactory: () =>
         new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
           maxRetriesPerRequest: 3,
         }),
+    },
+    {
+      provide: 'KMS_ADAPTER',
+      useFactory: () => new LocalKMS(),
+    },
+    {
+      provide: SettingsCache,
+      useFactory: (redis: Redis) => new SettingsCache(redis, 60),
+      inject: ['BILLING_REDIS'],
     },
   ],
 })

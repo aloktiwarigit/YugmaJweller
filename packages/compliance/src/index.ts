@@ -5,3 +5,10 @@ export { applyGstSplit } from './gst/split';
 export { ComplianceHardBlockError } from './errors';
 export { validateHuidPresence } from './huid/validate-presence';
 export type { HuidPresenceLine } from './huid/validate-presence';
+export { validatePanFormat, normalizePan } from './pan/validate-format';
+export {
+  PAN_THRESHOLD_PAISE,
+  enforcePanRequired,
+  validateForm60,
+} from './pan/rule-114b';
+export type { PanEnforcementInput } from './pan/rule-114b';

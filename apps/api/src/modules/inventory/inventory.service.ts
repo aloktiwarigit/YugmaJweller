@@ -99,19 +99,11 @@ export class InventoryService {
    */
   async getProductRowForBilling(id: string): Promise<{
     id: string; shop_id: string; metal: string; purity: string;
-    net_weight_g: string; huid: string | null; status: string;
+    net_weight_g: string; huid: string | null; status: string; category: string | null;
   }> {
-    const row = await this.repo.getProduct(id);
+    const row = await this.repo.getProductBillingRow(id);
     if (!row) throw new NotFoundException({ code: 'inventory.product_not_found' });
-    return {
-      id:           row.id,
-      shop_id:      row.shop_id,
-      metal:        row.metal,
-      purity:       row.purity,
-      net_weight_g: row.net_weight_g,
-      huid:         row.huid,
-      status:       row.status,
-    };
+    return row;
   }
 
   async updateProduct(id: string, dto: UpdateProductDto): Promise<ProductResponse> {

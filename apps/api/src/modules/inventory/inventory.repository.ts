@@ -47,6 +47,17 @@ export interface FailedRow {
   error: string;
 }
 
+export interface ProductBillingRow {
+  id: string;
+  shop_id: string;
+  metal: string;
+  purity: string;
+  net_weight_g: string;
+  huid: string | null;
+  status: string;
+  category: string | null;
+}
+
 export interface ValuationProductRow {
   id: string;
   metal: string;
@@ -106,6 +117,20 @@ export class InventoryRepository {
     return withTenantTx(this.pool, async (tx) => {
       const r = await tx.query<ProductRow>(
         `SELECT ${SELECT_COLS} FROM products WHERE id = $1`,
+        [id],
+      );
+      return r.rows[0] ?? null;
+    });
+  }
+
+  async getProductBillingRow(id: string): Promise<ProductBillingRow | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query<ProductBillingRow>(
+        `SELECT p.id, p.shop_id, p.metal, p.purity, p.net_weight_g, p.huid, p.status,
+                pc.name AS category
+           FROM products p
+           LEFT JOIN product_categories pc ON pc.id = p.category_id
+          WHERE p.id = $1`,
         [id],
       );
       return r.rows[0] ?? null;

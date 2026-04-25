@@ -15,10 +15,23 @@ import { BillingLineBuilder } from '@goldsmith/ui-mobile';
 import type { BillingLineValue, BillingLineProduct } from '@goldsmith/ui-mobile';
 import { api } from '../../src/api/client';
 import type { InvoiceResponse, CreateInvoiceDtoType } from '@goldsmith/shared';
+import { PanPromptSheet } from '../../src/features/billing/components/PanPromptSheet';
+import type { PanSubmitPayload } from '../../src/features/billing/components/PanPromptSheet';
 
 interface DraftLine extends BillingLineValue {
   product: BillingLineProduct;
   ratePerGramPaise: bigint;
+}
+
+function extractTotalPaise(errorBody: unknown): bigint {
+  try {
+    const body = errorBody as { totalPaise?: string } | null | undefined;
+    const raw = body?.totalPaise;
+    if (raw != null) return BigInt(raw);
+  } catch {
+    // fall through
+  }
+  return 0n;
 }
 
 export default function NewInvoiceScreen(): JSX.Element {
@@ -27,7 +40,11 @@ export default function NewInvoiceScreen(): JSX.Element {
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [idempotencyKey] = useState<string>(() => uuid());
 
-  const createInvoice = useMutation<InvoiceResponse, Error, CreateInvoiceDtoType>({
+  // PAN prompt state
+  const [panRequired, setPanRequired] = useState(false);
+  const [panTotalPaise, setPanTotalPaise] = useState(0n);
+
+  const createInvoice = useMutation<InvoiceResponse, unknown, CreateInvoiceDtoType>({
     mutationFn: async (dto) => {
       const res = await api.post<InvoiceResponse>('/api/v1/billing/invoices', dto, {
         headers: { 'Idempotency-Key': idempotencyKey },
@@ -37,9 +54,40 @@ export default function NewInvoiceScreen(): JSX.Element {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onSuccess: (invoice) => router.replace(`/billing/${invoice.id}` as any),
     onError: (err) => {
-      Alert.alert('Invoice generate नहीं हुआ', err.message);
+      const body = (err as { response?: { data?: unknown; status?: number } }).response?.data;
+      const status = (err as { response?: { status?: number } }).response?.status;
+      const code = (body as { code?: string } | null | undefined)?.code;
+
+      if (status === 422 && code === 'compliance.pan_required') {
+        const totalPaise = extractTotalPaise(body);
+        setPanTotalPaise(totalPaise);
+        setPanRequired(true);
+        return;
+      }
+
+      const message = (body as { detail?: string } | null | undefined)?.detail
+        ?? (err instanceof Error ? err.message : 'कुछ गलत हो गया');
+      Alert.alert('Invoice generate नहीं हुआ', message);
     },
   });
+
+  const buildDto = useCallback(
+    (extra: PanSubmitPayload = {}): CreateInvoiceDtoType => ({
+      customerName: customerName.trim(),
+      ...(customerPhone.trim() ? { customerPhone: customerPhone.trim() } : {}),
+      lines: lines.map((l) => ({
+        productId: l.productId,
+        description: l.description,
+        huid: l.huid,
+        makingChargePct: l.makingChargePct,
+        stoneChargesPaise: '0',
+        hallmarkFeePaise: '0',
+      })),
+      ...(extra.pan ? { pan: extra.pan } : {}),
+      ...(extra.form60Data ? { form60Data: extra.form60Data } : {}),
+    }),
+    [customerName, customerPhone, lines],
+  );
 
   const onLineChange = useCallback((index: number, next: BillingLineValue) => {
     setLines((curr) => {
@@ -58,80 +106,90 @@ export default function NewInvoiceScreen(): JSX.Element {
       Alert.alert('कम से कम एक आइटम जोड़ें');
       return;
     }
-    const dto: CreateInvoiceDtoType = {
-      customerName: customerName.trim(),
-      ...(customerPhone.trim() ? { customerPhone: customerPhone.trim() } : {}),
-      lines: lines.map((l) => ({
-        productId: l.productId,
-        description: l.description,
-        huid: l.huid,
-        makingChargePct: l.makingChargePct,
-        stoneChargesPaise: '0',
-        hallmarkFeePaise: '0',
-      })),
-    };
-    createInvoice.mutate(dto);
-  }, [customerName, customerPhone, lines, createInvoice]);
+    createInvoice.mutate(buildDto());
+  }, [customerName, lines, buildDto, createInvoice]);
+
+  const onPanSubmit = useCallback(
+    (payload: PanSubmitPayload) => {
+      setPanRequired(false);
+      createInvoice.mutate(buildDto(payload));
+    },
+    [buildDto, createInvoice],
+  );
+
+  const onPanCancel = useCallback(() => {
+    setPanRequired(false);
+    setPendingDto(null);
+  }, []);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>नया Invoice</Text>
+    <>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Text style={styles.title}>नया Invoice</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.label}>ग्राहक का नाम *</Text>
-        <TextInput
-          value={customerName}
-          onChangeText={setCustomerName}
-          style={styles.input}
-          placeholder="नाम लिखें"
-          accessibilityLabel="Customer name"
-        />
-        <Text style={styles.label}>फ़ोन (वैकल्पिक)</Text>
-        <TextInput
-          value={customerPhone}
-          onChangeText={setCustomerPhone}
-          keyboardType="phone-pad"
-          maxLength={10}
-          style={styles.input}
-          placeholder="9876543210"
-          accessibilityLabel="Customer phone"
-        />
-      </View>
+        <View style={styles.card}>
+          <Text style={styles.label}>ग्राहक का नाम *</Text>
+          <TextInput
+            value={customerName}
+            onChangeText={setCustomerName}
+            style={styles.input}
+            placeholder="नाम लिखें"
+            accessibilityLabel="Customer name"
+          />
+          <Text style={styles.label}>फ़ोन (वैकल्पिक)</Text>
+          <TextInput
+            value={customerPhone}
+            onChangeText={setCustomerPhone}
+            keyboardType="phone-pad"
+            maxLength={10}
+            style={styles.input}
+            placeholder="9876543210"
+            accessibilityLabel="Customer phone"
+          />
+        </View>
 
-      {lines.map((line, i) => (
-        <BillingLineBuilder
-          key={`${line.productId}-${i}`}
-          product={line.product}
-          ratePerGramPaise={line.ratePerGramPaise}
-          makingChargePct={line.makingChargePct}
-          onChange={(v) => onLineChange(i, v)}
-        />
-      ))}
+        {lines.map((line, i) => (
+          <BillingLineBuilder
+            key={`${line.productId}-${i}`}
+            product={line.product}
+            ratePerGramPaise={line.ratePerGramPaise}
+            makingChargePct={line.makingChargePct}
+            onChange={(v) => onLineChange(i, v)}
+          />
+        ))}
 
-      <Pressable
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        onPress={() => router.push('/billing/scan' as any)}
-        style={styles.scanButton}
-        accessibilityRole="button"
-      >
-        <Text style={styles.scanButtonText}>+ बारकोड स्कैन करें</Text>
-      </Pressable>
+        <Pressable
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onPress={() => router.push('/billing/scan' as any)}
+          style={styles.scanButton}
+          accessibilityRole="button"
+        >
+          <Text style={styles.scanButtonText}>+ बारकोड स्कैन करें</Text>
+        </Pressable>
 
-      <Pressable
-        onPress={onSubmit}
-        disabled={createInvoice.isPending}
-        style={[
-          styles.submitButton,
-          createInvoice.isPending && styles.submitButtonDisabled,
-        ]}
-        accessibilityRole="button"
-        accessibilityState={{ disabled: createInvoice.isPending }}
-      >
-        <Text style={styles.submitButtonText}>
-          {createInvoice.isPending ? 'Generate हो रहा है...' : 'Invoice बनाएं'}
-        </Text>
-      </Pressable>
-    </ScrollView>
+        <Pressable
+          onPress={onSubmit}
+          disabled={createInvoice.isPending}
+          style={[
+            styles.submitButton,
+            createInvoice.isPending && styles.submitButtonDisabled,
+          ]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: createInvoice.isPending }}
+        >
+          <Text style={styles.submitButtonText}>
+            {createInvoice.isPending ? 'Generate हो रहा है...' : 'Invoice बनाएं'}
+          </Text>
+        </Pressable>
+      </ScrollView>
+
+      <PanPromptSheet
+        visible={panRequired}
+        totalPaise={panTotalPaise}
+        onSubmit={onPanSubmit}
+        onCancel={onPanCancel}
+      />
+    </>
   );
 }
 

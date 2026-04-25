@@ -18,6 +18,11 @@ export interface InvoiceRow {
   idempotency_key:     string;
   issued_at:           Date | null;
   created_by_user_id:  string;
+  // PAN Rule 114B encrypted fields (null when total < Rs 2,00,000)
+  pan_ciphertext:      Buffer | null;
+  pan_key_id:          string | null;
+  form60_encrypted:    Buffer | null;
+  form60_key_id:       string | null;
   created_at:          Date;
   updated_at:          Date;
 }
@@ -59,6 +64,10 @@ export interface InsertInvoiceInput {
   idempotencyKey:   string;
   issuedAt:         Date | null;
   createdByUserId:  string;
+  panCiphertext:    Buffer | null;
+  panKeyId:         string | null;
+  form60Encrypted:  Buffer | null;
+  form60KeyId:      string | null;
   items: Array<{
     productId:           string | null;
     description:         string;
@@ -92,7 +101,9 @@ const INVOICE_COLS = `
   id, shop_id, invoice_number, invoice_type,
   customer_id, customer_name, customer_phone,
   status, subtotal_paise, gst_metal_paise, gst_making_paise, total_paise,
-  idempotency_key, issued_at, created_by_user_id, created_at, updated_at
+  idempotency_key, issued_at, created_by_user_id,
+  pan_ciphertext, pan_key_id, form60_encrypted, form60_key_id,
+  created_at, updated_at
 `;
 
 const ITEM_COLS = `
@@ -120,9 +131,10 @@ export class BillingRepository {
              (shop_id, invoice_number, invoice_type,
               customer_id, customer_name, customer_phone,
               status, subtotal_paise, gst_metal_paise, gst_making_paise, total_paise,
-              idempotency_key, issued_at, created_by_user_id)
+              idempotency_key, issued_at, created_by_user_id,
+              pan_ciphertext, pan_key_id, form60_encrypted, form60_key_id)
            VALUES (current_setting('app.current_shop_id')::uuid,
-                   $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+                   $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
            RETURNING ${INVOICE_COLS}`,
           [
             input.invoiceNumber, input.invoiceType,
@@ -130,6 +142,8 @@ export class BillingRepository {
             input.status, input.subtotalPaise, input.gstMetalPaise,
             input.gstMakingPaise, input.totalPaise,
             input.idempotencyKey, input.issuedAt, input.createdByUserId,
+            input.panCiphertext, input.panKeyId,
+            input.form60Encrypted, input.form60KeyId,
           ],
         );
         const invoice = invRes.rows[0]!;
@@ -239,6 +253,18 @@ export class BillingRepository {
         [invoice.id],
       );
       return { invoice, items: itemRes.rows };
+    });
+  }
+
+  async getInvoicePanData(
+    id: string,
+  ): Promise<Pick<InvoiceRow, 'id' | 'shop_id' | 'pan_ciphertext' | 'pan_key_id'> | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query<Pick<InvoiceRow, 'id' | 'shop_id' | 'pan_ciphertext' | 'pan_key_id'>>(
+        `SELECT id, shop_id, pan_ciphertext, pan_key_id FROM invoices WHERE id = $1`,
+        [id],
+      );
+      return r.rows[0] ?? null;
     });
   }
 

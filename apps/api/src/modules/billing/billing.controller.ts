@@ -71,4 +71,17 @@ export class BillingController {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.svc.getInvoice(id);
   }
+
+  // Tax-audit PAN decryption — OWNER only, rate-limited 10 req/hr per shop.
+  // PAN is never included in audit log; only access timestamp + actor.
+  @TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-0000-0000-000000000000' } })
+  @Get('/invoices/:id/pan-decrypt')
+  @Roles('shop_admin')
+  async decryptPan(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<{ pan: string }> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.svc.decryptInvoicePan(id);
+  }
 }
