@@ -136,6 +136,32 @@ export class BillingRepository {
 
         const items = await this.insertItems(tx, invoice.id, input.items);
 
+        // Decrement quantity for every product-backed line within this transaction.
+        // SELECT FOR UPDATE prevents concurrent invoices from overselling the same product.
+        const productIds = [...new Set(
+          input.items
+            .filter((it) => it.productId !== null)
+            .map((it) => it.productId as string),
+        )];
+
+        for (const productId of productIds) {
+          const lockRes = await tx.query<{ quantity: number; status: string }>(
+            `SELECT quantity, status FROM products WHERE id = $1 FOR UPDATE`,
+            [productId],
+          );
+          const product = lockRes.rows[0];
+          if (!product) continue; // already 404'd in service layer; defensive skip
+          if (product.quantity <= 0) {
+            throw new Error(`invoice.insufficient_quantity:${productId}`);
+          }
+          const newQty = product.quantity - 1;
+          const newStatus = newQty === 0 ? 'SOLD' : product.status;
+          await tx.query(
+            `UPDATE products SET quantity = $1, status = $2, updated_at = now() WHERE id = $3`,
+            [newQty, newStatus, productId],
+          );
+        }
+
         return { invoice, items };
       } catch (err: unknown) {
         // pg unique_violation

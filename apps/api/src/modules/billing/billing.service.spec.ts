@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi } from 'vitest';
+import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
 import { BillingService } from './billing.service';
 import { ComplianceHardBlockError } from '@goldsmith/compliance';
 
@@ -186,6 +187,92 @@ describe('BillingService.createInvoice', () => {
       ),
     ).rejects.toMatchObject({
       response: { code: 'invoice.idempotency_key_required' },
+    });
+  });
+
+  it('status guard — SOLD product → BadRequestException invoice.product_not_billable', async () => {
+    const repo = fakeRepo();
+    const inv  = {
+      getProductRowForBilling: vi.fn(async (id: string) => ({
+        id,
+        shop_id: SHOP,
+        metal: 'GOLD',
+        purity: 'GOLD_22K',
+        net_weight_g: '10.0000',
+        huid: null,
+        status: 'SOLD',  // product already sold
+      })),
+    };
+    const svc = new BillingService(
+      repo as any, inv as any, fakePricing() as any,
+      fakeRedis() as any, fakePool(),
+    );
+
+    await expect(
+      svc.createInvoice(
+        { customerName: 'राम', lines: [
+          { productId: 'p-sold', description: 'Already sold item', makingChargePct: '10.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
+        ]},
+        'idem-sold-guard',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    const err = await svc.createInvoice(
+      { customerName: 'राम', lines: [
+        { productId: 'p-sold', description: 'Already sold item', makingChargePct: '10.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
+      ]},
+      'idem-sold-guard-2',
+    ).catch((e: unknown) => e);
+
+    expect((err as BadRequestException).getResponse()).toMatchObject({
+      code: 'invoice.product_not_billable',
+      status: 'SOLD',
+    });
+    expect(repo.insertInvoice).not.toHaveBeenCalled();
+  });
+
+  it('insufficient_quantity — repo throws typed error → UnprocessableEntityException', async () => {
+    const repo = {
+      ...fakeRepo(),
+      insertInvoice: vi.fn(async () => {
+        throw new Error('invoice.insufficient_quantity:prod-xyz');
+      }),
+    };
+    const inv = {
+      getProductRowForBilling: vi.fn(async (id: string) => ({
+        id,
+        shop_id: SHOP,
+        metal: 'GOLD',
+        purity: 'GOLD_22K',
+        net_weight_g: '10.0000',
+        huid: null,
+        status: 'IN_STOCK',
+      })),
+    };
+    const svc = new BillingService(
+      repo as any, inv as any, fakePricing() as any,
+      fakeRedis() as any, fakePool(),
+    );
+
+    await expect(
+      svc.createInvoice(
+        { customerName: 'राम', lines: [
+          { productId: 'prod-xyz', description: 'Zero qty item', makingChargePct: '10.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
+        ]},
+        'idem-insufficient',
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+
+    const err = await svc.createInvoice(
+      { customerName: 'राम', lines: [
+        { productId: 'prod-xyz', description: 'Zero qty item', makingChargePct: '10.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
+      ]},
+      'idem-insufficient-2',
+    ).catch((e: unknown) => e);
+
+    expect((err as UnprocessableEntityException).getResponse()).toMatchObject({
+      code: 'invoice.insufficient_quantity',
+      productId: 'prod-xyz',
     });
   });
 });

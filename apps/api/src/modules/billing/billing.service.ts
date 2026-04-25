@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import type { Pool } from 'pg';
 import type { Redis } from '@goldsmith/cache';
@@ -184,6 +185,22 @@ export class BillingService {
       }
     });
 
+    // 2b. Status guard: only IN_STOCK products can be invoiced.
+    // SOLD/RESERVED/ON_APPROVAL/WITH_KARIGAR are rejected before rate fetch.
+    const BILLABLE_STATUSES: string[] = ['IN_STOCK'];
+    dto.lines.forEach((line, i) => {
+      const product = resolvedProducts[i];
+      if (!product) return; // manual line — no status to check
+      if (!BILLABLE_STATUSES.includes(product.status)) {
+        throw new BadRequestException({
+          code: 'invoice.product_not_billable',
+          lineIndex: i,
+          productId: line.productId,
+          status: product.status,
+        });
+      }
+    });
+
     // 3. Compliance hard-block — uses PRODUCT's HUID, not the request's
     validateHuidPresence(
       dto.lines.map((line, i) => ({
@@ -313,6 +330,13 @@ export class BillingService {
           this.cacheResponse(ctx.shopId, idempotencyKey, resp);
           return resp;
         }
+      }
+      if (err instanceof Error && err.message.startsWith('invoice.insufficient_quantity:')) {
+        const productId = err.message.split(':')[1];
+        throw new UnprocessableEntityException({
+          code: 'invoice.insufficient_quantity',
+          productId,
+        });
       }
       throw err;
     }
