@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import {
@@ -15,9 +15,6 @@ export interface CashPaymentOverride {
   justification: string;
 }
 
-// IST-based aggregate lookup: fetches the existing daily cash total for this
-// customer+shop within the IST calendar day, using a lock to prevent TOCTOU.
-// Returns 0 if no aggregate row exists yet.
 const FETCH_OR_INIT_AGGREGATE_SQL = `
   INSERT INTO pmla_aggregates
     (shop_id, customer_id, customer_phone, aggregate_date, aggregate_month, cash_total_paise, invoice_count)
@@ -44,8 +41,8 @@ const INCREMENT_AGGREGATE_SQL = `
     AND (customer_phone IS NOT DISTINCT FROM $3)
 `;
 
-// Idempotency check: verify both the key AND that it matches the same invoice + amount.
-// Prevents a client reusing a cached key on a different payment from silently no-oping.
+// Idempotency check: validates key + invoice_id + amount_paise so a client
+// reusing a key for a different payment does not get a silent no-op.
 const CHECK_PAYMENT_IDEM_SQL = `
   SELECT id FROM payments
   WHERE shop_id         = current_setting('app.current_shop_id', true)::uuid
@@ -56,18 +53,25 @@ const CHECK_PAYMENT_IDEM_SQL = `
 
 @Injectable()
 export class PaymentService {
+  private readonly logger = new Logger(PaymentService.name);
+
   constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
 
   // Records a cash payment against an invoice.
   // Enforces the Section 269ST Rs 1,99,999 daily cash-cap per customer.
   // idempotencyKey: caller-provided key; duplicate requests return void silently.
   //
-  // Idempotency is guaranteed by a double-check pattern:
-  //   (a) early SELECT before any locking — fast-path for sequential retries
-  //   (b) late SELECT after acquiring the aggregate row lock — catches concurrent races
-  //
-  // Override: if provided and the limit is exceeded, actor must be shop_admin or
-  // shop_manager with justification ≥10 chars; override is audit-logged.
+  // Transaction order is carefully designed:
+  //   A. Early idem check (no lock): fast path for sequential retries
+  //   B. Invoice SELECT FOR UPDATE: lock invoice to serialize concurrent payments
+  //   C. Aggregate lock (IST date, TOCTOU-safe): INSERT ON CONFLICT row lock
+  //   D. Late idem check (post-lock): catches concurrent retries that slipped past A
+  //   E. Balance check: MUST come after D so a concurrent retry returning early at D
+  //      never hits the false-positive payment_exceeds_balance error
+  //   F. Compliance enforcement
+  //   G. Increment aggregate
+  //   H. Insert payment
+  //   I. Override metadata on invoice
   async recordCashPayment(
     invoiceId: string,
     amountPaise: bigint,
@@ -79,18 +83,14 @@ export class PaymentService {
 
     await withTenantTx(this.pool, async (tx) => {
       // ── A. Early idempotency check ─────────────────────────────────────────
-      // Catches sequential retries before acquiring any locks.
-      // Validates key matches the same invoice + amount to prevent silent no-ops on reused keys.
       const earlyIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
-      if (earlyIdem.rows[0]) return; // Already committed — safe retry
+      if (earlyIdem.rows[0]) return;
 
-      // ── B. Verify invoice (RLS scopes to current tenant) ──────────────────
-      // FOR UPDATE locks the row — serializes concurrent payments on the same invoice,
-      // preventing a TOCTOU gap between the balance check and the payment INSERT.
+      // ── B. Verify invoice — lock row to serialize concurrent payments ───────
       const invRes = await tx.query<{
         id: string;
         status: string;
-        total_paise: string; // pg returns BIGINT as string
+        total_paise: string;
         customer_id: string | null;
         customer_phone: string | null;
       }>(
@@ -101,18 +101,29 @@ export class PaymentService {
         throw new NotFoundException({ code: 'invoice.not_found' });
       }
       const { status, total_paise, customer_id: customerId, customer_phone: rawPhone } = invRes.rows[0];
-
-      // Normalize customer identity: customer_id takes precedence over phone.
-      // When customer_id is known, we clear phone from the aggregate key so that
-      // the same customer with different phone data across invoices maps to one row.
       const customerPhone = customerId ? null : rawPhone;
 
-      // Only ISSUED invoices accept payments (not DRAFT or VOIDED)
       if (status !== 'ISSUED') {
         throw new UnprocessableEntityException({ code: 'invoice.not_payable', status });
       }
 
-      // Overpayment guard: amount must not exceed outstanding balance
+      // ── C. Acquire aggregate row lock (IST date, TOCTOU-safe) ──────────────
+      const aggRes = await tx.query<{ cash_total_paise: string }>(
+        FETCH_OR_INIT_AGGREGATE_SQL,
+        [customerId ?? null, customerPhone ?? null],
+      );
+      const existingDailyPaise = BigInt(aggRes.rows[0]?.cash_total_paise ?? '0');
+
+      // ── D. Late idempotency check (post-lock) ──────────────────────────────
+      // A concurrent retry that waited on the invoice lock in B would have the
+      // first request's payment committed by now — this returns it early BEFORE
+      // the balance check in E. Without this order, the retry would see
+      // alreadyPaidPaise including the first payment and falsely throw
+      // payment_exceeds_balance when amountPaise == invoice total.
+      const lateIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
+      if (lateIdem.rows[0]) return;
+
+      // ── E. Balance check (after late idem — only reached for new payments) ─
       const paidRes = await tx.query<{ paid: string }>(
         `SELECT COALESCE(SUM(amount_paise), 0)::text AS paid
          FROM payments
@@ -124,35 +135,13 @@ export class PaymentService {
       const remainingBalancePaise = invoiceTotalPaise - alreadyPaidPaise;
       if (amountPaise > remainingBalancePaise) {
         throw new UnprocessableEntityException({
-          code: 'invoice.payment_exceeds_balance',
+          code:                   'invoice.payment_exceeds_balance',
           amountPaise:            amountPaise.toString(),
           remainingBalancePaise:  remainingBalancePaise.toString(),
         });
       }
 
-      // ── C. Acquire aggregate row lock (IST date, TOCTOU-safe) ──────────────
-      // INSERT ON CONFLICT acquires an exclusive row lock. Concurrent transactions
-      // on the same customer+date block here until this transaction commits.
-      // For anonymous walk-ins (customer_id=null, phone=null): we use the shop-level
-      // anonymous bucket (NULL, NULL key). This is the conservative compliance approach —
-      // occasional false blocks for unrelated anonymous customers can be overridden
-      // by OWNER/MANAGER. Skipping the aggregate entirely would defeat 269ST entirely
-      // for the common case where customer_id is null (as it is in the current billing flow).
-      const aggRes = await tx.query<{ cash_total_paise: string }>(
-        FETCH_OR_INIT_AGGREGATE_SQL,
-        [customerId ?? null, customerPhone ?? null],
-      );
-      // pg returns BIGINT columns as strings — convert explicitly before arithmetic
-      const existingDailyPaise = BigInt(aggRes.rows[0]?.cash_total_paise ?? '0');
-
-      // ── D. Late idempotency check (post-lock) ──────────────────────────────
-      // Catches concurrent requests that committed the same idempotency_key
-      // while this transaction was waiting for the aggregate lock in step C.
-      const lateIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
-      if (lateIdem.rows[0]) return; // Another concurrent request committed first
-
-      // ── E. Compliance enforcement ──────────────────────────────────────────
-      // Three paths: within limit / over limit with override / hard-block
+      // ── F. Compliance enforcement ──────────────────────────────────────────
       const projectedPaise = existingDailyPaise + amountPaise;
       const limitExceeded = projectedPaise > SECTION_269ST_LIMIT_PAISE;
       let overrideMeta: CashCapOverride | null = null;
@@ -160,14 +149,13 @@ export class PaymentService {
       if (!limitExceeded) {
         // Path A: within limit — no override metadata, no audit event
       } else if (override) {
-        // Path B: over limit + override provided.
-        // buildCashCapOverride throws ComplianceHardBlockError for shop_staff or unknown role.
+        // Path B: over limit + override. buildCashCapOverride throws for shop_staff.
         overrideMeta = buildCashCapOverride(
           { role: ctx.role, justification: override.justification },
           projectedPaise,
         );
       } else {
-        // Path C: over limit + no override — hard-block (throws)
+        // Path C: over limit + no override — hard-block (throws ComplianceHardBlockError)
         enforce269ST({
           shopId:             ctx.shopId,
           customerId:         customerId ?? null,
@@ -177,16 +165,13 @@ export class PaymentService {
         });
       }
 
-      // ── F. Increment aggregate (now safe — we hold the lock) ───────────────
+      // ── G. Increment aggregate ─────────────────────────────────────────────
       await tx.query(INCREMENT_AGGREGATE_SQL, [amountPaise, customerId ?? null, customerPhone ?? null]);
 
-      // ── G. Insert payment record ───────────────────────────────────────────
-      // 'CONFIRMED' for cash (immediate, no clearing delay).
-      // The unique index uq_payments_shop_idempotency is (shop_id, idempotency_key).
-      // If a client reuses a key for a DIFFERENT invoice/amount, the SELECT checks
-      // above miss it (they also filter invoice_id+amount), but this INSERT would
-      // hit the constraint. Catch 23505 here and return a typed 409 Conflict
-      // rather than an uncaught 500.
+      // ── H. Insert payment record ───────────────────────────────────────────
+      // Catch 23505 from uq_payments_shop_idempotency: a reused key targeting
+      // a different invoice/amount missed the SELECT checks (they filter all three)
+      // but the DB unique index catches it. Map to typed 409 instead of 500.
       try {
         await tx.query(
           `INSERT INTO payments
@@ -201,7 +186,7 @@ export class PaymentService {
         throw err;
       }
 
-      // ── H. Store override metadata on invoice for audit trail ──────────────
+      // ── I. Override metadata on invoice ────────────────────────────────────
       if (overrideMeta) {
         await tx.query(
           `UPDATE invoices
@@ -215,7 +200,7 @@ export class PaymentService {
       }
     });
 
-    // ── I. Audit override (fire-and-forget, after transaction commits) ────────
+    // ── J. Audit override (fire-and-forget, separate tx after commit) ─────────
     if (overrideWasUsed) {
       void auditLog(this.pool, {
         action:      AuditAction.COMPLIANCE_OVERRIDE_269ST,
@@ -228,7 +213,10 @@ export class PaymentService {
           role:          ctx.role,
           limitPaise:    SECTION_269ST_LIMIT_PAISE.toString(),
         },
-      }).catch(() => undefined);
+      }).catch((err: unknown) => {
+        // Log rather than silently swallow — compliance overrides must be traceable.
+        this.logger.error(`Failed to write COMPLIANCE_OVERRIDE_269ST audit log for invoice ${invoiceId}: ${String(err)}`);
+      });
     }
   }
 }
