@@ -207,8 +207,11 @@ export class BillingService {
 
     const lines: Line[] = dto.lines.map((input, i) => {
       const product = resolvedProducts[i];
-      const purity = toPurityKey(input.purity ?? product?.purity);
-      const netWeightG = input.netWeightG ?? product?.net_weight_g;
+      // For product-backed lines, purity and weight come from the DB record (server-authoritative).
+      // A client cannot change them by passing different values in the request.
+      // For manual lines (no productId), the request values are the only source.
+      const purity    = product ? toPurityKey(product.purity) : toPurityKey(input.purity ?? '');
+      const netWeightG = product ? product.net_weight_g : (input.netWeightG ?? null);
 
       if (!purity || !(purity in rates)) {
         throw new BadRequestException({
@@ -275,7 +278,9 @@ export class BillingService {
           productId:           input.productId ?? null,
           description:         input.description,
           hsnCode:             '7113',
-          huid:                input.huid ?? null,
+          // For product-backed lines, use the DB's stored HUID (what BIS certified).
+          // For manual lines, use the request HUID.
+          huid:                product?.huid ?? input.huid ?? null,
           metalType:           input.metalType ?? product?.metal ?? null,
           purity:              input.purity ?? product?.purity ?? null,
           netWeightG:          input.netWeightG ?? product?.net_weight_g ?? null,
