@@ -147,7 +147,8 @@ export default function EditProductScreen(): React.ReactElement {
 
       <Pressable
         style={styles.linkRow}
-        onPress={() => router.push(`/inventory/${id}/movements`)}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onPress={() => router.push(`/inventory/${id}/movements` as any)}
         accessibilityRole="link"
         accessibilityLabel="आंदोलन इतिहास">
         <Text style={styles.linkText}>आंदोलन इतिहास →</Text>
