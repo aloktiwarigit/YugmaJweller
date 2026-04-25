@@ -1,4 +1,5 @@
 import type { SearchPort, ProductSearchDoc, SearchQuery, SearchResult } from '../search.port';
+import { MeilisearchUnavailableError } from '../search.port';
 
 export class StubSearchAdapter implements SearchPort {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -13,7 +14,8 @@ export class StubSearchAdapter implements SearchPort {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async search(_shopId: string, _query: SearchQuery): Promise<SearchResult> {
-    console.warn('StubSearchAdapter: Meilisearch not configured, returning empty results');
-    return { hits: [], total: 0, source: 'meilisearch' };
+    // Throw so InventorySearchService falls back to Postgres automatically.
+    // MEILISEARCH_URL is not configured — treat as unavailable, not as "no results".
+    throw new MeilisearchUnavailableError('MEILISEARCH_URL not configured');
   }
 }

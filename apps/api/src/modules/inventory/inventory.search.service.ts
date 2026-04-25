@@ -69,12 +69,14 @@ export class InventorySearchService {
     }
 
     const where = conditions.join(' AND ');
+    // COUNT(*) OVER () returns the total matching rows across all pages, not just the current page.
     const sql = `
       SELECT p.id, p.sku, p.metal, p.purity, p.huid, p.status,
              p.gross_weight_g::text AS "weightG",
              COALESCE(pc.name, '') AS category,
              (p.published_at IS NOT NULL) AS published,
-             EXTRACT(EPOCH FROM p.updated_at)::bigint * 1000 AS "updatedAt"
+             EXTRACT(EPOCH FROM p.updated_at)::bigint * 1000 AS "updatedAt",
+             COUNT(*) OVER () AS total_count
       FROM products p
       LEFT JOIN product_categories pc ON pc.id = p.category_id
       WHERE ${where}
@@ -86,6 +88,7 @@ export class InventorySearchService {
     const client = await this.pool.connect(); // nosemgrep: goldsmith.require-tenant-transaction -- RLS context already set by interceptor; read-only search query
     try {
       const rows = await client.query(sql, params);
+      const total = rows.rows.length > 0 ? Number(rows.rows[0]?.['total_count'] ?? 0) : 0;
       return {
         hits: rows.rows.map((r: Record<string, unknown>) => ({
           id: r['id'] as string,
@@ -99,7 +102,7 @@ export class InventorySearchService {
           published: r['published'] as boolean,
           updatedAt: Number(r['updatedAt']),
         })),
-        total: rows.rowCount ?? 0,
+        total,
         source: 'postgres',
       };
     } finally {

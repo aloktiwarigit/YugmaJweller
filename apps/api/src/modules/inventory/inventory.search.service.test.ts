@@ -114,6 +114,7 @@ describe('InventorySearchService', () => {
         category: 'Rings',
         published: true,
         updatedAt: '1714000000000',
+        total_count: '1',
       };
       const pool = makePoolMock([pgRow], 1);
 

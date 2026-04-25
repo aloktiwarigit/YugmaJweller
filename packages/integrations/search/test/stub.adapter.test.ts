@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { StubSearchAdapter } from '../src/adapters/stub.adapter';
+import { MeilisearchUnavailableError } from '../src/search.port';
 import type { SearchQuery } from '../src/search.port';
 
 const makeQuery = (overrides: Partial<SearchQuery> = {}): SearchQuery => ({
@@ -12,15 +13,14 @@ const makeQuery = (overrides: Partial<SearchQuery> = {}): SearchQuery => ({
 describe('StubSearchAdapter', () => {
   const adapter = new StubSearchAdapter();
 
-  it('search returns empty hits and total 0', async () => {
-    const result = await adapter.search('any-shop', makeQuery());
-    expect(result.hits).toHaveLength(0);
-    expect(result.total).toBe(0);
+  it('search throws MeilisearchUnavailableError so callers fall back to Postgres', async () => {
+    await expect(adapter.search('any-shop', makeQuery())).rejects.toBeInstanceOf(MeilisearchUnavailableError);
   });
 
-  it('search returns source meilisearch (no degraded-UX notice for stub)', async () => {
-    const result = await adapter.search('any-shop', makeQuery());
-    expect(result.source).toBe('meilisearch');
+  it('search throws for any query including empty q', async () => {
+    await expect(
+      adapter.search('any-shop', makeQuery({ q: '', filters: { metal: 'platinum' } })),
+    ).rejects.toBeInstanceOf(MeilisearchUnavailableError);
   });
 
   it('indexProduct does not throw', async () => {
@@ -42,11 +42,5 @@ describe('StubSearchAdapter', () => {
 
   it('removeProduct does not throw', async () => {
     await expect(adapter.removeProduct('any-shop', 'prod-1')).resolves.toBeUndefined();
-  });
-
-  it('search never throws for any query', async () => {
-    await expect(
-      adapter.search('any-shop', makeQuery({ q: '', filters: { metal: 'platinum' } })),
-    ).resolves.toBeDefined();
   });
 });
