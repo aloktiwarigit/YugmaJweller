@@ -25,6 +25,9 @@ import { InventorySearchService } from './inventory.search.service';
 import type { SearchResult } from '@goldsmith/integrations-search';
 import { InventoryDeadStockService } from './inventory.dead-stock.service';
 import type { DeadStockProduct } from './inventory.dead-stock.service';
+import { StockMovementService } from './stock-movement.service';
+import { RecordMovementBodySchema } from '@goldsmith/shared';
+import type { RecordMovementBodyDto, StockMovementResponse } from '@goldsmith/shared';
 
 @Controller('/api/v1/inventory')
 export class InventoryController {
@@ -34,6 +37,7 @@ export class InventoryController {
     private readonly barcodeSvc: BarcodeService,
     private readonly searchSvc: InventorySearchService,
     private readonly deadStockSvc: InventoryDeadStockService,
+    private readonly stockMovementSvc: StockMovementService,
   ) {}
 
   @Get('/search')
@@ -205,5 +209,31 @@ export class InventoryController {
   ): Promise<BulkImportJobStatus> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.bulkImportSvc.getJobStatus(jobId);
+  }
+
+  @Post('/products/:id/movements')
+  @HttpCode(201)
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async recordStockMovement(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) productId: string,
+    @Body(new ZodValidationPipe(RecordMovementBodySchema)) body: RecordMovementBodyDto,
+  ): Promise<StockMovementResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.stockMovementSvc.recordMovement({ ...body, productId });
+  }
+
+  @Get('/products/:id/movements')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async listStockMovements(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) productId: string,
+    @Query('limit') limitStr: string = '50',
+    @Query('offset') offsetStr: string = '0',
+  ): Promise<StockMovementResponse[]> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    const limit = parseInt(limitStr, 10) || 50;
+    const offset = parseInt(offsetStr, 10) || 0;
+    return this.stockMovementSvc.listMovements(productId, limit, offset);
   }
 }

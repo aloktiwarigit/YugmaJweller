@@ -146,6 +146,14 @@ export default function EditProductScreen(): React.ReactElement {
       )}
 
       <Pressable
+        style={styles.linkRow}
+        onPress={() => router.push(`/inventory/${id}/movements`)}
+        accessibilityRole="link"
+        accessibilityLabel="आंदोलन इतिहास">
+        <Text style={styles.linkText}>आंदोलन इतिहास →</Text>
+      </Pressable>
+
+      <Pressable
         style={[styles.saveBtn, mutation.isPending && styles.saveBtnDisabled]}
         onPress={() => mutation.mutate(form)}
         disabled={mutation.isPending}
@@ -171,4 +179,20 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.6 },
   saveBtnText: { color: colors.white, fontSize: 18, fontWeight: '600' },
+  linkRow: {
+    marginTop: spacing.lg,
+    padding: spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  linkText: {
+    fontSize: 16,
+    color: colors.primary,
+    fontWeight: '600',
+    fontFamily: 'NotoSansDevanagari_400Regular',
+  },
 });

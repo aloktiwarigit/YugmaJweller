@@ -146,3 +146,13 @@ export type {
   BarcodeData,
   GenerateBarcodesRequest,
 } from './schemas/barcode.schema';
+
+export {
+  MovementType,
+  RecordMovementBodySchema,
+  StockMovementResponseSchema,
+} from './schemas/stock-movement.schema';
+export type {
+  RecordMovementBodyDto,
+  StockMovementResponse,
+} from './schemas/stock-movement.schema';

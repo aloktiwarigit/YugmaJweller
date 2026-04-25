@@ -63,6 +63,7 @@ export const ProductResponseSchema = z.object({
   makingChargeOverridePct:  z.string().nullable(),
   huid:                     z.string().nullable(),
   status:                   STATUS,
+  quantity:                 z.number().int().nonnegative(),
   publishedAt:              z.string().nullable(),
   publishedByUserId:        z.string().uuid().nullable(),
   createdByUserId:          z.string().uuid(),

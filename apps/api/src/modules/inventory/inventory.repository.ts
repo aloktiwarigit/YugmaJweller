@@ -19,6 +19,7 @@ export interface ProductRow {
   making_charge_override_pct: string | null;
   huid: string | null;
   status: string;
+  quantity: number;
   published_at: Date | null;
   published_by_user_id: string | null;
   created_by_user_id: string;
@@ -59,8 +60,8 @@ export interface ValuationProductRow {
 const SELECT_COLS = `
   id, shop_id, category_id, sku, metal, purity,
   gross_weight_g, net_weight_g, stone_weight_g, stone_details,
-  making_charge_override_pct, huid, status, published_at, published_by_user_id,
-  created_by_user_id, created_at, updated_at
+  making_charge_override_pct, huid, status, quantity,
+  published_at, published_by_user_id, created_by_user_id, created_at, updated_at
 `;
 
 @Injectable()
