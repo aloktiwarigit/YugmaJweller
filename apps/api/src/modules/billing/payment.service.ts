@@ -44,10 +44,14 @@ const INCREMENT_AGGREGATE_SQL = `
     AND (customer_phone IS NOT DISTINCT FROM $3)
 `;
 
+// Idempotency check: verify both the key AND that it matches the same invoice + amount.
+// Prevents a client reusing a cached key on a different payment from silently no-oping.
 const CHECK_PAYMENT_IDEM_SQL = `
   SELECT id FROM payments
-  WHERE shop_id       = current_setting('app.current_shop_id', true)::uuid
+  WHERE shop_id         = current_setting('app.current_shop_id', true)::uuid
     AND idempotency_key = $1
+    AND invoice_id      = $2
+    AND amount_paise    = $3
 `;
 
 @Injectable()
@@ -76,7 +80,8 @@ export class PaymentService {
     await withTenantTx(this.pool, async (tx) => {
       // ── A. Early idempotency check ─────────────────────────────────────────
       // Catches sequential retries before acquiring any locks.
-      const earlyIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey]);
+      // Validates key matches the same invoice + amount to prevent silent no-ops on reused keys.
+      const earlyIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
       if (earlyIdem.rows[0]) return; // Already committed — safe retry
 
       // ── B. Verify invoice (RLS scopes to current tenant) ──────────────────
@@ -126,19 +131,26 @@ export class PaymentService {
       }
 
       // ── C. Acquire aggregate row lock (IST date, TOCTOU-safe) ──────────────
-      // INSERT ON CONFLICT acquires an exclusive row lock. Concurrent transactions
-      // on the same customer+date block here until this transaction commits.
-      const aggRes = await tx.query<{ cash_total_paise: string }>(
-        FETCH_OR_INIT_AGGREGATE_SQL,
-        [customerId ?? null, customerPhone ?? null],
-      );
-      // pg returns BIGINT columns as strings — convert explicitly before arithmetic
-      const existingDailyPaise = BigInt(aggRes.rows[0]?.cash_total_paise ?? '0');
+      // When both customer_id and phone are null (truly anonymous walk-in), we cannot
+      // aggregate across transactions — each is checked in isolation (existingDailyPaise = 0n).
+      // This prevents unrelated anonymous customers from sharing a daily cash bucket.
+      let existingDailyPaise = 0n;
+      const isIdentified = customerId !== null || customerPhone !== null;
+      if (isIdentified) {
+        // INSERT ON CONFLICT acquires an exclusive row lock. Concurrent transactions
+        // on the same customer+date block here until this transaction commits.
+        const aggRes = await tx.query<{ cash_total_paise: string }>(
+          FETCH_OR_INIT_AGGREGATE_SQL,
+          [customerId ?? null, customerPhone ?? null],
+        );
+        // pg returns BIGINT columns as strings — convert explicitly before arithmetic
+        existingDailyPaise = BigInt(aggRes.rows[0]?.cash_total_paise ?? '0');
+      }
 
       // ── D. Late idempotency check (post-lock) ──────────────────────────────
       // Catches concurrent requests that committed the same idempotency_key
       // while this transaction was waiting for the aggregate lock in step C.
-      const lateIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey]);
+      const lateIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
       if (lateIdem.rows[0]) return; // Another concurrent request committed first
 
       // ── E. Compliance enforcement ──────────────────────────────────────────
@@ -168,7 +180,10 @@ export class PaymentService {
       }
 
       // ── F. Increment aggregate (now safe — we hold the lock) ───────────────
-      await tx.query(INCREMENT_AGGREGATE_SQL, [amountPaise, customerId ?? null, customerPhone ?? null]);
+      // Skip for anonymous walk-ins — no shared bucket to update
+      if (isIdentified) {
+        await tx.query(INCREMENT_AGGREGATE_SQL, [amountPaise, customerId ?? null, customerPhone ?? null]);
+      }
 
       // ── G. Insert payment record (idempotency_key unique partial index) ────
       // 'CONFIRMED' is correct for cash (immediate, no clearing delay).
