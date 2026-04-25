@@ -281,9 +281,11 @@ export class BillingService {
           // For product-backed lines, use the DB's stored HUID (what BIS certified).
           // For manual lines, use the request HUID.
           huid:                product?.huid ?? input.huid ?? null,
-          metalType:           input.metalType ?? product?.metal ?? null,
-          purity:              input.purity ?? product?.purity ?? null,
-          netWeightG:          input.netWeightG ?? product?.net_weight_g ?? null,
+          // For product-backed lines: persist what was actually billed (from DB).
+          // For manual lines: persist the request values (no DB product to reference).
+          metalType:           product ? (product.metal ?? null)       : (input.metalType ?? null),
+          purity:              product ? (product.purity ?? null)       : (input.purity ?? null),
+          netWeightG:          product ? (product.net_weight_g ?? null) : (input.netWeightG ?? null),
           ratePerGramPaise,
           makingChargePct:     input.makingChargePct,
           goldValuePaise:      computed.goldValuePaise,
