@@ -183,6 +183,8 @@ describe('BillingService.createInvoice', () => {
         { customerName: 'X', lines: [{ description: 'x', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any] },
         '',
       ),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({
+      response: { code: 'invoice.idempotency_key_required' },
+    });
   });
 });

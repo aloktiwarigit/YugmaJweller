@@ -212,6 +212,8 @@ export class BillingService {
     });
 
     // 6. Roll up invoice totals from per-line numbers (integer-exact)
+    // Per-line totals are summed to invoice-level aggregates.
+    // Invariant: totalPaise === subtotalPaise + gstMetalPaise + gstMakingPaise (verified by integration test).
     let subtotalPaise   = 0n;
     let gstMetalPaise   = 0n;
     let gstMakingPaise  = 0n;
@@ -270,6 +272,11 @@ export class BillingService {
       if (err instanceof IdempotencyKeyConflictError) {
         const existing = await this.repo.getInvoiceByIdempotencyKey(idempotencyKey);
         if (existing) {
+          // Defence-in-depth: RLS already scoped this read to ctx.shopId, but verify
+          // service-layer too. A misconfigured RLS policy must not leak cross-tenant invoices.
+          if (existing.invoice.shop_id !== ctx.shopId) {
+            throw new BadRequestException({ code: 'invoice.idempotency_key_conflict' });
+          }
           const resp = rowToInvoiceResponse(existing.invoice, existing.items);
           this.cacheResponse(ctx.shopId, idempotencyKey, resp);
           return resp;
