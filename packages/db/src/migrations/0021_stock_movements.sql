@@ -7,10 +7,21 @@
 
 BEGIN;
 
--- 1. products.quantity column (drives oversell guard; default 1 for existing rows)
+-- 1. products.quantity column (drives oversell guard; backfill by status)
+-- 1a. Add the column nullable so we can set it per-row before locking it down.
 ALTER TABLE products
-  ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 1
-  CONSTRAINT products_quantity_nonneg CHECK (quantity >= 0);
+  ADD COLUMN IF NOT EXISTS quantity INTEGER;
+
+-- 1b. Backfill by status: SOLD products are out of stock (0); everything else
+--     is one unit per row (the existing one-product-per-row inventory model).
+UPDATE products SET quantity = CASE WHEN status = 'SOLD' THEN 0 ELSE 1 END
+  WHERE quantity IS NULL;
+
+-- 1c. Lock the column down: NOT NULL, default 1 for new inserts, non-negative.
+ALTER TABLE products
+  ALTER COLUMN quantity SET NOT NULL,
+  ALTER COLUMN quantity SET DEFAULT 1,
+  ADD CONSTRAINT products_quantity_nonneg CHECK (quantity >= 0);
 
 -- 2. stock_movements append-only ledger
 CREATE TABLE stock_movements (
@@ -61,6 +72,7 @@ CREATE OR REPLACE FUNCTION stock_movements_immutable()
   RETURNS trigger
   LANGUAGE plpgsql
   SECURITY DEFINER
+  SET search_path = public, pg_temp
 AS $$
 BEGIN
   RAISE EXCEPTION 'stock_movements are immutable; use a compensating movement'
@@ -68,10 +80,17 @@ BEGIN
 END;
 $$;
 
+ALTER FUNCTION stock_movements_immutable() OWNER TO platform_admin;
+
 DROP TRIGGER IF EXISTS trg_stock_movements_immutable ON stock_movements;
 CREATE TRIGGER trg_stock_movements_immutable
   BEFORE UPDATE OR DELETE ON stock_movements
   FOR EACH ROW EXECUTE FUNCTION stock_movements_immutable();
+
+DROP TRIGGER IF EXISTS trg_stock_movements_no_truncate ON stock_movements;
+CREATE TRIGGER trg_stock_movements_no_truncate
+  BEFORE TRUNCATE ON stock_movements
+  FOR EACH STATEMENT EXECUTE FUNCTION stock_movements_immutable();
 
 -- 7. Grants — INSERT + SELECT only. No UPDATE / DELETE.
 -- The trigger is defense-in-depth; the grant is the primary control.
