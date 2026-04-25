@@ -85,8 +85,8 @@ function rowToInvoiceItemResponse(it: InvoiceItemRow): InvoiceItemResponse {
   };
 }
 
-function idemKey(shopId: string, key: string): string {
-  return `invoice:idempotency:${shopId}:${key}`;
+function idemKey(shopUuid: string, key: string): string {
+  return `invoice:idempotency:${shopUuid}:${key}`;
 }
 
 @Injectable()
@@ -331,9 +331,9 @@ export class BillingService {
     return rows.map((invoice) => rowToInvoiceResponse(invoice, []));
   }
 
-  private cacheResponse(shopId: string, key: string, resp: InvoiceResponse): void {
+  private cacheResponse(shopUuid: string, key: string, resp: InvoiceResponse): void {
     this.redis
-      .setex(idemKey(shopId, key), IDEM_TTL_SEC, JSON.stringify(resp))
+      .setex(idemKey(shopUuid, key), IDEM_TTL_SEC, JSON.stringify(resp))
       .catch((e: unknown) => this.logger.warn(`Idempotency cache write failed: ${String(e)}`));
   }
 }

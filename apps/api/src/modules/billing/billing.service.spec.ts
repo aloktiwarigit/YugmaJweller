@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi } from 'vitest';
 import { BillingService } from './billing.service';
 import { ComplianceHardBlockError } from '@goldsmith/compliance';
