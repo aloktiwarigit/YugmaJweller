@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import { tenantContext } from '@goldsmith/tenant-context';
 import { SyncLogger } from '@goldsmith/sync';
@@ -119,13 +119,16 @@ export class StockMovementRepository {
       );
       const movement = insertRes.rows[0]!;
 
-      // 3. Update product quantity (+ status if SALE→0 was signalled by service)
-      const productUpdate = await tx.query<{ id: string; quantity: number; status: string }>(
+      // 3. Update product quantity (+ status if SALE→0 was signalled by service).
+      // RETURNING * so the sync_change_log payload has the full product row;
+      // pull() forwards payload verbatim and partial payloads would overwrite
+      // offline-cached product fields.
+      const productUpdate = await tx.query<Record<string, unknown>>(
         nextStatus
           ? `UPDATE products SET quantity = $1, status = $2, updated_at = now()
-             WHERE id = $3 RETURNING id, quantity, status`
+             WHERE id = $3 RETURNING *`
           : `UPDATE products SET quantity = $1, updated_at = now()
-             WHERE id = $2 RETURNING id, quantity, status`,
+             WHERE id = $2 RETURNING *`,
         nextStatus
           ? [input.balanceAfter, nextStatus, input.productId]
           : [input.balanceAfter, input.productId],
@@ -135,7 +138,7 @@ export class StockMovementRepository {
       const ctx = tenantContext.requireCurrent();
       await this.syncLogger.logInTx(
         tx, ctx.shopId, 'products', input.productId, 'UPDATE',
-        productUpdate.rows[0] as unknown as Record<string, unknown>,
+        productUpdate.rows[0] ?? null,
       );
 
       return movement;

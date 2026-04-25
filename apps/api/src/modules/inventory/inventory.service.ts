@@ -28,6 +28,7 @@ function mapRow(row: ProductRow): ProductResponse {
     makingChargeOverridePct: row.making_charge_override_pct,
     huid: row.huid,
     status: row.status as ProductResponse['status'],
+    quantity: row.quantity,
     publishedAt: row.published_at?.toISOString() ?? null,
     publishedByUserId: row.published_by_user_id ?? null,
     createdByUserId: row.created_by_user_id,
