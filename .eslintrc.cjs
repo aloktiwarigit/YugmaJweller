@@ -50,6 +50,8 @@ module.exports = {
         'packages/sync/src/server/cursor.ts',
         'packages/sync/src/server/push.ts',
         'packages/sync/src/server/sync-logger.ts',
+        // Meilisearch adapter is infrastructure: per-tenant index naming uses shopId directly.
+        'packages/integrations/search/src/adapters/meilisearch.adapter.ts',
       ],
       rules: { 'goldsmith/no-raw-shop-id-param': 'off' },
     },
