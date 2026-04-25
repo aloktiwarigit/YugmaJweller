@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import {
@@ -180,14 +180,26 @@ export class PaymentService {
       // ── F. Increment aggregate (now safe — we hold the lock) ───────────────
       await tx.query(INCREMENT_AGGREGATE_SQL, [amountPaise, customerId ?? null, customerPhone ?? null]);
 
-      // ── G. Insert payment record (idempotency_key unique partial index) ────
-      // 'CONFIRMED' is correct for cash (immediate, no clearing delay).
-      await tx.query(
-        `INSERT INTO payments
-           (shop_id, invoice_id, method, amount_paise, status, created_by_user_id, idempotency_key)
-         VALUES (current_setting('app.current_shop_id', true)::uuid, $1, 'CASH', $2, 'CONFIRMED', $3, $4)`,
-        [invoiceId, amountPaise, ctx.userId, idempotencyKey],
-      );
+      // ── G. Insert payment record ───────────────────────────────────────────
+      // 'CONFIRMED' for cash (immediate, no clearing delay).
+      // The unique index uq_payments_shop_idempotency is (shop_id, idempotency_key).
+      // If a client reuses a key for a DIFFERENT invoice/amount, the SELECT checks
+      // above miss it (they also filter invoice_id+amount), but this INSERT would
+      // hit the constraint. Catch 23505 here and return a typed 409 Conflict
+      // rather than an uncaught 500.
+      try {
+        await tx.query(
+          `INSERT INTO payments
+             (shop_id, invoice_id, method, amount_paise, status, created_by_user_id, idempotency_key)
+           VALUES (current_setting('app.current_shop_id', true)::uuid, $1, 'CASH', $2, 'CONFIRMED', $3, $4)`,
+          [invoiceId, amountPaise, ctx.userId, idempotencyKey],
+        );
+      } catch (err: unknown) {
+        if (typeof err === 'object' && err !== null && (err as { code?: string }).code === '23505') {
+          throw new ConflictException({ code: 'payment.idempotency_key_conflict' });
+        }
+        throw err;
+      }
 
       // ── H. Store override metadata on invoice for audit trail ──────────────
       if (overrideMeta) {
