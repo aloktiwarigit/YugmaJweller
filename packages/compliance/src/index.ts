@@ -12,3 +12,4 @@ export {
   validateForm60,
 } from './pan/rule-114b';
 export type { PanEnforcementInput } from './pan/rule-114b';
+export { validateGstinFormat, normalizeGstin, getStateCodeFromGstin } from './gstin';
