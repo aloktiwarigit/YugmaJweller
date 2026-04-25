@@ -152,6 +152,16 @@ export class BillingService {
       this.logger.warn(`Redis unavailable on idempotency check: ${String(e)}`);
     }
 
+    // DB pre-flight — covers Redis-cold/expired retries.
+    // If an invoice already exists for this key, return it without re-running validations
+    // (the product may be SOLD now, which is correct — we still owe the client this invoice).
+    const existingFromDb = await this.repo.getInvoiceByIdempotencyKey(idempotencyKey);
+    if (existingFromDb) {
+      const resp = rowToInvoiceResponse(existingFromDb.invoice, existingFromDb.items);
+      this.cacheResponse(ctx.shopId, idempotencyKey, resp); // re-warm Redis
+      return resp;
+    }
+
     // 2. Resolve product rows (server-authoritative — productHuidOnRecord drives the gate)
     type ResolvedProduct = {
       id: string;

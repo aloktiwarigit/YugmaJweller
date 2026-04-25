@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { computeProductPrice } from '@goldsmith/money';
 import { colors, spacing } from '@goldsmith/ui-tokens';
@@ -33,6 +33,10 @@ export function BillingLineBuilder({
   onChange,
 }: BillingLineBuilderProps): JSX.Element {
   const [pct, setPct] = useState<string>(makingChargePct);
+
+  useEffect(() => {
+    setPct(makingChargePct);
+  }, [makingChargePct]);
 
   const priceTotal = useMemo<string>(() => {
     try {
