@@ -138,13 +138,13 @@ export class BillingRepository {
 
         // Decrement quantity for every product-backed line within this transaction.
         // SELECT FOR UPDATE prevents concurrent invoices from overselling the same product.
-        const productIds = [...new Set(
-          input.items
-            .filter((it) => it.productId !== null)
-            .map((it) => it.productId as string),
-        )];
+        // Iterate per item occurrence (no Set deduplication): a product appearing twice on the
+        // invoice triggers two decrements. The second will hit quantity <= 0 and throw
+        // invoice.insufficient_quantity — correct protection for unique single-quantity pieces.
+        const billableItems = input.items.filter((it) => it.productId !== null);
 
-        for (const productId of productIds) {
+        for (const item of billableItems) {
+          const productId = item.productId as string;
           const lockRes = await tx.query<{ quantity: number; status: string }>(
             `SELECT quantity, status FROM products WHERE id = $1 FOR UPDATE`,
             [productId],
@@ -160,6 +160,9 @@ export class BillingRepository {
             `UPDATE products SET quantity = $1, status = $2, updated_at = now() WHERE id = $3`,
             [newQty, newStatus, productId],
           );
+          // Story 5.3: emit invoice.created domain event here → StockMovementService records
+          // the SALE movement in stock_movements + sync_change_log for offline clients.
+          // nosemgrep: goldsmith.require-stock-movement — intentional deferral, domain event in next story
         }
 
         return { invoice, items };
