@@ -21,6 +21,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { InventoryService } from './inventory.service';
 import { InventoryBulkImportService } from './inventory.bulk-import.service';
 import { BarcodeService } from './barcode.service';
+import { InventoryValuationService } from './inventory.valuation.service';
 
 @Controller('/api/v1/inventory')
 export class InventoryController {
@@ -28,7 +29,29 @@ export class InventoryController {
     private readonly svc: InventoryService,
     private readonly bulkImportSvc: InventoryBulkImportService,
     private readonly barcodeSvc: BarcodeService,
+    private readonly valuationSvc: InventoryValuationService,
   ) {}
+
+  @Get('/valuation')
+  @Roles('shop_admin', 'shop_manager')
+  async getValuation(
+    @TenantContextDec() ctx: TenantContext,
+  ): Promise<object> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    const authCtx = ctx as AuthenticatedTenantContext;
+    const summary = await this.valuationSvc.computeValuation(authCtx);
+    // Serialize bigints to strings for JSON transport
+    return {
+      ...summary,
+      grandTotalPaise: summary.grandTotalPaise.toString(),
+      ratesFreshAt: summary.ratesFreshAt.toISOString(),
+      computedAt: summary.computedAt.toISOString(),
+      categories: summary.categories.map((c) => ({
+        ...c,
+        marketValuePaise: c.marketValuePaise.toString(),
+      })),
+    };
+  }
 
   @Post('/products')
   @Roles('shop_admin', 'shop_manager')

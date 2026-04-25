@@ -15,11 +15,13 @@ import type { BulkImportJobData } from './inventory.bulk-import.processor';
 import { InventoryBulkImportService } from './inventory.bulk-import.service';
 import { BarcodeService } from './barcode.service';
 import { SyncModule } from '../sync/sync.module';
+import { PricingModule } from '../pricing/pricing.module';
+import { InventoryValuationService } from './inventory.valuation.service';
 
 const QUEUE_NAME = 'inventory-bulk-import';
 
 @Module({
-  imports: [AuthModule, TenantLookupModule, StorageModule, SyncModule],
+  imports: [AuthModule, TenantLookupModule, StorageModule, SyncModule, PricingModule],
   controllers: [InventoryController],
   providers: [
     InventoryService,
@@ -27,6 +29,7 @@ const QUEUE_NAME = 'inventory-bulk-import';
     BarcodeService,
     InventoryBulkImportProcessor,
     InventoryBulkImportService,
+    InventoryValuationService,
     {
       provide: 'INVENTORY_REDIS',
       // maxRetriesPerRequest: null is required by BullMQ Workers (blocking BZPOPMIN semantics).
