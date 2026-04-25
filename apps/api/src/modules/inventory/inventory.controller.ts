@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  Inject,
   NotFoundException,
   Param,
   ParseIntPipe,
@@ -29,7 +30,7 @@ export class InventoryController {
     private readonly svc: InventoryService,
     private readonly bulkImportSvc: InventoryBulkImportService,
     private readonly barcodeSvc: BarcodeService,
-    private readonly valuationSvc: InventoryValuationService,
+    @Inject(InventoryValuationService) private readonly valuationSvc: InventoryValuationService,
   ) {}
 
   @Get('/valuation')
