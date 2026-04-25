@@ -749,6 +749,9 @@ importers:
       '@goldsmith/money':
         specifier: workspace:*
         version: link:../money
+      '@goldsmith/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@goldsmith/ui-tokens':
         specifier: workspace:*
         version: link:../ui-tokens

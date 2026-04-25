@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@goldsmith/money": "workspace:*",
+    "@goldsmith/shared": "workspace:*",
     "@goldsmith/ui-tokens": "workspace:*"
   },
   "devDependencies": {
