@@ -1,4 +1,1 @@
-{"timestamp":"2026-04-24T16:58:28-04:00","commit":"story-4.6","reviewer":"codex","note":"Story 4.6 code clean — rebased onto main after CI fixes"}
-codex review passed — story 3.6: 3 P1 correctness fixes applied (cursor snapshot, pending creates, pull cursor); no remaining P0/P1 items
-
-codex review passed — stories 3.9+3.10: P1 StubAdapter fallback + P1 index population (Epic 7 deferred) + P2 COUNT(*) OVER total count fixed; no remaining P0/P1 items
+2026-04-25T06:20:07Z story-3.8 stock-movements ledger
