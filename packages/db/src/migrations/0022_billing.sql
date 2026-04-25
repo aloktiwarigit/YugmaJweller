@@ -70,11 +70,11 @@ CREATE TABLE payments (
 
 -- 4. RLS — same pattern as invoices/audit_events/products
 ALTER TABLE invoices       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE invoices       FORCE  ROW LEVEL SECURITY;
+ALTER TABLE invoices       FORCE ROW LEVEL SECURITY;
 ALTER TABLE invoice_items  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE invoice_items  FORCE  ROW LEVEL SECURITY;
+ALTER TABLE invoice_items  FORCE ROW LEVEL SECURITY;
 ALTER TABLE payments       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE payments       FORCE  ROW LEVEL SECURITY;
+ALTER TABLE payments       FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS rls_invoices_tenant_isolation       ON invoices;
 DROP POLICY IF EXISTS rls_invoice_items_tenant_isolation  ON invoice_items;
@@ -116,12 +116,19 @@ CREATE INDEX idx_invoices_created_at
   ON invoices(shop_id, created_at DESC);
 CREATE INDEX idx_invoice_items_invoice
   ON invoice_items(invoice_id);
+CREATE INDEX idx_invoice_items_shop
+  ON invoice_items(shop_id);
 CREATE INDEX idx_payments_invoice
   ON payments(invoice_id);
+CREATE INDEX idx_payments_shop
+  ON payments(shop_id, recorded_at DESC);
 
 -- 8. updated_at touch trigger on invoices (mirrors products)
 CREATE OR REPLACE FUNCTION invoices_touch_updated_at()
-RETURNS trigger LANGUAGE plpgsql AS $$
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
