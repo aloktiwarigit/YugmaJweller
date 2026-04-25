@@ -48,6 +48,9 @@ function makeTx(
       if (sql.includes('INSERT INTO payments')) {
         return { rows: [] };
       }
+      if (sql.includes('SUM(amount_paise)')) {
+        return { rows: [{ paid: '0' }] };
+      }
       return { rows: [] };
     }),
   };
@@ -71,7 +74,7 @@ function setupWithTenantTx(pool: ReturnType<typeof fakePool>) {
   );
 }
 
-const INVOICE_ROW = { id: INVOICE, customer_id: null, customer_phone: '+919999999999' };
+const INVOICE_ROW = { id: INVOICE, status: 'ISSUED', total_paise: '100000000', customer_id: null, customer_phone: '+919999999999' };
 
 describe('PaymentService.recordCashPayment', () => {
   let svc: PaymentService;

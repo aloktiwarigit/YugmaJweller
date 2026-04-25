@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import {
@@ -79,19 +79,44 @@ export class PaymentService {
       const earlyIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey]);
       if (earlyIdem.rows[0]) return; // Already committed — safe retry
 
-      // ── B. Verify invoice exists (RLS scopes to current tenant) ────────────
+      // ── B. Verify invoice (RLS scopes to current tenant) ──────────────────
       const invRes = await tx.query<{
         id: string;
+        status: string;
+        total_paise: string; // pg returns BIGINT as string
         customer_id: string | null;
         customer_phone: string | null;
       }>(
-        `SELECT id, customer_id, customer_phone FROM invoices WHERE id = $1`,
+        `SELECT id, status, total_paise, customer_id, customer_phone FROM invoices WHERE id = $1`,
         [invoiceId],
       );
       if (!invRes.rows[0]) {
         throw new NotFoundException({ code: 'invoice.not_found' });
       }
-      const { customer_id: customerId, customer_phone: customerPhone } = invRes.rows[0];
+      const { status, total_paise, customer_id: customerId, customer_phone: customerPhone } = invRes.rows[0];
+
+      // Only ISSUED invoices accept payments (not DRAFT or VOIDED)
+      if (status !== 'ISSUED') {
+        throw new UnprocessableEntityException({ code: 'invoice.not_payable', status });
+      }
+
+      // Overpayment guard: amount must not exceed outstanding balance
+      const paidRes = await tx.query<{ paid: string }>(
+        `SELECT COALESCE(SUM(amount_paise), 0)::text AS paid
+         FROM payments
+         WHERE invoice_id = $1 AND status != 'FAILED'`,
+        [invoiceId],
+      );
+      const alreadyPaidPaise = BigInt(paidRes.rows[0]?.paid ?? '0');
+      const invoiceTotalPaise = BigInt(total_paise);
+      const remainingBalancePaise = invoiceTotalPaise - alreadyPaidPaise;
+      if (amountPaise > remainingBalancePaise) {
+        throw new UnprocessableEntityException({
+          code: 'invoice.payment_exceeds_balance',
+          amountPaise:            amountPaise.toString(),
+          remainingBalancePaise:  remainingBalancePaise.toString(),
+        });
+      }
 
       // ── C. Acquire aggregate row lock (IST date, TOCTOU-safe) ──────────────
       // INSERT ON CONFLICT acquires an exclusive row lock. Concurrent transactions
