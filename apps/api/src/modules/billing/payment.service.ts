@@ -116,11 +116,11 @@ export class PaymentService {
         await tx.query(INCREMENT_AGGREGATE_SQL, [amountPaise, customerId ?? null, customerPhone ?? null]);
       }
 
-      // 6. Insert payment record
+      // 6. Insert payment record — 'CONFIRMED' is correct for cash (immediate, no clearing delay)
       await tx.query(
         `INSERT INTO payments
            (shop_id, invoice_id, method, amount_paise, status, created_by_user_id)
-         VALUES (current_setting('app.current_shop_id', true)::uuid, $1, 'CASH', $2, 'COMPLETED', $3)`,
+         VALUES (current_setting('app.current_shop_id', true)::uuid, $1, 'CASH', $2, 'CONFIRMED', $3)`,
         [invoiceId, amountPaise, ctx.userId],
       );
     });

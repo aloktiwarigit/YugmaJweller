@@ -91,9 +91,14 @@ export const InvoiceResponseSchema = z.object({
 export type InvoiceItemResponse = z.infer<typeof InvoiceItemResponseSchema>;
 export type InvoiceResponse     = z.infer<typeof InvoiceResponseSchema>;
 
+const PositivePaiseString = z
+  .string()
+  .regex(/^[1-9]\d*$/, 'paise must be a positive integer string (> 0)');
+
 export const RecordCashPaymentSchema = z.object({
-  // Paise value as string to avoid JavaScript precision loss with large integers
-  amountPaise: PaiseString,
+  // Paise value as string to avoid JavaScript precision loss with large integers.
+  // Must be > 0 to match the payments.amount_paise check constraint.
+  amountPaise: PositivePaiseString,
   override: z.object({
     justification: z.string().min(1).max(1000),
   }).optional(),
