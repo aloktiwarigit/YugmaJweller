@@ -83,7 +83,8 @@ export default function NewInvoiceScreen(): JSX.Element {
         productId: l.productId,
         description: l.description,
         huid: l.huid,
-        makingChargePct: l.makingChargePct,
+        // B2B_WHOLESALE: omit makingChargePct so server-side WHOLESALE category lookup applies
+        ...(invoiceType !== 'B2B_WHOLESALE' ? { makingChargePct: l.makingChargePct } : {}),
         stoneChargesPaise: '0',
         hallmarkFeePaise: '0',
       })),
