@@ -46,8 +46,8 @@ export class InventoryValuationService {
   readonly logger = new Logger(InventoryValuationService.name);
 
   constructor(
-    private readonly repo: InventoryRepository,
-    private readonly pricingService: PricingService,
+    @Inject(InventoryRepository) private readonly repo: InventoryRepository,
+    @Inject(PricingService) private readonly pricingService: PricingService,
     @Inject('INVENTORY_REDIS') private readonly redis: Redis,
   ) {}
 
