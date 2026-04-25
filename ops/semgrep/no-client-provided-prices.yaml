@@ -1,0 +1,30 @@
+rules:
+  - id: goldsmith.no-client-provided-prices
+    message: |
+      Invoice request schemas (InvoiceLineSchema, CreateInvoiceSchema) must NOT
+      declare any server-computed *Paise field. The server is the authoritative
+      source of truth for goldValuePaise, makingChargePaise, gstMetalPaise,
+      gstMakingPaise, lineTotalPaise, subtotalPaise, and totalPaise — these are
+      derived from live rates + product data and must never be accepted from the
+      client. Allowed input *Paise fields are stoneChargesPaise and
+      hallmarkFeePaise (physical add-ons with no server-derivable value).
+      If a forbidden field is needed on a response object, define it only in
+      InvoiceItemResponseSchema or InvoiceResponseSchema.
+    severity: ERROR
+    languages: [typescript]
+    paths:
+      include:
+        - "**/packages/shared/src/schemas/invoice.schema.ts"
+    patterns:
+      - pattern-either:
+          - pattern: "goldValuePaise: $X"
+          - pattern: "makingChargePaise: $X"
+          - pattern: "gstMetalPaise: $X"
+          - pattern: "gstMakingPaise: $X"
+          - pattern: "lineTotalPaise: $X"
+          - pattern: "subtotalPaise: $X"
+          - pattern: "totalPaise: $X"
+      - pattern-not-inside: |
+          export const InvoiceItemResponseSchema = z.object({...})
+      - pattern-not-inside: |
+          export const InvoiceResponseSchema = z.object({...})
