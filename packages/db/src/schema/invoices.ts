@@ -1,0 +1,21 @@
+import { uuid, text, bigint, timestamp } from 'drizzle-orm/pg-core';
+import { tenantScopedTable } from './_helpers/tenantScopedTable';
+
+export const invoices = tenantScopedTable('invoices', {
+  id:                   uuid('id').primaryKey().defaultRandom(),
+  invoice_number:       text('invoice_number').notNull(),
+  invoice_type:         text('invoice_type').notNull().default('B2C'),
+  customer_id:          uuid('customer_id'),
+  customer_name:        text('customer_name').notNull(),
+  customer_phone:       text('customer_phone'),
+  status:               text('status').notNull().default('DRAFT'),
+  subtotal_paise:       bigint('subtotal_paise',     { mode: 'bigint' }).notNull(),
+  gst_metal_paise:      bigint('gst_metal_paise',    { mode: 'bigint' }).notNull(),
+  gst_making_paise:     bigint('gst_making_paise',   { mode: 'bigint' }).notNull(),
+  total_paise:          bigint('total_paise',        { mode: 'bigint' }).notNull(),
+  idempotency_key:      text('idempotency_key').notNull(),
+  issued_at:            timestamp('issued_at',  { withTimezone: true }),
+  created_by_user_id:   uuid('created_by_user_id').notNull(),
+  created_at:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updated_at:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
