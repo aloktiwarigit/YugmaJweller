@@ -5,7 +5,6 @@ import { Decimal } from 'decimal.js';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import type { PurityRates } from '@goldsmith/rates';
 import { InventoryRepository } from './inventory.repository';
-import type { ValuationProductRow } from './inventory.repository';
 import { PricingService } from '../pricing/pricing.service';
 
 const PURITY_RATE_MAP: Record<string, keyof PurityRates> = {
