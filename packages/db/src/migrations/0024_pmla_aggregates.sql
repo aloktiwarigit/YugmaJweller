@@ -14,6 +14,11 @@ CREATE TABLE pmla_aggregates (
   cash_total_paise BIGINT NOT NULL DEFAULT 0,
   invoice_count    INTEGER NOT NULL DEFAULT 0,
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Mutual exclusion: customer_id takes precedence; phone is only used when id is unknown.
+  -- This prevents the same customer from splitting across multiple rows when their contact
+  -- data differs across invoices (e.g., phone null on one invoice, non-null on another).
+  CONSTRAINT pmla_customer_id_or_phone
+    CHECK (customer_id IS NULL OR customer_phone IS NULL),
   CONSTRAINT pmla_aggregates_unique
     UNIQUE NULLS NOT DISTINCT (shop_id, aggregate_date, customer_id, customer_phone)
 );

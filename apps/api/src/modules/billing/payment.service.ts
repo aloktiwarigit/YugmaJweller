@@ -80,6 +80,8 @@ export class PaymentService {
       if (earlyIdem.rows[0]) return; // Already committed — safe retry
 
       // ── B. Verify invoice (RLS scopes to current tenant) ──────────────────
+      // FOR UPDATE locks the row — serializes concurrent payments on the same invoice,
+      // preventing a TOCTOU gap between the balance check and the payment INSERT.
       const invRes = await tx.query<{
         id: string;
         status: string;
@@ -87,13 +89,18 @@ export class PaymentService {
         customer_id: string | null;
         customer_phone: string | null;
       }>(
-        `SELECT id, status, total_paise, customer_id, customer_phone FROM invoices WHERE id = $1`,
+        `SELECT id, status, total_paise, customer_id, customer_phone FROM invoices WHERE id = $1 FOR UPDATE`,
         [invoiceId],
       );
       if (!invRes.rows[0]) {
         throw new NotFoundException({ code: 'invoice.not_found' });
       }
-      const { status, total_paise, customer_id: customerId, customer_phone: customerPhone } = invRes.rows[0];
+      const { status, total_paise, customer_id: customerId, customer_phone: rawPhone } = invRes.rows[0];
+
+      // Normalize customer identity: customer_id takes precedence over phone.
+      // When customer_id is known, we clear phone from the aggregate key so that
+      // the same customer with different phone data across invoices maps to one row.
+      const customerPhone = customerId ? null : rawPhone;
 
       // Only ISSUED invoices accept payments (not DRAFT or VOIDED)
       if (status !== 'ISSUED') {
