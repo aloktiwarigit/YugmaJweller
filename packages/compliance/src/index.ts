@@ -13,3 +13,5 @@ export {
 } from './pan/rule-114b';
 export type { PanEnforcementInput } from './pan/rule-114b';
 export { validateGstinFormat, normalizeGstin, getStateCodeFromGstin } from './gstin';
+export type { GstTreatment, B2BGstBreakdown } from './gst/b2b-treatment';
+export { determineGstTreatment, applyB2BGstTreatment } from './gst/b2b-treatment';
