@@ -201,6 +201,7 @@ describe('BillingService.createInvoice', () => {
     });
 
     const dto = {
+      invoiceType: 'B2C' as const,
       customerName: 'राहुल शर्मा',
       customerPhone: undefined,
       lines: [{
@@ -254,6 +255,7 @@ describe('BillingService.createInvoice', () => {
 
     const key = newKey();
     const dto = {
+      invoiceType: 'B2C' as const,
       customerName: 'Idempotency Test Customer',
       lines: [{
         productId,
@@ -281,6 +283,7 @@ describe('BillingService.createInvoice', () => {
     });
 
     const dto = {
+      invoiceType: 'B2C' as const,
       customerName: 'HUID Block Customer',
       lines: [{
         productId,
@@ -313,6 +316,7 @@ describe('BillingService.createInvoice', () => {
     });
 
     const dto = {
+      invoiceType: 'B2C' as const,
       customerName: 'No Key Customer',
       lines: [{
         productId,
@@ -338,6 +342,7 @@ describe('BillingService.createInvoice', () => {
     });
 
     const dto = {
+      invoiceType: 'B2C' as const,
       customerName: 'Shop A Customer',
       lines: [{
         productId,
@@ -372,6 +377,7 @@ describe('BillingService.createInvoice', () => {
     // Create one invoice for each tenant
     await tenantContext.runWith(ctxA, () =>
       svcA.createInvoice({
+        invoiceType: 'B2C',
         customerName: 'List Customer A',
         lines: [{
           productId:        productIdA,
@@ -385,6 +391,7 @@ describe('BillingService.createInvoice', () => {
 
     await tenantContext.runWith(ctxB, () =>
       svcB.createInvoice({
+        invoiceType: 'B2C',
         customerName: 'List Customer B',
         lines: [{
           productId:        productIdB,
@@ -432,6 +439,7 @@ describe('BillingService.createInvoice', () => {
     });
 
     const dto = {
+      invoiceType: 'B2C' as const,
       customerName: 'Paise Test Customer',
       lines: [{
         productId,

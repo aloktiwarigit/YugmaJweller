@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
 import { BillingService } from './billing.service';
+import { IdempotencyKeyConflictError } from './billing.repository';
 import { ComplianceHardBlockError } from '@goldsmith/compliance';
 import type { MakingChargeConfig } from '@goldsmith/shared';
 
@@ -80,6 +81,16 @@ function fakeRepo() {
         id: 'inv-1', shop_id: SHOP,
         invoice_number: input.invoiceNumber,
         invoice_type: input.invoiceType,
+        buyer_gstin: input.buyerGstin ?? null,
+        buyer_business_name: input.buyerBusinessName ?? null,
+        seller_state_code: input.sellerStateCode ?? '09',
+        gst_treatment: input.gstTreatment ?? 'CGST_SGST',
+        cgst_metal_paise: input.cgstMetalPaise ?? 0n,
+        sgst_metal_paise: input.sgstMetalPaise ?? 0n,
+        cgst_making_paise: input.cgstMakingPaise ?? 0n,
+        sgst_making_paise: input.sgstMakingPaise ?? 0n,
+        igst_metal_paise: input.igstMetalPaise ?? 0n,
+        igst_making_paise: input.igstMakingPaise ?? 0n,
         customer_id: input.customerId,
         customer_name: input.customerName,
         customer_phone: input.customerPhone,
@@ -91,6 +102,10 @@ function fakeRepo() {
         idempotency_key: input.idempotencyKey,
         issued_at: input.issuedAt,
         created_by_user_id: input.createdByUserId,
+        pan_ciphertext: null,
+        pan_key_id: null,
+        form60_encrypted: null,
+        form60_key_id: null,
         created_at: new Date(), updated_at: new Date(),
       },
       items: input.items.map((it: any, i: number) => ({
@@ -131,7 +146,7 @@ describe('BillingService.createInvoice', () => {
 
     await expect(
       svc.createInvoice(
-        { customerName: 'राम', lines: [
+        { invoiceType: 'B2C', customerName: 'राम', lines: [
           { productId: 'p1', description: 'Gold Chain', huid: null, makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
         ]},
         'idem-1',
@@ -165,7 +180,7 @@ describe('BillingService.createInvoice', () => {
 
     const svc = new BillingService(repo as any, inv as any, fakePricing() as any, redis as any, fakePool(), undefined as any, undefined as any, undefined as any);
     const out = await svc.createInvoice(
-      { customerName: 'Smoke', lines: [{ description: 'x', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any] },
+      { invoiceType: 'B2C', customerName: 'Smoke', lines: [{ description: 'x', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any] },
       'idem-cached',
     );
 
@@ -185,7 +200,7 @@ describe('BillingService.createInvoice', () => {
     // Request line has no huid; product on record DOES (hallmarked) → must hard-block
     await expect(
       svc.createInvoice(
-        { customerName: 'राम', lines: [{ productId: 'p1', description: 'Gold Chain', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any] },
+        { invoiceType: 'B2C', customerName: 'राम', lines: [{ productId: 'p1', description: 'Gold Chain', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any] },
         'idem-bypass-attempt',
       ),
     ).rejects.toBeInstanceOf(ComplianceHardBlockError);
@@ -198,7 +213,7 @@ describe('BillingService.createInvoice', () => {
 
     await expect(
       svc.createInvoice(
-        { customerName: 'X', lines: [{ description: 'x', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any] },
+        { invoiceType: 'B2C', customerName: 'X', lines: [{ description: 'x', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any] },
         '',
       ),
     ).rejects.toMatchObject({
@@ -227,7 +242,7 @@ describe('BillingService.createInvoice', () => {
 
     await expect(
       svc.createInvoice(
-        { customerName: 'राम', lines: [
+        { invoiceType: 'B2C', customerName: 'राम', lines: [
           { productId: 'p-sold', description: 'Already sold item', makingChargePct: '10.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
         ]},
         'idem-sold-guard',
@@ -235,7 +250,7 @@ describe('BillingService.createInvoice', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
 
     const err = await svc.createInvoice(
-      { customerName: 'राम', lines: [
+      { invoiceType: 'B2C', customerName: 'राम', lines: [
         { productId: 'p-sold', description: 'Already sold item', makingChargePct: '10.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
       ]},
       'idem-sold-guard-2',
@@ -274,7 +289,7 @@ describe('BillingService.createInvoice', () => {
 
     await expect(
       svc.createInvoice(
-        { customerName: 'राम', lines: [
+        { invoiceType: 'B2C', customerName: 'राम', lines: [
           { productId: 'prod-xyz', description: 'Zero qty item', makingChargePct: '10.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
         ]},
         'idem-insufficient',
@@ -282,7 +297,7 @@ describe('BillingService.createInvoice', () => {
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
 
     const err = await svc.createInvoice(
-      { customerName: 'राम', lines: [
+      { invoiceType: 'B2C', customerName: 'राम', lines: [
         { productId: 'prod-xyz', description: 'Zero qty item', makingChargePct: '10.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
       ]},
       'idem-insufficient-2',
@@ -326,7 +341,7 @@ describe('BillingService.createInvoice — making charges from shop settings', (
     );
 
     await svc.createInvoice(
-      { customerName: 'राम', lines: [
+      { invoiceType: 'B2C', customerName: 'राम', lines: [
         { productId: 'p1', description: 'Bridal Set', huid: 'AB12CD', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
       ]},
       'idem-bridal',
@@ -350,7 +365,7 @@ describe('BillingService.createInvoice — making charges from shop settings', (
     );
 
     await svc.createInvoice(
-      { customerName: 'राम', lines: [
+      { invoiceType: 'B2C', customerName: 'राम', lines: [
         { productId: 'p1', description: 'Ring', huid: 'AB12CD', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
       ]},
       'idem-rings-fallback',
@@ -374,7 +389,7 @@ describe('BillingService.createInvoice — making charges from shop settings', (
     );
 
     await svc.createInvoice(
-      { customerName: 'राम', lines: [
+      { invoiceType: 'B2C', customerName: 'राम', lines: [
         { productId: 'p1', description: 'Bridal Override', huid: 'AB12CD', makingChargePct: '8.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
       ]},
       'idem-dto-override',
@@ -400,7 +415,7 @@ describe('BillingService.createInvoice — making charges from shop settings', (
     );
 
     await svc.createInvoice(
-      { customerName: 'राम', lines: [
+      { invoiceType: 'B2C', customerName: 'राम', lines: [
         { productId: 'p1', description: 'Chain', huid: 'AB12CD', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
       ]},
       'idem-cache-miss',
@@ -410,5 +425,110 @@ describe('BillingService.createInvoice — making charges from shop settings', (
     expect(item.makingChargePct).toBe('10.00');
     expect(sr.getMakingCharges).toHaveBeenCalled();
     expect(sc.setMakingCharges).toHaveBeenCalledWith([{ category: 'CHAINS', type: 'percent', value: '10.00' }]);
+  });
+});
+
+describe('BillingService — tenant isolation (service-layer RLS defense-in-depth)', () => {
+  it('Tenant A B2B invoice is not readable by Tenant B (service-layer RLS check)', async () => {
+    // This tests the defence-in-depth guard in billing.service.ts at the
+    // idempotency-conflict handler (lines ~516-518):
+    //   if (existing.invoice.shop_id !== ctx.shopId) throw BadRequestException
+    //
+    // The actual RLS enforcement lives in PostgreSQL (tested by integration tests).
+    // This test covers the service-layer check that fires when the DB returns a
+    // row with a mismatched shop_id — e.g. if a misconfigured RLS policy leaked
+    // a cross-tenant invoice through the idempotency key fetch.
+    //
+    // Setup:
+    //   - ctx.shopId = SHOP (shop-a)
+    //   - repo.insertInvoice throws IdempotencyKeyConflictError (simulates key collision)
+    //   - repo.getInvoiceByIdempotencyKey returns an invoice with shop_id = 'shop-b-uuid'
+    //   - Service MUST throw BadRequestException (not return the other tenant's invoice)
+
+    const SHOP_B = 'ffffffff-ffff-4000-8000-000000000099';
+
+    const inv = {
+      getProductRowForBilling: vi.fn(async (id: string) => ({
+        id,
+        shop_id: SHOP,
+        metal: 'GOLD',
+        purity: 'GOLD_22K',
+        net_weight_g: '10.0000',
+        huid: null,
+        status: 'IN_STOCK',
+      })),
+    };
+
+    const repo = {
+      insertInvoice: vi.fn(async () => {
+        throw new IdempotencyKeyConflictError('idem-cross-tenant');
+      }),
+      // First call: pre-flight check at line ~226 → returns null (no early return)
+      // Second call: inside catch(IdempotencyKeyConflictError) → returns cross-tenant invoice
+      getInvoiceByIdempotencyKey: vi.fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          invoice: {
+            id: 'inv-tenant-b',
+            shop_id: SHOP_B,  // Different tenant — must not be returned to SHOP
+            invoice_number: 'GS-XXX-20260425-BBB999',
+            invoice_type: 'B2B',
+            buyer_gstin: '27ABCDE1234F1Z3',
+            buyer_business_name: 'Other Jeweller',
+            seller_state_code: '09',
+            gst_treatment: 'IGST',
+            cgst_metal_paise: 0n,
+            sgst_metal_paise: 0n,
+            cgst_making_paise: 0n,
+            sgst_making_paise: 0n,
+            igst_metal_paise: 900n,
+            igst_making_paise: 250n,
+            customer_id: null,
+            customer_name: 'Other Customer',
+            customer_phone: null,
+            status: 'ISSUED',
+            subtotal_paise: 30_000n,
+            gst_metal_paise: 900n,
+            gst_making_paise: 250n,
+            total_paise: 31_150n,
+            idempotency_key: 'idem-cross-tenant',
+            issued_at: new Date(),
+            created_by_user_id: 'some-other-user',
+            pan_ciphertext: null,
+            pan_key_id: null,
+            form60_encrypted: null,
+            form60_key_id: null,
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+          items: [],
+        }),
+      getInvoice: vi.fn(async () => null),
+      listInvoices: vi.fn(async () => []),
+    };
+
+    const svc = new BillingService(
+      repo as any,
+      inv as any,
+      fakePricing() as any,
+      fakeRedis() as any,
+      fakePool(),
+      undefined as any,
+      undefined as any,
+      undefined as any,
+    );
+
+    // The service must throw, not silently return Tenant B's invoice
+    await expect(
+      svc.createInvoice(
+        { invoiceType: 'B2C', customerName: 'राम', lines: [
+          { productId: 'p1', description: 'Ring', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
+        ]},
+        'idem-cross-tenant',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    // The cross-tenant invoice must never have been returned
+    expect(repo.getInvoiceByIdempotencyKey).toHaveBeenCalled();
   });
 });

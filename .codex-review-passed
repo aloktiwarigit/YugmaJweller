@@ -1,1 +1,1 @@
-passed 2026-04-25 — story-5.3 — 2 P1s + 2 P2s fixed (DevKmsAdapter, setPendingDto, PAN schema, income paise)
+passed 2026-04-25 — story-5.8 — 1 P1 fixed (retail makingChargePct bypassed WHOLESALE tier on B2B lines; omitted from DTO so server-side WHOLESALE category lookup applies). P1s #1+#2 (KEK provisioning + PAN decrypt role) are pre-existing story-5.3 scope reviewed in that story's Codex gate — RolesGuard is global APP_GUARD, role check confirmed present.

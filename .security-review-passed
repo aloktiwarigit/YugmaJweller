@@ -1,1 +1,1 @@
-passed 2026-04-25 — story-5.3 — 0 confirmed vulnerabilities (defence-in-depth gap and form60 API misuse both scored 3/10, below threshold)
+passed 2026-04-25 — story-5.8 — 0 confirmed vulnerabilities. All 3 candidates below threshold: weak UI regex (client-side, server validates), missing gst_treatment CHECK (DB-only write path), duplicated SELLER_STATE_CODE literal (code quality, no exploit vector).

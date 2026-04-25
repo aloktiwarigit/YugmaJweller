@@ -16,6 +16,10 @@ import {
   validatePanFormat,
   normalizePan,
   validateForm60,
+  validateGstinFormat,
+  normalizeGstin,
+  getStateCodeFromGstin,
+  determineGstTreatment,
 } from '@goldsmith/compliance';
 import { encryptColumn, decryptColumn, serializeEnvelope, deserializeEnvelope } from '@goldsmith/crypto-envelope';
 import type { KmsAdapter } from '@goldsmith/crypto-envelope';
@@ -97,6 +101,16 @@ function rowToInvoiceResponse(invoice: InvoiceRow, items: InvoiceItemRow[]): Inv
     createdAt:         invoice.created_at.toISOString(),
     updatedAt:         invoice.updated_at.toISOString(),
     lines:             items.map(rowToInvoiceItemResponse),
+    // B2B fields
+    buyerGstin:        invoice.buyer_gstin ?? null,
+    buyerBusinessName: invoice.buyer_business_name ?? null,
+    gstTreatment:      invoice.gst_treatment as 'CGST_SGST' | 'IGST',
+    cgstMetalPaise:    invoice.cgst_metal_paise.toString(),
+    sgstMetalPaise:    invoice.sgst_metal_paise.toString(),
+    cgstMakingPaise:   invoice.cgst_making_paise.toString(),
+    sgstMakingPaise:   invoice.sgst_making_paise.toString(),
+    igstMetalPaise:    invoice.igst_metal_paise.toString(),
+    igstMakingPaise:   invoice.igst_making_paise.toString(),
   };
 }
 
@@ -292,15 +306,37 @@ export class BillingService {
       validateForm60(dto.form60Data as Record<string, unknown>);
     }
 
+    // 3c. B2B GSTIN validation
+    let normalizedGstin: string | null = null;
+    let gstTreatment: 'CGST_SGST' | 'IGST' = 'CGST_SGST';
+
+    if (dto.invoiceType === 'B2B_WHOLESALE') {
+      if (!dto.buyerGstin) {
+        throw new BadRequestException({ code: 'invoice.b2b_gstin_required' });
+      }
+      normalizedGstin = normalizeGstin(dto.buyerGstin);
+      if (!validateGstinFormat(normalizedGstin)) {
+        throw new BadRequestException({ code: 'invoice.b2b_gstin_invalid' });
+      }
+      const buyerStateCode = getStateCodeFromGstin(normalizedGstin);
+      const SELLER_STATE_CODE = '09'; // UP — anchor shop. Phase 2: read from shop_settings.
+      gstTreatment = determineGstTreatment(SELLER_STATE_CODE, buyerStateCode);
+    }
+
     // 4. Fetch live tenant rates (with override applied)
     const rates = await this.pricing.getCurrentRatesForTenant(ctx);
 
     // 5. Resolve making charges per line (settings cache → DB fallback → 12% hardcoded default).
     // DTO override wins; absent DTO value + productId → look up shop settings by category.
+    // For B2B_WHOLESALE, use 'WHOLESALE' category so the jeweller's wholesale making-charge
+    // rate applies; falls back to product category if product exists.
     const effectiveMakingPcts: string[] = await Promise.all(
-      dto.lines.map((input, i) =>
-        this.resolveMakingChargePct(resolvedProducts[i]?.category, input.makingChargePct),
-      ),
+      dto.lines.map((input, i) => {
+        const category = dto.invoiceType === 'B2B_WHOLESALE'
+          ? (resolvedProducts[i]?.category ?? 'WHOLESALE')
+          : resolvedProducts[i]?.category;
+        return this.resolveMakingChargePct(category, input.makingChargePct);
+      }),
     );
 
     // 5b. Compute each line server-side. Client price fields are ignored
@@ -363,6 +399,30 @@ export class BillingService {
       totalPaise      += computed.totalPaise;
     }
 
+    // 6a. B2B GST treatment — split invoice-level GST into CGST/SGST or IGST.
+    // computeProductPrice (via applyGstSplit) already computed the total GST amounts.
+    // We split those at the invoice level: equal halves for CGST/SGST; full amount for IGST.
+    let cgstMetalPaise  = 0n;
+    let sgstMetalPaise  = 0n;
+    let cgstMakingPaise = 0n;
+    let sgstMakingPaise = 0n;
+    let igstMetalPaise  = 0n;
+    let igstMakingPaise = 0n;
+
+    if (dto.invoiceType === 'B2B_WHOLESALE') {
+      if (gstTreatment === 'CGST_SGST') {
+        // Integer-exact halving: half rounded down for CGST, remainder to SGST
+        cgstMetalPaise  = gstMetalPaise / 2n;
+        sgstMetalPaise  = gstMetalPaise - cgstMetalPaise;
+        cgstMakingPaise = gstMakingPaise / 2n;
+        sgstMakingPaise = gstMakingPaise - cgstMakingPaise;
+      } else {
+        // IGST: full GST amount, no CGST/SGST
+        igstMetalPaise  = gstMetalPaise;
+        igstMakingPaise = gstMakingPaise;
+      }
+    }
+
     // 6b. PAN Rule 114B hard-block — now that total is known
     enforcePanRequired({ totalPaise, pan: normalizedPan, form60Data: dto.form60Data ?? null });
 
@@ -395,18 +455,28 @@ export class BillingService {
     try {
       const insertInput: InsertInvoiceInput = {
         invoiceNumber,
-        invoiceType:    'B2C',
-        customerId:     null,
-        customerName:   dto.customerName,
-        customerPhone:  dto.customerPhone ?? null,
-        status:         'ISSUED',
+        invoiceType:         dto.invoiceType ?? 'B2C',
+        buyerGstin:          normalizedGstin,
+        buyerBusinessName:   dto.buyerBusinessName ?? null,
+        sellerStateCode:     '09', // UP — anchor shop. Phase 2: read from shop_settings.
+        gstTreatment,
+        cgstMetalPaise,
+        sgstMetalPaise,
+        cgstMakingPaise,
+        sgstMakingPaise,
+        igstMetalPaise,
+        igstMakingPaise,
+        customerId:          null,
+        customerName:        dto.customerName,
+        customerPhone:       dto.customerPhone ?? null,
+        status:              'ISSUED',
         subtotalPaise,
         gstMetalPaise,
         gstMakingPaise,
         totalPaise,
         idempotencyKey,
-        issuedAt:       new Date(),
-        createdByUserId: ctx.userId,
+        issuedAt:            new Date(),
+        createdByUserId:     ctx.userId,
         panCiphertext,
         panKeyId,
         form60Encrypted,
