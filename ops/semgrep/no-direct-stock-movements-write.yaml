@@ -1,0 +1,35 @@
+rules:
+  - id: no-stock-movements-update-or-delete
+    message: |
+      stock_movements is append-only — never UPDATE or DELETE.
+      Use a compensating movement (e.g. ADJUSTMENT_OUT) instead.
+    languages: [generic]
+    severity: ERROR
+    paths:
+      include:
+        - "**/*.ts"
+        - "**/*.sql"
+      exclude:
+        - "packages/db/src/migrations/0021_stock_movements.sql"
+        - "**/*.spec.ts"
+        - "**/*.test.ts"
+        - "**/test/**"
+    pattern-either:
+      - pattern-regex: 'UPDATE\s+stock_movements\b'
+      - pattern-regex: 'DELETE\s+FROM\s+stock_movements\b'
+
+  - id: no-direct-stock-movements-insert
+    message: |
+      Insert stock_movements only via StockMovementRepository.recordAtomic.
+      Direct INSERTs bypass the FOR UPDATE lock + balance invariant.
+    languages: [generic]
+    severity: ERROR
+    paths:
+      include:
+        - "apps/**/*.ts"
+      exclude:
+        - "apps/api/src/modules/inventory/stock-movement.repository.ts"
+        - "**/*.spec.ts"
+        - "**/*.test.ts"
+        - "**/test/**"
+    pattern-regex: 'INSERT\s+INTO\s+stock_movements\b'
