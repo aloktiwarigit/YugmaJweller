@@ -72,6 +72,10 @@ describe('validateGstinFormat', () => {
     expect(validateGstinFormat(validGstin)).toBe(true);
   });
 
+  it('rejects non-numeric state code', () => {
+    expect(validateGstinFormat('AAABCDE1234F1ZM')).toBe(false);
+  });
+
   it('rejects PAN with digit in position 1 (should be letter)', () => {
     expect(validateGstinFormat('291BCDE1234F1Z3')).toBe(false);
   });
@@ -84,8 +88,8 @@ describe('validateGstinFormat', () => {
     expect(validateGstinFormat('29ABCDEA234F1Z3')).toBe(false);
   });
 
-  it('rejects PAN with digit in position 7 (should be letter)', () => {
-    expect(validateGstinFormat('29ABCDE12341Z3')).toBe(false);
+  it('rejects GSTIN with digit at PAN final position (PAN[9])', () => {
+    expect(validateGstinFormat('29ABCDE12341IZX')).toBe(false);
   });
 
   it('rejects entity number 0 (invalid)', () => {
