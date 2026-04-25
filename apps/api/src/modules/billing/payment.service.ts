@@ -62,7 +62,17 @@ export class PaymentService {
     let overrideWasUsed = false;
 
     await withTenantTx(this.pool, async (tx) => {
-      // 1. Verify invoice exists (RLS scopes to current tenant)
+      // 1a. Idempotency check — must happen BEFORE any compliance/aggregate mutation.
+      //     If this key was already committed, return silently without re-counting.
+      const idemCheck = await tx.query<{ id: string }>(
+        `SELECT id FROM payments
+         WHERE shop_id = current_setting('app.current_shop_id', true)::uuid
+           AND idempotency_key = $1`,
+        [idempotencyKey],
+      );
+      if (idemCheck.rows[0]) return; // Already processed — idempotent
+
+      // 1b. Verify invoice exists (RLS scopes to current tenant)
       const invRes = await tx.query<{
         id: string;
         customer_id: string | null;
