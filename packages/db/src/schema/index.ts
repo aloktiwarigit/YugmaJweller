@@ -14,3 +14,4 @@ export * from './ibja-rate-snapshots';
 export * from './shop-rate-overrides';
 export * from './tenant-sync-cursors';
 export * from './sync-change-log';
+export * from './stock-movements';

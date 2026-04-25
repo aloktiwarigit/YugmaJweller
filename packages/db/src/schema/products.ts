@@ -1,4 +1,4 @@
-import { uuid, text, timestamp, decimal } from 'drizzle-orm/pg-core';
+import { uuid, text, timestamp, decimal, integer } from 'drizzle-orm/pg-core';
 import { tenantScopedTable } from './_helpers/tenantScopedTable';
 import { productCategories } from './product-categories';
 
@@ -15,6 +15,7 @@ export const products = tenantScopedTable('products', {
   making_charge_override_pct: decimal('making_charge_override_pct', { precision: 5, scale: 2 }),
   huid:                       text('huid'),
   status:                     text('status').notNull().default('IN_STOCK'),
+  quantity:                   integer('quantity').notNull().default(1),
   published_at:               timestamp('published_at', { withTimezone: true }),
   published_by_user_id:       uuid('published_by_user_id'),
   created_by_user_id:         uuid('created_by_user_id').notNull(),
