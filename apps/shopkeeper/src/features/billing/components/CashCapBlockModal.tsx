@@ -125,7 +125,7 @@ export function CashCapBlockModal({
           </View>
 
           {/* Quick-action split buttons */}
-          {remainingPaise > 0n && (
+          {nonCashAmountPaise > 0n && (
             <View style={styles.splitSection}>
               <Text style={styles.sectionLabel}>बाकी {paiseToRupees(nonCashAmountPaise)} इससे लें:</Text>
               <View style={styles.splitRow}>

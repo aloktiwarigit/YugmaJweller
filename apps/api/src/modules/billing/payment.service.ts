@@ -15,6 +15,16 @@ export interface CashPaymentOverride {
   justification: string;
 }
 
+// Normalizes a phone number to a canonical 10-digit form before using it as
+// a pmla_aggregates key. Prevents the same walk-in customer from creating
+// separate aggregate rows due to formatting variants (9999999999 vs +91 99999 99999).
+function normalizePhone(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  // Strip spaces, dashes, parentheses, then remove leading +91 or 91 (10-digit numbers)
+  const digits = phone.replace(/[\s\-\(\)\.]/g, '').replace(/^\+?91(?=\d{10}$)/, '');
+  return digits.length > 0 ? digits : null;
+}
+
 const FETCH_OR_INIT_AGGREGATE_SQL = `
   INSERT INTO pmla_aggregates
     (shop_id, customer_id, customer_phone, aggregate_date, aggregate_month, cash_total_paise, invoice_count)
@@ -101,7 +111,10 @@ export class PaymentService {
         throw new NotFoundException({ code: 'invoice.not_found' });
       }
       const { status, total_paise, customer_id: customerId, customer_phone: rawPhone } = invRes.rows[0];
-      const customerPhone = customerId ? null : rawPhone;
+      // Normalize customer identity for aggregate key:
+      //   - customer_id takes precedence; when non-null, phone is set to null
+      //   - phone is normalized to canonical 10-digit form to prevent variant-based bypass
+      const customerPhone = customerId ? null : normalizePhone(rawPhone);
 
       if (status !== 'ISSUED') {
         throw new UnprocessableEntityException({ code: 'invoice.not_payable', status });
