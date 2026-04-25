@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
 import { BillingService } from './billing.service';
+import { IdempotencyKeyConflictError } from './billing.repository';
 import { ComplianceHardBlockError } from '@goldsmith/compliance';
 import type { MakingChargeConfig } from '@goldsmith/shared';
 
@@ -424,5 +425,110 @@ describe('BillingService.createInvoice — making charges from shop settings', (
     expect(item.makingChargePct).toBe('10.00');
     expect(sr.getMakingCharges).toHaveBeenCalled();
     expect(sc.setMakingCharges).toHaveBeenCalledWith([{ category: 'CHAINS', type: 'percent', value: '10.00' }]);
+  });
+});
+
+describe('BillingService — tenant isolation (service-layer RLS defense-in-depth)', () => {
+  it('Tenant A B2B invoice is not readable by Tenant B (service-layer RLS check)', async () => {
+    // This tests the defence-in-depth guard in billing.service.ts at the
+    // idempotency-conflict handler (lines ~516-518):
+    //   if (existing.invoice.shop_id !== ctx.shopId) throw BadRequestException
+    //
+    // The actual RLS enforcement lives in PostgreSQL (tested by integration tests).
+    // This test covers the service-layer check that fires when the DB returns a
+    // row with a mismatched shop_id — e.g. if a misconfigured RLS policy leaked
+    // a cross-tenant invoice through the idempotency key fetch.
+    //
+    // Setup:
+    //   - ctx.shopId = SHOP (shop-a)
+    //   - repo.insertInvoice throws IdempotencyKeyConflictError (simulates key collision)
+    //   - repo.getInvoiceByIdempotencyKey returns an invoice with shop_id = 'shop-b-uuid'
+    //   - Service MUST throw BadRequestException (not return the other tenant's invoice)
+
+    const SHOP_B = 'ffffffff-ffff-4000-8000-000000000099';
+
+    const inv = {
+      getProductRowForBilling: vi.fn(async (id: string) => ({
+        id,
+        shop_id: SHOP,
+        metal: 'GOLD',
+        purity: 'GOLD_22K',
+        net_weight_g: '10.0000',
+        huid: null,
+        status: 'IN_STOCK',
+      })),
+    };
+
+    const repo = {
+      insertInvoice: vi.fn(async () => {
+        throw new IdempotencyKeyConflictError('idem-cross-tenant');
+      }),
+      // First call: pre-flight check at line ~226 → returns null (no early return)
+      // Second call: inside catch(IdempotencyKeyConflictError) → returns cross-tenant invoice
+      getInvoiceByIdempotencyKey: vi.fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          invoice: {
+            id: 'inv-tenant-b',
+            shop_id: SHOP_B,  // Different tenant — must not be returned to SHOP
+            invoice_number: 'GS-XXX-20260425-BBB999',
+            invoice_type: 'B2B',
+            buyer_gstin: '27ABCDE1234F1Z3',
+            buyer_business_name: 'Other Jeweller',
+            seller_state_code: '09',
+            gst_treatment: 'IGST',
+            cgst_metal_paise: 0n,
+            sgst_metal_paise: 0n,
+            cgst_making_paise: 0n,
+            sgst_making_paise: 0n,
+            igst_metal_paise: 900n,
+            igst_making_paise: 250n,
+            customer_id: null,
+            customer_name: 'Other Customer',
+            customer_phone: null,
+            status: 'ISSUED',
+            subtotal_paise: 30_000n,
+            gst_metal_paise: 900n,
+            gst_making_paise: 250n,
+            total_paise: 31_150n,
+            idempotency_key: 'idem-cross-tenant',
+            issued_at: new Date(),
+            created_by_user_id: 'some-other-user',
+            pan_ciphertext: null,
+            pan_key_id: null,
+            form60_encrypted: null,
+            form60_key_id: null,
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+          items: [],
+        }),
+      getInvoice: vi.fn(async () => null),
+      listInvoices: vi.fn(async () => []),
+    };
+
+    const svc = new BillingService(
+      repo as any,
+      inv as any,
+      fakePricing() as any,
+      fakeRedis() as any,
+      fakePool(),
+      undefined as any,
+      undefined as any,
+      undefined as any,
+    );
+
+    // The service must throw, not silently return Tenant B's invoice
+    await expect(
+      svc.createInvoice(
+        { invoiceType: 'B2C', customerName: 'राम', lines: [
+          { productId: 'p1', description: 'Ring', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
+        ]},
+        'idem-cross-tenant',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    // The cross-tenant invoice must never have been returned
+    expect(repo.getInvoiceByIdempotencyKey).toHaveBeenCalled();
   });
 });
