@@ -1,0 +1,75 @@
+import { z } from 'zod';
+
+const PaiseString = z.string().regex(/^\d+$/, 'paise must be non-negative integer string');
+const DecimalWeight = z.string().regex(/^\d+(\.\d{1,4})?$/, 'weight must be DECIMAL(*,4)');
+const DecimalPct    = z.string().regex(/^\d+(\.\d{1,2})?$/, 'percent must be DECIMAL(5,2)');
+const HuidString    = z.string().regex(/^[A-Z0-9]{6}$/, 'HUID must be 6 uppercase alphanumeric');
+const PhoneIndia    = z.string().regex(/^[6-9]\d{9}$/, 'phone must be 10 digits starting 6-9');
+const Uuid          = z.string().uuid();
+
+export const InvoiceLineSchema = z.object({
+  productId:         Uuid.optional(),
+  description:       z.string().min(1).max(500),
+  huid:              HuidString.nullable().optional(),
+  metalType:         z.enum(['GOLD', 'SILVER', 'PLATINUM']).optional(),
+  purity:            z.string().max(16).optional(),
+  netWeightG:        DecimalWeight.optional(),
+  makingChargePct:   DecimalPct.default('12.00'),
+  stoneChargesPaise: PaiseString.default('0'),
+  hallmarkFeePaise:  PaiseString.default('0'),
+});
+
+export const CreateInvoiceSchema = z.object({
+  customerName:  z.string().min(1).max(200),
+  customerPhone: PhoneIndia.optional(),
+  lines:         z.array(InvoiceLineSchema).min(1).max(50),
+});
+
+export type CreateInvoiceDtoType = z.infer<typeof CreateInvoiceSchema>;
+export type InvoiceLineDtoType   = z.infer<typeof InvoiceLineSchema>;
+
+// Response schema — paise emitted as decimal strings (BigInt-safe across JSON boundaries).
+export const InvoiceItemResponseSchema = z.object({
+  id:                 Uuid,
+  productId:          Uuid.nullable(),
+  description:        z.string(),
+  hsnCode:            z.string(),
+  huid:               z.string().nullable(),
+  metalType:          z.string().nullable(),
+  purity:             z.string().nullable(),
+  netWeightG:         z.string().nullable(),
+  ratePerGramPaise:   z.string().nullable(),
+  makingChargePct:    z.string().nullable(),
+  goldValuePaise:     PaiseString,
+  makingChargePaise:  PaiseString,
+  stoneChargesPaise:  PaiseString,
+  hallmarkFeePaise:   PaiseString,
+  gstMetalPaise:      PaiseString,
+  gstMakingPaise:     PaiseString,
+  lineTotalPaise:     PaiseString,
+  sortOrder:          z.number().int().nonnegative(),
+});
+
+export const InvoiceResponseSchema = z.object({
+  id:                 Uuid,
+  shopId:             Uuid,
+  invoiceNumber:      z.string(),
+  invoiceType:        z.enum(['B2C', 'B2B_WHOLESALE']),
+  customerId:         Uuid.nullable(),
+  customerName:       z.string(),
+  customerPhone:      z.string().nullable(),
+  status:             z.enum(['DRAFT', 'ISSUED', 'VOIDED']),
+  subtotalPaise:      PaiseString,
+  gstMetalPaise:      PaiseString,
+  gstMakingPaise:     PaiseString,
+  totalPaise:         PaiseString,
+  idempotencyKey:     z.string(),
+  issuedAt:           z.string().datetime().nullable(),
+  createdByUserId:    Uuid,
+  createdAt:          z.string().datetime(),
+  updatedAt:          z.string().datetime(),
+  lines:              z.array(InvoiceItemResponseSchema),
+});
+
+export type InvoiceItemResponse = z.infer<typeof InvoiceItemResponseSchema>;
+export type InvoiceResponse     = z.infer<typeof InvoiceResponseSchema>;

@@ -1,1 +1,1 @@
-2026-04-25T06:20:07Z story-3.8 stock-movements ledger
+{"timestamp":"2026-04-25T12:31:48-04:00","commit":"bf3bb5918cf0a7a809d3166fc83d788ca66aceed","reviewer":"claude-opus-security-review","story":"5.1","result":"PASS","findings":0,"notes":"All candidate findings filtered below confidence-8 threshold. Two hardening recommendations logged for pre-compliance-gate stories (meta allowlist, pre-flight shop_id assertion)."}

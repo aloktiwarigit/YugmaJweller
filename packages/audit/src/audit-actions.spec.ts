@@ -17,6 +17,8 @@ describe('AuditAction — backfilled values', () => {
     'SETTINGS_RETURN_POLICY_UPDATED',
     'SETTINGS_NOTIFICATION_PREFS_UPDATED',
     'AUTH_LOGOUT_ALL',
+    'INVOICE_CREATED',
+    'INVOICE_ISSUED',
   ])('AuditAction.%s exists and equals its string key', (key) => {
     expect(AuditAction[key as keyof typeof AuditAction]).toBe(key);
   });

@@ -15,3 +15,6 @@ export * from './shop-rate-overrides';
 export * from './tenant-sync-cursors';
 export * from './sync-change-log';
 export * from './stock-movements';
+export * from './invoices';
+export * from './invoice-items';
+export * from './payments';

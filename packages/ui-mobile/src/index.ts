@@ -37,3 +37,8 @@ export { RateUpdateToast } from './business/RateUpdateToast';
 export type { RateUpdateToastProps } from './business/RateUpdateToast';
 export { OfflineBadge } from './primitives/OfflineBadge';
 export type { OfflineBadgeProps } from './primitives/OfflineBadge';
+
+export { BillingLineBuilder } from './business/BillingLineBuilder';
+export type { BillingLineBuilderProps, BillingLineProduct, BillingLineValue } from './business/BillingLineBuilder';
+
+export { InvoiceLineItem } from './business/InvoiceLineItem';

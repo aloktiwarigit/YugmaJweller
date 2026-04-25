@@ -1,3 +1,6 @@
+export { BillingLineBuilder } from './BillingLineBuilder';
+export type { BillingLineBuilderProps, BillingLineProduct, BillingLineValue } from './BillingLineBuilder';
+
 export { RateHistoryChart } from './RateHistoryChart';
 export type { RateHistoryChartProps, RateHistoryPoint } from './RateHistoryChart';
 

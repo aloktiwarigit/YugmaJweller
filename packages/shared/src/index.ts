@@ -156,3 +156,16 @@ export type {
   RecordMovementBodyDto,
   StockMovementResponse,
 } from './schemas/stock-movement.schema';
+
+export {
+  CreateInvoiceSchema,
+  InvoiceLineSchema,
+  InvoiceResponseSchema,
+  InvoiceItemResponseSchema,
+} from './schemas/invoice.schema';
+export type {
+  CreateInvoiceDtoType,
+  InvoiceLineDtoType,
+  InvoiceResponse,
+  InvoiceItemResponse,
+} from './schemas/invoice.schema';

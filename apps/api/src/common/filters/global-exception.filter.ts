@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Catch, type ArgumentsHost, type ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
 import type { Response, Request } from 'express';
 import { logger } from '@goldsmith/observability';
+import { ComplianceHardBlockError } from '@goldsmith/compliance';
 
 interface ProblemJson {
   type: string;
@@ -100,7 +101,17 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    // 3. Anything else — generic 500, no message leak
+    // 3. ComplianceHardBlockError — hard-block violation, map to 422
+    if (exception instanceof ComplianceHardBlockError) {
+      res.status(422).json({
+        statusCode: 422,
+        code: exception.code,
+        ...exception.meta,
+      });
+      return;
+    }
+
+    // 4. Anything else — generic 500, no message leak
     const problem: ProblemJson = {
       type: 'about:blank',
       title: 'internal_error',
