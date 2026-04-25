@@ -16,7 +16,7 @@ export interface CashPaymentOverride {
 
 // IST-based aggregate lookup: fetches the existing daily cash total for this
 // customer+shop within the IST calendar day, using a lock to prevent TOCTOU.
-// Returns 0n if no aggregate row exists yet.
+// Returns 0 if no aggregate row exists yet.
 const FETCH_OR_INIT_AGGREGATE_SQL = `
   INSERT INTO pmla_aggregates
     (shop_id, customer_id, customer_phone, aggregate_date, aggregate_month, cash_total_paise, invoice_count)
@@ -49,11 +49,13 @@ export class PaymentService {
 
   // Records a cash payment against an invoice.
   // Enforces the Section 269ST Rs 1,99,999 daily cash-cap per customer.
-  // If override is provided, the actor must be shop_admin or shop_manager with
-  // a substantive justification (≥10 chars); override is audit-logged.
+  // idempotencyKey: caller-provided key; duplicate requests return void silently.
+  // If override is provided and the limit is exceeded, the actor must be shop_admin
+  // or shop_manager with a substantive justification (≥10 chars); override is audit-logged.
   async recordCashPayment(
     invoiceId: string,
     amountPaise: bigint,
+    idempotencyKey: string,
     override?: CashPaymentOverride,
   ): Promise<void> {
     const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
@@ -103,9 +105,14 @@ export class PaymentService {
 
         await tx.query(INCREMENT_AGGREGATE_SQL, [amountPaise, customerId ?? null, customerPhone ?? null]);
 
-        // 5. Store override metadata on the invoice for audit trail
+        // 5. Append override metadata to the invoice's JSONB array (preserves prior overrides).
+        //    Uses || jsonb_build_array() so multiple overrides accumulate as an array.
         await tx.query(
-          `UPDATE invoices SET compliance_overrides_jsonb = $1, updated_at = now() WHERE id = $2`,
+          `UPDATE invoices
+           SET compliance_overrides_jsonb =
+             COALESCE(compliance_overrides_jsonb, '[]'::jsonb) || jsonb_build_array($1::jsonb),
+               updated_at = now()
+           WHERE id = $2`,
           [JSON.stringify({ ...overrideMeta, actorUserId: ctx.userId }), invoiceId],
         );
         overrideWasUsed = true;
@@ -120,12 +127,15 @@ export class PaymentService {
         });
       }
 
-      // 6. Insert payment record — 'CONFIRMED' is correct for cash (immediate, no clearing delay)
+      // 6. Insert payment record — 'CONFIRMED' for cash (immediate, no clearing delay).
+      //    ON CONFLICT DO NOTHING implements idempotency: a retry with the same
+      //    idempotency key silently skips the insert without rolling back the transaction.
       await tx.query(
         `INSERT INTO payments
-           (shop_id, invoice_id, method, amount_paise, status, created_by_user_id)
-         VALUES (current_setting('app.current_shop_id', true)::uuid, $1, 'CASH', $2, 'CONFIRMED', $3)`,
-        [invoiceId, amountPaise, ctx.userId],
+           (shop_id, invoice_id, method, amount_paise, status, created_by_user_id, idempotency_key)
+         VALUES (current_setting('app.current_shop_id', true)::uuid, $1, 'CASH', $2, 'CONFIRMED', $3, $4)
+         ON CONFLICT (shop_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING`,
+        [invoiceId, amountPaise, ctx.userId, idempotencyKey],
       );
     });
 

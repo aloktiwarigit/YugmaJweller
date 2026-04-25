@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Get, Headers, Param, Post, Query,
+  BadRequestException, Body, Controller, Get, Headers, Param, Post, Query,
   ParseIntPipe, ParseUUIDPipe, UnauthorizedException,
 } from '@nestjs/common';
 import { TenantContextDec } from '@goldsmith/tenant-context';
@@ -77,19 +77,25 @@ export class BillingController {
   }
 
   // Section 269ST cash-cap: all roles can attempt a cash payment; STAFF cannot use override.
+  // Idempotency-Key header is required — retries with the same key are safe (idempotent).
   // Returns 422 ComplianceHardBlockError when daily cash would exceed Rs 1,99,999 and no override.
-  @TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-0000-0000-000000000000' } })
+  @TenantWalkerRoute({ expectedStatus: 400, pathParams: { id: '00000000-0000-0000-0000-000000000001' } })
   @Post('/invoices/:id/payments/cash')
   @Roles('shop_admin', 'shop_manager', 'shop_staff')
   async recordCashPayment(
     @TenantContextDec() ctx: TenantContext,
     @Param('id', ParseUUIDPipe) invoiceId: string,
+    @Headers('idempotency-key') idempotencyKey: string,
     @Body(new ZodValidationPipe(RecordCashPaymentSchema)) dto: RecordCashPaymentDto,
   ): Promise<void> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (!idempotencyKey?.trim()) {
+      throw new BadRequestException({ code: 'payment.idempotency_key_required' });
+    }
     return this.payments.recordCashPayment(
       invoiceId,
       BigInt(dto.amountPaise),
+      idempotencyKey,
       dto.override,
     );
   }

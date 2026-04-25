@@ -85,7 +85,7 @@ describe('PaymentService.recordCashPayment', () => {
     setupWithTenantTx(pool);
     svc = new PaymentService(pool);
 
-    await expect(svc.recordCashPayment(INVOICE, 10_000_000n)).resolves.toBeUndefined();
+    await expect(svc.recordCashPayment(INVOICE, 10_000_000n, 'idem-1')).resolves.toBeUndefined();
     expect(pool._tx.query).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO payments'),
       expect.arrayContaining([INVOICE]),
@@ -97,7 +97,7 @@ describe('PaymentService.recordCashPayment', () => {
     setupWithTenantTx(pool);
     svc = new PaymentService(pool);
 
-    await expect(svc.recordCashPayment(INVOICE, 1_000_000n)).rejects.toMatchObject({
+    await expect(svc.recordCashPayment(INVOICE, 1_000_000n, 'idem-2')).rejects.toMatchObject({
       response: { code: 'invoice.not_found' },
     });
   });
@@ -109,7 +109,7 @@ describe('PaymentService.recordCashPayment', () => {
     svc = new PaymentService(pool);
 
     await expect(
-      svc.recordCashPayment(INVOICE, 3_000_000n),
+      svc.recordCashPayment(INVOICE, 3_000_000n, 'idem-3'),
     ).rejects.toBeInstanceOf(ComplianceHardBlockError);
   });
 
@@ -119,7 +119,7 @@ describe('PaymentService.recordCashPayment', () => {
     svc = new PaymentService(pool);
 
     await expect(
-      svc.recordCashPayment(INVOICE, SECTION_269ST_LIMIT_PAISE),
+      svc.recordCashPayment(INVOICE, SECTION_269ST_LIMIT_PAISE, 'idem-4'),
     ).resolves.toBeUndefined();
   });
 
@@ -129,12 +129,12 @@ describe('PaymentService.recordCashPayment', () => {
     svc = new PaymentService(pool);
 
     await expect(
-      svc.recordCashPayment(INVOICE, 5_000_000n, { justification: 'Known regular customer bulk purchase' }),
+      svc.recordCashPayment(INVOICE, 5_000_000n, 'idem-6', { justification: 'Known regular customer bulk purchase' }),
     ).resolves.toBeUndefined();
 
     // Override metadata must be written to invoice
     expect(pool._tx.query).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE invoices SET compliance_overrides_jsonb'),
+      expect.stringContaining('compliance_overrides_jsonb'),
       expect.any(Array),
     );
   });
@@ -144,7 +144,7 @@ describe('PaymentService.recordCashPayment', () => {
     setupWithTenantTx(pool);
     svc = new PaymentService(pool);
 
-    await svc.recordCashPayment(INVOICE, 5_000_000n, { justification: 'Known regular customer bulk purchase' });
+    await svc.recordCashPayment(INVOICE, 5_000_000n, 'idem-7', { justification: 'Known regular customer bulk purchase' });
 
     expect(auditLog).toHaveBeenCalledWith(
       expect.anything(),
@@ -159,7 +159,7 @@ describe('PaymentService.recordCashPayment', () => {
     svc = new PaymentService(pool);
 
     await expect(
-      svc.recordCashPayment(INVOICE, 5_000_000n, { justification: 'Staff trying to override' }),
+      svc.recordCashPayment(INVOICE, 5_000_000n, 'idem-8', { justification: 'Staff trying to override' }),
     ).rejects.toMatchObject({ code: 'compliance.override.role_required' });
   });
 
@@ -168,7 +168,7 @@ describe('PaymentService.recordCashPayment', () => {
     setupWithTenantTx(pool);
     svc = new PaymentService(pool);
 
-    await svc.recordCashPayment(INVOICE, 1_000_000n);
+    await svc.recordCashPayment(INVOICE, 1_000_000n, 'idem-5');
 
     expect(auditLog).not.toHaveBeenCalled();
   });
@@ -179,7 +179,7 @@ describe('PaymentService.recordCashPayment', () => {
     svc = new PaymentService(pool);
 
     // override provided, but payment (Rs 1L) is under the limit (Rs 1.99999L)
-    await svc.recordCashPayment(INVOICE, 10_000_000n, { justification: 'Override not needed here at all' });
+    await svc.recordCashPayment(INVOICE, 10_000_000n, 'idem-9', { justification: 'Override not needed here at all' });
 
     expect(auditLog).not.toHaveBeenCalled();
     expect(pool._tx.query).not.toHaveBeenCalledWith(

@@ -32,3 +32,10 @@ CREATE INDEX idx_pmla_aggregates_monthly
 -- 2. Store supervisor override metadata on the invoice when cash-cap is overridden.
 ALTER TABLE invoices
   ADD COLUMN compliance_overrides_jsonb JSONB;
+
+-- 3. Add idempotency key to payments so cash-payment endpoint retries are safe.
+--    Partial unique index: NULL keys (non-idempotent writes) are excluded.
+ALTER TABLE payments ADD COLUMN idempotency_key TEXT;
+CREATE UNIQUE INDEX uq_payments_shop_idempotency
+  ON payments(shop_id, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;

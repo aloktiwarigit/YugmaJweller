@@ -18,9 +18,9 @@ function paiseToRupees(paise: bigint): string {
 }
 
 export interface CashCapBlockPayload {
-  // Split remainder to a non-cash method
   splitMethod: 'UPI' | 'CARD';
-  remainingPaise: bigint;
+  // Amount that must go via the non-cash method (requestedPaise - allowedCashPaise)
+  nonCashAmountPaise: bigint;
 }
 
 export interface CashCapOverridePayload {
@@ -73,7 +73,13 @@ export function CashCapBlockModal({
     onOverride({ justification: trimmed });
   }, [justification, onOverride]);
 
-  const splitCashStr  = paiseToRupees(remainingPaise > 0n ? remainingPaise : 0n);
+  const allowedCashPaise = remainingPaise > 0n ? remainingPaise : 0n;
+  // Amount that must go via a non-cash method when split
+  const nonCashAmountPaise = requestedPaise > allowedCashPaise
+    ? requestedPaise - allowedCashPaise
+    : 0n;
+
+  const splitCashStr  = paiseToRupees(allowedCashPaise);
   const requestedStr  = paiseToRupees(requestedPaise);
   const limitStr      = paiseToRupees(BigInt(LIMIT_RUPEES * 100));
 
@@ -115,11 +121,11 @@ export function CashCapBlockModal({
           {/* Quick-action split buttons */}
           {remainingPaise > 0n && (
             <View style={styles.splitSection}>
-              <Text style={styles.sectionLabel}>बाकी {paiseToRupees(requestedPaise - (remainingPaise > 0n ? remainingPaise : 0n))} इससे लें:</Text>
+              <Text style={styles.sectionLabel}>बाकी {paiseToRupees(nonCashAmountPaise)} इससे लें:</Text>
               <View style={styles.splitRow}>
                 <Pressable
                   style={[styles.splitBtn, styles.splitUpi]}
-                  onPress={() => onSplitMethod({ splitMethod: 'UPI', remainingPaise })}
+                  onPress={() => onSplitMethod({ splitMethod: 'UPI', nonCashAmountPaise })}
                   accessibilityLabel={`UPI से बाकी राशि लें`}
                   accessibilityRole="button"
                 >
@@ -127,7 +133,7 @@ export function CashCapBlockModal({
                 </Pressable>
                 <Pressable
                   style={[styles.splitBtn, styles.splitCard]}
-                  onPress={() => onSplitMethod({ splitMethod: 'CARD', remainingPaise })}
+                  onPress={() => onSplitMethod({ splitMethod: 'CARD', nonCashAmountPaise })}
                   accessibilityLabel={`Card से बाकी राशि लें`}
                   accessibilityRole="button"
                 >
