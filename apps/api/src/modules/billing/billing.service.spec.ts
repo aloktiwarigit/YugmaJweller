@@ -80,6 +80,16 @@ function fakeRepo() {
         id: 'inv-1', shop_id: SHOP,
         invoice_number: input.invoiceNumber,
         invoice_type: input.invoiceType,
+        buyer_gstin: input.buyerGstin ?? null,
+        buyer_business_name: input.buyerBusinessName ?? null,
+        seller_state_code: input.sellerStateCode ?? '09',
+        gst_treatment: input.gstTreatment ?? 'CGST_SGST',
+        cgst_metal_paise: input.cgstMetalPaise ?? 0n,
+        sgst_metal_paise: input.sgstMetalPaise ?? 0n,
+        cgst_making_paise: input.cgstMakingPaise ?? 0n,
+        sgst_making_paise: input.sgstMakingPaise ?? 0n,
+        igst_metal_paise: input.igstMetalPaise ?? 0n,
+        igst_making_paise: input.igstMakingPaise ?? 0n,
         customer_id: input.customerId,
         customer_name: input.customerName,
         customer_phone: input.customerPhone,
@@ -91,6 +101,10 @@ function fakeRepo() {
         idempotency_key: input.idempotencyKey,
         issued_at: input.issuedAt,
         created_by_user_id: input.createdByUserId,
+        pan_ciphertext: null,
+        pan_key_id: null,
+        form60_encrypted: null,
+        form60_key_id: null,
         created_at: new Date(), updated_at: new Date(),
       },
       items: input.items.map((it: any, i: number) => ({
@@ -131,7 +145,7 @@ describe('BillingService.createInvoice', () => {
 
     await expect(
       svc.createInvoice(
-        { customerName: 'राम', lines: [
+        { invoiceType: 'B2C', customerName: 'राम', lines: [
           { productId: 'p1', description: 'Gold Chain', huid: null, makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
         ]},
         'idem-1',
@@ -165,7 +179,7 @@ describe('BillingService.createInvoice', () => {
 
     const svc = new BillingService(repo as any, inv as any, fakePricing() as any, redis as any, fakePool(), undefined as any, undefined as any, undefined as any);
     const out = await svc.createInvoice(
-      { customerName: 'Smoke', lines: [{ description: 'x', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any] },
+      { invoiceType: 'B2C', customerName: 'Smoke', lines: [{ description: 'x', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any] },
       'idem-cached',
     );
 
@@ -185,7 +199,7 @@ describe('BillingService.createInvoice', () => {
     // Request line has no huid; product on record DOES (hallmarked) → must hard-block
     await expect(
       svc.createInvoice(
-        { customerName: 'राम', lines: [{ productId: 'p1', description: 'Gold Chain', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any] },
+        { invoiceType: 'B2C', customerName: 'राम', lines: [{ productId: 'p1', description: 'Gold Chain', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any] },
         'idem-bypass-attempt',
       ),
     ).rejects.toBeInstanceOf(ComplianceHardBlockError);
@@ -198,7 +212,7 @@ describe('BillingService.createInvoice', () => {
 
     await expect(
       svc.createInvoice(
-        { customerName: 'X', lines: [{ description: 'x', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any] },
+        { invoiceType: 'B2C', customerName: 'X', lines: [{ description: 'x', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any] },
         '',
       ),
     ).rejects.toMatchObject({
@@ -227,7 +241,7 @@ describe('BillingService.createInvoice', () => {
 
     await expect(
       svc.createInvoice(
-        { customerName: 'राम', lines: [
+        { invoiceType: 'B2C', customerName: 'राम', lines: [
           { productId: 'p-sold', description: 'Already sold item', makingChargePct: '10.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
         ]},
         'idem-sold-guard',
@@ -235,7 +249,7 @@ describe('BillingService.createInvoice', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
 
     const err = await svc.createInvoice(
-      { customerName: 'राम', lines: [
+      { invoiceType: 'B2C', customerName: 'राम', lines: [
         { productId: 'p-sold', description: 'Already sold item', makingChargePct: '10.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
       ]},
       'idem-sold-guard-2',
@@ -274,7 +288,7 @@ describe('BillingService.createInvoice', () => {
 
     await expect(
       svc.createInvoice(
-        { customerName: 'राम', lines: [
+        { invoiceType: 'B2C', customerName: 'राम', lines: [
           { productId: 'prod-xyz', description: 'Zero qty item', makingChargePct: '10.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
         ]},
         'idem-insufficient',
@@ -282,7 +296,7 @@ describe('BillingService.createInvoice', () => {
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
 
     const err = await svc.createInvoice(
-      { customerName: 'राम', lines: [
+      { invoiceType: 'B2C', customerName: 'राम', lines: [
         { productId: 'prod-xyz', description: 'Zero qty item', makingChargePct: '10.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
       ]},
       'idem-insufficient-2',
@@ -326,7 +340,7 @@ describe('BillingService.createInvoice — making charges from shop settings', (
     );
 
     await svc.createInvoice(
-      { customerName: 'राम', lines: [
+      { invoiceType: 'B2C', customerName: 'राम', lines: [
         { productId: 'p1', description: 'Bridal Set', huid: 'AB12CD', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
       ]},
       'idem-bridal',
@@ -350,7 +364,7 @@ describe('BillingService.createInvoice — making charges from shop settings', (
     );
 
     await svc.createInvoice(
-      { customerName: 'राम', lines: [
+      { invoiceType: 'B2C', customerName: 'राम', lines: [
         { productId: 'p1', description: 'Ring', huid: 'AB12CD', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
       ]},
       'idem-rings-fallback',
@@ -374,7 +388,7 @@ describe('BillingService.createInvoice — making charges from shop settings', (
     );
 
     await svc.createInvoice(
-      { customerName: 'राम', lines: [
+      { invoiceType: 'B2C', customerName: 'राम', lines: [
         { productId: 'p1', description: 'Bridal Override', huid: 'AB12CD', makingChargePct: '8.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
       ]},
       'idem-dto-override',
@@ -400,7 +414,7 @@ describe('BillingService.createInvoice — making charges from shop settings', (
     );
 
     await svc.createInvoice(
-      { customerName: 'राम', lines: [
+      { invoiceType: 'B2C', customerName: 'राम', lines: [
         { productId: 'p1', description: 'Chain', huid: 'AB12CD', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any,
       ]},
       'idem-cache-miss',

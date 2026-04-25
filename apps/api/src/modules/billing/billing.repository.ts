@@ -7,6 +7,17 @@ export interface InvoiceRow {
   shop_id:             string;
   invoice_number:      string;
   invoice_type:        string;
+  // B2B fields (null for B2C invoices)
+  buyer_gstin:          string | null;
+  buyer_business_name:  string | null;
+  seller_state_code:    string;
+  gst_treatment:        string;
+  cgst_metal_paise:     bigint;
+  sgst_metal_paise:     bigint;
+  cgst_making_paise:    bigint;
+  sgst_making_paise:    bigint;
+  igst_metal_paise:     bigint;
+  igst_making_paise:    bigint;
   customer_id:         string | null;
   customer_name:       string;
   customer_phone:      string | null;
@@ -51,23 +62,33 @@ export interface InvoiceItemRow {
 }
 
 export interface InsertInvoiceInput {
-  invoiceNumber:    string;
-  invoiceType:      'B2C' | 'B2B_WHOLESALE';
-  customerId:       string | null;
-  customerName:     string;
-  customerPhone:    string | null;
-  status:           'DRAFT' | 'ISSUED';
-  subtotalPaise:    bigint;
-  gstMetalPaise:    bigint;
-  gstMakingPaise:   bigint;
-  totalPaise:       bigint;
-  idempotencyKey:   string;
-  issuedAt:         Date | null;
-  createdByUserId:  string;
-  panCiphertext:    Buffer | null;
-  panKeyId:         string | null;
-  form60Encrypted:  Buffer | null;
-  form60KeyId:      string | null;
+  invoiceNumber:       string;
+  invoiceType:         'B2C' | 'B2B_WHOLESALE';
+  buyerGstin:          string | null;
+  buyerBusinessName:   string | null;
+  sellerStateCode:     string;
+  gstTreatment:        'CGST_SGST' | 'IGST';
+  cgstMetalPaise:      bigint;
+  sgstMetalPaise:      bigint;
+  cgstMakingPaise:     bigint;
+  sgstMakingPaise:     bigint;
+  igstMetalPaise:      bigint;
+  igstMakingPaise:     bigint;
+  customerId:          string | null;
+  customerName:        string;
+  customerPhone:       string | null;
+  status:              'DRAFT' | 'ISSUED';
+  subtotalPaise:       bigint;
+  gstMetalPaise:       bigint;
+  gstMakingPaise:      bigint;
+  totalPaise:          bigint;
+  idempotencyKey:      string;
+  issuedAt:            Date | null;
+  createdByUserId:     string;
+  panCiphertext:       Buffer | null;
+  panKeyId:            string | null;
+  form60Encrypted:     Buffer | null;
+  form60KeyId:         string | null;
   items: Array<{
     productId:           string | null;
     description:         string;
@@ -99,8 +120,11 @@ export class IdempotencyKeyConflictError extends Error {
 
 const INVOICE_COLS = `
   id, shop_id, invoice_number, invoice_type,
+  buyer_gstin, buyer_business_name, seller_state_code, gst_treatment,
   customer_id, customer_name, customer_phone,
   status, subtotal_paise, gst_metal_paise, gst_making_paise, total_paise,
+  cgst_metal_paise, sgst_metal_paise, cgst_making_paise, sgst_making_paise,
+  igst_metal_paise, igst_making_paise,
   idempotency_key, issued_at, created_by_user_id,
   pan_ciphertext, pan_key_id, form60_encrypted, form60_key_id,
   created_at, updated_at
@@ -129,18 +153,25 @@ export class BillingRepository {
         const invRes = await tx.query<InvoiceRow>(
           `INSERT INTO invoices
              (shop_id, invoice_number, invoice_type,
+              buyer_gstin, buyer_business_name, seller_state_code, gst_treatment,
               customer_id, customer_name, customer_phone,
               status, subtotal_paise, gst_metal_paise, gst_making_paise, total_paise,
+              cgst_metal_paise, sgst_metal_paise, cgst_making_paise, sgst_making_paise,
+              igst_metal_paise, igst_making_paise,
               idempotency_key, issued_at, created_by_user_id,
               pan_ciphertext, pan_key_id, form60_encrypted, form60_key_id)
            VALUES (current_setting('app.current_shop_id')::uuid,
-                   $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+                   $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
+                   $18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
            RETURNING ${INVOICE_COLS}`,
           [
             input.invoiceNumber, input.invoiceType,
+            input.buyerGstin, input.buyerBusinessName, input.sellerStateCode, input.gstTreatment,
             input.customerId, input.customerName, input.customerPhone,
             input.status, input.subtotalPaise, input.gstMetalPaise,
             input.gstMakingPaise, input.totalPaise,
+            input.cgstMetalPaise, input.sgstMetalPaise, input.cgstMakingPaise, input.sgstMakingPaise,
+            input.igstMetalPaise, input.igstMakingPaise,
             input.idempotencyKey, input.issuedAt, input.createdByUserId,
             input.panCiphertext, input.panKeyId,
             input.form60Encrypted, input.form60KeyId,
