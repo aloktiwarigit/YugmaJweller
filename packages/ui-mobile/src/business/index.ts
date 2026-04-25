@@ -6,3 +6,6 @@ export type { RateWidgetProps, PublicRatesResponse, PublicRateEntry } from './Ra
 
 export { RateUpdateToast } from './RateUpdateToast';
 export type { RateUpdateToastProps } from './RateUpdateToast';
+
+export { DailySummaryCard } from './DailySummaryCard';
+export type { DailySummaryCardProps } from './DailySummaryCard';
