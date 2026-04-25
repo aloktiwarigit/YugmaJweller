@@ -19,8 +19,12 @@ export const InvoiceLineSchema = z.object({
   hallmarkFeePaise:  PaiseString.default('0'),
 });
 
-// PAN: AAAAA9999A — 5 uppercase alpha + 4 digits + 1 uppercase alpha (Rule 114B)
-const PanString = z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]$/, 'Invalid PAN format — e.g. ABCDE1234F');
+// PAN: normalize to uppercase + strip spaces, then validate format AAAAA9999A.
+// Accepts lowercase input so non-mobile clients can pass unnormalized PANs.
+const PanString = z
+  .string()
+  .transform((v) => v.toUpperCase().replace(/\s+/g, ''))
+  .pipe(z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]$/, 'Invalid PAN format — e.g. ABCDE1234F'));
 
 export const Form60Schema = z.object({
   name:                       z.string().min(2),

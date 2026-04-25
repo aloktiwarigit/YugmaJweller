@@ -22,6 +22,9 @@ import type { KmsAdapter } from '@goldsmith/crypto-envelope';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
+import {
+  MAKING_CHARGE_DEFAULTS,
+} from '@goldsmith/shared';
 import type {
   CreateInvoiceDtoType,
   InvoiceLineDtoType,
@@ -158,7 +161,10 @@ export class BillingService {
       }
     }
 
-    const match = configs?.find((c) => c.category === category);
+    // Shop config takes precedence; fall back to MAKING_CHARGE_DEFAULTS by category,
+    // then to '12.00' only for categories not covered by the defaults table.
+    const match = configs?.find((c) => c.category === category)
+      ?? MAKING_CHARGE_DEFAULTS.find((c) => c.category === category);
     return match?.value ?? '12.00';
   }
 

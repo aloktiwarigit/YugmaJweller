@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { Redis } from '@goldsmith/cache';
-import { LocalKMS } from '@goldsmith/crypto-envelope';
+import { LocalKMS, DevKmsAdapter } from '@goldsmith/crypto-envelope';
 import { SettingsCache } from '@goldsmith/tenant-config';
 import { AuthModule }      from '../auth/auth.module';
 import { InventoryModule } from '../inventory/inventory.module';
@@ -26,7 +26,12 @@ import { BillingRepository } from './billing.repository';
     },
     {
       provide: 'KMS_ADAPTER',
-      useFactory: () => new LocalKMS(),
+      useFactory: () => {
+        const secret = process.env['KMS_MASTER_SECRET'];
+        // DevKmsAdapter survives restarts via HKDF-derived keys.
+        // LocalKMS is an in-memory fallback for local dev only — restart loses keys.
+        return secret ? new DevKmsAdapter(secret) : new LocalKMS();
+      },
     },
     {
       provide: SettingsCache,

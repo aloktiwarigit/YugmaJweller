@@ -119,7 +119,6 @@ export default function NewInvoiceScreen(): JSX.Element {
 
   const onPanCancel = useCallback(() => {
     setPanRequired(false);
-    setPendingDto(null);
   }, []);
 
   return (

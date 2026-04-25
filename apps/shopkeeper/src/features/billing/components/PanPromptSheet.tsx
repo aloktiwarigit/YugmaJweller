@@ -94,13 +94,14 @@ export function PanPromptSheet({ visible, totalPaise, onSubmit, onCancel }: Prop
       AccessibilityInfo.announceForAccessibility('सभी फ़ील्ड ज़रूरी हैं');
       return;
     }
-    const incomePaise = f60Income.replace(/[^0-9]/g, '');
+    // UI collects rupees; API expects paise (rupees × 100)
+    const rupees = parseInt(f60Income.replace(/[^0-9]/g, '') || '0', 10);
     onSubmit({
       form60Data: {
         name: f60Name.trim(),
         address: f60Address.trim(),
         reasonForNoPan: f60Reason.trim(),
-        estimatedAnnualIncomePaise: incomePaise || '0',
+        estimatedAnnualIncomePaise: String(rupees * 100),
       },
     });
   }, [f60Name, f60Address, f60Reason, f60Income, onSubmit]);
