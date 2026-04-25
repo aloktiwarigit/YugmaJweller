@@ -20,6 +20,7 @@
     "@goldsmith/audit": "workspace:*",
     "@goldsmith/cache": "workspace:*",
     "@goldsmith/compliance": "workspace:*",
+    "@goldsmith/crypto-envelope": "workspace:*",
     "@goldsmith/money": "workspace:*",
     "@goldsmith/db": "workspace:*",
     "@goldsmith/integrations-search": "workspace:*",

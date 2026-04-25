@@ -1,1 +1,1 @@
-{"timestamp":"2026-04-25T12:31:48-04:00","commit":"bf3bb5918cf0a7a809d3166fc83d788ca66aceed","reviewer":"claude-opus-security-review","story":"5.1","result":"PASS","findings":0,"notes":"All candidate findings filtered below confidence-8 threshold. Two hardening recommendations logged for pre-compliance-gate stories (meta allowlist, pre-flight shop_id assertion)."}
+passed 2026-04-25 — story-5.3 — 0 confirmed vulnerabilities (defence-in-depth gap and form60 API misuse both scored 3/10, below threshold)

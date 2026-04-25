@@ -1,5 +1,9 @@
-import { uuid, text, bigint, timestamp } from 'drizzle-orm/pg-core';
+import { uuid, text, bigint, timestamp, customType } from 'drizzle-orm/pg-core';
 import { tenantScopedTable } from './_helpers/tenantScopedTable';
+
+const bytea = customType<{ data: Buffer }>({
+  dataType() { return 'bytea'; },
+});
 
 export const invoices = tenantScopedTable('invoices', {
   id:                   uuid('id').primaryKey().defaultRandom(),
@@ -16,6 +20,11 @@ export const invoices = tenantScopedTable('invoices', {
   idempotency_key:      text('idempotency_key').notNull(),
   issued_at:            timestamp('issued_at',  { withTimezone: true }),
   created_by_user_id:   uuid('created_by_user_id').notNull(),
+  // PAN Rule 114B — encrypted at app layer; only present when total >= Rs 2,00,000
+  pan_ciphertext:       bytea('pan_ciphertext'),
+  pan_key_id:           text('pan_key_id'),
+  form60_encrypted:     bytea('form60_encrypted'),
+  form60_key_id:        text('form60_key_id'),
   created_at:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updated_at:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

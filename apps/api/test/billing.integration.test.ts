@@ -125,6 +125,9 @@ function buildBillingService(): BillingService {
     pricingSvc,
     redis as never,      // BILLING_REDIS
     pool as never,       // PG_POOL
+    undefined as never,  // KMS_ADAPTER — not used in these tests
+    undefined as never,  // SettingsCache — all tests pass makingChargePct explicitly
+    undefined as never,  // SettingsRepository — see above
   );
 }
 

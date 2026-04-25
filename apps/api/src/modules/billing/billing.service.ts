@@ -12,22 +12,34 @@ import { computeProductPrice } from '@goldsmith/money';
 import {
   validateHuidPresence,
   ComplianceHardBlockError,
+  enforcePanRequired,
+  validatePanFormat,
+  normalizePan,
+  validateForm60,
 } from '@goldsmith/compliance';
+import { encryptColumn, decryptColumn, serializeEnvelope, deserializeEnvelope } from '@goldsmith/crypto-envelope';
+import type { KmsAdapter } from '@goldsmith/crypto-envelope';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
+import {
+  MAKING_CHARGE_DEFAULTS,
+} from '@goldsmith/shared';
 import type {
   CreateInvoiceDtoType,
   InvoiceLineDtoType,
   InvoiceResponse,
   InvoiceItemResponse,
   PurityKey,
+  MakingChargeConfig,
 } from '@goldsmith/shared';
+import { SettingsCache } from '@goldsmith/tenant-config';
 import { BillingRepository, IdempotencyKeyConflictError } from './billing.repository';
 import type { InvoiceRow, InvoiceItemRow, InsertInvoiceInput } from './billing.repository';
 import { generateInvoiceNumber } from './invoice-number';
 import { InventoryService } from '../inventory/inventory.service';
 import { PricingService } from '../pricing/pricing.service';
+import { SettingsRepository } from '../settings/settings.repository';
 
 // Re-export so consumers can import from billing module without needing @goldsmith/compliance
 export { ComplianceHardBlockError };
@@ -115,17 +127,59 @@ function idemKey(shopUuid: string, key: string): string {
   return `invoice:idempotency:${shopUuid}:${key}`;
 }
 
+const PAN_DECRYPT_RATE_LIMIT_KEY = (shopUuid: string): string =>
+  `billing:pan_decrypt:${shopUuid}:${new Date().toISOString().slice(0, 13)}`; // hour bucket
+
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
 
   constructor(
-    @Inject(BillingRepository) private readonly repo: BillingRepository,
-    @Inject(InventoryService)  private readonly inventory: InventoryService,
-    @Inject(PricingService)    private readonly pricing: PricingService,
-    @Inject('BILLING_REDIS')   private readonly redis: Redis,
-    @Inject('PG_POOL')         private readonly pool: Pool,
+    @Inject(BillingRepository)  private readonly repo: BillingRepository,
+    @Inject(InventoryService)   private readonly inventory: InventoryService,
+    @Inject(PricingService)     private readonly pricing: PricingService,
+    @Inject('BILLING_REDIS')    private readonly redis: Redis,
+    @Inject('PG_POOL')          private readonly pool: Pool,
+    @Inject('KMS_ADAPTER')      private readonly kms: KmsAdapter,
+    @Inject(SettingsCache)      private readonly settingsCache: SettingsCache,
+    @Inject(SettingsRepository) private readonly settingsRepo: SettingsRepository,
   ) {}
+
+  private async resolveMakingChargePct(
+    category: string | null | undefined,
+    dtoValue: string | undefined,
+  ): Promise<string> {
+    if (dtoValue !== undefined) return dtoValue;
+    if (!category) return '12.00';
+
+    let configs: MakingChargeConfig[] | null = await this.settingsCache.getMakingCharges();
+    if (configs === null) {
+      const fromDb = await this.settingsRepo.getMakingCharges();
+      if (fromDb !== null) {
+        configs = fromDb;
+        void this.settingsCache.setMakingCharges(configs).catch(() => undefined);
+      }
+    }
+
+    // Shop config takes precedence; fall back to MAKING_CHARGE_DEFAULTS by category,
+    // then to '12.00' only for categories not covered by the defaults table.
+    const match = configs?.find((c) => c.category === category)
+      ?? MAKING_CHARGE_DEFAULTS.find((c) => c.category === category);
+    return match?.value ?? '12.00';
+  }
+
+  private async getShopKekArn(shopUuid: string): Promise<string> {
+    // shops is platform-global for SELECT; no tenant GUC needed
+    const r = await this.pool.query<{ kek_key_arn: string | null }>(
+      `SELECT kek_key_arn FROM shops WHERE id = $1`,
+      [shopUuid],
+    );
+    const arn = r.rows[0]?.kek_key_arn;
+    if (!arn) {
+      throw new BadRequestException({ code: 'shop.kek_not_provisioned' });
+    }
+    return arn;
+  }
 
   async createInvoice(
     dto: CreateInvoiceDtoType,
@@ -170,6 +224,7 @@ export class BillingService {
       net_weight_g: string;
       huid: string | null;
       status: string;
+      category: string | null;
     } | null;
 
     const resolvedProducts: ResolvedProduct[] = await Promise.all(
@@ -220,16 +275,42 @@ export class BillingService {
       })),
     );
 
+    // 3b. PAN Rule 114B pre-check (total unknown at this point, validated again after pricing).
+    // We validate PAN format here eagerly so the client gets a 400 (not 422) for malformed PAN.
+    let normalizedPan: string | null = null;
+    if (dto.pan != null) {
+      normalizedPan = normalizePan(dto.pan);
+      if (!validatePanFormat(normalizedPan)) {
+        throw new BadRequestException({
+          code: 'invoice.pan_format_invalid',
+          message: 'PAN format is invalid — expected AAAAA9999A',
+        });
+      }
+    }
+    if (dto.form60Data != null) {
+      // Validate form60 structure eagerly (400 for malformed payload)
+      validateForm60(dto.form60Data as Record<string, unknown>);
+    }
+
     // 4. Fetch live tenant rates (with override applied)
     const rates = await this.pricing.getCurrentRatesForTenant(ctx);
 
-    // 5. Compute each line server-side. Client price fields are ignored
-    //    (the Zod schema does not even accept them on input).
+    // 5. Resolve making charges per line (settings cache → DB fallback → 12% hardcoded default).
+    // DTO override wins; absent DTO value + productId → look up shop settings by category.
+    const effectiveMakingPcts: string[] = await Promise.all(
+      dto.lines.map((input, i) =>
+        this.resolveMakingChargePct(resolvedProducts[i]?.category, input.makingChargePct),
+      ),
+    );
+
+    // 5b. Compute each line server-side. Client price fields are ignored
+    //     (the Zod schema does not even accept them on input).
     type Line = {
       input: InvoiceLineDtoType;
       product: ResolvedProduct;
       computed: ReturnType<typeof computeProductPrice>;
       ratePerGramPaise: bigint;
+      effectiveMakingPct: string;
     };
 
     const lines: Line[] = dto.lines.map((input, i) => {
@@ -254,16 +335,17 @@ export class BillingService {
       }
 
       const ratePerGramPaise = (rates as unknown as Record<string, { perGramPaise: bigint }>)[purity].perGramPaise;
+      const effectiveMakingPct = effectiveMakingPcts[i];
 
       const computed = computeProductPrice({
         netWeightG,
         ratePerGramPaise,
-        makingChargePct:   input.makingChargePct,
+        makingChargePct:   effectiveMakingPct,
         stoneChargesPaise: BigInt(input.stoneChargesPaise),
         hallmarkFeePaise:  BigInt(input.hallmarkFeePaise),
       });
 
-      return { input, product, computed, ratePerGramPaise };
+      return { input, product, computed, ratePerGramPaise, effectiveMakingPct };
     });
 
     // 6. Roll up invoice totals from per-line numbers (integer-exact)
@@ -279,6 +361,30 @@ export class BillingService {
       gstMetalPaise   += computed.gstMetalPaise;
       gstMakingPaise  += computed.gstMakingPaise;
       totalPaise      += computed.totalPaise;
+    }
+
+    // 6b. PAN Rule 114B hard-block — now that total is known
+    enforcePanRequired({ totalPaise, pan: normalizedPan, form60Data: dto.form60Data ?? null });
+
+    // 6c. Encrypt PAN / Form 60 if provided (only reaches here when total >= Rs 2L or pan/form60 supplied)
+    let panCiphertext: Buffer | null = null;
+    let panKeyId: string | null = null;
+    let form60Encrypted: Buffer | null = null;
+    let form60KeyId: string | null = null;
+
+    if (normalizedPan != null || dto.form60Data != null) {
+      const keyArn = await this.getShopKekArn(ctx.shopId);
+      if (normalizedPan != null) {
+        const env = await encryptColumn(this.kms, keyArn, normalizedPan);
+        panCiphertext = serializeEnvelope(env);
+        panKeyId = keyArn;
+      }
+      if (dto.form60Data != null) {
+        const form60Json = JSON.stringify(dto.form60Data);
+        const env = await encryptColumn(this.kms, keyArn, form60Json);
+        form60Encrypted = serializeEnvelope(env);
+        form60KeyId = keyArn;
+      }
     }
 
     // 7. Generate invoice number
@@ -301,7 +407,11 @@ export class BillingService {
         idempotencyKey,
         issuedAt:       new Date(),
         createdByUserId: ctx.userId,
-        items: lines.map(({ input, product, computed, ratePerGramPaise }, i) => ({
+        panCiphertext,
+        panKeyId,
+        form60Encrypted,
+        form60KeyId,
+        items: lines.map(({ input, product, computed, ratePerGramPaise, effectiveMakingPct }, i) => ({
           productId:           input.productId ?? null,
           description:         input.description,
           hsnCode:             '7113',
@@ -314,7 +424,7 @@ export class BillingService {
           purity:              product ? (product.purity ?? null)       : (input.purity ?? null),
           netWeightG:          product ? (product.net_weight_g ?? null) : (input.netWeightG ?? null),
           ratePerGramPaise,
-          makingChargePct:     input.makingChargePct,
+          makingChargePct:     effectiveMakingPct,
           goldValuePaise:      computed.goldValuePaise,
           makingChargePaise:   computed.makingChargePaise,
           stoneChargesPaise:   computed.stoneChargesPaise,
@@ -351,7 +461,7 @@ export class BillingService {
       throw err;
     }
 
-    // 9. Audit — phone masked; PAN never collected on B2C path
+    // 9. Audit — phone masked; PAN plaintext NEVER logged; only key_id for traceability
     const maskedPhone = maskPhone(dto.customerPhone ?? null);
     void auditLog(this.pool, {
       action: AuditAction.INVOICE_CREATED,
@@ -359,11 +469,14 @@ export class BillingService {
       subjectId: result.invoice.id,
       actorUserId: ctx.userId,
       after: {
-        invoice_number: result.invoice.invoice_number,
-        customer_name:  result.invoice.customer_name,
+        invoice_number:        result.invoice.invoice_number,
+        customer_name:         result.invoice.customer_name,
         customer_phone_masked: maskedPhone,
-        line_count:     result.items.length,
-        total_paise:    result.invoice.total_paise.toString(),
+        line_count:            result.items.length,
+        total_paise:           result.invoice.total_paise.toString(),
+        pan_captured:          panCiphertext !== null,
+        pan_key_id:            panKeyId ?? undefined,
+        form60_captured:       form60Encrypted !== null,
       },
     }).catch(() => undefined);
     void auditLog(this.pool, {
@@ -381,6 +494,44 @@ export class BillingService {
     const resp = rowToInvoiceResponse(result.invoice, result.items);
     this.cacheResponse(ctx.shopId, idempotencyKey, resp);
     return resp;
+  }
+
+  async decryptInvoicePan(id: string): Promise<{ pan: string }> {
+    const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
+
+    // Rate-limit: 10 decryptions per shop per hour (Redis counter; best-effort)
+    const rateKey = PAN_DECRYPT_RATE_LIMIT_KEY(ctx.shopId);
+    try {
+      const count = await this.redis.incr(rateKey);
+      if (count === 1) {
+        await this.redis.expire(rateKey, 3600);
+      }
+      if (count > 10) {
+        throw new BadRequestException({ code: 'invoice.pan_decrypt_rate_limit_exceeded' });
+      }
+    } catch (e) {
+      if (e instanceof BadRequestException) throw e;
+      this.logger.warn(`Redis rate-limit check failed for PAN decrypt: ${String(e)}`);
+    }
+
+    const row = await this.repo.getInvoicePanData(id);
+    if (!row) throw new NotFoundException({ code: 'invoice.not_found' });
+    if (!row.pan_ciphertext || !row.pan_key_id) {
+      throw new NotFoundException({ code: 'invoice.pan_not_captured' });
+    }
+
+    const envelope = deserializeEnvelope(row.pan_ciphertext, row.pan_key_id);
+    const plaintext = await decryptColumn(this.kms, envelope);
+
+    void auditLog(this.pool, {
+      action: AuditAction.INVOICE_PAN_ACCESSED,
+      subjectType: 'invoice',
+      subjectId: id,
+      actorUserId: ctx.userId,
+      metadata: { pan_key_id: row.pan_key_id },
+    }).catch(() => undefined);
+
+    return { pan: plaintext };
   }
 
   async getInvoice(id: string): Promise<InvoiceResponse> {
