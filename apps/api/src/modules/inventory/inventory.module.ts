@@ -35,6 +35,7 @@ const QUEUE_NAME = 'inventory-bulk-import';
     BullModule.registerQueue({ name: 'search-indexer' }),
   ],
   controllers: [InventoryController],
+  exports: [InventoryService],
   providers: [
     InventoryService,
     InventoryRepository,
