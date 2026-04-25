@@ -14,7 +14,13 @@ const LIMIT_RUPEES = 1_99_999;
 
 function paiseToRupees(paise: bigint): string {
   const r = Number(paise) / 100;
-  return new Intl.NumberFormat('hi-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(r);
+  // Use 2 decimal places when there are sub-rupee paise to avoid over-reporting legal limits
+  const hasFraction = Number(paise) % 100 !== 0;
+  return new Intl.NumberFormat('hi-IN', {
+    style: 'currency', currency: 'INR',
+    minimumFractionDigits: hasFraction ? 2 : 0,
+    maximumFractionDigits: hasFraction ? 2 : 0,
+  }).format(r);
 }
 
 export interface CashCapBlockPayload {

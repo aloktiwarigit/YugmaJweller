@@ -131,21 +131,19 @@ export class PaymentService {
       }
 
       // ── C. Acquire aggregate row lock (IST date, TOCTOU-safe) ──────────────
-      // When both customer_id and phone are null (truly anonymous walk-in), we cannot
-      // aggregate across transactions — each is checked in isolation (existingDailyPaise = 0n).
-      // This prevents unrelated anonymous customers from sharing a daily cash bucket.
-      let existingDailyPaise = 0n;
-      const isIdentified = customerId !== null || customerPhone !== null;
-      if (isIdentified) {
-        // INSERT ON CONFLICT acquires an exclusive row lock. Concurrent transactions
-        // on the same customer+date block here until this transaction commits.
-        const aggRes = await tx.query<{ cash_total_paise: string }>(
-          FETCH_OR_INIT_AGGREGATE_SQL,
-          [customerId ?? null, customerPhone ?? null],
-        );
-        // pg returns BIGINT columns as strings — convert explicitly before arithmetic
-        existingDailyPaise = BigInt(aggRes.rows[0]?.cash_total_paise ?? '0');
-      }
+      // INSERT ON CONFLICT acquires an exclusive row lock. Concurrent transactions
+      // on the same customer+date block here until this transaction commits.
+      // For anonymous walk-ins (customer_id=null, phone=null): we use the shop-level
+      // anonymous bucket (NULL, NULL key). This is the conservative compliance approach —
+      // occasional false blocks for unrelated anonymous customers can be overridden
+      // by OWNER/MANAGER. Skipping the aggregate entirely would defeat 269ST entirely
+      // for the common case where customer_id is null (as it is in the current billing flow).
+      const aggRes = await tx.query<{ cash_total_paise: string }>(
+        FETCH_OR_INIT_AGGREGATE_SQL,
+        [customerId ?? null, customerPhone ?? null],
+      );
+      // pg returns BIGINT columns as strings — convert explicitly before arithmetic
+      const existingDailyPaise = BigInt(aggRes.rows[0]?.cash_total_paise ?? '0');
 
       // ── D. Late idempotency check (post-lock) ──────────────────────────────
       // Catches concurrent requests that committed the same idempotency_key
@@ -180,10 +178,7 @@ export class PaymentService {
       }
 
       // ── F. Increment aggregate (now safe — we hold the lock) ───────────────
-      // Skip for anonymous walk-ins — no shared bucket to update
-      if (isIdentified) {
-        await tx.query(INCREMENT_AGGREGATE_SQL, [amountPaise, customerId ?? null, customerPhone ?? null]);
-      }
+      await tx.query(INCREMENT_AGGREGATE_SQL, [amountPaise, customerId ?? null, customerPhone ?? null]);
 
       // ── G. Insert payment record (idempotency_key unique partial index) ────
       // 'CONFIRMED' is correct for cash (immediate, no clearing delay).
