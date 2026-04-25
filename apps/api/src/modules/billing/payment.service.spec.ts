@@ -17,13 +17,6 @@ vi.mock('@goldsmith/tenant-context', () => ({
   },
 }));
 
-vi.mock('@goldsmith/audit', () => ({
-  auditLog: vi.fn().mockResolvedValue(undefined),
-  AuditAction: {
-    COMPLIANCE_OVERRIDE_269ST: 'COMPLIANCE_OVERRIDE_269ST',
-  },
-}));
-
 vi.mock('@goldsmith/db', async () => {
   const actual = await vi.importActual<typeof import('@goldsmith/db')>('@goldsmith/db');
   return { ...actual, withTenantTx: vi.fn() };
@@ -66,7 +59,6 @@ function fakePool(
 
 import { withTenantTx } from '@goldsmith/db';
 import { tenantContext } from '@goldsmith/tenant-context';
-import { auditLog } from '@goldsmith/audit';
 
 function setupWithTenantTx(pool: ReturnType<typeof fakePool>) {
   (withTenantTx as any).mockImplementation((_p: any, fn: (tx: any) => Promise<any>) =>
@@ -149,9 +141,9 @@ describe('PaymentService.recordCashPayment', () => {
 
     await svc.recordCashPayment(INVOICE, 5_000_000n, 'idem-7', { justification: 'Known regular customer bulk purchase' });
 
-    expect(auditLog).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ action: 'COMPLIANCE_OVERRIDE_269ST' }),
+    expect(pool._tx.query).toHaveBeenCalledWith(
+      expect.stringContaining('audit_events'),
+      expect.arrayContaining(['COMPLIANCE_OVERRIDE_269ST']),
     );
   });
 
@@ -173,7 +165,10 @@ describe('PaymentService.recordCashPayment', () => {
 
     await svc.recordCashPayment(INVOICE, 1_000_000n, 'idem-5');
 
-    expect(auditLog).not.toHaveBeenCalled();
+    expect(pool._tx.query).not.toHaveBeenCalledWith(
+      expect.stringContaining('audit_events'),
+      expect.any(Array),
+    );
   });
 
   it('does NOT write override metadata or audit when override provided but payment is within limit', async () => {
@@ -184,7 +179,10 @@ describe('PaymentService.recordCashPayment', () => {
     // override provided, but payment (Rs 1L) is under the limit (Rs 1.99999L)
     await svc.recordCashPayment(INVOICE, 10_000_000n, 'idem-9', { justification: 'Override not needed here at all' });
 
-    expect(auditLog).not.toHaveBeenCalled();
+    expect(pool._tx.query).not.toHaveBeenCalledWith(
+      expect.stringContaining('audit_events'),
+      expect.any(Array),
+    );
     expect(pool._tx.query).not.toHaveBeenCalledWith(
       expect.stringContaining('UPDATE invoices SET compliance_overrides_jsonb'),
       expect.any(Array),

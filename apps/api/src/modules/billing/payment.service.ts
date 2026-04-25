@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import {
@@ -7,7 +7,7 @@ import {
   SECTION_269ST_LIMIT_PAISE,
 } from '@goldsmith/compliance';
 import type { CashCapOverride } from '@goldsmith/compliance';
-import { auditLog, AuditAction } from '@goldsmith/audit';
+import { AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 
@@ -43,7 +43,6 @@ const FETCH_OR_INIT_AGGREGATE_SQL = `
 const INCREMENT_AGGREGATE_SQL = `
   UPDATE pmla_aggregates SET
     cash_total_paise = cash_total_paise + $1,
-    invoice_count    = invoice_count + 1,
     updated_at       = now()
   WHERE shop_id       = current_setting('app.current_shop_id', true)::uuid
     AND aggregate_date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date
@@ -63,8 +62,6 @@ const CHECK_PAYMENT_IDEM_SQL = `
 
 @Injectable()
 export class PaymentService {
-  private readonly logger = new Logger(PaymentService.name);
-
   constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
 
   // Records a cash payment against an invoice.
@@ -89,7 +86,6 @@ export class PaymentService {
     override?: CashPaymentOverride,
   ): Promise<void> {
     const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
-    let overrideWasUsed = false;
 
     await withTenantTx(this.pool, async (tx) => {
       // ── A. Early idempotency check ─────────────────────────────────────────
@@ -199,7 +195,9 @@ export class PaymentService {
         throw err;
       }
 
-      // ── I. Override metadata on invoice ────────────────────────────────────
+      // ── I. Override metadata + audit (in-transaction for atomicity) ──────────
+      // Compliance overrides MUST be audited atomically with the payment.
+      // A committed override with no audit trail is a regulatory gap.
       if (overrideMeta) {
         await tx.query(
           `UPDATE invoices
@@ -209,27 +207,28 @@ export class PaymentService {
            WHERE id = $2`,
           [JSON.stringify({ ...overrideMeta, actorUserId: ctx.userId }), invoiceId],
         );
-        overrideWasUsed = true;
+
+        // Write audit event within the same transaction — if this fails, the
+        // payment rolls back, ensuring no override escapes without an audit record.
+        await tx.query(
+          `INSERT INTO audit_events
+             (shop_id, actor_user_id, action, subject_type, subject_id, metadata)
+           VALUES
+             (current_setting('app.current_shop_id', true)::uuid, $1, $2, $3, $4, $5)`,
+          [
+            ctx.userId,
+            AuditAction.COMPLIANCE_OVERRIDE_269ST,
+            'invoice',
+            invoiceId,
+            JSON.stringify({
+              justification: overrideMeta.justification,
+              amountPaise:   amountPaise.toString(),
+              role:          ctx.role,
+              limitPaise:    SECTION_269ST_LIMIT_PAISE.toString(),
+            }),
+          ],
+        );
       }
     });
-
-    // ── J. Audit override (fire-and-forget, separate tx after commit) ─────────
-    if (overrideWasUsed) {
-      void auditLog(this.pool, {
-        action:      AuditAction.COMPLIANCE_OVERRIDE_269ST,
-        subjectType: 'invoice',
-        subjectId:   invoiceId,
-        actorUserId: ctx.userId,
-        metadata: {
-          justification: override?.justification ?? '',
-          amountPaise:   amountPaise.toString(),
-          role:          ctx.role,
-          limitPaise:    SECTION_269ST_LIMIT_PAISE.toString(),
-        },
-      }).catch((err: unknown) => {
-        // Log rather than silently swallow — compliance overrides must be traceable.
-        this.logger.error(`Failed to write COMPLIANCE_OVERRIDE_269ST audit log for invoice ${invoiceId}: ${String(err)}`);
-      });
-    }
   }
 }
