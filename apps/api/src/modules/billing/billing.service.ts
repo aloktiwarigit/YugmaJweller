@@ -33,6 +33,31 @@ export { ComplianceHardBlockError };
 
 const IDEM_TTL_SEC = 60 * 60 * 24; // 24h
 
+// Maps DB purity values (e.g. '22K', '999') → PurityKey (e.g. 'GOLD_22K', 'SILVER_999').
+// Products are stored in the DB with short purity codes; rates are keyed by full PurityKey.
+const DB_PURITY_TO_PURITY_KEY: Record<string, PurityKey> = {
+  '24K':  'GOLD_24K',
+  '22K':  'GOLD_22K',
+  '20K':  'GOLD_20K',
+  '18K':  'GOLD_18K',
+  '14K':  'GOLD_14K',
+  '999':  'SILVER_999',
+  '925':  'SILVER_925',
+  // Full PurityKey values pass through unchanged (unit-test mocks return full keys)
+  'GOLD_24K':   'GOLD_24K',
+  'GOLD_22K':   'GOLD_22K',
+  'GOLD_20K':   'GOLD_20K',
+  'GOLD_18K':   'GOLD_18K',
+  'GOLD_14K':   'GOLD_14K',
+  'SILVER_999': 'SILVER_999',
+  'SILVER_925': 'SILVER_925',
+};
+
+function toPurityKey(raw: string | undefined): PurityKey | undefined {
+  if (!raw) return undefined;
+  return DB_PURITY_TO_PURITY_KEY[raw];
+}
+
 function maskPhone(phone: string | null | undefined): string | null {
   if (!phone) return null;
   if (phone.length < 4) return '***';
@@ -182,7 +207,7 @@ export class BillingService {
 
     const lines: Line[] = dto.lines.map((input, i) => {
       const product = resolvedProducts[i];
-      const purity = (input.purity ?? product?.purity) as PurityKey | undefined;
+      const purity = toPurityKey(input.purity ?? product?.purity);
       const netWeightG = input.netWeightG ?? product?.net_weight_g;
 
       if (!purity || !(purity in rates)) {
