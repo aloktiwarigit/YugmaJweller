@@ -39,7 +39,8 @@ function makeTx(
         return { rows: invoiceRow ? [invoiceRow] : [] };
       }
       if (sql.includes('pmla_aggregates_unique')) {
-        return { rows: [{ cash_total_paise: existingPaise }] };
+        // pg returns BIGINT as string — mirror that in the mock
+        return { rows: [{ cash_total_paise: existingPaise.toString() }] };
       }
       if (sql.includes('UPDATE invoices SET compliance_overrides_jsonb')) {
         return { rows: [] };
@@ -170,5 +171,20 @@ describe('PaymentService.recordCashPayment', () => {
     await svc.recordCashPayment(INVOICE, 1_000_000n);
 
     expect(auditLog).not.toHaveBeenCalled();
+  });
+
+  it('does NOT write override metadata or audit when override provided but payment is within limit', async () => {
+    const pool = fakePool(INVOICE_ROW, 0n); // zero existing — payment is within limit
+    setupWithTenantTx(pool);
+    svc = new PaymentService(pool);
+
+    // override provided, but payment (Rs 1L) is under the limit (Rs 1.99999L)
+    await svc.recordCashPayment(INVOICE, 10_000_000n, { justification: 'Override not needed here at all' });
+
+    expect(auditLog).not.toHaveBeenCalled();
+    expect(pool._tx.query).not.toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE invoices SET compliance_overrides_jsonb'),
+      expect.any(Array),
+    );
   });
 });

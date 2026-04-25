@@ -57,6 +57,7 @@ export class PaymentService {
     override?: CashPaymentOverride,
   ): Promise<void> {
     const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
+    let overrideWasUsed = false;
 
     await withTenantTx(this.pool, async (tx) => {
       // 1. Verify invoice exists (RLS scopes to current tenant)
@@ -76,44 +77,47 @@ export class PaymentService {
       // 2. Lock-or-create the aggregate row (IST date) and read the existing daily total.
       //    INSERT ON CONFLICT acquires an exclusive row lock preventing concurrent
       //    transactions from reading+writing the aggregate simultaneously (TOCTOU-safe).
-      const aggRes = await tx.query<{ cash_total_paise: bigint }>(
+      const aggRes = await tx.query<{ cash_total_paise: string }>(
         FETCH_OR_INIT_AGGREGATE_SQL,
         [customerId ?? null, customerPhone ?? null],
       );
-      const existingDailyPaise = aggRes.rows[0]?.cash_total_paise ?? 0n;
+      // pg returns BIGINT columns as strings — convert explicitly before arithmetic
+      const existingDailyPaise = BigInt(aggRes.rows[0]?.cash_total_paise ?? '0');
+      const projectedPaise = existingDailyPaise + amountPaise;
+      const limitExceeded = projectedPaise > SECTION_269ST_LIMIT_PAISE;
 
-      // 3. Compliance check
-      if (override) {
-        // Override path: validate actor role + justification before proceeding.
+      // 3. Compliance enforcement — three paths:
+      //    A. Under limit (override ignored): normal increment
+      //    B. Over limit + override provided: role+justification check, then record
+      //    C. Over limit + no override: throw hard-block error
+      if (!limitExceeded) {
+        // Path A: within limit — no override metadata, no audit event
+        await tx.query(INCREMENT_AGGREGATE_SQL, [amountPaise, customerId ?? null, customerPhone ?? null]);
+      } else if (override) {
+        // Path B: limit exceeded and override provided.
         // buildCashCapOverride throws ComplianceHardBlockError if role is shop_staff or unknown.
         const overrideMeta = buildCashCapOverride(
           { role: ctx.role, justification: override.justification },
-          existingDailyPaise + amountPaise,
+          projectedPaise,
         );
 
-        // 4a. Increment aggregate (override bypasses the hard-block)
         await tx.query(INCREMENT_AGGREGATE_SQL, [amountPaise, customerId ?? null, customerPhone ?? null]);
 
         // 5. Store override metadata on the invoice for audit trail
         await tx.query(
           `UPDATE invoices SET compliance_overrides_jsonb = $1, updated_at = now() WHERE id = $2`,
-          [
-            JSON.stringify({ ...overrideMeta, actorUserId: ctx.userId }),
-            invoiceId,
-          ],
+          [JSON.stringify({ ...overrideMeta, actorUserId: ctx.userId }), invoiceId],
         );
+        overrideWasUsed = true;
       } else {
-        // No override: enforce the hard-block
+        // Path C: limit exceeded and no override — hard-block
         enforce269ST({
           shopId:             ctx.shopId,
           customerId:         customerId ?? null,
           customerPhone:      customerPhone ?? null,
           cashAmountPaise:    amountPaise,
-          existingDailyPaise: existingDailyPaise,
+          existingDailyPaise,
         });
-
-        // 4b. Increment aggregate (passed the check)
-        await tx.query(INCREMENT_AGGREGATE_SQL, [amountPaise, customerId ?? null, customerPhone ?? null]);
       }
 
       // 6. Insert payment record — 'CONFIRMED' is correct for cash (immediate, no clearing delay)
@@ -125,15 +129,16 @@ export class PaymentService {
       );
     });
 
-    // 7. Audit override — fire-and-forget after transaction commits
-    if (override) {
+    // 7. Audit override — only when the limit was actually exceeded and override was used.
+    //    Fire-and-forget after the transaction commits (separate tx inside auditLog).
+    if (overrideWasUsed) {
       void auditLog(this.pool, {
         action:      AuditAction.COMPLIANCE_OVERRIDE_269ST,
         subjectType: 'invoice',
         subjectId:   invoiceId,
         actorUserId: ctx.userId,
         metadata: {
-          justification:     override.justification,
+          justification:     override?.justification ?? '',
           amountPaise:       amountPaise.toString(),
           role:              ctx.role,
           limitPaise:        SECTION_269ST_LIMIT_PAISE.toString(),
