@@ -1,14 +1,16 @@
 -- 0021_stock_movements.sql
 -- Append-only ledger of stock changes. Drives products.quantity.
 -- DB-enforced immutability via trigger; compensating movements correct mistakes.
--- PMLA 5-year retention enforced by app_user grant (SELECT + INSERT only).
+-- PMLA 5-year retention enforced at two layers:
+--   1. Immutability trigger with SECURITY DEFINER (rejects UPDATE/DELETE for ALL roles)
+--   2. app_user grant restricted to SELECT + INSERT (denies privilege at role level)
 
 BEGIN;
 
 -- 1. products.quantity column (drives oversell guard; default 1 for existing rows)
 ALTER TABLE products
   ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 1
-  CHECK (quantity >= 0);
+  CONSTRAINT products_quantity_nonneg CHECK (quantity >= 0);
 
 -- 2. stock_movements append-only ledger
 CREATE TABLE stock_movements (
@@ -25,6 +27,8 @@ CREATE TABLE stock_movements (
   balance_after       INTEGER NOT NULL CHECK (balance_after  >= 0),
   source_name         TEXT,
   source_id           UUID,
+  -- recorded_by_user_id intentionally has no FK: the value must persist for 5 yr
+  -- PMLA retention even if the user record is purged. Service layer validates write-time.
   recorded_by_user_id UUID NOT NULL,
   recorded_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -47,17 +51,20 @@ ALTER TABLE stock_movements FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS rls_stock_movements_tenant_isolation ON stock_movements;
 CREATE POLICY rls_stock_movements_tenant_isolation ON stock_movements
   FOR ALL
-  USING      (shop_id = current_setting('app.current_shop_id')::uuid)
-  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
 
 -- 6. Immutability trigger — DB-level rejection of UPDATE/DELETE.
 -- This is the PMLA retention floor: even a buggy migration or a developer
 -- with raw psql access cannot mutate or destroy a recorded movement.
 CREATE OR REPLACE FUNCTION stock_movements_immutable()
-RETURNS trigger LANGUAGE plpgsql AS $$
+  RETURNS trigger
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+AS $$
 BEGIN
   RAISE EXCEPTION 'stock_movements are immutable; use a compensating movement'
-    USING ERRCODE = 'raise_exception';
+    USING ERRCODE = 'restrict_violation';
 END;
 $$;
 
@@ -76,5 +83,7 @@ CREATE INDEX idx_stock_movements_product
   ON stock_movements(shop_id, product_id, recorded_at DESC);
 CREATE INDEX idx_stock_movements_type
   ON stock_movements(shop_id, type, recorded_at DESC);
+CREATE INDEX idx_stock_movements_recorded_by
+  ON stock_movements(shop_id, recorded_by_user_id, recorded_at DESC);
 
 COMMIT;
