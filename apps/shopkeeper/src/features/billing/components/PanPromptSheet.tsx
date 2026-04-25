@@ -117,7 +117,6 @@ export function PanPromptSheet({ visible, totalPaise, onSubmit, onCancel }: Prop
       <Pressable style={styles.backdrop} onPress={onCancel} accessibilityLabel="रद्द करें" />
       <Animated.View
         style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}
-        accessibilityRole="dialog"
         accessibilityLabel="PAN या Form 60 ज़रूरी है"
       >
         <View style={styles.handle} />
