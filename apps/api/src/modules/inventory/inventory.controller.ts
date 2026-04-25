@@ -21,6 +21,10 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { InventoryService } from './inventory.service';
 import { InventoryBulkImportService } from './inventory.bulk-import.service';
 import { BarcodeService } from './barcode.service';
+import { InventorySearchService } from './inventory.search.service';
+import type { SearchResult } from '@goldsmith/integrations-search';
+import { InventoryDeadStockService } from './inventory.dead-stock.service';
+import type { DeadStockProduct } from './inventory.dead-stock.service';
 
 @Controller('/api/v1/inventory')
 export class InventoryController {
@@ -28,7 +32,43 @@ export class InventoryController {
     private readonly svc: InventoryService,
     private readonly bulkImportSvc: InventoryBulkImportService,
     private readonly barcodeSvc: BarcodeService,
+    private readonly searchSvc: InventorySearchService,
+    private readonly deadStockSvc: InventoryDeadStockService,
   ) {}
+
+  @Get('/search')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async searchProducts(
+    @TenantContextDec() ctx: TenantContext,
+    @Query('q') q: string = '',
+    @Query('metal') metal?: string,
+    @Query('purity') purity?: string,
+    @Query('status') status?: string,
+    @Query('published') publishedStr?: string,
+    @Query('limit') limitStr: string = '20',
+    @Query('offset') offsetStr: string = '0',
+  ): Promise<SearchResult> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    const published = publishedStr === undefined ? undefined : publishedStr === 'true';
+    const limit = Math.min(parseInt(limitStr, 10) || 20, 100); // cap at 100
+    const offset = parseInt(offsetStr, 10) || 0;
+    return this.searchSvc.search(ctx, {
+      q,
+      filters: { metal, purity, status, published },
+      limit,
+      offset,
+    });
+  }
+
+  @Get('/dead-stock')
+  @Roles('shop_admin', 'shop_manager')
+  async getDeadStock(
+    @TenantContextDec() ctx: TenantContext,
+  ): Promise<DeadStockProduct[]> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.deadStockSvc.getDeadStock(ctx);
+  }
+
 
   @Post('/products')
   @Roles('shop_admin', 'shop_manager')

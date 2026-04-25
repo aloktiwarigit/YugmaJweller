@@ -50,6 +50,11 @@ module.exports = {
         'packages/sync/src/server/cursor.ts',
         'packages/sync/src/server/push.ts',
         'packages/sync/src/server/sync-logger.ts',
+        // Meilisearch adapter is infrastructure: per-tenant index naming uses shopId directly.
+        'packages/integrations/search/src/adapters/meilisearch.adapter.ts',
+        // Search service: indexProduct/removeFromIndex are called from BullMQ worker (no TenantContext).
+        // postgresSearch is a private helper receiving shopId extracted from ctx at the call site.
+        'apps/api/src/modules/inventory/inventory.search.service.ts',
       ],
       rules: { 'goldsmith/no-raw-shop-id-param': 'off' },
     },

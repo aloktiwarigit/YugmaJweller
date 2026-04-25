@@ -11,5 +11,6 @@ export const shopSettings = tenantSingletonTable('shop_settings', {
   custom_order_policy_text: text('custom_order_policy_text'),
   return_policy_text:       text('return_policy_text'),
   notification_prefs_json:  jsonb('notification_prefs_json'),
+  dead_stock_threshold_days: integer('dead_stock_threshold_days').notNull().default(180),
   updated_at:               timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

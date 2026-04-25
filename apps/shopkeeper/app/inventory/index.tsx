@@ -1,18 +1,16 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { RateWidget } from '@goldsmith/ui-mobile';
-import { colors, spacing, typography } from '@goldsmith/ui-tokens';
+import { colors, spacing } from '@goldsmith/ui-tokens';
 import { usePublicRates } from '../../src/hooks/usePublicRates';
+import { InventorySearch } from '../../src/features/inventory/components/InventorySearch';
 
 export default function InventoryListScreen(): React.ReactElement {
   const { data: rates, isLoading } = usePublicRates();
 
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={styles.container}
-    >
+    <View style={styles.screen}>
       {/* Live rate compact header — quick reference while browsing inventory */}
       <View style={styles.rateHeader}>
         <RateWidget
@@ -24,29 +22,28 @@ export default function InventoryListScreen(): React.ReactElement {
         />
       </View>
 
-      {/* Placeholder — full inventory list implemented in future story */}
-      <View style={styles.placeholder}>
-        <Text style={styles.placeholderText}>उत्पाद सूची जल्द आ रही है</Text>
+      {/* Inventory search + results */}
+      <View style={styles.searchContainer}>
+        <InventorySearch />
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: colors.background ?? colors.bg ?? '#F5EDDD' },
-  container: { paddingBottom: spacing.xxl ?? 48 },
+  screen: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
   rateHeader: {
-    backgroundColor: colors.white ?? '#FFFFFF',
+    backgroundColor: colors.white,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border ?? '#E5E7EB',
+    borderBottomColor: colors.border,
   },
-  placeholder: {
-    padding: spacing.xl ?? 32,
-    alignItems: 'center',
-  },
-  placeholderText: {
-    fontFamily: typography.body.family,
-    fontSize: 16,
-    color: colors.textSecondary ?? '#6B7280',
+  searchContainer: {
+    flex: 1,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
   },
 });
