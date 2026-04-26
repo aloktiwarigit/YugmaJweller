@@ -4,10 +4,10 @@ import {
 } from '@nestjs/common';
 import { ComplianceHardBlockError } from '@goldsmith/compliance';
 import { TenantContextDec } from '@goldsmith/tenant-context';
-import type { TenantContext } from '@goldsmith/tenant-context';
+import type { TenantContext, AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { CreateInvoiceSchema, RecordCashPaymentSchema } from '@goldsmith/shared';
 import type { CreateInvoiceDtoType, InvoiceResponse, RecordCashPaymentDto } from '@goldsmith/shared';
-import type { CashPaymentResult } from './payment.service';
+import type { CashPaymentResult, ManualPaymentDto, Payment } from './payment.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { TenantWalkerRoute } from '../../common/decorators/tenant-walker-route.decorator';
@@ -171,6 +171,7 @@ export class BillingController {
     );
   }
 
+<<<<<<< HEAD
 
   @TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-0000-0000-000000000000' } })
   @Post('/invoices/:id/share/whatsapp')
@@ -200,5 +201,30 @@ export class BillingController {
       ? await this.gstr.generateGstr1Csv(month)
       : await this.gstr.generateGstr3bSummary(month);
     return { csv, filename: `${type}-${month}.csv` };
+  }
+
+  @Post('/invoices/:id/payments/upi')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async initiateUpiPayment(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: { amountPaise: string }): Promise<{ orderId: string }> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (!dto.amountPaise) throw new BadRequestException({ code: 'payment.amount_required' });
+    return this.payments.initiateUpiPayment(ctx as AuthenticatedTenantContext, id, BigInt(dto.amountPaise));
+  }
+
+  @Post('/invoices/:id/payments/manual')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async recordManualPayment(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: { method: ManualPaymentDto['method']; amountPaise: string; referenceNumber?: string }): Promise<Payment> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (!dto.method || !dto.amountPaise) throw new BadRequestException({ code: 'payment.fields_required' });
+    const validMethods: ManualPaymentDto['method'][] = ['CARD', 'NET_BANKING', 'OLD_GOLD', 'SCHEME'];
+    if (!validMethods.includes(dto.method)) throw new UnprocessableEntityException({ code: 'payment.invalid_method' });
+    return this.payments.recordManualPayment(ctx as AuthenticatedTenantContext, id, { method: dto.method, amountPaise: BigInt(dto.amountPaise), referenceNumber: dto.referenceNumber });
+  }
+
+  @Get('/invoices/:id/payments')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async listPayments(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string): Promise<Payment[]> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.payments.listPayments(id);
   }
 }

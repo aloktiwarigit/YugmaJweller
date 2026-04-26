@@ -4,6 +4,7 @@ import { Redis } from '@goldsmith/cache';
 import { LocalKMS, DevKmsAdapter } from '@goldsmith/crypto-envelope';
 import { SettingsCache } from '@goldsmith/tenant-config';
 import { StorageModule } from '@goldsmith/integrations-storage';
+import { RazorpayAdapter, StubPaymentsAdapter } from '@goldsmith/integrations-payments';
 import { AuthModule }      from '../auth/auth.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { PricingModule }   from '../pricing/pricing.module';
@@ -29,6 +30,7 @@ import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
     StorageModule,
     BullModule.registerQueue({ name: 'compliance-pmla' }),
     BullModule.registerQueue({ name: 'gstr-export' }),
+    BullModule.registerQueue({ name: 'razorpay-webhooks' }),
   ],
   controllers: [BillingController, ComplianceReportsController],
   providers: [
@@ -43,6 +45,13 @@ import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
     CompliancePmlaProcessor,
     GstrExportProcessor,
     SettingsRepository,
+    {
+      provide: 'PAYMENTS_ADAPTER',
+      useFactory: () => {
+        const adapter = process.env['PAYMENTS_ADAPTER'] ?? 'stub';
+        return adapter === 'razorpay' ? new RazorpayAdapter() : new StubPaymentsAdapter();
+      },
+    },
     {
       provide: 'BILLING_REDIS',
       useFactory: () =>
@@ -65,5 +74,6 @@ import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
       inject: ['BILLING_REDIS'],
     },
   ],
+  exports: [PaymentService, 'PAYMENTS_ADAPTER'],
 })
 export class BillingModule {}
