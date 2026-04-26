@@ -137,10 +137,13 @@ export class VoidService {
           [newQty, newStatus, productId],
         );
 
-        // Record compensating ADJUSTMENT_IN stock movement
+        // Record compensating ADJUSTMENT_IN stock movement.
+        // nosemgrep: ops.semgrep.no-direct-stock-movements-insert -- intentional: this INSERT
+        // must be atomic with the void UPDATE; StockMovementRepository creates its own
+        // withTenantTx which cannot participate in the outer void transaction.
         const beforeQty = prod.quantity;
         await tx.query(
-          `INSERT INTO stock_movements
+          `INSERT INTO stock_movements -- nosemgrep: ops.semgrep.no-direct-stock-movements-insert
              (shop_id, product_id, type, reason, quantity_delta, balance_before, balance_after,
               source_name, source_id, recorded_by_user_id, recorded_at)
            VALUES (current_setting('app.current_shop_id', true)::uuid,

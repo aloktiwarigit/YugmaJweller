@@ -17,8 +17,10 @@ CREATE TABLE credit_notes (
 );
 
 ALTER TABLE credit_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE credit_notes FORCE ROW LEVEL SECURITY;
 CREATE POLICY credit_notes_tenant ON credit_notes
-  USING (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
 
 GRANT SELECT, INSERT ON credit_notes TO app_user;
 
