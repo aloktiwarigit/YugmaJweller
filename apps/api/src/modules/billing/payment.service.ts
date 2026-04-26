@@ -228,11 +228,11 @@ export class PaymentService {
       });
       const prePaymentMonthlyPaise = pmlaResult.cumulativePaise - amountPaise;
       const prePmlaStatus = getPmlaThresholdStatus(prePaymentMonthlyPaise);
-      // Only true on the payment that crosses into warn (not on subsequent payments above Rs 8L).
-      // Assigned to outer scope so post-commit BullMQ enqueue also uses crossing logic.
-      // prePmlaStatus === 'ok' catches both ok→warn AND ok→block in a single payment.
-      // Only ok→warn fires warn effects. ok→block: Story 5.6 handles block events.
-      crossedWarnThreshold = prePmlaStatus === 'ok' && pmlaResult.status === 'warn';
+      // Fires on first crossing of Rs 8L warn threshold (ok→warn OR ok→block).
+      // ok→block fires warn effects because Rs 8L WAS crossed; Story 5.6 adds
+      // the separate block effects. Subsequent warn/block payments: prePmlaStatus
+      // is not 'ok', so crossedWarnThreshold stays false (no duplicates).
+      crossedWarnThreshold = prePmlaStatus === 'ok' && pmlaResult.status !== 'ok';
 
       // ── H. Insert payment record ───────────────────────────────────────────
       try {
