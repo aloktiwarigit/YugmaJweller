@@ -4,12 +4,15 @@ import { AuthModule } from '../auth/auth.module';
 import { CrmController } from './crm.controller';
 import { CrmService } from './crm.service';
 import { CrmRepository } from './crm.repository';
+import { FamilyService } from './family.service';
+import { FamilyRepository } from './family.repository';
 
 @Module({
   imports: [AuthModule],
   controllers: [CrmController],
   providers: [
     CrmService, CrmRepository,
+    FamilyService, FamilyRepository,
     {
       provide: 'KMS_ADAPTER',
       useFactory: () => {
@@ -24,6 +27,6 @@ import { CrmRepository } from './crm.repository';
       },
     },
   ],
-  exports: [CrmService],
+  exports: [CrmService, FamilyService],
 })
 export class CrmModule {}

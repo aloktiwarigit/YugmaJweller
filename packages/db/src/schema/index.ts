@@ -22,3 +22,4 @@ export * from './pmla-aggregates';
 export * from './credit-notes';
 export * from './customers';
 export * from './urd-purchases';
+export * from './family-members';

@@ -177,10 +177,15 @@ export {
   UpdateCustomerSchema,
   CustomerListQuerySchema,
   CustomerResponseSchema,
+  LinkFamilySchema,
+  FamilyMemberResponseSchema,
+  FAMILY_RELATIONSHIPS,
 } from './schemas/customer.schema';
 export type {
   CreateCustomerDto,
   UpdateCustomerDto,
   CustomerListQuery,
   CustomerResponse,
+  LinkFamilyDto,
+  FamilyMemberResponse,
 } from './schemas/customer.schema';
