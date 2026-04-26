@@ -16,3 +16,21 @@ verified:
   - err.meta: server-computed BigInt strings, not user-controlled
   - Tenant isolation: withTenantTx GUC + RLS on pmla_aggregates + invoices
   - Block bypass: threshold split-payment checked cumulatively (monthly SUM)
+story: 6.1
+reviewer: feature-dev:code-reviewer (fresh context, no implementation knowledge)
+date: 2026-04-26
+result: PASSED
+round: 2 (after P1+P2 fixes)
+fixes-verified:
+  - RLS: FORCE ROW LEVEL SECURITY + WITH CHECK + fail-loud current_setting (0028_customers.sql)
+  - KEK: getShopKekArn throws on NULL kek_key_arn, no fallback ARN (crm.service.ts)
+  - Audit: updateCustomer logs fieldsUpdated+panUpdated only, no PII spread (crm.service.ts)
+  - Guard: production guard blocks LocalKMS when NODE_ENV=production (crm.module.ts)
+candidates-cleared:
+  - SET LOCAL shopId interpolation: ctx.shopId is DB-sourced UUID, Firebase JWTs signed server-side
+  - KEK ARN exposure: no bypass path, C-1 cleared
+  - Denylist role check: @Roles controller gate is primary; service check is redundant defence-in-depth
+  - DevKmsAdapter in production: aspirational scaffolding, no AKV adapter exists, billing same pattern
+  - KEK ARN in audit log: key identifier not key material; billing already logs it; industry standard
+tests-passing: 418/418
+typecheck: clean
