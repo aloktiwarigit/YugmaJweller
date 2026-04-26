@@ -9,7 +9,6 @@ import {
   SECTION_269ST_LIMIT_PAISE,
   trackPmlaCumulative,
   getPmlaThresholdStatus,
-  istMonthStr,
 } from '@goldsmith/compliance';
 import type { CashCapOverride, PmlaCumulativeResult } from '@goldsmith/compliance';
 import { AuditAction } from '@goldsmith/audit';
@@ -109,44 +108,18 @@ export class PaymentService {
     const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
 
     let pmlaResult: PmlaCumulativeResult | null = null;
-    // True only on the payment that crosses into warn — prevents duplicate audit/notification
-    // on every subsequent payment when customer is already above Rs 8L in that month.
     let crossedWarnThreshold = false;
-    // True on a late-idem retry: reconstruct pmlaWarning for a consistent response
-    // without emitting a duplicate audit event or BullMQ notification.
-    let pmlaWarnRetry = false;
 
     await withTenantTx(this.pool, async (tx) => {
       // ── A. Early idempotency check ─────────────────────────────────────────
-      // When the first request committed but the response was lost (common timeout/retry),
-      // reconstruct the PMLA warning from the current monthly aggregate so the response
-      // is consistent. Requires an invoice fetch for customer identity.
+      // The pmlaWarning is a UX notification; the authoritative compliance record is
+      // the PMLA_WARN_THRESHOLD_REACHED audit event committed in-tx on first request.
+      // On retry the audit event and BullMQ notification are already committed.
+      // Returning {} here is correct: the warning state belongs to the original response;
+      // reconstructing from the current aggregate would produce a different cumulativePaise
+      // if the month rolled over or another payment changed the total.
       const earlyIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
-      if (earlyIdem.rows[0]) {
-        const earlyInv = await tx.query<{ customer_id: string | null; customer_phone: string | null }>(
-          `SELECT customer_id, customer_phone FROM invoices WHERE id = $1`,
-          [invoiceId],
-        );
-        if (earlyInv.rows[0]) {
-          const eCustomerId = earlyInv.rows[0].customer_id;
-          const eCustomerPhone = eCustomerId ? null : normalizePhone(earlyInv.rows[0].customer_phone);
-          const eMonthStr = istMonthStr(new Date());
-          const eRes = await tx.query<{ monthly_total: string }>(
-            `SELECT COALESCE(SUM(cash_total_paise), 0)::text AS monthly_total
-             FROM pmla_aggregates
-             WHERE aggregate_month = $1
-               AND (customer_id IS NOT DISTINCT FROM $2::uuid)
-               AND (customer_phone IS NOT DISTINCT FROM $3)`,
-            [eMonthStr, eCustomerId, eCustomerPhone],
-          );
-          const eCumulative = BigInt(eRes.rows[0]?.monthly_total ?? '0');
-          if (getPmlaThresholdStatus(eCumulative) === 'warn') {
-            pmlaResult = { cumulativePaise: eCumulative, status: 'warn' as const, monthStr: eMonthStr };
-            pmlaWarnRetry = true;
-          }
-        }
-        return;
-      }
+      if (earlyIdem.rows[0]) return;
 
       // ── B. Verify invoice — lock row to serialize concurrent payments ───────
       const invRes = await tx.query<{
@@ -188,26 +161,10 @@ export class PaymentService {
         : new Date();
 
       // ── D. Late idempotency check (post-lock) ──────────────────────────────
-      // Customer identity and aggDateIST are available from step C, so we can
-      // reconstruct the PMLA warning status on retry without a duplicate event/job.
+      // Same design as step A: return {} on retry to avoid deriving warning state
+      // from the current aggregate which may have changed since the first request.
       const lateIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
-      if (lateIdem.rows[0]) {
-        const retryMonthStr = aggRes.rows[0]?.aggregate_month ?? istMonthStr(aggDateIST);
-        const retryRes = await tx.query<{ monthly_total: string }>(
-          `SELECT COALESCE(SUM(cash_total_paise), 0)::text AS monthly_total
-           FROM pmla_aggregates
-           WHERE aggregate_month = $1
-             AND (customer_id IS NOT DISTINCT FROM $2::uuid)
-             AND (customer_phone IS NOT DISTINCT FROM $3)`,
-          [retryMonthStr, customerId ?? null, customerPhone ?? null],
-        );
-        const retryCumulative = BigInt(retryRes.rows[0]?.monthly_total ?? '0');
-        if (getPmlaThresholdStatus(retryCumulative) === 'warn') {
-          pmlaResult = { cumulativePaise: retryCumulative, status: 'warn' as const, monthStr: retryMonthStr };
-          pmlaWarnRetry = true;
-        }
-        return;
-      }
+      if (lateIdem.rows[0]) return;
 
       // ── E. Balance check ────────────────────────────────────────────────────
       const paidRes = await tx.query<{ paid: string; cash_count: string }>(
@@ -257,21 +214,24 @@ export class PaymentService {
       }
 
       // ── G. PMLA tracking — atomic daily upsert + monthly cumulative SUM ────
-      // Replaces the old two-step fetch-or-init + increment pattern.
-      // Upserts the daily row (INSERT ON CONFLICT DO UPDATE with increment),
-      // then queries the monthly SUM. Returns warn/block/ok status.
+      // trackPmlaCumulative upserts the daily row (replacing old INCREMENT step)
+      // and returns the post-payment monthly total + status.
+      // Pre-payment status is inferred from (postTotal - amountPaise) to detect
+      // the threshold CROSSING on this payment (avoids re-firing on every subsequent
+      // payment once the customer is already in the warn band).
       pmlaResult = await trackPmlaCumulative(tx, {
         customerId:           customerId ?? null,
         customerPhone:        customerPhone ?? null,
         cashIncrementPaise:   amountPaise,
         transactionDateIST:   aggDateIST,      // P1b fix: same IST date as step C's lock
-        incrementInvoiceCount: isFirstCashPayment, // invoice_count: count per invoice, not per installment
+        incrementInvoiceCount: isFirstCashPayment, // P2 fix: count per invoice, not per installment
       });
-      // Detect warn-zone threshold crossing. Only fires on the first payment that moves
-      // the customer from 'ok' into 'warn'. 'block' crossings are Story 5.6's concern
-      // and do not get warn-state side-effects (audit event, job, response pmlaWarning).
       const prePaymentMonthlyPaise = pmlaResult.cumulativePaise - amountPaise;
       const prePmlaStatus = getPmlaThresholdStatus(prePaymentMonthlyPaise);
+      // Only true on the payment that crosses into warn (not on subsequent payments above Rs 8L).
+      // Assigned to outer scope so post-commit BullMQ enqueue also uses crossing logic.
+      // prePmlaStatus === 'ok' catches both ok→warn AND ok→block in a single payment.
+      // Only ok→warn fires warn effects. ok→block: Story 5.6 handles block events.
       crossedWarnThreshold = prePmlaStatus === 'ok' && pmlaResult.status === 'warn';
 
       // ── H. Insert payment record ───────────────────────────────────────────
@@ -321,8 +281,9 @@ export class PaymentService {
       }
 
       // ── J. PMLA audit log (inside tx — atomic with payment) ─────────────────
-      // Only on threshold crossing — prevents duplicate audit rows on every subsequent
-      // payment when the customer is already in the warn band (Rs 8L–10L).
+      // Only fires when THIS payment crosses the Rs 8L warn threshold (not on
+      // subsequent payments that are already above Rs 8L). crossedWarnThreshold
+      // is false when customer was already in warn band before this payment.
       if (crossedWarnThreshold && pmlaResult) {
         await tx.query(
           `INSERT INTO audit_events
@@ -352,9 +313,8 @@ export class PaymentService {
     // ── Post-commit: async BullMQ job for PMLA notification ─────────────────
     // Enqueued AFTER the transaction commits so the job never fires for a rolled-back payment.
     // Fire-and-forget (void) — a queue failure must not fail the payment response.
-    // crossedWarnThreshold: only enqueue on first crossing — avoids notification spam
-    // when customer is already above Rs 8L. On idempotency retries, crossedWarnThreshold
-    // is false; the notification was already queued atomically on the first commit.
+    // crossedWarnThreshold: only enqueue on the payment that crosses Rs 8L, not on
+    // every subsequent payment that is already in the warn band (avoids notification spam).
     if (crossedWarnThreshold && capturedPmla) {
       const job: PmlaCashThresholdWarningJob = {
         shopId:          ctx.shopId,
@@ -366,10 +326,12 @@ export class PaymentService {
       void this.pmlaQueue.add('cash-threshold-warning', job).catch(() => undefined);
     }
 
-    // Consistent response: return pmlaWarning on first warn crossing OR on a late-idem
-    // retry where we reconstructed the PMLA status (pmlaWarnRetry). Retries do not
-    // emit a duplicate audit event or BullMQ job (crossedWarnThreshold remains false).
-    return (crossedWarnThreshold || pmlaWarnRetry) && capturedPmla
+    // Return pmlaWarning only when this payment is the first to cross Rs 8L warn threshold.
+    // Idempotency retries (early or late) return {} — the pmlaWarning is tied to the first
+    // successful response; reconstructing from the current aggregate would produce
+    // a different cumulativePaise if the month rolled over or another payment intervened.
+    // The authoritative compliance record is the in-tx audit event, not this response field.
+    return crossedWarnThreshold && capturedPmla
       ? {
           pmlaWarning: {
             cumulativePaise: capturedPmla.cumulativePaise.toString(),

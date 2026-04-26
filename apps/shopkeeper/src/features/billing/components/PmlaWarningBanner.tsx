@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 
-const PMLA_BLOCK_THRESHOLD_PAISE = 100_000_000n; // Rs 10,00,000
+// Banner fires when the Rs 8L warn threshold is crossed (PMLA Section 12).
+// Show the warn threshold (Rs 8L), not the block threshold (Rs 10L, Story 5.6).
+const PMLA_WARN_THRESHOLD_PAISE = 80_000_000n; // Rs 8,00,000
 
 function formatPaise(paise: bigint): string {
   const rupees = Number(paise) / 100;
@@ -34,7 +36,7 @@ export function PmlaWarningBanner({
   onDismiss,
 }: PmlaWarningBannerProps): React.JSX.Element {
   const formattedAmount  = formatPaise(cumulativePaise);
-  const formattedLimit   = formatPaise(PMLA_BLOCK_THRESHOLD_PAISE);
+  const formattedWarnLimit = formatPaise(PMLA_WARN_THRESHOLD_PAISE);
   const formattedMonth   = formatMonthStr(monthStr);
 
   return (
@@ -47,7 +49,7 @@ export function PmlaWarningBanner({
         <Text style={styles.icon} accessibilityElementsHidden>⚠️</Text>
         <View style={styles.textContainer}>
           <Text style={styles.message}>
-            {customerName} की {formattedMonth} की cash: {formattedAmount}। PMLA सीमा {formattedLimit} है।
+            {customerName} की {formattedMonth} की cash: {formattedAmount}। PMLA चेतावनी सीमा {formattedWarnLimit} पार हो गई।
           </Text>
         </View>
       </View>
