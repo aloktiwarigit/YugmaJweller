@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Redis } from '@goldsmith/cache';
 import { SettingsCache } from '@goldsmith/tenant-config';
 import { AuthModule } from '../auth/auth.module';
+import { LoyaltyController } from './loyalty.controller';
 import { LoyaltyService } from './loyalty.service';
 import { LoyaltyRepository } from './loyalty.repository';
 import { LoyaltyEventListener, LOYALTY_ACCRUAL_QUEUE } from './loyalty.event-listener';
@@ -21,6 +22,7 @@ import { LoyaltyAccrualProcessor } from '../../workers/loyalty-accrual.processor
       },
     }),
   ],
+  controllers: [LoyaltyController],
   providers: [
     LoyaltyService,
     LoyaltyRepository,
