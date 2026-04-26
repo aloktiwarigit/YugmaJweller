@@ -36,7 +36,7 @@ function formatWeight(weightG: string): string {
 
 function parseWeightUnits(weightG: string): bigint {
   const trimmed = weightG.trim();
-  if (!trimmed || !/^-?\d+(\.\d*)?\$/.test(trimmed)) {
+  if (!trimmed || !/^-?\d+(\.\d*)?$/.test(trimmed)) {
     throw new RangeError('invalid weight: must be a positive finite number');
   }
   const parts = trimmed.split('.');
