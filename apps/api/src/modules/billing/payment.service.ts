@@ -219,10 +219,13 @@ export class PaymentService {
         incrementInvoiceCount: isFirstCashPayment, // invoice_count: count per invoice, not per installment
       });
       // Detect threshold crossing: only fire warn once (pre-payment was ok, post is warn).
-      // Avoids duplicate audit events and notifications on every subsequent payment above Rs 8L.
+      // Fire on the first payment that moves the customer out of the 'ok' band.
+      // 'ok' → 'warn': normal case (Rs 8L threshold crossed).
+      // 'ok' → 'block': single large payment skipped the warn band entirely (admin override).
+      // 'warn' → 'block': already notified; Story 5.6 handles the hard block.
       const prePaymentMonthlyPaise = pmlaResult.cumulativePaise - amountPaise;
-      crossedWarnThreshold = getPmlaThresholdStatus(prePaymentMonthlyPaise) !== 'warn'
-        && pmlaResult.status === 'warn';
+      const prePmlaStatus = getPmlaThresholdStatus(prePaymentMonthlyPaise);
+      crossedWarnThreshold = prePmlaStatus === 'ok' && pmlaResult.status !== 'ok';
 
       // ── H. Insert payment record ───────────────────────────────────────────
       try {
