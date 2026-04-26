@@ -299,6 +299,7 @@ export class PaymentService {
               cumulativePaise: pmlaResult.cumulativePaise.toString(),
               month:           pmlaResult.monthStr,
               customerId:      customerId ?? null,
+              customerPhone:   customerPhone ?? null,
             }),
           ],
         );
