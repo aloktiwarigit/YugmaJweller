@@ -8,6 +8,7 @@ import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import type { CreateCustomerDto, UpdateCustomerDto, CustomerResponse } from '@goldsmith/shared';
 import { CrmRepository } from './crm.repository';
 import type { CustomerRow } from './crm.repository';
+import { CrmSearchService } from './crm-search.service';
 
 function normalizePhone(raw: string): string {
   const stripped = raw.replace(/[\s-]/g, '');
@@ -33,6 +34,7 @@ export class CrmService {
     @Inject('PG_POOL') private readonly pool: Pool,
     @Inject('KMS_ADAPTER') private readonly kms: KmsAdapter,
     private readonly repo: CrmRepository,
+    @Inject(CrmSearchService) private readonly searchSvc: CrmSearchService,
   ) {}
 
   async createCustomer(ctx: AuthenticatedTenantContext, dto: CreateCustomerDto): Promise<CustomerResponse> {
@@ -61,6 +63,10 @@ export class CrmService {
     void auditLog(this.pool, {
       action: AuditAction.CRM_CUSTOMER_CREATED, subjectType: 'customer', subjectId: row.id, actorUserId: ctx.userId,
       after: { phone, name: dto.name, pan_captured: panCiphertext !== null ? 'PAN_REDACTED' : null, pan_key_id: panKeyId ?? undefined },
+    }).catch(() => undefined);
+    void this.searchSvc.indexCustomer(ctx.shopId, {
+      id: row.id, name: row.name, phoneLast4: row.phone.slice(-4),
+      city: row.city, updatedAt: Date.now(),
     }).catch(() => undefined);
     return rowToResponse(row);
   }
@@ -96,6 +102,10 @@ export class CrmService {
     void auditLog(this.pool, {
       action: AuditAction.CRM_CUSTOMER_UPDATED, subjectType: 'customer', subjectId: id, actorUserId: ctx.userId,
       after: { fieldsUpdated: Object.keys(dto).filter(k => k !== 'pan'), panUpdated: 'pan' in dto },
+    }).catch(() => undefined);
+    void this.searchSvc.indexCustomer(ctx.shopId, {
+      id: row.id, name: row.name, phoneLast4: row.phone.slice(-4),
+      city: row.city, updatedAt: Date.now(),
     }).catch(() => undefined);
     return rowToResponse(row);
   }

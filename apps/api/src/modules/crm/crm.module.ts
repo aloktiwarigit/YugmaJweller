@@ -6,11 +6,13 @@ import {
 import { BullModule, InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from '@goldsmith/queue';
 import { LocalKMS, DevKmsAdapter } from '@goldsmith/crypto-envelope';
+import { SearchModule } from '@goldsmith/integrations-search';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
 import { CrmController } from './crm.controller';
 import { CrmService } from './crm.service';
 import { CrmRepository } from './crm.repository';
+import { CrmSearchService } from './crm-search.service';
 import { FamilyService } from './family.service';
 import { FamilyRepository } from './family.repository';
 import { HistoryService } from './history.service';
@@ -26,11 +28,13 @@ const OCCASION_REMINDER_CRON = '30 2 * * *';
   imports: [
     AuthModule,
     BillingModule,
+    SearchModule,
     BullModule.registerQueue({ name: 'occasion-reminder' }),
   ],
   controllers: [CrmController],
   providers: [
     CrmService, CrmRepository,
+    CrmSearchService,
     FamilyService, FamilyRepository,
     HistoryService,
     BalanceService,
@@ -51,7 +55,7 @@ const OCCASION_REMINDER_CRON = '30 2 * * *';
       },
     },
   ],
-  exports: [CrmService, FamilyService, NotesService, OccasionsService],
+  exports: [CrmService, CrmSearchService, FamilyService, NotesService, OccasionsService],
 })
 export class CrmModule implements OnModuleInit {
   private readonly logger = new Logger(CrmModule.name);
