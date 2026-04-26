@@ -6,6 +6,7 @@ import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext } from '@goldsmith/tenant-context';
 import { CreateInvoiceSchema, RecordCashPaymentSchema } from '@goldsmith/shared';
 import type { CreateInvoiceDtoType, InvoiceResponse, RecordCashPaymentDto } from '@goldsmith/shared';
+import type { CashPaymentResult } from './payment.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { TenantWalkerRoute } from '../../common/decorators/tenant-walker-route.decorator';
@@ -87,7 +88,7 @@ export class BillingController {
     @Param('id', ParseUUIDPipe) invoiceId: string,
     @Headers('idempotency-key') idempotencyKey: string,
     @Body(new ZodValidationPipe(RecordCashPaymentSchema)) dto: RecordCashPaymentDto,
-  ): Promise<void> {
+  ): Promise<CashPaymentResult> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     if (!idempotencyKey?.trim()) {
       throw new BadRequestException({ code: 'payment.idempotency_key_required' });
@@ -99,6 +100,7 @@ export class BillingController {
       dto.override,
     );
   }
+
 
   // Tax-audit PAN decryption — OWNER only, rate-limited 10 req/hr per shop.
   // PAN is never included in audit log; only access timestamp + actor.
