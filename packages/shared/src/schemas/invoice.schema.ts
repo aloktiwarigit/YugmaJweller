@@ -102,6 +102,10 @@ export const InvoiceResponseSchema = z.object({
   sgstMakingPaise:    PaiseString.optional(),
   igstMetalPaise:     PaiseString.optional(),
   igstMakingPaise:    PaiseString.optional(),
+  // Void fields (null/absent unless invoice is VOIDED)
+  voidedAt:           z.string().datetime().nullable().optional(),
+  voidedByUserId:     Uuid.nullable().optional(),
+  voidReason:         z.string().nullable().optional(),
 });
 
 export type InvoiceItemResponse = z.infer<typeof InvoiceItemResponseSchema>;

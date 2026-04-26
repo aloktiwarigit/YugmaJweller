@@ -11,6 +11,7 @@ import { BillingController } from './billing.controller';
 import { BillingService }    from './billing.service';
 import { BillingRepository } from './billing.repository';
 import { PaymentService }    from './payment.service';
+import { VoidService }       from './void.service';
 import { CompliancePmlaProcessor } from '../../workers/compliance-pmla.processor';
 
 @Module({
@@ -25,6 +26,7 @@ import { CompliancePmlaProcessor } from '../../workers/compliance-pmla.processor
     BillingService,
     BillingRepository,
     PaymentService,
+    VoidService,
     CompliancePmlaProcessor,
     SettingsRepository,
     {

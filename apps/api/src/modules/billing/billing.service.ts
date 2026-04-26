@@ -111,6 +111,9 @@ function rowToInvoiceResponse(invoice: InvoiceRow, items: InvoiceItemRow[]): Inv
     sgstMakingPaise:   invoice.sgst_making_paise.toString(),
     igstMetalPaise:    invoice.igst_metal_paise.toString(),
     igstMakingPaise:   invoice.igst_making_paise.toString(),
+    voidedAt:          invoice.voided_at?.toISOString() ?? null,
+    voidedByUserId:    invoice.voided_by_user_id ?? null,
+    voidReason:        invoice.void_reason ?? null,
   };
 }
 
@@ -604,6 +607,10 @@ export class BillingService {
     }).catch(() => undefined);
 
     return { pan: plaintext };
+  }
+
+  toInvoiceResponse(invoice: InvoiceRow): InvoiceResponse {
+    return rowToInvoiceResponse(invoice, []);
   }
 
   async getInvoice(id: string): Promise<InvoiceResponse> {
