@@ -49,7 +49,16 @@ import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
       provide: 'PAYMENTS_ADAPTER',
       useFactory: () => {
         const adapter = process.env['PAYMENTS_ADAPTER'] ?? 'stub';
-        return adapter === 'razorpay' ? new RazorpayAdapter() : new StubPaymentsAdapter();
+        if (adapter === 'razorpay') return new RazorpayAdapter();
+        // Fail-closed in production: stub adapter bypasses all signature verification.
+        // Guard prevents misconfigured containers from accepting unsigned webhooks.
+        if (process.env['NODE_ENV'] === 'production') {
+          throw new Error(
+            'PAYMENTS_ADAPTER must be set to "razorpay" in production. ' +
+            'The stub adapter accepts any webhook signature and must never run in production.',
+          );
+        }
+        return new StubPaymentsAdapter();
       },
     },
     {

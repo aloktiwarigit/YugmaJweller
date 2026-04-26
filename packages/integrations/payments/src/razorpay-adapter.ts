@@ -23,20 +23,24 @@ export class RazorpayAdapter implements PaymentsPort {
   }
 
   // HMAC-SHA256 over the raw request body.
-  // crypto.timingSafeEqual prevents timing-oracle attacks on the signature comparison.
-  // Both buffers are derived from hex-encoded HMAC output → always 32 bytes; equal length guaranteed.
+  // Security design:
+  //   - Both sides are decoded as hex into 32-byte Buffers before comparison.
+  //   - This avoids the length-oracle that string comparison creates (a 64-char
+  //     hex HMAC always produces a 32-byte Buffer; any non-hex input decodes to
+  //     fewer bytes, so a length mismatch reveals nothing about the secret).
+  //   - crypto.timingSafeEqual ensures constant-time comparison for valid-length inputs.
   verifyWebhookSignature(rawBody: string, signature: string): boolean {
-    const expectedHex = crypto
+    const expectedBuf = crypto
       .createHmac('sha256', this.webhookSecret)
       .update(rawBody)
-      .digest('hex');
+      .digest();                            // raw 32-byte Buffer, never hex string
 
-    // Normalize to same encoding before timingSafeEqual to avoid length mismatch rejection
-    // being exploitable as an oracle (attacker learns whether their sig is even valid hex).
-    const expectedBuf = Buffer.from(expectedHex, 'utf8');
-    const actualBuf   = Buffer.from(signature, 'utf8');
+    // Decode the incoming hex signature to the same 32-byte representation.
+    // If the signature is not valid 64-char hex, actualBuf will be shorter than 32
+    // bytes and we return false — no oracle (both sides are always decoded as binary).
+    const actualBuf = Buffer.from(signature ?? '', 'hex');
 
-    if (expectedBuf.length !== actualBuf.length) return false;
+    if (actualBuf.length !== expectedBuf.length) return false;
     return crypto.timingSafeEqual(expectedBuf, actualBuf);
   }
 

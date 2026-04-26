@@ -2,6 +2,7 @@ import {
   Controller,
   Headers,
   Inject,
+  InternalServerErrorException,
   Logger,
   Post,
   Req,
@@ -18,7 +19,10 @@ export interface RazorpayWebhookJob {
   event: string;
   razorpayPaymentId: string;
   razorpayOrderId: string;
-  shopId: string;
+  // shopId is NOT trusted from the webhook payload — it is resolved from the
+  // payments table in confirmWebhookPayment using razorpay_order_id.
+  // Kept here for logging/debugging only.
+  shopIdHint: string;
   rawPayload: string;
 }
 
@@ -38,9 +42,13 @@ export class RazorpayWebhookController {
     @Req() req: Request & { rawBody?: Buffer },
     @Headers('x-razorpay-signature') signature: string,
   ): Promise<{ status: 'ok' }> {
-    // rawBody is populated only if NestJS was created with { rawBody: true }
-    // and the route has the express raw-body middleware applied.
-    const rawBody = req.rawBody?.toString('utf8') ?? JSON.stringify(req.body);
+    // Security: rawBody must be available; JSON.stringify(req.body) is NOT a valid
+    // substitute because re-serialization changes byte layout, breaking the HMAC.
+    if (!req.rawBody) {
+      this.logger.error('rawBody is undefined — NestJS rawBody:true not configured or middleware stripped it');
+      throw new InternalServerErrorException({ code: 'webhook.raw_body_unavailable' });
+    }
+    const rawBody = req.rawBody.toString('utf8');
 
     if (!signature) {
       throw new UnauthorizedException({ code: 'webhook.missing_signature' });
@@ -67,11 +75,14 @@ export class RazorpayWebhookController {
       const entity = paymentEntity?.['entity'] as Record<string, unknown> | undefined;
       const razorpayPaymentId = typeof entity?.['id'] === 'string' ? entity['id'] : '';
       const razorpayOrderId   = typeof entity?.['order_id'] === 'string' ? entity['order_id'] : '';
-      const notes             = (entity?.['notes'] as Record<string, string> | undefined) ?? {};
-      const shopId            = notes['shopId'] ?? '';
+      // notes.shopId is UNTRUSTED — kept only as a debugging hint in the job payload.
+      // The actual shopId used for DB writes is resolved inside confirmWebhookPayment
+      // by looking up the payments row via razorpay_order_id.
+      const notes    = (entity?.['notes'] as Record<string, string> | undefined) ?? {};
+      const shopIdHint = notes['shopId'] ?? '';
 
-      if (!razorpayPaymentId || !razorpayOrderId || !shopId) {
-        this.logger.warn({ event, razorpayPaymentId, razorpayOrderId, shopId }, 'Webhook missing required fields — skipping enqueue');
+      if (!razorpayPaymentId || !razorpayOrderId) {
+        this.logger.warn({ event, razorpayPaymentId, razorpayOrderId }, 'Webhook missing payment IDs — skipping enqueue');
         return { status: 'ok' };
       }
 
@@ -79,7 +90,7 @@ export class RazorpayWebhookController {
         event,
         razorpayPaymentId,
         razorpayOrderId,
-        shopId,
+        shopIdHint,
         rawPayload: rawBody,
       };
 

@@ -452,21 +452,75 @@ export class PaymentService {
     return { id: paymentId!, invoiceId, shopId: ctx.shopId, method: dto.method, amountPaise: dto.amountPaise, status: 'CONFIRMED', webhookStatus: 'NA', recordedAt: new Date() };
   }
 
-  async confirmWebhookPayment(razorpayPaymentId: string, razorpayOrderId: string, shopId: string): Promise<void> {
+  // Confirms a payment received via Razorpay webhook.
+  // Security design:
+  //   1. shopId is NOT taken from the webhook payload. It is looked up from the DB
+  //      using razorpay_order_id — the row was written at initiateUpiPayment time by
+  //      the authenticated tenant. This prevents cross-tenant payment injection via
+  //      attacker-controlled notes.shopId in the webhook body.
+  //   2. All DML runs under tenant GUC (SET LOCAL app.current_shop_id) so RLS
+  //      policies on payments and audit_events are enforced as a second fence.
+  //   3. Redis NX lock deduplicates concurrent or repeated webhook deliveries.
+  async confirmWebhookPayment(razorpayPaymentId: string, razorpayOrderId: string, _shopIdFromPayload: string): Promise<void> {
     const redisKey = `payments:webhook:${razorpayPaymentId}`;
+
+    // SET NX: only the first caller proceeds.
     const acquired = await this.redis.set(redisKey, '1', 'EX', WEBHOOK_IDEM_TTL_SEC, 'NX');
     if (!acquired) return;
-    const res = await this.pool.query<{ id: string; invoice_id: string }>(`SELECT id, invoice_id FROM payments WHERE razorpay_order_id = $1 AND shop_id = $2 AND status = 'PENDING' LIMIT 1`, [razorpayOrderId, shopId]);
-    if (!res.rows[0]) { await this.redis.del(redisKey); return; }
-    const { id: paymentId, invoice_id: invoiceId } = res.rows[0];
+
+    // Derive the real shopId from the payment row — do NOT trust the payload.
+    // The row was written by the authenticated tenant at order-initiation time.
+    const res = await this.pool.query<{ id: string; invoice_id: string; shop_id: string }>(
+      `SELECT id, invoice_id, shop_id
+       FROM payments
+       WHERE razorpay_order_id = $1
+         AND status            = 'PENDING'
+       LIMIT 1`,
+      [razorpayOrderId],
+    );
+
+    if (!res.rows[0]) {
+      // No matching PENDING payment — release lock so a future retry can try again.
+      await this.redis.del(redisKey);
+      return;
+    }
+
+    const { id: paymentId, invoice_id: invoiceId, shop_id: dbShopId } = res.rows[0];
+
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query(`UPDATE payments SET status='CONFIRMED', webhook_status='CAPTURED', razorpay_payment_id=$1, webhook_received_at=now() WHERE id=$2`, [razorpayPaymentId, paymentId]);
-      await client.query(`INSERT INTO audit_events (shop_id, actor_user_id, action, subject_type, subject_id, metadata) VALUES ($1, NULL, $2, $3, $4, $5)`, [shopId, AuditAction.PAYMENT_RECORDED, 'invoice', invoiceId, JSON.stringify({ source: 'razorpay_webhook', razorpayPaymentId, razorpayOrderId })]);
+      // Set tenant GUC so RLS policies on payments and audit_events are enforced.
+      await client.query(`SET LOCAL app.current_shop_id = '${dbShopId}'`);
+      await client.query(
+        `UPDATE payments
+         SET status              = 'CONFIRMED',
+             webhook_status      = 'CAPTURED',
+             razorpay_payment_id = $1,
+             webhook_received_at = now()
+         WHERE id = $2`,
+        [razorpayPaymentId, paymentId],
+      );
+      await client.query(
+        `INSERT INTO audit_events
+           (shop_id, actor_user_id, action, subject_type, subject_id, metadata)
+         VALUES (current_setting('app.current_shop_id', true)::uuid, NULL, $1, $2, $3, $4)`,
+        [
+          AuditAction.PAYMENT_RECORDED,
+          'invoice',
+          invoiceId,
+          JSON.stringify({ source: 'razorpay_webhook', razorpayPaymentId, razorpayOrderId }),
+        ],
+      );
       await client.query('COMMIT');
-    } catch (err) { await client.query('ROLLBACK'); await this.redis.del(redisKey); throw err; }
-    finally { client.release(); }
+    } catch (err) {
+      await client.query('ROLLBACK');
+      // Release the lock so the worker can retry.
+      await this.redis.del(redisKey);
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   async listPayments(invoiceId: string): Promise<Payment[]> {

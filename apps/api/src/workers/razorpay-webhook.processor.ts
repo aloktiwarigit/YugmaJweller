@@ -18,11 +18,13 @@ export class RazorpayWebhookProcessor extends WorkerHost {
   }
 
   async process(job: Job<RazorpayWebhookJob>): Promise<void> {
-    const { event, razorpayPaymentId, razorpayOrderId, shopId } = job.data;
+    const { event, razorpayPaymentId, razorpayOrderId, shopIdHint } = job.data;
 
     if (event === 'payment.captured') {
-      this.logger.log({ razorpayPaymentId, razorpayOrderId, shopId }, 'Processing payment.captured webhook');
-      await this.paymentService.confirmWebhookPayment(razorpayPaymentId, razorpayOrderId, shopId);
+      this.logger.log({ razorpayPaymentId, razorpayOrderId, shopIdHint }, 'Processing payment.captured webhook');
+      // shopIdHint is NOT used for DB writes — confirmWebhookPayment derives the real
+      // shopId from the payments table via razorpay_order_id.
+      await this.paymentService.confirmWebhookPayment(razorpayPaymentId, razorpayOrderId, shopIdHint);
       this.logger.log({ razorpayPaymentId }, 'Webhook payment confirmed');
     }
   }
@@ -34,9 +36,9 @@ export class RazorpayWebhookProcessor extends WorkerHost {
       error.stack,
     );
 
-    // After exhausting all retries (job.attemptsMade === job.opts.attempts), audit PAYMENT_FAILED.
+    // After exhausting all retries, audit PAYMENT_FAILED.
     if (job && job.attemptsMade >= (job.opts.attempts ?? 3)) {
-      const { razorpayPaymentId, razorpayOrderId, shopId } = job.data;
+      const { razorpayPaymentId, razorpayOrderId, shopIdHint } = job.data;
       try {
         await auditLog(this.pool, {
           action:      AuditAction.PAYMENT_FAILED,
@@ -46,7 +48,7 @@ export class RazorpayWebhookProcessor extends WorkerHost {
           after: {
             razorpayPaymentId,
             razorpayOrderId,
-            shopId,
+            shopIdHint,
             error:        error.message,
             attemptsMade: String(job.attemptsMade),
           },
