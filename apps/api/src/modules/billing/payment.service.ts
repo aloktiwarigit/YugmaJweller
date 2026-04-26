@@ -22,7 +22,7 @@ export interface CashPaymentOverride {
 export interface PmlaWarningDto {
   cumulativePaise: string;
   monthStr:        string;
-  status:          'warn';
+  status:          'warn' | 'block'; // 'block' when ok→10L+ without intermediate warn step
 }
 
 export interface CashPaymentResult {
@@ -337,7 +337,7 @@ export class PaymentService {
           pmlaWarning: {
             cumulativePaise: capturedPmla.cumulativePaise.toString(),
             monthStr:        capturedPmla.monthStr,
-            status:          'warn',
+            status:          capturedPmla.status as 'warn' | 'block',
           },
         }
       : {};
