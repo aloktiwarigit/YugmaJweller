@@ -9,6 +9,8 @@ import { CrmService } from './crm.service';
 import { FamilyService } from './family.service';
 import { NotesService } from './notes.service';
 import type { NoteResponse } from './notes.service';
+import { OccasionsService } from './occasions.service';
+import type { OccasionResponse, AddOccasionDto } from './occasions.service';
 
 @Controller('/api/v1/crm')
 export class CrmController {
@@ -16,6 +18,7 @@ export class CrmController {
     private readonly svc: CrmService,
     private readonly familySvc: FamilyService,
     private readonly notesSvc: NotesService,
+    private readonly occasionsSvc: OccasionsService,
   ) {}
 
   @Post('customers') @Roles('shop_admin', 'shop_manager', 'shop_staff')
@@ -75,5 +78,23 @@ export class CrmController {
   async deleteNote(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) _id: string, @Param('noteId', ParseUUIDPipe) noteId: string): Promise<void> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.notesSvc.deleteNote(ctx, noteId, ctx.userId, ctx.role);
+  }
+
+  @Post('customers/:id/occasions') @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async addOccasion(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: AddOccasionDto): Promise<OccasionResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.occasionsSvc.addOccasion(ctx, id, dto);
+  }
+
+  @Get('customers/:id/occasions') @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async listOccasions(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string): Promise<OccasionResponse[]> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.occasionsSvc.listOccasions(ctx, id);
+  }
+
+  @Delete('customers/:id/occasions/:occId') @Roles('shop_admin', 'shop_manager')
+  async deleteOccasion(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) _id: string, @Param('occId', ParseUUIDPipe) occId: string): Promise<void> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.occasionsSvc.deleteOccasion(ctx, occId);
   }
 }
