@@ -134,10 +134,8 @@ export class VoidService {
                updated_at       = now()
            WHERE shop_id = current_setting('app.current_shop_id', true)::uuid
              AND aggregate_date = $2
-             AND (
-               (customer_id = $3 AND $3 IS NOT NULL)
-               OR (customer_id IS NULL AND customer_phone = $4 AND $4 IS NOT NULL)
-             )`,
+             AND customer_id    IS NOT DISTINCT FROM $3
+             AND customer_phone IS NOT DISTINCT FROM $4`,
           [pay.amount_paise, aggDateStr, invoice.customer_id ?? null, invoice.customer_phone ?? null],
         );
       }
