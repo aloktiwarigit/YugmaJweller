@@ -32,14 +32,14 @@ export class OccasionReminderProcessor extends WorkerHost {
 
     this.logger.log(`occasion-reminder daily-check for IST date=${todayIST}`);
 
-    // Find occasions due today OR in reminder_days days
-    // Use a raw pool connection (no tenant context — this is a platform-level scan)
-    const client = await this.pool.connect(); // nosemgrep: goldsmith.require-tenant-transaction — platform worker, cross-tenant scan
+    // Cross-tenant scan via SECURITY DEFINER fns (migration 0035).
+    // Raw app_user SELECT would silently return zero rows: provider.ts seeds
+    // app.current_shop_id with a poison UUID on every new pool client, and
+    // customer_occasions is FORCE RLS. The fns run as platform_admin (BYPASSRLS).
+    const client = await this.pool.connect(); // nosemgrep: goldsmith.require-tenant-transaction — platform worker, cross-tenant scan via SECURITY DEFINER fns
     try {
       const r = await client.query<OccasionReminderRow>(
-        `SELECT * FROM customer_occasions
-         WHERE next_occurrence = $1::date
-            OR next_occurrence = ($1::date + reminder_days * INTERVAL '1 day')`,
+        `SELECT * FROM get_due_occasions($1::date)`,
         [todayIST],
       );
 
@@ -49,23 +49,8 @@ export class OccasionReminderProcessor extends WorkerHost {
           `crm.occasion_reminder: shopId=${occ.shop_id} customerId=${occ.customer_id} type=${occ.occasion_type} next=${occ.next_occurrence}`,
         );
 
-        // Advance next_occurrence to next year
-        const [year, month, day] = occ.next_occurrence.split('-').map(Number);
-        const nextYear = year + 1;
-        const isLeap = (y: number): boolean =>
-          (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
-        let newMonth = month;
-        let newDay = day;
-        if (month === 2 && day === 29 && !isLeap(nextYear)) {
-          newMonth = 3;
-          newDay = 1;
-        }
-        const newDate = `${nextYear}-${pad(newMonth)}-${pad(newDay)}`;
-
-        await client.query(
-          `UPDATE customer_occasions SET next_occurrence = $1::date WHERE id = $2`,
-          [newDate, occ.id],
-        );
+        // Advance to next year via SECURITY DEFINER fn (Feb 29 → Mar 1 fallback inside).
+        await client.query(`SELECT advance_occasion_to_next_year($1::uuid)`, [occ.id]);
       }
 
       this.logger.log(`occasion-reminder: processed ${r.rows.length} occasions`);
