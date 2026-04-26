@@ -5,7 +5,9 @@ import {
   NotFoundException,
   BadRequestException,
   UnprocessableEntityException,
+  Optional,
 } from '@nestjs/common';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Pool } from 'pg';
 import type { Redis } from '@goldsmith/cache';
 import { computeProductPrice } from '@goldsmith/money';

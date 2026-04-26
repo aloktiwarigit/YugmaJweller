@@ -7,11 +7,14 @@ import { BullModule, InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from '@goldsmith/queue';
 import { LocalKMS, DevKmsAdapter } from '@goldsmith/crypto-envelope';
 import { AuthModule } from '../auth/auth.module';
+import { BillingModule } from '../billing/billing.module';
 import { CrmController } from './crm.controller';
 import { CrmService } from './crm.service';
 import { CrmRepository } from './crm.repository';
 import { FamilyService } from './family.service';
 import { FamilyRepository } from './family.repository';
+import { HistoryService } from './history.service';
+import { BalanceService } from './balance.service';
 import { NotesService } from './notes.service';
 import { OccasionsService } from './occasions.service';
 import { OccasionReminderProcessor } from '../../workers/occasion-reminder.processor';
@@ -22,12 +25,15 @@ const OCCASION_REMINDER_CRON = '30 2 * * *';
 @Module({
   imports: [
     AuthModule,
+    BillingModule,
     BullModule.registerQueue({ name: 'occasion-reminder' }),
   ],
   controllers: [CrmController],
   providers: [
     CrmService, CrmRepository,
     FamilyService, FamilyRepository,
+    HistoryService,
+    BalanceService,
     NotesService,
     OccasionsService,
     OccasionReminderProcessor,

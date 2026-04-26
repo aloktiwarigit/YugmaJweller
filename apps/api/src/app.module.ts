@@ -1,6 +1,7 @@
 import { Module, type ExecutionContext, type CallHandler, Injectable, type NestInterceptor } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { Observable } from 'rxjs';
 import { TenantInterceptor } from '@goldsmith/tenant-context';
 import { HealthController } from './health.controller';
@@ -42,6 +43,7 @@ class ConditionalTenantInterceptor implements NestInterceptor {
 
 @Module({
   imports: [
+    EventEmitterModule.forRoot({ wildcard: false }),
     BullModule.forRoot({
       connection: (() => {
         const u = new URL(process.env['REDIS_URL'] ?? 'redis://localhost:6379');
