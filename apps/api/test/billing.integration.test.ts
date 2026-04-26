@@ -528,9 +528,11 @@ describe('VoidService — invoice void + credit note (integration)', () => {
     const invoiceId = await createTestInvoice(productId);
 
     // Verify product quantity decremented to 0 after invoice creation
-    const before = await withTenantTx(pool, (tx) =>
-      tx.query<{ quantity: number; status: string }>(`SELECT quantity, status FROM products WHERE id = $1`, [productId])
-        .then((r) => r.rows[0]!),
+    const before = await tenantContext.runWith(ctxOwnerA, () =>
+      withTenantTx(pool, (tx) =>
+        tx.query<{ quantity: number; status: string }>(`SELECT quantity, status FROM products WHERE id = $1`, [productId])
+          .then((r) => r.rows[0]!),
+      ),
     );
     expect(before.quantity).toBe(0);
     expect(before.status).toBe('SOLD');
@@ -544,19 +546,23 @@ describe('VoidService — invoice void + credit note (integration)', () => {
     expect(voided.voided_by_user_id).toBe(USER_A);
 
     // Verify product quantity restored to 1, status back to IN_STOCK
-    const after = await withTenantTx(pool, (tx) =>
-      tx.query<{ quantity: number; status: string }>(`SELECT quantity, status FROM products WHERE id = $1`, [productId])
-        .then((r) => r.rows[0]!),
+    const after = await tenantContext.runWith(ctxOwnerA, () =>
+      withTenantTx(pool, (tx) =>
+        tx.query<{ quantity: number; status: string }>(`SELECT quantity, status FROM products WHERE id = $1`, [productId])
+          .then((r) => r.rows[0]!),
+      ),
     );
     expect(after.quantity).toBe(1);
     expect(after.status).toBe('IN_STOCK');
 
     // Verify stock movement ADJUSTMENT_IN was recorded
-    const movements = await withTenantTx(pool, (tx) =>
-      tx.query<{ type: string; reason: string }>(
-        `SELECT type, reason FROM stock_movements WHERE product_id = $1 AND type = 'ADJUSTMENT_IN'`,
-        [productId],
-      ).then((r) => r.rows),
+    const movements = await tenantContext.runWith(ctxOwnerA, () =>
+      withTenantTx(pool, (tx) =>
+        tx.query<{ type: string; reason: string }>(
+          `SELECT type, reason FROM stock_movements WHERE product_id = $1 AND type = 'ADJUSTMENT_IN'`,
+          [productId],
+        ).then((r) => r.rows),
+      ),
     );
     expect(movements.length).toBeGreaterThan(0);
     expect(movements[0]!.reason).toContain(invoiceId);
@@ -567,10 +573,12 @@ describe('VoidService — invoice void + credit note (integration)', () => {
     const invoiceId = await createTestInvoice(productId);
 
     // Backdate the invoice issued_at to 25h ago to simulate expired window
-    await withTenantTx(pool, (tx) =>
-      tx.query(
-        `UPDATE invoices SET issued_at = now() - interval '25 hours' WHERE id = $1`,
-        [invoiceId],
+    await tenantContext.runWith(ctxOwnerA, () =>
+      withTenantTx(pool, (tx) =>
+        tx.query(
+          `UPDATE invoices SET issued_at = now() - interval '25 hours' WHERE id = $1`,
+          [invoiceId],
+        ),
       ),
     );
 
@@ -604,10 +612,12 @@ describe('VoidService — invoice void + credit note (integration)', () => {
     const invoiceId = await createTestInvoice(productId);
 
     // Backdate issued_at to 26h ago
-    await withTenantTx(pool, (tx) =>
-      tx.query(
-        `UPDATE invoices SET issued_at = now() - interval '26 hours' WHERE id = $1`,
-        [invoiceId],
+    await tenantContext.runWith(ctxOwnerA, () =>
+      withTenantTx(pool, (tx) =>
+        tx.query(
+          `UPDATE invoices SET issued_at = now() - interval '26 hours' WHERE id = $1`,
+          [invoiceId],
+        ),
       ),
     );
 
@@ -626,8 +636,10 @@ describe('VoidService — invoice void + credit note (integration)', () => {
   it('cannot issue duplicate credit note — 409 already_issued', async () => {
     const productId = await seedProduct({ ctx: ctxOwnerA, shopId: SHOP_A, sku: `cn-dup-${newKey()}` });
     const invoiceId = await createTestInvoice(productId);
-    await withTenantTx(pool, (tx) =>
-      tx.query(`UPDATE invoices SET issued_at = now() - interval '26 hours' WHERE id = $1`, [invoiceId]),
+    await tenantContext.runWith(ctxOwnerA, () =>
+      withTenantTx(pool, (tx) =>
+        tx.query(`UPDATE invoices SET issued_at = now() - interval '26 hours' WHERE id = $1`, [invoiceId]),
+      ),
     );
     // First credit note
     await tenantContext.runWith(ctxOwnerA, () =>
