@@ -6,3 +6,8 @@
 -- Stored as JSONB so the caller gets the exact same cumulativePaise/monthStr/status
 -- that was returned on the first successful response, regardless of subsequent payments.
 ALTER TABLE payments ADD COLUMN pmla_warning_jsonb JSONB;
+
+-- Partial index for phone-only PMLA monthly lookups (consolidated from 5.5 Codex)
+CREATE INDEX idx_pmla_aggregates_monthly_phone
+  ON pmla_aggregates(shop_id, aggregate_month, customer_phone)
+  WHERE customer_id IS NULL;
