@@ -17,6 +17,7 @@ import { api } from '../../src/api/client';
 import type { InvoiceResponse, CreateInvoiceDtoType } from '@goldsmith/shared';
 import { PanPromptSheet } from '../../src/features/billing/components/PanPromptSheet';
 import type { PanSubmitPayload } from '../../src/features/billing/components/PanPromptSheet';
+import { InvoiceTypeToggle } from '../../src/features/billing/components/InvoiceTypeToggle';
 
 interface DraftLine extends BillingLineValue {
   product: BillingLineProduct;
@@ -35,6 +36,9 @@ function extractTotalPaise(errorBody: unknown): bigint {
 }
 
 export default function NewInvoiceScreen(): JSX.Element {
+  const [invoiceType, setInvoiceType] = useState<'B2C' | 'B2B_WHOLESALE'>('B2C');
+  const [buyerGstin, setBuyerGstin] = useState<string>('');
+  const [buyerBusinessName, setBuyerBusinessName] = useState<string>('');
   const [customerName, setCustomerName] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [lines, setLines] = useState<DraftLine[]>([]);
@@ -79,14 +83,20 @@ export default function NewInvoiceScreen(): JSX.Element {
         productId: l.productId,
         description: l.description,
         huid: l.huid,
-        makingChargePct: l.makingChargePct,
+        // B2B_WHOLESALE: omit makingChargePct so server-side WHOLESALE category lookup applies
+        ...(invoiceType !== 'B2B_WHOLESALE' ? { makingChargePct: l.makingChargePct } : {}),
         stoneChargesPaise: '0',
         hallmarkFeePaise: '0',
       })),
+      invoiceType,
+      ...(invoiceType === 'B2B_WHOLESALE' && buyerGstin.length === 15 ? { buyerGstin } : {}),
+      ...(invoiceType === 'B2B_WHOLESALE' && buyerBusinessName.trim()
+        ? { buyerBusinessName: buyerBusinessName.trim() }
+        : {}),
       ...(extra.pan ? { pan: extra.pan } : {}),
       ...(extra.form60Data ? { form60Data: extra.form60Data } : {}),
     }),
-    [customerName, customerPhone, lines],
+    [customerName, customerPhone, lines, invoiceType, buyerGstin, buyerBusinessName],
   );
 
   const onLineChange = useCallback((index: number, next: BillingLineValue) => {
@@ -98,6 +108,10 @@ export default function NewInvoiceScreen(): JSX.Element {
   }, []);
 
   const onSubmit = useCallback(() => {
+    if (invoiceType === 'B2B_WHOLESALE' && buyerGstin.length !== 15) {
+      Alert.alert('GSTIN 15 अक्षर का होना चाहिए');
+      return;
+    }
     if (!customerName.trim()) {
       Alert.alert('ग्राहक का नाम आवश्यक है');
       return;
@@ -107,7 +121,7 @@ export default function NewInvoiceScreen(): JSX.Element {
       return;
     }
     createInvoice.mutate(buildDto());
-  }, [customerName, lines, buildDto, createInvoice]);
+  }, [invoiceType, buyerGstin, customerName, lines, buildDto, createInvoice]);
 
   const onPanSubmit = useCallback(
     (payload: PanSubmitPayload) => {
@@ -125,6 +139,15 @@ export default function NewInvoiceScreen(): JSX.Element {
     <>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.title}>नया Invoice</Text>
+
+        <InvoiceTypeToggle
+          invoiceType={invoiceType}
+          buyerGstin={buyerGstin}
+          buyerBusinessName={buyerBusinessName}
+          onInvoiceTypeChange={setInvoiceType}
+          onBuyerGstinChange={setBuyerGstin}
+          onBuyerBusinessNameChange={setBuyerBusinessName}
+        />
 
         <View style={styles.card}>
           <Text style={styles.label}>ग्राहक का नाम *</Text>

@@ -34,13 +34,19 @@ export const Form60Schema = z.object({
 });
 
 export const CreateInvoiceSchema = z.object({
-  customerName:  z.string().min(1).max(200),
-  customerPhone: PhoneIndia.optional(),
-  lines:         z.array(InvoiceLineSchema).min(1).max(50),
+  customerName:      z.string().min(1).max(200),
+  customerPhone:     PhoneIndia.optional(),
+  lines:             z.array(InvoiceLineSchema).min(1).max(50),
   // PAN Rule 114B — required when total >= Rs 2,00,000; normalised to uppercase before sending
-  pan:           PanString.optional(),
-  form60Data:    Form60Schema.optional(),
-});
+  pan:               PanString.optional(),
+  form60Data:        Form60Schema.optional(),
+  invoiceType:       z.enum(['B2C', 'B2B_WHOLESALE']).default('B2C'),
+  buyerGstin:        z.string().length(15).optional(),
+  buyerBusinessName: z.string().min(2).max(200).optional(),
+}).refine(
+  (data) => data.invoiceType !== 'B2B_WHOLESALE' || data.buyerGstin != null,
+  { message: 'buyerGstin is required for B2B_WHOLESALE invoices', path: ['buyerGstin'] },
+);
 
 export type CreateInvoiceDtoType = z.infer<typeof CreateInvoiceSchema>;
 export type InvoiceLineDtoType   = z.infer<typeof InvoiceLineSchema>;
@@ -86,6 +92,16 @@ export const InvoiceResponseSchema = z.object({
   createdAt:          z.string().datetime(),
   updatedAt:          z.string().datetime(),
   lines:              z.array(InvoiceItemResponseSchema),
+  // B2B fields (null/absent for B2C invoices)
+  buyerGstin:         z.string().nullable().optional(),
+  buyerBusinessName:  z.string().nullable().optional(),
+  gstTreatment:       z.enum(['CGST_SGST', 'IGST']).optional(),
+  cgstMetalPaise:     PaiseString.optional(),
+  sgstMetalPaise:     PaiseString.optional(),
+  cgstMakingPaise:    PaiseString.optional(),
+  sgstMakingPaise:    PaiseString.optional(),
+  igstMetalPaise:     PaiseString.optional(),
+  igstMakingPaise:    PaiseString.optional(),
 });
 
 export type InvoiceItemResponse = z.infer<typeof InvoiceItemResponseSchema>;

@@ -27,6 +27,17 @@ export const invoices = tenantScopedTable('invoices', {
   form60_key_id:        text('form60_key_id'),
   // Section 269ST supervisor override metadata — stored when OWNER/MANAGER overrides cash-cap block
   compliance_overrides_jsonb: jsonb('compliance_overrides_jsonb'),
+  // B2B wholesale fields (null for B2C invoices)
+  buyer_gstin:          text('buyer_gstin'),
+  buyer_business_name:  text('buyer_business_name'),
+  seller_state_code:    text('seller_state_code').notNull().default('09'),
+  gst_treatment:        text('gst_treatment').notNull().default('CGST_SGST'),
+  cgst_metal_paise:     bigint('cgst_metal_paise',   { mode: 'bigint' }).notNull().default(0n),
+  sgst_metal_paise:     bigint('sgst_metal_paise',   { mode: 'bigint' }).notNull().default(0n),
+  cgst_making_paise:    bigint('cgst_making_paise',  { mode: 'bigint' }).notNull().default(0n),
+  sgst_making_paise:    bigint('sgst_making_paise',  { mode: 'bigint' }).notNull().default(0n),
+  igst_metal_paise:     bigint('igst_metal_paise',   { mode: 'bigint' }).notNull().default(0n),
+  igst_making_paise:    bigint('igst_making_paise',  { mode: 'bigint' }).notNull().default(0n),
   created_at:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updated_at:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

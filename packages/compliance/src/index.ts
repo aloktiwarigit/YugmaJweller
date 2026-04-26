@@ -18,3 +18,6 @@ export {
   buildCashCapOverride,
 } from './cash-cap/section-269st';
 export type { CashCapCheckInput, CashCapOverride, OverrideInput } from './cash-cap/section-269st';
+export { validateGstinFormat, normalizeGstin, getStateCodeFromGstin } from './gstin';
+export type { GstTreatment, B2BGstBreakdown } from './gst/b2b-treatment';
+export { determineGstTreatment, applyB2BGstTreatment } from './gst/b2b-treatment';
