@@ -51,7 +51,7 @@ export function CashCapBlockModal({
   onSplitMethod,
   onOverride,
   onDismiss,
-}: CashCapBlockModalProps) {
+}: CashCapBlockModalProps): React.JSX.Element {
   const [justification, setJustification] = useState('');
   const [showOverride, setShowOverride]   = useState(false);
   const slideAnim = useRef(new Animated.Value(300)).current;

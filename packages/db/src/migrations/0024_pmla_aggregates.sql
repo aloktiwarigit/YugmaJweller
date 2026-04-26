@@ -24,8 +24,10 @@ CREATE TABLE pmla_aggregates (
 );
 
 ALTER TABLE pmla_aggregates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pmla_aggregates FORCE ROW LEVEL SECURITY;
 CREATE POLICY pmla_aggregates_tenant ON pmla_aggregates
-  USING (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
 
 GRANT SELECT, INSERT, UPDATE ON pmla_aggregates TO app_user;
 
