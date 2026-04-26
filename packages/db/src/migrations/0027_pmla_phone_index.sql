@@ -1,4 +1,4 @@
--- Migration 0026: Partial index for phone-only PMLA monthly lookups
+-- Migration 0027: Partial index for phone-only PMLA monthly lookups
 -- Story 5.5 — added after Codex review
 --
 -- The monthly SUM query in trackPmlaCumulative uses:
