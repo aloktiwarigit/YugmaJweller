@@ -50,7 +50,9 @@ const FETCH_OR_INIT_AGGREGATE_SQL = `
   )
   ON CONFLICT ON CONSTRAINT pmla_aggregates_unique
   DO UPDATE SET updated_at = pmla_aggregates.updated_at
-  RETURNING cash_total_paise
+  RETURNING cash_total_paise,
+            aggregate_date::text AS aggregate_date,
+            aggregate_month
 `;
 
 // Idempotency check: validates key + invoice_id + amount_paise so a client
