@@ -130,12 +130,13 @@ export class BillingController {
     @Body() dto: { reason?: string } | undefined,
   ): Promise<InvoiceResponse> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
-    const row = await this.voids.voidInvoice(
+    await this.voids.voidInvoice(
       { userId: ctx.userId, role: ctx.role, shopId: ctx.shopId },
       id,
       { reason: dto?.reason ?? '' },
     );
-    return this.svc.toInvoiceResponse(row);
+    // Fetch with line items so the response is complete (toInvoiceResponse returns lines:[]).
+    return this.svc.getInvoice(id);
   }
 
   // Issue a credit note when invoice is older than 24h. OWNER only.
