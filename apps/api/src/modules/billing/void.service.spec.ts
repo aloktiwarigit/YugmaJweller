@@ -188,7 +188,7 @@ describe('VoidService.issueCreditNote', () => {
       { reason: 'test' },
     );
     expect(result.id).toBe('cn-1');
-    expect(result.credit_number).toMatch(/^CN-/);
+    expect(result.creditNumber).toMatch(/^CN-/);
   });
 
   it('throws ConflictException with billing.credit_note.already_issued on duplicate', async () => {

@@ -13,7 +13,7 @@ import { TenantWalkerRoute } from '../../common/decorators/tenant-walker-route.d
 import { BillingService } from './billing.service';
 import { PaymentService } from './payment.service';
 import { VoidService } from './void.service';
-import type { CreditNoteRow } from './void.service';
+import type { CreditNoteResponse } from './void.service';
 
 @Controller('/api/v1/billing')
 export class BillingController {
@@ -148,7 +148,7 @@ export class BillingController {
     @TenantContextDec() ctx: TenantContext,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: { reason: string },
-  ): Promise<CreditNoteRow> {
+  ): Promise<CreditNoteResponse> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.voids.issueCreditNote(
       { userId: ctx.userId, role: ctx.role, shopId: ctx.shopId },

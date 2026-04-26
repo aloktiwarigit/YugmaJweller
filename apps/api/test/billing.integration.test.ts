@@ -618,9 +618,9 @@ describe('VoidService — invoice void + credit note (integration)', () => {
         { reason: 'customer return' },
       ),
     );
-    expect(cn.credit_number).toMatch(/^CN-/);
+    expect(cn.creditNumber).toMatch(/^CN-/);
     expect(cn.reason).toBe('customer return');
-    expect(cn.original_invoice_id).toBe(invoiceId);
+    expect(cn.originalInvoiceId).toBe(invoiceId);
   });
 
   it('cannot issue duplicate credit note — 409 already_issued', async () => {

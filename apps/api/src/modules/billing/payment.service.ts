@@ -8,6 +8,7 @@ import {
   buildCashCapOverride,
   SECTION_269ST_LIMIT_PAISE,
   trackPmlaCumulative,
+  getPmlaThresholdStatus,
 } from '@goldsmith/compliance';
 import type { CashCapOverride, PmlaCumulativeResult } from '@goldsmith/compliance';
 import { AuditAction } from '@goldsmith/audit';
@@ -107,6 +108,9 @@ export class PaymentService {
     const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
 
     let pmlaResult: PmlaCumulativeResult | null = null;
+    // True only on the payment that crosses into warn — prevents duplicate audit/notification
+    // on every subsequent payment when customer is already above Rs 8L in that month.
+    let crossedWarnThreshold = false;
 
     await withTenantTx(this.pool, async (tx) => {
       // ── A. Early idempotency check ─────────────────────────────────────────
@@ -212,8 +216,13 @@ export class PaymentService {
         customerPhone:        customerPhone ?? null,
         cashIncrementPaise:   amountPaise,
         transactionDateIST:   aggDateIST,      // P1b fix: same IST date as step C's lock
-        incrementInvoiceCount: isFirstCashPayment, // P2 fix: count per invoice, not per installment
+        incrementInvoiceCount: isFirstCashPayment, // invoice_count: count per invoice, not per installment
       });
+      // Detect threshold crossing: only fire warn once (pre-payment was ok, post is warn).
+      // Avoids duplicate audit events and notifications on every subsequent payment above Rs 8L.
+      const prePaymentMonthlyPaise = pmlaResult.cumulativePaise - amountPaise;
+      crossedWarnThreshold = getPmlaThresholdStatus(prePaymentMonthlyPaise) !== 'warn'
+        && pmlaResult.status === 'warn';
 
       // ── H. Insert payment record ───────────────────────────────────────────
       try {
@@ -262,7 +271,9 @@ export class PaymentService {
       }
 
       // ── J. PMLA audit log (inside tx — atomic with payment) ─────────────────
-      if (pmlaResult && pmlaResult.status === 'warn') {
+      // Only on threshold crossing — prevents duplicate audit rows on every subsequent
+      // payment when the customer is already in the warn band (Rs 8L–10L).
+      if (crossedWarnThreshold && pmlaResult) {
         await tx.query(
           `INSERT INTO audit_events
              (shop_id, actor_user_id, action, subject_type, subject_id, metadata)
@@ -291,7 +302,10 @@ export class PaymentService {
     // ── Post-commit: async BullMQ job for PMLA notification ─────────────────
     // Enqueued AFTER the transaction commits so the job never fires for a rolled-back payment.
     // Fire-and-forget (void) — a queue failure must not fail the payment response.
-    if (capturedPmla?.status === 'warn') {
+    // crossedWarnThreshold: only enqueue on first crossing — avoids notification spam
+    // when customer is already above Rs 8L. On idempotency retries, crossedWarnThreshold
+    // is false; the notification was already queued atomically on the first commit.
+    if (crossedWarnThreshold && capturedPmla) {
       const job: PmlaCashThresholdWarningJob = {
         shopId:          ctx.shopId,
         customerId:      null, // Epic 6: customer identity TBD
@@ -302,7 +316,7 @@ export class PaymentService {
       void this.pmlaQueue.add('cash-threshold-warning', job).catch(() => undefined);
     }
 
-    return capturedPmla?.status === 'warn'
+    return crossedWarnThreshold && capturedPmla
       ? {
           pmlaWarning: {
             cumulativePaise: capturedPmla.cumulativePaise.toString(),

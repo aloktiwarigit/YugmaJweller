@@ -56,7 +56,7 @@ function makeTx(
         return { rows: [] };
       }
       if (sql.includes('SUM(amount_paise)')) {
-        return { rows: [{ paid: '0' }] };
+        return { rows: [{ paid: '0', cash_count: '0' }] };
       }
       return { rows: [] };
     }),
@@ -242,14 +242,31 @@ describe('PaymentService.recordCashPayment — PMLA threshold warnings', () => {
     );
   });
 
-  it('writes PMLA_WARN_THRESHOLD_REACHED audit event in-transaction on warn', async () => {
-    const pool = fakePool(INVOICE_ROW, 0n, 85_000_000n);
+  it('writes PMLA_WARN_THRESHOLD_REACHED audit event on FIRST threshold crossing (pre=7.8L→post=8.3L)', async () => {
+    // Pre-payment = Rs 7,80,000 (ok), post = Rs 8,30,000 (warn) → crossing fires
+    const pool = fakePool(INVOICE_ROW, 0n, 83_000_000n);
     setupWithTenantTx(pool);
     svc = new PaymentService(pool, fakeQueue());
 
     await svc.recordCashPayment(INVOICE, 5_000_000n, 'idem-pmla-audit');
 
     expect(pool._tx.query).toHaveBeenCalledWith(
+      expect.stringContaining('audit_events'),
+      expect.arrayContaining([AuditAction.PMLA_WARN_THRESHOLD_REACHED]),
+    );
+  });
+
+  it('does NOT write audit event or enqueue job when customer is already in warn zone (Rs 9L)', async () => {
+    // Pre-payment = Rs 8,5L (already warn), post = Rs 9L (warn) → no crossing
+    const pool = fakePool(INVOICE_ROW, 0n, 90_000_000n);
+    setupWithTenantTx(pool);
+    const q = fakeQueue();
+    svc = new PaymentService(pool, q);
+
+    await svc.recordCashPayment(INVOICE, 5_000_000n, 'idem-pmla-no-dup');
+
+    expect(q.add).not.toHaveBeenCalled();
+    expect(pool._tx.query).not.toHaveBeenCalledWith(
       expect.stringContaining('audit_events'),
       expect.arrayContaining([AuditAction.PMLA_WARN_THRESHOLD_REACHED]),
     );

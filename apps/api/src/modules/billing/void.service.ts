@@ -14,7 +14,15 @@ import type { InvoiceRow } from './billing.repository';
 
 const generateCreditSuffix = customAlphabet('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6);
 
-export interface CreditNoteRow {
+// Mirrors payment.service.ts normalizePhone — used to match the aggregate key
+// that payment.service.ts stored for walk-in customers (phone-only identity).
+function normalizePhone(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/[\s\-().]/g, '').replace(/^\+?91(?=\d{10}$)/, '');
+  return digits.length > 0 ? digits : null;
+}
+
+interface CreditNoteRow {
   id:                   string;
   shop_id:              string;
   original_invoice_id:  string;
@@ -24,6 +32,32 @@ export interface CreditNoteRow {
   issued_at:            Date;
   issued_by_user_id:    string;
   created_at:           Date;
+}
+
+export interface CreditNoteResponse {
+  id:                   string;
+  shopId:               string;
+  originalInvoiceId:    string;
+  creditNumber:         string;
+  reason:               string;
+  totalPaise:           string;
+  issuedAt:             string;
+  issuedByUserId:       string;
+  createdAt:            string;
+}
+
+function toCreditNoteResponse(cn: CreditNoteRow): CreditNoteResponse {
+  return {
+    id:                cn.id,
+    shopId:            cn.shop_id,
+    originalInvoiceId: cn.original_invoice_id,
+    creditNumber:      cn.credit_number,
+    reason:            cn.reason,
+    totalPaise:        cn.total_paise.toString(),
+    issuedAt:          cn.issued_at.toISOString(),
+    issuedByUserId:    cn.issued_by_user_id,
+    createdAt:         cn.created_at.toISOString(),
+  };
 }
 
 const INVOICE_COLS = `
@@ -136,7 +170,11 @@ export class VoidService {
              AND aggregate_date = $2
              AND customer_id    IS NOT DISTINCT FROM $3
              AND customer_phone IS NOT DISTINCT FROM $4`,
-          [pay.amount_paise, aggDateStr, invoice.customer_id ?? null, invoice.customer_phone ?? null],
+          // customer_phone must be normalized — aggregates were stored under normalizePhone(rawPhone).
+          // customer_id takes precedence: if set, phone key was stored as NULL (mirrors payment.service.ts).
+          [pay.amount_paise, aggDateStr,
+           invoice.customer_id ?? null,
+           invoice.customer_id ? null : normalizePhone(invoice.customer_phone ?? null)],
         );
       }
     });
@@ -157,7 +195,7 @@ export class VoidService {
     ctx: { userId: string; role: string; shopId: string },
     originalInvoiceId: string,
     dto: { reason: string },
-  ): Promise<CreditNoteRow> {
+  ): Promise<CreditNoteResponse> {
     if (ctx.role !== 'shop_admin') {
       throw new ForbiddenException({ code: 'billing.void.role_required' });
     }
@@ -219,6 +257,6 @@ export class VoidService {
       after:        { originalInvoiceId, reason: dto.reason },
     });
 
-    return creditNote!;
+    return toCreditNoteResponse(creditNote!);
   }
 }
