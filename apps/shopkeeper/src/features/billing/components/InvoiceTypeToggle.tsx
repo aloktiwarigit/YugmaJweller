@@ -53,13 +53,13 @@ export function InvoiceTypeToggle({
 }: InvoiceTypeToggleProps): JSX.Element {
   const [gstinError, setGstinError] = useState<string | null>(null);
 
-  const handleGstinChange = (text: string) => {
+  const handleGstinChange = (text: string): void => {
     const normalized = text.toUpperCase().replace(/\s+/g, '');
     onBuyerGstinChange(normalized);
     setGstinError(null);
   };
 
-  const handleGstinBlur = () => {
+  const handleGstinBlur = (): void => {
     if (buyerGstin.length === 0) {
       setGstinError(null);
       return;

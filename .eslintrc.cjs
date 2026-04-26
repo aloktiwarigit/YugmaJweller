@@ -70,6 +70,12 @@ module.exports = {
         '**/apps/api/src/modules/pricing/pricing.module.ts',
         'apps/api/src/modules/inventory/inventory.module.ts',
         '**/apps/api/src/modules/inventory/inventory.module.ts',
+        'apps/api/src/modules/billing/billing.module.ts',
+        '**/apps/api/src/modules/billing/billing.module.ts',
+        'apps/api/src/modules/billing/payment.service.ts',
+        '**/apps/api/src/modules/billing/payment.service.ts',
+        'apps/api/src/workers/compliance-pmla.processor.ts',
+        '**/apps/api/src/workers/compliance-pmla.processor.ts',
       ],
       rules: {
         'no-restricted-imports': ['error', {
