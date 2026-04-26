@@ -157,6 +157,9 @@ export class VoidService {
         [invoiceId],
       );
 
+      // invoice_count was incremented exactly once per invoice (not per installment).
+      // Decrement it on the first payment row only to mirror the increment logic.
+      let isFirstPaymentRow = true;
       for (const pay of payRes.rows) {
         // aggregate_date is the IST calendar date the payment was recorded
         const payDateIst = new Date(pay.recorded_at.getTime() + 5.5 * 60 * 60 * 1000);
@@ -164,7 +167,7 @@ export class VoidService {
         await tx.query(
           `UPDATE pmla_aggregates
            SET cash_total_paise = GREATEST(0, cash_total_paise - $1),
-               invoice_count    = GREATEST(0, invoice_count - 1),
+               invoice_count    = GREATEST(0, invoice_count - $5),
                updated_at       = now()
            WHERE shop_id = current_setting('app.current_shop_id', true)::uuid
              AND aggregate_date = $2
@@ -174,8 +177,10 @@ export class VoidService {
           // customer_id takes precedence: if set, phone key was stored as NULL (mirrors payment.service.ts).
           [pay.amount_paise, aggDateStr,
            invoice.customer_id ?? null,
-           invoice.customer_id ? null : normalizePhone(invoice.customer_phone ?? null)],
+           invoice.customer_id ? null : normalizePhone(invoice.customer_phone ?? null),
+           isFirstPaymentRow ? 1 : 0],
         );
+        isFirstPaymentRow = false;
       }
     });
 

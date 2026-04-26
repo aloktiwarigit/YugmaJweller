@@ -127,13 +127,13 @@ export class BillingController {
   async voidInvoice(
     @TenantContextDec() ctx: TenantContext,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: { reason: string },
+    @Body() dto: { reason?: string } | undefined,
   ): Promise<InvoiceResponse> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     const row = await this.voids.voidInvoice(
       { userId: ctx.userId, role: ctx.role, shopId: ctx.shopId },
       id,
-      { reason: dto.reason ?? '' },
+      { reason: dto?.reason ?? '' },
     );
     return this.svc.toInvoiceResponse(row);
   }
@@ -147,13 +147,13 @@ export class BillingController {
   async issueCreditNote(
     @TenantContextDec() ctx: TenantContext,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: { reason: string },
+    @Body() dto: { reason?: string } | undefined,
   ): Promise<CreditNoteResponse> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.voids.issueCreditNote(
       { userId: ctx.userId, role: ctx.role, shopId: ctx.shopId },
       id,
-      { reason: dto.reason ?? '' },
+      { reason: dto?.reason ?? '' },
     );
   }
 }
