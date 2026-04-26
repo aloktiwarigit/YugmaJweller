@@ -9,7 +9,6 @@ import {
   SECTION_269ST_LIMIT_PAISE,
   trackPmlaCumulative,
   getPmlaThresholdStatus,
-  istMonthStr,
 } from '@goldsmith/compliance';
 import type { CashCapOverride, PmlaCumulativeResult } from '@goldsmith/compliance';
 import { AuditAction } from '@goldsmith/audit';
@@ -57,23 +56,15 @@ const FETCH_OR_INIT_AGGREGATE_SQL = `
             aggregate_month
 `;
 
-// Idempotency check: validates key + invoice_id + amount_paise so a client
-// reusing a key for a different payment does not get a silent no-op.
+// Idempotency check: also reads the stored pmla_warning_jsonb so retries return
+// the ORIGINAL pmlaWarning from the first request (migration 0027).
 const CHECK_PAYMENT_IDEM_SQL = `
-  SELECT id FROM payments
+  SELECT id, pmla_warning_jsonb
+  FROM payments
   WHERE shop_id         = current_setting('app.current_shop_id', true)::uuid
     AND idempotency_key = $1
     AND invoice_id      = $2
     AND amount_paise    = $3
-`;
-
-// Monthly SUM reused for idempotency-retry warning reconstruction (steps A and D).
-const PMLA_MONTHLY_SUM_SQL = `
-  SELECT COALESCE(SUM(cash_total_paise), 0)::text AS monthly_total
-  FROM pmla_aggregates
-  WHERE aggregate_month = $1
-    AND (customer_id IS NOT DISTINCT FROM $2::uuid)
-    AND (customer_phone IS NOT DISTINCT FROM $3)
 `;
 
 export interface PmlaCashThresholdWarningJob {
@@ -123,24 +114,13 @@ export class PaymentService {
 
     await withTenantTx(this.pool, async (tx) => {
       // ── A. Early idempotency check ─────────────────────────────────────────
-      // Reconstruct pmlaWarning from the current monthly aggregate on retry.
-      // The original audit event and BullMQ notification are already committed.
-      const earlyIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
+      // Return the ORIGINAL pmlaWarning stored in payments.pmla_warning_jsonb (migration 0027).
+      // This ensures retries always return the exact payment-time warning regardless of
+      // subsequent payments or month rollover — true idempotency for the pmlaWarning field.
+      const earlyIdem = await tx.query<{ id: string; pmla_warning_jsonb: PmlaWarningDto | null }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
       if (earlyIdem.rows[0]) {
-        const eInv = await tx.query<{ customer_id: string | null; customer_phone: string | null }>(
-          `SELECT customer_id, customer_phone FROM invoices WHERE id = $1`,
-          [invoiceId],
-        );
-        if (eInv.rows[0]) {
-          const eCid = eInv.rows[0].customer_id;
-          const eCphone = eCid ? null : normalizePhone(eInv.rows[0].customer_phone);
-          const eMonth = istMonthStr(new Date());
-          const eSumRes = await tx.query<{ monthly_total: string }>(PMLA_MONTHLY_SUM_SQL, [eMonth, eCid, eCphone]);
-          const eCumulative = BigInt(eSumRes.rows[0]?.monthly_total ?? '0');
-          const ePmlaStatus = getPmlaThresholdStatus(eCumulative);
-          if (ePmlaStatus !== 'ok') {
-            pmlaWarnFromRetry = { cumulativePaise: eCumulative.toString(), monthStr: eMonth, status: ePmlaStatus };
-          }
+        if (earlyIdem.rows[0].pmla_warning_jsonb) {
+          pmlaWarnFromRetry = earlyIdem.rows[0].pmla_warning_jsonb;
         }
         return;
       }
@@ -185,15 +165,11 @@ export class PaymentService {
         : new Date();
 
       // ── D. Late idempotency check (post-lock) ──────────────────────────────
-      // Customer identity available from step B — reconstruct pmlaWarning same as step A.
-      const lateIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
+      // Same as step A: return the stored pmla_warning_jsonb from the original payment.
+      const lateIdem = await tx.query<{ id: string; pmla_warning_jsonb: PmlaWarningDto | null }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
       if (lateIdem.rows[0]) {
-        const lMonth = aggRes.rows[0]?.aggregate_month ?? istMonthStr(aggDateIST);
-        const lSumRes = await tx.query<{ monthly_total: string }>(PMLA_MONTHLY_SUM_SQL, [lMonth, customerId ?? null, customerPhone ?? null]);
-        const lCumulative = BigInt(lSumRes.rows[0]?.monthly_total ?? '0');
-        const lPmlaStatus = getPmlaThresholdStatus(lCumulative);
-        if (lPmlaStatus !== 'ok') {
-          pmlaWarnFromRetry = { cumulativePaise: lCumulative.toString(), monthStr: lMonth, status: lPmlaStatus };
+        if (lateIdem.rows[0].pmla_warning_jsonb) {
+          pmlaWarnFromRetry = lateIdem.rows[0].pmla_warning_jsonb;
         }
         return;
       }
@@ -270,12 +246,21 @@ export class PaymentService {
       crossedWarnThreshold = prePmlaStatus === 'ok' && pmlaResult.status !== 'ok';
 
       // ── H. Insert payment record ───────────────────────────────────────────
+      // pmla_warning_jsonb stores the original pmlaWarning so idempotency retries
+      // return the SAME response as the first request (migration 0027).
+      const pmlaWarningToStore = crossedWarnThreshold && pmlaResult
+        ? JSON.stringify({
+            cumulativePaise: pmlaResult.cumulativePaise.toString(),
+            monthStr:        pmlaResult.monthStr,
+            status:          pmlaResult.status,
+          })
+        : null;
       try {
         await tx.query(
           `INSERT INTO payments
-             (shop_id, invoice_id, method, amount_paise, status, created_by_user_id, idempotency_key)
-           VALUES (current_setting('app.current_shop_id', true)::uuid, $1, 'CASH', $2, 'CONFIRMED', $3, $4)`,
-          [invoiceId, amountPaise, ctx.userId, idempotencyKey],
+             (shop_id, invoice_id, method, amount_paise, status, created_by_user_id, idempotency_key, pmla_warning_jsonb)
+           VALUES (current_setting('app.current_shop_id', true)::uuid, $1, 'CASH', $2, 'CONFIRMED', $3, $4, $5::jsonb)`,
+          [invoiceId, amountPaise, ctx.userId, idempotencyKey, pmlaWarningToStore],
         );
       } catch (err: unknown) {
         if (typeof err === 'object' && err !== null && (err as { code?: string }).code === '23505') {
