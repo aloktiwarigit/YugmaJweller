@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { Redis } from '@goldsmith/cache';
 import { LocalKMS, DevKmsAdapter } from '@goldsmith/crypto-envelope';
 import { SettingsCache } from '@goldsmith/tenant-config';
@@ -10,14 +11,21 @@ import { BillingController } from './billing.controller';
 import { BillingService }    from './billing.service';
 import { BillingRepository } from './billing.repository';
 import { PaymentService }    from './payment.service';
+import { CompliancePmlaProcessor } from '../../workers/compliance-pmla.processor';
 
 @Module({
-  imports: [AuthModule, InventoryModule, PricingModule],
+  imports: [
+    AuthModule,
+    InventoryModule,
+    PricingModule,
+    BullModule.registerQueue({ name: 'compliance-pmla' }),
+  ],
   controllers: [BillingController],
   providers: [
     BillingService,
     BillingRepository,
     PaymentService,
+    CompliancePmlaProcessor,
     SettingsRepository,
     {
       provide: 'BILLING_REDIS',

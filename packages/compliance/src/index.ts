@@ -21,3 +21,12 @@ export type { CashCapCheckInput, CashCapOverride, OverrideInput } from './cash-c
 export { validateGstinFormat, normalizeGstin, getStateCodeFromGstin } from './gstin';
 export type { GstTreatment, B2BGstBreakdown } from './gst/b2b-treatment';
 export { determineGstTreatment, applyB2BGstTreatment } from './gst/b2b-treatment';
+export {
+  PMLA_WARN_THRESHOLD_PAISE,
+  PMLA_BLOCK_THRESHOLD_PAISE,
+  getPmlaThresholdStatus,
+  trackPmlaCumulative,
+  istMonthStr,
+  istDateStr,
+} from './pmla';
+export type { PmlaThresholdStatus, PmlaCumulativeResult } from './pmla';

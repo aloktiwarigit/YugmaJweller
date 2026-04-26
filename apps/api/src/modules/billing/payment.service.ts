@@ -1,18 +1,31 @@
 import { ConflictException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import type { Queue } from '@goldsmith/queue';
 import type { Pool } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import {
   enforce269ST,
   buildCashCapOverride,
   SECTION_269ST_LIMIT_PAISE,
+  trackPmlaCumulative,
 } from '@goldsmith/compliance';
-import type { CashCapOverride } from '@goldsmith/compliance';
+import type { CashCapOverride, PmlaCumulativeResult } from '@goldsmith/compliance';
 import { AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 
 export interface CashPaymentOverride {
   justification: string;
+}
+
+export interface PmlaWarningDto {
+  cumulativePaise: string;
+  monthStr:        string;
+  status:          'warn';
+}
+
+export interface CashPaymentResult {
+  pmlaWarning?: PmlaWarningDto;
 }
 
 // Normalizes a phone number to a canonical 10-digit form before using it as
@@ -40,16 +53,6 @@ const FETCH_OR_INIT_AGGREGATE_SQL = `
   RETURNING cash_total_paise
 `;
 
-const INCREMENT_AGGREGATE_SQL = `
-  UPDATE pmla_aggregates SET
-    cash_total_paise = cash_total_paise + $1,
-    updated_at       = now()
-  WHERE shop_id       = current_setting('app.current_shop_id', true)::uuid
-    AND aggregate_date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date
-    AND (customer_id IS NOT DISTINCT FROM $2::uuid)
-    AND (customer_phone IS NOT DISTINCT FROM $3)
-`;
-
 // Idempotency check: validates key + invoice_id + amount_paise so a client
 // reusing a key for a different payment does not get a silent no-op.
 const CHECK_PAYMENT_IDEM_SQL = `
@@ -60,32 +63,48 @@ const CHECK_PAYMENT_IDEM_SQL = `
     AND amount_paise    = $3
 `;
 
+export interface PmlaCashThresholdWarningJob {
+  shopId:          string;
+  customerId:      string | null;
+  customerPhone:   string | null;
+  cumulativePaise: string;
+  monthStr:        string;
+}
+
 @Injectable()
 export class PaymentService {
-  constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
+  constructor(
+    @Inject('PG_POOL') private readonly pool: Pool,
+    @InjectQueue('compliance-pmla') private readonly pmlaQueue: Queue,
+  ) {}
 
   // Records a cash payment against an invoice.
   // Enforces the Section 269ST Rs 1,99,999 daily cash-cap per customer.
-  // idempotencyKey: caller-provided key; duplicate requests return void silently.
+  // Tracks monthly PMLA cumulative cash (warn at Rs 8L, block at Rs 10L in Story 5.6).
+  // idempotencyKey: caller-provided key; duplicate requests return silently.
   //
-  // Transaction order is carefully designed:
+  // Transaction order:
   //   A. Early idem check (no lock): fast path for sequential retries
   //   B. Invoice SELECT FOR UPDATE: lock invoice to serialize concurrent payments
   //   C. Aggregate lock (IST date, TOCTOU-safe): INSERT ON CONFLICT row lock
-  //   D. Late idem check (post-lock): catches concurrent retries that slipped past A
-  //   E. Balance check: MUST come after D so a concurrent retry returning early at D
-  //      never hits the false-positive payment_exceeds_balance error
-  //   F. Compliance enforcement
-  //   G. Increment aggregate
+  //   D. Late idem check (post-lock): catches concurrent retries
+  //   E. Balance check
+  //   F. Compliance 269ST enforcement
+  //   G. PMLA tracking (replaces old INCREMENT step): atomic upsert + monthly SUM
   //   H. Insert payment
   //   I. Override metadata on invoice
+  //   J. PMLA audit log (inside tx, atomic with payment)
+  //
+  //   Post-commit: enqueue async BullMQ job for PMLA notification if status === 'warn'
   async recordCashPayment(
     invoiceId: string,
     amountPaise: bigint,
     idempotencyKey: string,
     override?: CashPaymentOverride,
-  ): Promise<void> {
+  ): Promise<CashPaymentResult> {
     const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
+
+    let pmlaResult: PmlaCumulativeResult | null = null;
 
     await withTenantTx(this.pool, async (tx) => {
       // ── A. Early idempotency check ─────────────────────────────────────────
@@ -124,15 +143,10 @@ export class PaymentService {
       const existingDailyPaise = BigInt(aggRes.rows[0]?.cash_total_paise ?? '0');
 
       // ── D. Late idempotency check (post-lock) ──────────────────────────────
-      // A concurrent retry that waited on the invoice lock in B would have the
-      // first request's payment committed by now — this returns it early BEFORE
-      // the balance check in E. Without this order, the retry would see
-      // alreadyPaidPaise including the first payment and falsely throw
-      // payment_exceeds_balance when amountPaise == invoice total.
       const lateIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
       if (lateIdem.rows[0]) return;
 
-      // ── E. Balance check (after late idem — only reached for new payments) ─
+      // ── E. Balance check ────────────────────────────────────────────────────
       const paidRes = await tx.query<{ paid: string }>(
         `SELECT COALESCE(SUM(amount_paise), 0)::text AS paid
          FROM payments
@@ -150,7 +164,7 @@ export class PaymentService {
         });
       }
 
-      // ── F. Compliance enforcement ──────────────────────────────────────────
+      // ── F. Compliance 269ST enforcement ────────────────────────────────────
       const projectedPaise = existingDailyPaise + amountPaise;
       const limitExceeded = projectedPaise > SECTION_269ST_LIMIT_PAISE;
       let overrideMeta: CashCapOverride | null = null;
@@ -174,13 +188,18 @@ export class PaymentService {
         });
       }
 
-      // ── G. Increment aggregate ─────────────────────────────────────────────
-      await tx.query(INCREMENT_AGGREGATE_SQL, [amountPaise, customerId ?? null, customerPhone ?? null]);
+      // ── G. PMLA tracking — atomic daily upsert + monthly cumulative SUM ────
+      // Replaces the old two-step fetch-or-init + increment pattern.
+      // Upserts the daily row (INSERT ON CONFLICT DO UPDATE with increment),
+      // then queries the monthly SUM. Returns warn/block/ok status.
+      pmlaResult = await trackPmlaCumulative(tx, {
+        customerId:         customerId ?? null,
+        customerPhone:      customerPhone ?? null,
+        cashIncrementPaise: amountPaise,
+        transactionDateIST: new Date(),
+      });
 
       // ── H. Insert payment record ───────────────────────────────────────────
-      // Catch 23505 from uq_payments_shop_idempotency: a reused key targeting
-      // a different invoice/amount missed the SELECT checks (they filter all three)
-      // but the DB unique index catches it. Map to typed 409 instead of 500.
       try {
         await tx.query(
           `INSERT INTO payments
@@ -195,9 +214,7 @@ export class PaymentService {
         throw err;
       }
 
-      // ── I. Override metadata + audit (in-transaction for atomicity) ──────────
-      // Compliance overrides MUST be audited atomically with the payment.
-      // A committed override with no audit trail is a regulatory gap.
+      // ── I. Override metadata + 269ST audit (in-transaction for atomicity) ──
       if (overrideMeta) {
         await tx.query(
           `UPDATE invoices
@@ -208,8 +225,6 @@ export class PaymentService {
           [JSON.stringify({ ...overrideMeta, actorUserId: ctx.userId }), invoiceId],
         );
 
-        // Write audit event within the same transaction — if this fails, the
-        // payment rolls back, ensuring no override escapes without an audit record.
         await tx.query(
           `INSERT INTO audit_events
              (shop_id, actor_user_id, action, subject_type, subject_id, metadata)
@@ -229,6 +244,56 @@ export class PaymentService {
           ],
         );
       }
+
+      // ── J. PMLA audit log (inside tx — atomic with payment) ─────────────────
+      if (pmlaResult && pmlaResult.status === 'warn') {
+        await tx.query(
+          `INSERT INTO audit_events
+             (shop_id, actor_user_id, action, subject_type, subject_id, metadata)
+           VALUES
+             (current_setting('app.current_shop_id', true)::uuid, $1, $2, $3, $4, $5)`,
+          [
+            ctx.userId,
+            AuditAction.PMLA_WARN_THRESHOLD_REACHED,
+            'invoice',
+            invoiceId,
+            JSON.stringify({
+              cumulativePaise: pmlaResult.cumulativePaise.toString(),
+              month:           pmlaResult.monthStr,
+              customerId:      customerId ?? null,
+            }),
+          ],
+        );
+      }
     });
+
+    // TypeScript cannot track `let` variable mutations through async closures.
+    // Snapshot with explicit annotation so post-commit checks resolve correctly.
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    const capturedPmla = pmlaResult as PmlaCumulativeResult | null;
+
+    // ── Post-commit: async BullMQ job for PMLA notification ─────────────────
+    // Enqueued AFTER the transaction commits so the job never fires for a rolled-back payment.
+    // Fire-and-forget (void) — a queue failure must not fail the payment response.
+    if (capturedPmla?.status === 'warn') {
+      const job: PmlaCashThresholdWarningJob = {
+        shopId:          ctx.shopId,
+        customerId:      null, // Epic 6: customer identity TBD
+        customerPhone:   null,
+        cumulativePaise: capturedPmla.cumulativePaise.toString(),
+        monthStr:        capturedPmla.monthStr,
+      };
+      void this.pmlaQueue.add('cash-threshold-warning', job).catch(() => undefined);
+    }
+
+    return capturedPmla?.status === 'warn'
+      ? {
+          pmlaWarning: {
+            cumulativePaise: capturedPmla.cumulativePaise.toString(),
+            monthStr:        capturedPmla.monthStr,
+            status:          'warn',
+          },
+        }
+      : {};
   }
 }
