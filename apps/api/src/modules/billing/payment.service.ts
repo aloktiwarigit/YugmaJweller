@@ -10,9 +10,10 @@ import {
   trackPmlaCumulative,
   getPmlaThresholdStatus,
   istMonthStr,
+  ComplianceHardBlockError,
 } from '@goldsmith/compliance';
 import type { CashCapOverride, PmlaCumulativeResult } from '@goldsmith/compliance';
-import { AuditAction } from '@goldsmith/audit';
+import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 
@@ -120,7 +121,9 @@ export class PaymentService {
     let pmlaResult: PmlaCumulativeResult | null = null;
     let crossedWarnThreshold = false;
     let pmlaWarnFromRetry: PmlaWarningDto | null = null;
+    let caughtBlockErr: ComplianceHardBlockError | null = null;
 
+    try {
     await withTenantTx(this.pool, async (tx) => {
       // ── A. Early idempotency check ─────────────────────────────────────────
       // Reconstruct pmlaWarning from the current monthly aggregate on retry.
@@ -337,6 +340,28 @@ export class PaymentService {
         );
       }
     });
+    } catch (err) {
+      if (err instanceof ComplianceHardBlockError && err.code === 'compliance.pmla_threshold_blocked') {
+        caughtBlockErr = err;
+      } else {
+        throw err;
+      }
+    }
+
+    // Audit the PMLA block in a separate tx (main tx rolled back).
+    if (caughtBlockErr) {
+      await auditLog(this.pool, {
+        action:      AuditAction.PMLA_BLOCK_THRESHOLD_REACHED,
+        subjectType: 'invoice',
+        subjectId:   invoiceId,
+        actorUserId: ctx.userId,
+        after: {
+          cumulativePaise: String(caughtBlockErr.meta['cumulativePaise'] ?? ''),
+          month:           String(caughtBlockErr.meta['monthStr'] ?? ''),
+        },
+      });
+      throw caughtBlockErr;
+    }
 
     // TypeScript cannot track `let` variable mutations through async closures.
     // Snapshot with explicit annotation so post-commit checks resolve correctly.
