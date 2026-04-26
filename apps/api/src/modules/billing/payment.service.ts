@@ -9,6 +9,7 @@ import {
   SECTION_269ST_LIMIT_PAISE,
   trackPmlaCumulative,
   getPmlaThresholdStatus,
+  istMonthStr,
 } from '@goldsmith/compliance';
 import type { CashCapOverride, PmlaCumulativeResult } from '@goldsmith/compliance';
 import { AuditAction } from '@goldsmith/audit';
@@ -66,6 +67,15 @@ const CHECK_PAYMENT_IDEM_SQL = `
     AND amount_paise    = $3
 `;
 
+// Monthly SUM reused for idempotency-retry warning reconstruction (steps A and D).
+const PMLA_MONTHLY_SUM_SQL = `
+  SELECT COALESCE(SUM(cash_total_paise), 0)::text AS monthly_total
+  FROM pmla_aggregates
+  WHERE aggregate_month = $1
+    AND (customer_id IS NOT DISTINCT FROM $2::uuid)
+    AND (customer_phone IS NOT DISTINCT FROM $3)
+`;
+
 export interface PmlaCashThresholdWarningJob {
   shopId:          string;
   customerId:      string | null;
@@ -109,17 +119,31 @@ export class PaymentService {
 
     let pmlaResult: PmlaCumulativeResult | null = null;
     let crossedWarnThreshold = false;
+    let pmlaWarnFromRetry: PmlaWarningDto | null = null;
 
     await withTenantTx(this.pool, async (tx) => {
       // ── A. Early idempotency check ─────────────────────────────────────────
-      // The pmlaWarning is a UX notification; the authoritative compliance record is
-      // the PMLA_WARN_THRESHOLD_REACHED audit event committed in-tx on first request.
-      // On retry the audit event and BullMQ notification are already committed.
-      // Returning {} here is correct: the warning state belongs to the original response;
-      // reconstructing from the current aggregate would produce a different cumulativePaise
-      // if the month rolled over or another payment changed the total.
+      // Reconstruct pmlaWarning from the current monthly aggregate on retry.
+      // The original audit event and BullMQ notification are already committed.
       const earlyIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
-      if (earlyIdem.rows[0]) return;
+      if (earlyIdem.rows[0]) {
+        const eInv = await tx.query<{ customer_id: string | null; customer_phone: string | null }>(
+          `SELECT customer_id, customer_phone FROM invoices WHERE id = $1`,
+          [invoiceId],
+        );
+        if (eInv.rows[0]) {
+          const eCid = eInv.rows[0].customer_id;
+          const eCphone = eCid ? null : normalizePhone(eInv.rows[0].customer_phone);
+          const eMonth = istMonthStr(new Date());
+          const eSumRes = await tx.query<{ monthly_total: string }>(PMLA_MONTHLY_SUM_SQL, [eMonth, eCid, eCphone]);
+          const eCumulative = BigInt(eSumRes.rows[0]?.monthly_total ?? '0');
+          const ePmlaStatus = getPmlaThresholdStatus(eCumulative);
+          if (ePmlaStatus !== 'ok') {
+            pmlaWarnFromRetry = { cumulativePaise: eCumulative.toString(), monthStr: eMonth, status: ePmlaStatus };
+          }
+        }
+        return;
+      }
 
       // ── B. Verify invoice — lock row to serialize concurrent payments ───────
       const invRes = await tx.query<{
@@ -161,10 +185,18 @@ export class PaymentService {
         : new Date();
 
       // ── D. Late idempotency check (post-lock) ──────────────────────────────
-      // Same design as step A: return {} on retry to avoid deriving warning state
-      // from the current aggregate which may have changed since the first request.
+      // Customer identity available from step B — reconstruct pmlaWarning same as step A.
       const lateIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
-      if (lateIdem.rows[0]) return;
+      if (lateIdem.rows[0]) {
+        const lMonth = aggRes.rows[0]?.aggregate_month ?? istMonthStr(aggDateIST);
+        const lSumRes = await tx.query<{ monthly_total: string }>(PMLA_MONTHLY_SUM_SQL, [lMonth, customerId ?? null, customerPhone ?? null]);
+        const lCumulative = BigInt(lSumRes.rows[0]?.monthly_total ?? '0');
+        const lPmlaStatus = getPmlaThresholdStatus(lCumulative);
+        if (lPmlaStatus !== 'ok') {
+          pmlaWarnFromRetry = { cumulativePaise: lCumulative.toString(), monthStr: lMonth, status: lPmlaStatus };
+        }
+        return;
+      }
 
       // ── E. Balance check ────────────────────────────────────────────────────
       const paidRes = await tx.query<{ paid: string; cash_count: string }>(
@@ -327,19 +359,21 @@ export class PaymentService {
       void this.pmlaQueue.add('cash-threshold-warning', job).catch(() => undefined);
     }
 
-    // Return pmlaWarning only when this payment is the first to cross Rs 8L warn threshold.
-    // Idempotency retries (early or late) return {} — the pmlaWarning is tied to the first
-    // successful response; reconstructing from the current aggregate would produce
-    // a different cumulativePaise if the month rolled over or another payment intervened.
-    // The authoritative compliance record is the in-tx audit event, not this response field.
-    return crossedWarnThreshold && capturedPmla
-      ? {
-          pmlaWarning: {
-            cumulativePaise: capturedPmla.cumulativePaise.toString(),
-            monthStr:        capturedPmla.monthStr,
-            status:          capturedPmla.status as 'warn' | 'block',
-          },
-        }
-      : {};
+    // On first crossing: return pmlaWarning with actual status ('warn' or 'block').
+    // On idempotency retry: return pmlaWarnFromRetry reconstructed from current aggregate
+    // (no duplicate audit event or BullMQ job — those were committed on first request).
+    if (crossedWarnThreshold && capturedPmla) {
+      return {
+        pmlaWarning: {
+          cumulativePaise: capturedPmla.cumulativePaise.toString(),
+          monthStr:        capturedPmla.monthStr,
+          status:          capturedPmla.status as 'warn' | 'block',
+        },
+      };
+    }
+    if (pmlaWarnFromRetry) {
+      return { pmlaWarning: pmlaWarnFromRetry };
+    }
+    return {};
   }
 }
