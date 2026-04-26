@@ -63,6 +63,28 @@ export class FamilyRepository {
     });
   }
 
+
+  // Single-TX lookup + delete: prevents TOCTOU between ownership check and deletion.
+  async unlinkByIdAtomic(id: string): Promise<FamilyMemberRow | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const shop = `current_setting('app.current_shop_id')::uuid`;
+      const lookup = await tx.query<FamilyMemberRow>(
+        `SELECT * FROM family_members WHERE id = $1 AND shop_id = ${shop}`,
+        [id],
+      );
+      const link = lookup.rows[0] ?? null;
+      if (!link) return null;
+      await tx.query(
+        `DELETE FROM family_members
+         WHERE shop_id = ${shop}
+           AND ((customer_id = $1 AND related_customer_id = $2)
+             OR (customer_id = $2 AND related_customer_id = $1))`,
+        [link.customer_id, link.related_customer_id],
+      );
+      return link;
+    });
+  }
+
   async getLinkById(id: string): Promise<FamilyMemberRow | null> {
     return withTenantTx(this.pool, async (tx) => {
       const r = await tx.query<FamilyMemberRow>(

@@ -78,15 +78,10 @@ export class FamilyService {
   }
 
   async unlinkFamily(ctx: AuthenticatedTenantContext, linkId: string): Promise<void> {
-    const link = await this.repo.getLinkById(linkId);
+    const link = await this.repo.unlinkByIdAtomic(linkId);
     if (!link) {
       throw new NotFoundException({ code: 'crm.family_link_not_found', message: 'Family link not found' });
     }
-
-    await this.repo.deleteLinkPair({
-      customerId: link.customer_id,
-      relatedCustomerId: link.related_customer_id,
-    });
 
     void auditLog(this.pool, {
       action: AuditAction.CRM_FAMILY_LINK_REMOVED,
@@ -98,7 +93,8 @@ export class FamilyService {
   }
 
   async getFamilyLinks(ctx: AuthenticatedTenantContext, customerId: string): Promise<FamilyMemberResponse[]> {
-    void ctx;
+    const ok = await this.repo.customerBelongsToShop(ctx.shopId, customerId);
+    if (!ok) throw new NotFoundException({ code: 'crm.customer_not_found', message: 'Customer not found' });
     const rows = await this.repo.getLinksByCustomer(customerId);
     return rows.map((r) => this.rowToResponse(r));
   }
