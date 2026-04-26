@@ -34,6 +34,9 @@ export interface InvoiceRow {
   pan_key_id:          string | null;
   form60_encrypted:    Buffer | null;
   form60_key_id:       string | null;
+  voided_at:           Date | null;
+  voided_by_user_id:   string | null;
+  void_reason:         string | null;
   created_at:          Date;
   updated_at:          Date;
 }
@@ -127,6 +130,7 @@ const INVOICE_COLS = `
   igst_metal_paise, igst_making_paise,
   idempotency_key, issued_at, created_by_user_id,
   pan_ciphertext, pan_key_id, form60_encrypted, form60_key_id,
+  voided_at, voided_by_user_id, void_reason,
   created_at, updated_at
 `;
 

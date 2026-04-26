@@ -38,6 +38,10 @@ export const invoices = tenantScopedTable('invoices', {
   sgst_making_paise:    bigint('sgst_making_paise',  { mode: 'bigint' }).notNull().default(0n),
   igst_metal_paise:     bigint('igst_metal_paise',   { mode: 'bigint' }).notNull().default(0n),
   igst_making_paise:    bigint('igst_making_paise',  { mode: 'bigint' }).notNull().default(0n),
+  // Story 5.11: void columns (null until invoice is voided)
+  voided_at:            timestamp('voided_at',    { withTimezone: true }),
+  voided_by_user_id:    uuid('voided_by_user_id'),
+  void_reason:          text('void_reason'),
   created_at:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updated_at:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

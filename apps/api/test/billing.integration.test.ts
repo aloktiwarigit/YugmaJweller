@@ -40,6 +40,7 @@ import { InventoryService }    from '../src/modules/inventory/inventory.service'
 import { PricingService }      from '../src/modules/pricing/pricing.service';
 import { BillingRepository }   from '../src/modules/billing/billing.repository';
 import { BillingService }      from '../src/modules/billing/billing.service';
+import { VoidService }         from '../src/modules/billing/void.service';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -479,5 +480,197 @@ describe('BillingService.createInvoice', () => {
 
     // Invoice-level total must match line total (single-line invoice)
     expect(BigInt(result.totalPaise)).toBe(lineTotal);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Story 5.11 — Void + Credit Note integration tests
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('VoidService — invoice void + credit note (integration)', () => {
+  let voidSvcA: VoidService;
+
+  const ctxOwnerA: AuthenticatedTenantContext = {
+    shopId: SHOP_A, tenant: tenantA, authenticated: true,
+    userId: USER_A, role: 'shop_admin',
+  };
+  const ctxManagerA: AuthenticatedTenantContext = {
+    shopId: SHOP_A, tenant: tenantA, authenticated: true,
+    userId: '33333333-0000-4444-0000-000000000003', role: 'shop_manager',
+  };
+
+  // Helper: create an invoice for SHOP_A and return its id
+  async function createTestInvoice(productId: string, key?: string): Promise<string> {
+    const dto = {
+      invoiceType: 'B2C' as const,
+      customerName: 'Void Test Customer',
+      lines: [{
+        productId,
+        description: 'Gold ring',
+        metalType: 'GOLD' as const,
+        purity: '22K',
+        netWeightG: '10.0000',
+        makingChargePct: '12.00',
+        stoneChargesPaise: '0',
+        hallmarkFeePaise: '0',
+      }],
+    };
+    const inv = await tenantContext.runWith(ctxOwnerA, () => svcA.createInvoice(dto, key ?? newKey()));
+    return inv.id;
+  }
+
+  beforeAll(() => {
+    voidSvcA = new VoidService(pool as never);
+  });
+
+  it('voids invoice within 24h — status becomes VOIDED, product quantity restored', async () => {
+    const productId = await seedProduct({ ctx: ctxOwnerA, shopId: SHOP_A, sku: `void-${newKey()}`, purity: '22K', netWeightG: '10.0000' });
+    const invoiceId = await createTestInvoice(productId);
+
+    // Verify product quantity decremented to 0 after invoice creation
+    const before = await tenantContext.runWith(ctxOwnerA, () =>
+      withTenantTx(pool, (tx) =>
+        tx.query<{ quantity: number; status: string }>(`SELECT quantity, status FROM products WHERE id = $1`, [productId])
+          .then((r) => r.rows[0]!),
+      ),
+    );
+    expect(before.quantity).toBe(0);
+    expect(before.status).toBe('SOLD');
+
+    // Void within 24h
+    const voided = await tenantContext.runWith(ctxOwnerA, () =>
+      voidSvcA.voidInvoice({ userId: USER_A, role: 'shop_admin', shopId: SHOP_A }, invoiceId, { reason: 'test void' }),
+    );
+    expect(voided.status).toBe('VOIDED');
+    expect(voided.void_reason).toBe('test void');
+    expect(voided.voided_by_user_id).toBe(USER_A);
+
+    // Verify product quantity restored to 1, status back to IN_STOCK
+    const after = await tenantContext.runWith(ctxOwnerA, () =>
+      withTenantTx(pool, (tx) =>
+        tx.query<{ quantity: number; status: string }>(`SELECT quantity, status FROM products WHERE id = $1`, [productId])
+          .then((r) => r.rows[0]!),
+      ),
+    );
+    expect(after.quantity).toBe(1);
+    expect(after.status).toBe('IN_STOCK');
+
+    // Verify stock movement ADJUSTMENT_IN was recorded
+    const movements = await tenantContext.runWith(ctxOwnerA, () =>
+      withTenantTx(pool, (tx) =>
+        tx.query<{ type: string; reason: string }>(
+          `SELECT type, reason FROM stock_movements WHERE product_id = $1 AND type = 'ADJUSTMENT_IN'`,
+          [productId],
+        ).then((r) => r.rows),
+      ),
+    );
+    expect(movements.length).toBeGreaterThan(0);
+    expect(movements[0]!.reason).toContain(invoiceId);
+  });
+
+  it('void after 24h window returns 422 window_expired', async () => {
+    const productId = await seedProduct({ ctx: ctxOwnerA, shopId: SHOP_A, sku: `void-expired-${newKey()}` });
+    const invoiceId = await createTestInvoice(productId);
+
+    // Backdate the invoice issued_at to 25h ago to simulate expired window
+    await tenantContext.runWith(ctxOwnerA, () =>
+      withTenantTx(pool, (tx) =>
+        tx.query(
+          `UPDATE invoices SET issued_at = now() - interval '25 hours' WHERE id = $1`,
+          [invoiceId],
+        ),
+      ),
+    );
+
+    try {
+      await tenantContext.runWith(ctxOwnerA, () =>
+        voidSvcA.voidInvoice({ userId: USER_A, role: 'shop_admin', shopId: SHOP_A }, invoiceId, { reason: 'late void' }),
+      );
+      expect.fail('should have thrown');
+    } catch (e: unknown) {
+      const body = (e as { getResponse?: () => Record<string, unknown> }).getResponse?.();
+      expect(body?.code).toBe('billing.void.window_expired');
+    }
+  });
+
+  it('MANAGER cannot void invoice', async () => {
+    const productId = await seedProduct({ ctx: ctxOwnerA, shopId: SHOP_A, sku: `void-mgr-${newKey()}` });
+    const invoiceId = await createTestInvoice(productId);
+    await expect(
+      tenantContext.runWith(ctxOwnerA, () =>
+        voidSvcA.voidInvoice(
+          { userId: ctxManagerA.userId, role: 'shop_manager', shopId: SHOP_A },
+          invoiceId,
+          { reason: 'test' },
+        ),
+      ),
+    ).rejects.toThrow(/* ForbiddenException */);
+  });
+
+  it('issues credit note for ISSUED invoice outside 24h window', async () => {
+    const productId = await seedProduct({ ctx: ctxOwnerA, shopId: SHOP_A, sku: `cn-${newKey()}` });
+    const invoiceId = await createTestInvoice(productId);
+
+    // Backdate issued_at to 26h ago
+    await tenantContext.runWith(ctxOwnerA, () =>
+      withTenantTx(pool, (tx) =>
+        tx.query(
+          `UPDATE invoices SET issued_at = now() - interval '26 hours' WHERE id = $1`,
+          [invoiceId],
+        ),
+      ),
+    );
+
+    const cn = await tenantContext.runWith(ctxOwnerA, () =>
+      voidSvcA.issueCreditNote(
+        { userId: USER_A, role: 'shop_admin', shopId: SHOP_A },
+        invoiceId,
+        { reason: 'customer return' },
+      ),
+    );
+    expect(cn.creditNumber).toMatch(/^CN-/);
+    expect(cn.reason).toBe('customer return');
+    expect(cn.originalInvoiceId).toBe(invoiceId);
+  });
+
+  it('cannot issue duplicate credit note — 409 already_issued', async () => {
+    const productId = await seedProduct({ ctx: ctxOwnerA, shopId: SHOP_A, sku: `cn-dup-${newKey()}` });
+    const invoiceId = await createTestInvoice(productId);
+    await tenantContext.runWith(ctxOwnerA, () =>
+      withTenantTx(pool, (tx) =>
+        tx.query(`UPDATE invoices SET issued_at = now() - interval '26 hours' WHERE id = $1`, [invoiceId]),
+      ),
+    );
+    // First credit note
+    await tenantContext.runWith(ctxOwnerA, () =>
+      voidSvcA.issueCreditNote({ userId: USER_A, role: 'shop_admin', shopId: SHOP_A }, invoiceId, { reason: 'first' }),
+    );
+    // Second credit note on same invoice
+    try {
+      await tenantContext.runWith(ctxOwnerA, () =>
+        voidSvcA.issueCreditNote({ userId: USER_A, role: 'shop_admin', shopId: SHOP_A }, invoiceId, { reason: 'second' }),
+      );
+      expect.fail('should have thrown');
+    } catch (e: unknown) {
+      const body = (e as { getResponse?: () => Record<string, unknown> }).getResponse?.();
+      expect(body?.code).toBe('billing.credit_note.already_issued');
+    }
+  });
+
+  // Tenant isolation: SHOP_B cannot void SHOP_A's invoice
+  it('tenant isolation — cannot void another shop invoice (returns 404)', async () => {
+    const productId = await seedProduct({ ctx: ctxOwnerA, shopId: SHOP_A, sku: `ti-${newKey()}` });
+    const invoiceId = await createTestInvoice(productId);
+
+    const ctxOwnerB: AuthenticatedTenantContext = {
+      shopId: SHOP_B, tenant: tenantB, authenticated: true,
+      userId: USER_B, role: 'shop_admin',
+    };
+
+    await expect(
+      tenantContext.runWith(ctxOwnerB, () =>
+        voidSvcA.voidInvoice({ userId: USER_B, role: 'shop_admin', shopId: SHOP_B }, invoiceId, { reason: 'cross-tenant' }),
+      ),
+    ).rejects.toThrow(/* NotFoundException — RLS hides cross-tenant rows */);
   });
 });

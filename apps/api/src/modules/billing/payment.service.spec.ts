@@ -242,8 +242,8 @@ describe('PaymentService.recordCashPayment — PMLA threshold warnings', () => {
     );
   });
 
-  it('writes PMLA_WARN_THRESHOLD_REACHED audit event in-transaction on FIRST threshold crossing', async () => {
-    // Post-payment total = Rs 8,30,000 (warn), pre-payment = Rs 7,80,000 (ok) → crossing
+  it('writes PMLA_WARN_THRESHOLD_REACHED audit event on FIRST threshold crossing (pre=7.8L→post=8.3L)', async () => {
+    // Pre-payment = Rs 7,80,000 (ok), post = Rs 8,30,000 (warn) → crossing fires
     const pool = fakePool(INVOICE_ROW, 0n, 83_000_000n);
     setupWithTenantTx(pool);
     svc = new PaymentService(pool, fakeQueue());
@@ -257,7 +257,7 @@ describe('PaymentService.recordCashPayment — PMLA threshold warnings', () => {
   });
 
   it('does NOT write audit event or enqueue job when customer is already in warn zone (Rs 9L)', async () => {
-    // Post-payment total = Rs 9L (warn), pre-payment = Rs 8,5L (already warn) → no crossing
+    // Pre-payment = Rs 8,5L (already warn), post = Rs 9L (warn) → no crossing
     const pool = fakePool(INVOICE_ROW, 0n, 90_000_000n);
     setupWithTenantTx(pool);
     const q = fakeQueue();

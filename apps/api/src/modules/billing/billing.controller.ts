@@ -12,12 +12,15 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { TenantWalkerRoute } from '../../common/decorators/tenant-walker-route.decorator';
 import { BillingService } from './billing.service';
 import { PaymentService } from './payment.service';
+import { VoidService } from './void.service';
+import type { CreditNoteResponse } from './void.service';
 
 @Controller('/api/v1/billing')
 export class BillingController {
   constructor(
     private readonly svc: BillingService,
     private readonly payments: PaymentService,
+    private readonly voids: VoidService,
   ) {}
 
   // Walker: missing idempotency-key header → service throws 400 BadRequest.
@@ -113,5 +116,45 @@ export class BillingController {
   ): Promise<{ pan: string }> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.svc.decryptInvoicePan(id);
+  }
+
+  // Void invoice within 24h of issuance. OWNER only.
+  // Returns 422 if outside window (use credit-note instead) or not ISSUED.
+  // Returns 403 if caller is not OWNER.
+  @TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-0000-0000-000000000000' } })
+  @Post('/invoices/:id/void')
+  @Roles('shop_admin')
+  async voidInvoice(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: { reason?: string } | undefined,
+  ): Promise<InvoiceResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    await this.voids.voidInvoice(
+      { userId: ctx.userId, role: ctx.role, shopId: ctx.shopId },
+      id,
+      { reason: dto?.reason ?? '' },
+    );
+    // Fetch with line items so the response is complete (toInvoiceResponse returns lines:[]).
+    return this.svc.getInvoice(id);
+  }
+
+  // Issue a credit note when invoice is older than 24h. OWNER only.
+  // Returns 409 if a credit note already exists for this invoice.
+  // Returns 409 if invoice is still within the void window (use void endpoint instead).
+  @TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-0000-0000-000000000000' } })
+  @Post('/invoices/:id/credit-note')
+  @Roles('shop_admin')
+  async issueCreditNote(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: { reason?: string } | undefined,
+  ): Promise<CreditNoteResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.voids.issueCreditNote(
+      { userId: ctx.userId, role: ctx.role, shopId: ctx.shopId },
+      id,
+      { reason: dto?.reason ?? '' },
+    );
   }
 }

@@ -1,5 +1,6 @@
-import { getPmlaThresholdStatus } from './thresholds';
+import { getPmlaThresholdStatus, PMLA_BLOCK_THRESHOLD_PAISE } from './thresholds';
 import type { PmlaThresholdStatus } from './thresholds';
+import { ComplianceHardBlockError } from '../errors';
 
 export interface PmlaCumulativeResult {
   cumulativePaise: bigint;
@@ -35,8 +36,8 @@ export function istMonthStr(date: Date): string {
 
 // Call INSIDE an active withTenantTx after the 269ST check but BEFORE recording the payment.
 // Atomically upserts the daily pmla_aggregates row (increment) and returns the monthly total.
-// Does NOT throw on warn — caller decides what to do with status.
-// Story 5.6 extends this: caller throws ComplianceHardBlockError on 'block'.
+// Does NOT throw on warn — returns status 'warn' for the caller to surface.
+// Throws ComplianceHardBlockError('compliance.pmla_threshold_blocked') when monthly cumulative >= Rs 10L.
 export async function trackPmlaCumulative(
   tx: DbClient,
   params: {
@@ -87,9 +88,13 @@ export async function trackPmlaCumulative(
   );
 
   const cumulativePaise = BigInt(monthlyRes.rows[0]?.monthly_total ?? '0');
-  return {
-    cumulativePaise,
-    status: getPmlaThresholdStatus(cumulativePaise),
-    monthStr,
-  };
+  const status = getPmlaThresholdStatus(cumulativePaise);
+  if (status === 'block') {
+    throw new ComplianceHardBlockError('compliance.pmla_threshold_blocked', {
+      cumulativePaise: cumulativePaise.toString(),
+      limitPaise:      PMLA_BLOCK_THRESHOLD_PAISE.toString(),
+      monthStr,
+    });
+  }
+  return { cumulativePaise, status, monthStr };
 }

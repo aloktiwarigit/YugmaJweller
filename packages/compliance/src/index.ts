@@ -28,5 +28,7 @@ export {
   trackPmlaCumulative,
   istMonthStr,
   istDateStr,
+  buildCtrDocument,
+  renderCtrText,
 } from './pmla';
-export type { PmlaThresholdStatus, PmlaCumulativeResult } from './pmla';
+export type { PmlaThresholdStatus, PmlaCumulativeResult, CtrDocument } from './pmla';

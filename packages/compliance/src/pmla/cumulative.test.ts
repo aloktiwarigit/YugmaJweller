@@ -95,17 +95,16 @@ describe('trackPmlaCumulative', () => {
     expect(result.status).toBe('warn');
   });
 
-  it('returns block at Rs 10,00,000 exact', async () => {
+  it('throws ComplianceHardBlockError at Rs 10,00,000 exact (story-5.6 hard-block)', async () => {
     const tx = makeDbClient(async (sql) => {
       if (sql.includes('SUM')) return { rows: [{ monthly_total: '100000000' }] };
       return { rows: [] };
     });
 
-    const result = await trackPmlaCumulative(tx, {
+    await expect(trackPmlaCumulative(tx, {
       customerId: null, customerPhone: '9999999999',
       cashIncrementPaise: 10_000_000n, transactionDateIST: new Date(),
-    });
-    expect(result.status).toBe('block');
+    })).rejects.toMatchObject({ code: 'compliance.pmla_threshold_blocked' });
   });
 
   it('month boundary: new month starts fresh (separate SUM scope)', async () => {
