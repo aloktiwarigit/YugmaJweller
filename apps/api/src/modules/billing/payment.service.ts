@@ -16,6 +16,8 @@ import type { CashCapOverride, PmlaCumulativeResult } from '@goldsmith/complianc
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
+import type { Redis } from '@goldsmith/cache';
+import type { PaymentsPort } from '@goldsmith/integrations-payments';
 
 export interface CashPaymentOverride {
   justification: string;
@@ -85,10 +87,33 @@ export interface PmlaCashThresholdWarningJob {
   monthStr:        string;
 }
 
+export interface ManualPaymentDto {
+  method: 'CARD' | 'NET_BANKING' | 'OLD_GOLD' | 'SCHEME';
+  amountPaise: bigint;
+  referenceNumber?: string;
+}
+
+export interface Payment {
+  id: string;
+  invoiceId: string;
+  shopId: string;
+  method: string;
+  amountPaise: bigint;
+  status: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  webhookStatus: string;
+  recordedAt: Date;
+}
+
+const WEBHOOK_IDEM_TTL_SEC = 60 * 60 * 48;
+
 @Injectable()
 export class PaymentService {
   constructor(
     @Inject('PG_POOL') private readonly pool: Pool,
+    @Inject('BILLING_REDIS') private readonly redis: Redis,
+    @Inject('PAYMENTS_ADAPTER') private readonly paymentsAdapter: PaymentsPort,
     @InjectQueue('compliance-pmla') private readonly pmlaQueue: Queue,
   ) {}
 
@@ -400,5 +425,57 @@ export class PaymentService {
       return { pmlaWarning: pmlaWarnFromRetry };
     }
     return {};
+  }
+
+
+  async initiateUpiPayment(ctx: AuthenticatedTenantContext, invoiceId: string, amountPaise: bigint): Promise<{ orderId: string }> {
+    const receiptId = `inv_${invoiceId.slice(0, 8)}_${Date.now()}`;
+    const result = await this.paymentsAdapter.createOrder({ amountPaise, currency: 'INR', receiptId, notes: { invoiceId, shopId: ctx.shopId } });
+    const orderId = result.orderId;
+    await withTenantTx(this.pool, async (tx) => {
+      await tx.query(`INSERT INTO payments (shop_id, invoice_id, method, amount_paise, status, created_by_user_id, razorpay_order_id, webhook_status) VALUES (current_setting('app.current_shop_id', true)::uuid, $1, 'UPI', $2, 'PENDING', $3, $4, 'PENDING')`, [invoiceId, amountPaise, ctx.userId, orderId]);
+      await tx.query(`INSERT INTO audit_events (shop_id, actor_user_id, action, subject_type, subject_id, metadata) VALUES (current_setting('app.current_shop_id', true)::uuid, $1, $2, $3, $4, $5)`, [ctx.userId, AuditAction.PAYMENT_INITIATED, 'invoice', invoiceId, JSON.stringify({ orderId, amountPaise: amountPaise.toString() })]);
+    });
+    return { orderId };
+  }
+
+  async recordManualPayment(ctx: AuthenticatedTenantContext, invoiceId: string, dto: ManualPaymentDto): Promise<Payment> {
+    let paymentId: string | undefined;
+    await withTenantTx(this.pool, async (tx) => {
+      const invRes = await tx.query<{ id: string; status: string }>(`SELECT id, status FROM invoices WHERE id = $1 FOR UPDATE`, [invoiceId]);
+      if (!invRes.rows[0]) throw new NotFoundException({ code: 'invoice.not_found' });
+      if (invRes.rows[0].status !== 'ISSUED') throw new UnprocessableEntityException({ code: 'invoice.not_payable', status: invRes.rows[0].status });
+      const res = await tx.query<{ id: string }>(`INSERT INTO payments (shop_id, invoice_id, method, amount_paise, status, created_by_user_id, webhook_status) VALUES (current_setting('app.current_shop_id', true)::uuid, $1, $2, $3, 'CONFIRMED', $4, 'NA') RETURNING id`, [invoiceId, dto.method, dto.amountPaise, ctx.userId]);
+      paymentId = res.rows[0]!.id;
+      await tx.query(`INSERT INTO audit_events (shop_id, actor_user_id, action, subject_type, subject_id, metadata) VALUES (current_setting('app.current_shop_id', true)::uuid, $1, $2, $3, $4, $5)`, [ctx.userId, AuditAction.PAYMENT_RECORDED, 'invoice', invoiceId, JSON.stringify({ method: dto.method, amountPaise: dto.amountPaise.toString() })]);
+    });
+    return { id: paymentId!, invoiceId, shopId: ctx.shopId, method: dto.method, amountPaise: dto.amountPaise, status: 'CONFIRMED', webhookStatus: 'NA', recordedAt: new Date() };
+  }
+
+  async confirmWebhookPayment(razorpayPaymentId: string, razorpayOrderId: string, shopId: string): Promise<void> {
+    const redisKey = `payments:webhook:${razorpayPaymentId}`;
+    const acquired = await this.redis.set(redisKey, '1', 'EX', WEBHOOK_IDEM_TTL_SEC, 'NX');
+    if (!acquired) return;
+    const res = await this.pool.query<{ id: string; invoice_id: string }>(`SELECT id, invoice_id FROM payments WHERE razorpay_order_id = $1 AND shop_id = $2 AND status = 'PENDING' LIMIT 1`, [razorpayOrderId, shopId]);
+    if (!res.rows[0]) { await this.redis.del(redisKey); return; }
+    const { id: paymentId, invoice_id: invoiceId } = res.rows[0];
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`UPDATE payments SET status='CONFIRMED', webhook_status='CAPTURED', razorpay_payment_id=$1, webhook_received_at=now() WHERE id=$2`, [razorpayPaymentId, paymentId]);
+      await client.query(`INSERT INTO audit_events (shop_id, actor_user_id, action, subject_type, subject_id, metadata) VALUES ($1, NULL, $2, $3, $4, $5)`, [shopId, AuditAction.PAYMENT_RECORDED, 'invoice', invoiceId, JSON.stringify({ source: 'razorpay_webhook', razorpayPaymentId, razorpayOrderId })]);
+      await client.query('COMMIT');
+    } catch (err) { await client.query('ROLLBACK'); await this.redis.del(redisKey); throw err; }
+    finally { client.release(); }
+  }
+
+  async listPayments(invoiceId: string): Promise<Payment[]> {
+    const rows = await new Promise<Payment[]>((resolve, reject) => {
+      withTenantTx(this.pool, async (tx) => {
+        const res = await tx.query<{ id: string; invoice_id: string; shop_id: string; method: string; amount_paise: string; status: string; razorpay_order_id: string | null; razorpay_payment_id: string | null; webhook_status: string; recorded_at: Date; }>(`SELECT id, invoice_id, shop_id, method, amount_paise, status, razorpay_order_id, razorpay_payment_id, webhook_status, recorded_at FROM payments WHERE invoice_id = $1 ORDER BY recorded_at ASC`, [invoiceId]);
+        resolve(res.rows.map(r => ({ id: r.id, invoiceId: r.invoice_id, shopId: r.shop_id, method: r.method, amountPaise: BigInt(r.amount_paise), status: r.status, razorpayOrderId: r.razorpay_order_id ?? undefined, razorpayPaymentId: r.razorpay_payment_id ?? undefined, webhookStatus: r.webhook_status, recordedAt: r.recorded_at })));
+      }).catch(reject);
+    });
+    return rows;
   }
 }
