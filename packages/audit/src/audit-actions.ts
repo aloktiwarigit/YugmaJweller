@@ -56,4 +56,5 @@ export enum AuditAction {
   URD_PURCHASE_RECORDED            = 'URD_PURCHASE_RECORDED',
   URD_APPLIED_TO_INVOICE           = 'URD_APPLIED_TO_INVOICE',
   CRM_NOTE_ADDED                   = 'CRM_NOTE_ADDED',
+  CRM_OCCASION_ADDED               = 'CRM_OCCASION_ADDED',
 }
