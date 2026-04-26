@@ -60,8 +60,11 @@ export class LoyaltyService {
   ) {}
 
   // Worker-driven (no actor user). Idempotency is enforced upstream by the queue.
+  // Reads only ctx.shopId — works with both authenticated (HTTP) and worker-built
+  // (unauthenticated) tenant contexts. Do NOT read ctx.userId or ctx.role here;
+  // the worker context has neither.
   async accruePoints(params: AccruePointsParams): Promise<AccruePointsResult> {
-    const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
+    const ctx = tenantContext.requireCurrent();
 
     const config = (await this.settingsCache.getLoyalty()) ?? LOYALTY_DEFAULTS;
     const pointsDelta = computeAccrualPoints(params.goldValuePaise, config.earnRatePercentage);
@@ -111,7 +114,8 @@ export class LoyaltyService {
   }
 
   async getLoyaltyState(customerId: string): Promise<LoyaltyState> {
-    const exists = await this.repo.customerExists(customerId);
+    const ctx = tenantContext.requireCurrent();
+    const exists = await this.repo.customerExists(ctx.shopId, customerId);
     if (!exists) {
       throw new NotFoundException({ code: 'loyalty.customer_not_found' });
     }
@@ -129,7 +133,8 @@ export class LoyaltyService {
   }
 
   async getRecentTransactions(customerId: string, limit: number): Promise<LoyaltyTransaction[]> {
-    const exists = await this.repo.customerExists(customerId);
+    const ctx = tenantContext.requireCurrent();
+    const exists = await this.repo.customerExists(ctx.shopId, customerId);
     if (!exists) {
       throw new NotFoundException({ code: 'loyalty.customer_not_found' });
     }
@@ -138,13 +143,19 @@ export class LoyaltyService {
   }
 
   async adjustPoints(customerId: string, dto: AdjustPointsBody): Promise<AccruePointsResult> {
-    const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
+    const rawCtx = tenantContext.requireCurrent();
+    // adjustPoints is HTTP-only; controller has already gated on ctx.authenticated.
+    // Runtime guard backs the type cast — fail fast if something ever bypasses the controller.
+    if (!rawCtx.authenticated) {
+      throw new UnprocessableEntityException({ code: 'loyalty.unauthenticated_context' });
+    }
+    const ctx = rawCtx as AuthenticatedTenantContext;
 
     if (dto.pointsDelta === 0) {
       throw new UnprocessableEntityException({ code: 'loyalty.points_delta_nonzero' });
     }
 
-    const exists = await this.repo.customerExists(customerId);
+    const exists = await this.repo.customerExists(ctx.shopId, customerId);
     if (!exists) {
       throw new NotFoundException({ code: 'loyalty.customer_not_found' });
     }

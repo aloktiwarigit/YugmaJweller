@@ -39,7 +39,7 @@ export class LoyaltyEventListener {
 
     // Zero-gold invoices (e.g. all-stones, all-making, all-hallmark fee) accrue no points.
     // Skip the job to save queue/worker overhead; the worker would no-op anyway.
-    if (event.goldValuePaise === '0' || event.goldValuePaise === '') {
+    if (event.goldValuePaise === '0') {
       return;
     }
 

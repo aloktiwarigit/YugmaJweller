@@ -15,8 +15,14 @@ vi.mock('@goldsmith/tenant-context', () => ({
   },
 }));
 
-function fakePool() {
-  return { connect: vi.fn() } as unknown as import('pg').Pool;
+function fakePool(opts: { customerExists?: boolean } = {}) {
+  // For Story 8.1 customerId validation: SELECT EXISTS(...) returns the configured boolean.
+  // Default true so existing tests (which don't set dto.customerId) keep passing.
+  const customerExists = opts.customerExists ?? true;
+  return {
+    connect: vi.fn(),
+    query: vi.fn(async () => ({ rows: [{ exists: customerExists }] })),
+  } as unknown as import('pg').Pool;
 }
 
 function fakeRedis(initial: Record<string, string> = {}) {
@@ -307,6 +313,59 @@ describe('BillingService.createInvoice', () => {
       code: 'invoice.insufficient_quantity',
       productId: 'prod-xyz',
     });
+  });
+
+  // Story 8.1 — customerId tenant-ownership validation drives loyalty accrual
+  it('400s when dto.customerId belongs to another tenant (Story 8.1)', async () => {
+    const repo = fakeRepo();
+    const inv  = fakeInventory();
+    const svc  = new BillingService(
+      repo as any, inv as any, fakePricing() as any,
+      fakeRedis() as any, fakePool({ customerExists: false }), // simulate not-found
+      undefined as any, undefined as any, undefined as any,
+    );
+
+    const err = await svc.createInvoice(
+      {
+        invoiceType: 'B2C',
+        customerId: '99999999-9999-4000-8000-000000000999', // foreign tenant
+        customerName: 'राम',
+        lines: [{ description: 'Manual line', metalType: 'GOLD', purity: 'GOLD_22K', netWeightG: '10.0000', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any],
+      } as any,
+      'idem-foreign-customer',
+    ).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(BadRequestException);
+    expect((err as BadRequestException).getResponse()).toMatchObject({
+      code: 'invoice.customer_not_found',
+    });
+    // No invoice was inserted
+    expect(repo.insertInvoice).not.toHaveBeenCalled();
+  });
+
+  it('persists customerId on InsertInvoiceInput when customer belongs to tenant (Story 8.1)', async () => {
+    const repo = fakeRepo();
+    const inv  = fakeInventory();
+    const svc  = new BillingService(
+      repo as any, inv as any, fakePricing() as any,
+      fakeRedis() as any, fakePool({ customerExists: true }),
+      undefined as any, undefined as any, undefined as any,
+    );
+
+    const validCustomerId = 'eeeeeeee-ffff-4000-8000-000000000003';
+    await svc.createInvoice(
+      {
+        invoiceType: 'B2C',
+        customerId: validCustomerId,
+        customerName: 'राम',
+        lines: [{ description: 'Manual line', metalType: 'GOLD', purity: 'GOLD_22K', netWeightG: '10.0000', makingChargePct: '12.00', stoneChargesPaise: '0', hallmarkFeePaise: '0' } as any],
+      } as any,
+      'idem-valid-customer',
+    );
+
+    expect(repo.insertInvoice).toHaveBeenCalledOnce();
+    const insertCall = (repo.insertInvoice as any).mock.calls[0][0];
+    expect(insertCall.customerId).toBe(validCustomerId);
   });
 });
 

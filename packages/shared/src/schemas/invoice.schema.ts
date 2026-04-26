@@ -34,6 +34,10 @@ export const Form60Schema = z.object({
 });
 
 export const CreateInvoiceSchema = z.object({
+  // Existing CRM customer record. Validated server-side to belong to the current
+  // tenant before persistence. Drives loyalty accrual (Story 8.1) — invoices
+  // without a customerId are treated as walk-ins and accrue no points.
+  customerId:        Uuid.optional(),
   customerName:      z.string().min(1).max(200),
   customerPhone:     PhoneIndia.optional(),
   lines:             z.array(InvoiceLineSchema).min(1).max(50),

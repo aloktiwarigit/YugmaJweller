@@ -147,12 +147,15 @@ export class LoyaltyRepository {
     });
   }
 
-  // Verifies the customer exists and belongs to the current tenant (relies on RLS).
-  async customerExists(customerId: string): Promise<boolean> {
+  // Verifies the customer exists and belongs to the current tenant.
+  // Defense-in-depth: explicit shop_id predicate in addition to RLS scope.
+  // Mirrors family.repository.customerBelongsToShop — never trust RLS alone
+  // at the service boundary.
+  async customerExists(shopId: string, customerId: string): Promise<boolean> {
     return withTenantTx(this.pool, async (tx) => {
       const r = await tx.query(
-        `SELECT 1 FROM customers WHERE id = $1`,
-        [customerId],
+        `SELECT 1 FROM customers WHERE id = $1 AND shop_id = $2`,
+        [customerId, shopId],
       );
       return r.rows.length > 0;
     });
