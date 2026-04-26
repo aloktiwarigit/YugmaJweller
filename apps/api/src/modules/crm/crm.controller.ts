@@ -7,12 +7,15 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { CrmService } from './crm.service';
 import { FamilyService } from './family.service';
+import { NotesService } from './notes.service';
+import type { NoteResponse } from './notes.service';
 
 @Controller('/api/v1/crm')
 export class CrmController {
   constructor(
     private readonly svc: CrmService,
     private readonly familySvc: FamilyService,
+    private readonly notesSvc: NotesService,
   ) {}
 
   @Post('customers') @Roles('shop_admin', 'shop_manager', 'shop_staff')
@@ -54,5 +57,23 @@ export class CrmController {
   async getFamilyLinks(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string): Promise<FamilyMemberResponse[]> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.familySvc.getFamilyLinks(ctx, id);
+  }
+
+  @Post('customers/:id/notes') @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async addNote(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string, @Body() body: { body: string }): Promise<NoteResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.notesSvc.addNote(ctx, id, body.body);
+  }
+
+  @Get('customers/:id/notes') @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async listNotes(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string): Promise<NoteResponse[]> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.notesSvc.listNotes(ctx, id);
+  }
+
+  @Delete('customers/:id/notes/:noteId') @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async deleteNote(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) _id: string, @Param('noteId', ParseUUIDPipe) noteId: string): Promise<void> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.notesSvc.deleteNote(ctx, noteId, ctx.userId, ctx.role);
   }
 }
