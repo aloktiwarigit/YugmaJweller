@@ -77,6 +77,11 @@ export async function trackPmlaCumulative(
 
   // Monthly SUM for the customer identity within this tenant.
   // Uses IS NOT DISTINCT FROM to handle NULLs correctly.
+  // Known limitation (Story 5.6 to address): two concurrent payments for the same customer
+  // on different calendar days (straddling IST midnight) each lock a different daily row,
+  // so this SUM is not serialized across the month. Duplicate warn notifications are possible
+  // in that narrow window; the hard-block in Story 5.6 must use SELECT FOR UPDATE on the
+  // monthly aggregate to prevent concurrent overcounting near the Rs 10L limit.
   const monthlyRes = await tx.query<{ monthly_total: string }>(
     `SELECT COALESCE(SUM(cash_total_paise), 0)::text AS monthly_total
      FROM pmla_aggregates

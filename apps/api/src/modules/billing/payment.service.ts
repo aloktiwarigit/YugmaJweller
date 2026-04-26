@@ -118,8 +118,35 @@ export class PaymentService {
 
     await withTenantTx(this.pool, async (tx) => {
       // ── A. Early idempotency check ─────────────────────────────────────────
+      // When the first request committed but the response was lost (common timeout/retry),
+      // reconstruct the PMLA warning from the current monthly aggregate so the response
+      // is consistent. Requires an invoice fetch for customer identity.
       const earlyIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
-      if (earlyIdem.rows[0]) return;
+      if (earlyIdem.rows[0]) {
+        const earlyInv = await tx.query<{ customer_id: string | null; customer_phone: string | null }>(
+          `SELECT customer_id, customer_phone FROM invoices WHERE id = $1`,
+          [invoiceId],
+        );
+        if (earlyInv.rows[0]) {
+          const eCustomerId = earlyInv.rows[0].customer_id;
+          const eCustomerPhone = eCustomerId ? null : normalizePhone(earlyInv.rows[0].customer_phone);
+          const eMonthStr = istMonthStr(new Date());
+          const eRes = await tx.query<{ monthly_total: string }>(
+            `SELECT COALESCE(SUM(cash_total_paise), 0)::text AS monthly_total
+             FROM pmla_aggregates
+             WHERE aggregate_month = $1
+               AND (customer_id IS NOT DISTINCT FROM $2::uuid)
+               AND (customer_phone IS NOT DISTINCT FROM $3)`,
+            [eMonthStr, eCustomerId, eCustomerPhone],
+          );
+          const eCumulative = BigInt(eRes.rows[0]?.monthly_total ?? '0');
+          if (getPmlaThresholdStatus(eCumulative) === 'warn') {
+            pmlaResult = { cumulativePaise: eCumulative, status: 'warn' as const, monthStr: eMonthStr };
+            pmlaWarnRetry = true;
+          }
+        }
+        return;
+      }
 
       // ── B. Verify invoice — lock row to serialize concurrent payments ───────
       const invRes = await tx.query<{
