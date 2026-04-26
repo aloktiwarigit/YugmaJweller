@@ -21,7 +21,7 @@ export interface CashPaymentOverride {
 function normalizePhone(phone: string | null | undefined): string | null {
   if (!phone) return null;
   // Strip spaces, dashes, parentheses, then remove leading +91 or 91 (10-digit numbers)
-  const digits = phone.replace(/[\s\-\(\)\.]/g, '').replace(/^\+?91(?=\d{10}$)/, '');
+  const digits = phone.replace(/[\s\-().]/g, '').replace(/^\+?91(?=\d{10}$)/, '');
   return digits.length > 0 ? digits : null;
 }
 
