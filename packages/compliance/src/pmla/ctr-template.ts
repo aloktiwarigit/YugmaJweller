@@ -35,7 +35,7 @@ export function buildCtrDocument(params: {
 }
 
 export function renderCtrText(doc: CtrDocument): string {
-  const paise2Rs = (p: bigint) => `Rs ${(Number(p) / 100).toFixed(2)}`;
+  const paise2Rs = (p: bigint): string => `Rs ${(Number(p) / 100).toFixed(2)}`;
 
   const txLines = doc.transactions
     .map(t => `  ${t.date}  ${t.invoiceNumber.padEnd(20)}  ${paise2Rs(t.amountPaise)}`)

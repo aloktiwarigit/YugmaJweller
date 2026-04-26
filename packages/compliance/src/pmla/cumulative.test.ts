@@ -95,7 +95,7 @@ describe('trackPmlaCumulative', () => {
     expect(result.status).toBe('warn');
   });
 
-  it('returns block at Rs 10,00,000 exact', async () => {
+  it('returns block status at Rs 10,00,000 exact (Story 5.6 will hard-block at caller)', async () => {
     const tx = makeDbClient(async (sql) => {
       if (sql.includes('SUM')) return { rows: [{ monthly_total: '100000000' }] };
       return { rows: [] };
