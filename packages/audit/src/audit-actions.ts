@@ -1,4 +1,4 @@
-﻿export enum AuditAction {
+export enum AuditAction {
   AUTH_VERIFY_SUCCESS      = 'AUTH_VERIFY_SUCCESS',
   AUTH_VERIFY_FAILURE      = 'AUTH_VERIFY_FAILURE',
   AUTH_VERIFY_LOCKED       = 'AUTH_VERIFY_LOCKED',
