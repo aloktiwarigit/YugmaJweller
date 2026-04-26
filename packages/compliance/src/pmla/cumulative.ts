@@ -57,7 +57,7 @@ export async function trackPmlaCumulative(
   // Atomic upsert: create the daily row with cashIncrementPaise, or add to existing.
   // invoice_count is only incremented when this is the first cash payment for the invoice
   // so split payments (multiple installments) count as one invoice in the aggregate.
-  await tx.query(
+  await tx.query( // nosemgrep: goldsmith.require-tenant-transaction -- tx is provided by caller inside withTenantTx; this function has no pool access
     `INSERT INTO pmla_aggregates
        (shop_id, customer_id, customer_phone, aggregate_date, aggregate_month,
         cash_total_paise, invoice_count)
@@ -77,7 +77,7 @@ export async function trackPmlaCumulative(
 
   // Monthly SUM for the customer identity within this tenant.
   // Uses IS NOT DISTINCT FROM to handle NULLs correctly.
-  const monthlyRes = await tx.query<{ monthly_total: string }>(
+  const monthlyRes = await tx.query<{ monthly_total: string }>( // nosemgrep: goldsmith.require-tenant-transaction
     `SELECT COALESCE(SUM(cash_total_paise), 0)::text AS monthly_total
      FROM pmla_aggregates
      WHERE aggregate_month = $1

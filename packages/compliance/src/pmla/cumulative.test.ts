@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { trackPmlaCumulative, istDateStr, istMonthStr } from './cumulative';
 
 // ─── IST date/month helpers ──────────────────────────────────────────────────
@@ -29,7 +29,10 @@ describe('istDateStr / istMonthStr — IST boundary', () => {
 // ─── trackPmlaCumulative DB logic ────────────────────────────────────────────
 
 function makeDbClient(queryFn: (sql: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>) {
-  return { query: queryFn };
+  // Cast to the generic DbClient signature — the mock returns Record<string,unknown>[]
+  // which is the non-generic base; safe because tests only read known keys.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { query: queryFn as any };
 }
 
 describe('trackPmlaCumulative', () => {
