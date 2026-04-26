@@ -136,24 +136,37 @@ export class PaymentService {
       }
 
       // ── C. Acquire aggregate row lock (IST date, TOCTOU-safe) ──────────────
-      const aggRes = await tx.query<{ cash_total_paise: string }>(
+      // aggregate_date/month come from DB's NOW() — capture them here so step G
+      // uses the same day bucket rather than JS new Date() which can diverge at
+      // IST midnight if app and DB clocks differ by even one second.
+      const aggRes = await tx.query<{ cash_total_paise: string; aggregate_date: string; aggregate_month: string }>(
         FETCH_OR_INIT_AGGREGATE_SQL,
         [customerId ?? null, customerPhone ?? null],
       );
       const existingDailyPaise = BigInt(aggRes.rows[0]?.cash_total_paise ?? '0');
+      // IST midnight of the aggregate_date — passed to trackPmlaCumulative so both
+      // the 269ST lock and the PMLA upsert target the same calendar day.
+      const aggDateIST = aggRes.rows[0]?.aggregate_date
+        ? new Date(`${aggRes.rows[0].aggregate_date}T00:00:00+05:30`)
+        : new Date();
 
       // ── D. Late idempotency check (post-lock) ──────────────────────────────
       const lateIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
       if (lateIdem.rows[0]) return;
 
       // ── E. Balance check ────────────────────────────────────────────────────
-      const paidRes = await tx.query<{ paid: string }>(
-        `SELECT COALESCE(SUM(amount_paise), 0)::text AS paid
+      const paidRes = await tx.query<{ paid: string; cash_count: string }>(
+        `SELECT COALESCE(SUM(amount_paise), 0)::text AS paid,
+                COUNT(*) FILTER (WHERE method = 'CASH')::text AS cash_count
          FROM payments
          WHERE invoice_id = $1 AND status != 'FAILED'`,
         [invoiceId],
       );
       const alreadyPaidPaise = BigInt(paidRes.rows[0]?.paid ?? '0');
+      // True only when this is the first cash payment for this invoice.
+      // Passed to trackPmlaCumulative so invoice_count is incremented once
+      // per invoice, not once per payment installment.
+      const isFirstCashPayment = Number(paidRes.rows[0]?.cash_count ?? '0') === 0;
       const invoiceTotalPaise = BigInt(total_paise);
       const remainingBalancePaise = invoiceTotalPaise - alreadyPaidPaise;
       if (amountPaise > remainingBalancePaise) {
@@ -193,10 +206,11 @@ export class PaymentService {
       // Upserts the daily row (INSERT ON CONFLICT DO UPDATE with increment),
       // then queries the monthly SUM. Returns warn/block/ok status.
       pmlaResult = await trackPmlaCumulative(tx, {
-        customerId:         customerId ?? null,
-        customerPhone:      customerPhone ?? null,
-        cashIncrementPaise: amountPaise,
-        transactionDateIST: new Date(),
+        customerId:           customerId ?? null,
+        customerPhone:        customerPhone ?? null,
+        cashIncrementPaise:   amountPaise,
+        transactionDateIST:   aggDateIST,      // P1b fix: same IST date as step C's lock
+        incrementInvoiceCount: isFirstCashPayment, // P2 fix: count per invoice, not per installment
       });
 
       // ── H. Insert payment record ───────────────────────────────────────────

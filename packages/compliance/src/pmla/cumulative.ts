@@ -40,19 +40,23 @@ export function istMonthStr(date: Date): string {
 export async function trackPmlaCumulative(
   tx: DbClient,
   params: {
-    customerId:         string | null;
-    customerPhone:      string | null;
-    cashIncrementPaise: bigint;
-    transactionDateIST: Date;
+    customerId:             string | null;
+    customerPhone:          string | null;
+    cashIncrementPaise:     bigint;
+    transactionDateIST:     Date;
+    incrementInvoiceCount?: boolean; // default true; pass false for 2nd+ installment on same invoice
   },
 ): Promise<PmlaCumulativeResult> {
-  const { customerId, customerPhone, cashIncrementPaise, transactionDateIST } = params;
+  const {
+    customerId, customerPhone, cashIncrementPaise,
+    transactionDateIST, incrementInvoiceCount = true,
+  } = params;
   const dateStr  = istDateStr(transactionDateIST);
   const monthStr = dateStr.slice(0, 7);
 
   // Atomic upsert: create the daily row with cashIncrementPaise, or add to existing.
-  // The ON CONFLICT constraint name is pmla_aggregates_unique (defined in migration 0024).
-  // aggregate_month is stored alongside aggregate_date so monthly SUM queries are index-only.
+  // invoice_count is only incremented when this is the first cash payment for the invoice
+  // so split payments (multiple installments) count as one invoice in the aggregate.
   await tx.query(
     `INSERT INTO pmla_aggregates
        (shop_id, customer_id, customer_phone, aggregate_date, aggregate_month,
@@ -60,14 +64,15 @@ export async function trackPmlaCumulative(
      VALUES (
        current_setting('app.current_shop_id', true)::uuid,
        $1, $2, $3::date, $4,
-       $5, 1
+       $5, $6
      )
      ON CONFLICT ON CONSTRAINT pmla_aggregates_unique
      DO UPDATE SET
        cash_total_paise = pmla_aggregates.cash_total_paise + EXCLUDED.cash_total_paise,
-       invoice_count    = pmla_aggregates.invoice_count + 1,
+       invoice_count    = pmla_aggregates.invoice_count + EXCLUDED.invoice_count,
        updated_at       = now()`,
-    [customerId, customerPhone, dateStr, monthStr, cashIncrementPaise],
+    [customerId, customerPhone, dateStr, monthStr, cashIncrementPaise,
+     incrementInvoiceCount ? 1 : 0],
   );
 
   // Monthly SUM for the customer identity within this tenant.
