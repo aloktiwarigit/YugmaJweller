@@ -9,6 +9,7 @@ import {
   SECTION_269ST_LIMIT_PAISE,
   trackPmlaCumulative,
   getPmlaThresholdStatus,
+  istMonthStr,
 } from '@goldsmith/compliance';
 import type { CashCapOverride, PmlaCumulativeResult } from '@goldsmith/compliance';
 import { AuditAction } from '@goldsmith/audit';
@@ -111,6 +112,9 @@ export class PaymentService {
     // True only on the payment that crosses into warn — prevents duplicate audit/notification
     // on every subsequent payment when customer is already above Rs 8L in that month.
     let crossedWarnThreshold = false;
+    // True on a late-idem retry: reconstruct pmlaWarning for a consistent response
+    // without emitting a duplicate audit event or BullMQ notification.
+    let pmlaWarnRetry = false;
 
     await withTenantTx(this.pool, async (tx) => {
       // ── A. Early idempotency check ─────────────────────────────────────────
@@ -157,8 +161,26 @@ export class PaymentService {
         : new Date();
 
       // ── D. Late idempotency check (post-lock) ──────────────────────────────
+      // Customer identity and aggDateIST are available from step C, so we can
+      // reconstruct the PMLA warning status on retry without a duplicate event/job.
       const lateIdem = await tx.query<{ id: string }>(CHECK_PAYMENT_IDEM_SQL, [idempotencyKey, invoiceId, amountPaise]);
-      if (lateIdem.rows[0]) return;
+      if (lateIdem.rows[0]) {
+        const retryMonthStr = aggRes.rows[0]?.aggregate_month ?? istMonthStr(aggDateIST);
+        const retryRes = await tx.query<{ monthly_total: string }>(
+          `SELECT COALESCE(SUM(cash_total_paise), 0)::text AS monthly_total
+           FROM pmla_aggregates
+           WHERE aggregate_month = $1
+             AND (customer_id IS NOT DISTINCT FROM $2::uuid)
+             AND (customer_phone IS NOT DISTINCT FROM $3)`,
+          [retryMonthStr, customerId ?? null, customerPhone ?? null],
+        );
+        const retryCumulative = BigInt(retryRes.rows[0]?.monthly_total ?? '0');
+        if (getPmlaThresholdStatus(retryCumulative) === 'warn') {
+          pmlaResult = { cumulativePaise: retryCumulative, status: 'warn' as const, monthStr: retryMonthStr };
+          pmlaWarnRetry = true;
+        }
+        return;
+      }
 
       // ── E. Balance check ────────────────────────────────────────────────────
       const paidRes = await tx.query<{ paid: string; cash_count: string }>(
@@ -218,14 +240,12 @@ export class PaymentService {
         transactionDateIST:   aggDateIST,      // P1b fix: same IST date as step C's lock
         incrementInvoiceCount: isFirstCashPayment, // invoice_count: count per invoice, not per installment
       });
-      // Detect threshold crossing: only fire warn once (pre-payment was ok, post is warn).
-      // Fire on the first payment that moves the customer out of the 'ok' band.
-      // 'ok' → 'warn': normal case (Rs 8L threshold crossed).
-      // 'ok' → 'block': single large payment skipped the warn band entirely (admin override).
-      // 'warn' → 'block': already notified; Story 5.6 handles the hard block.
+      // Detect warn-zone threshold crossing. Only fires on the first payment that moves
+      // the customer from 'ok' into 'warn'. 'block' crossings are Story 5.6's concern
+      // and do not get warn-state side-effects (audit event, job, response pmlaWarning).
       const prePaymentMonthlyPaise = pmlaResult.cumulativePaise - amountPaise;
       const prePmlaStatus = getPmlaThresholdStatus(prePaymentMonthlyPaise);
-      crossedWarnThreshold = prePmlaStatus === 'ok' && pmlaResult.status !== 'ok';
+      crossedWarnThreshold = prePmlaStatus === 'ok' && pmlaResult.status === 'warn';
 
       // ── H. Insert payment record ───────────────────────────────────────────
       try {
@@ -319,7 +339,10 @@ export class PaymentService {
       void this.pmlaQueue.add('cash-threshold-warning', job).catch(() => undefined);
     }
 
-    return crossedWarnThreshold && capturedPmla
+    // Consistent response: return pmlaWarning on first warn crossing OR on a late-idem
+    // retry where we reconstructed the PMLA status (pmlaWarnRetry). Retries do not
+    // emit a duplicate audit event or BullMQ job (crossedWarnThreshold remains false).
+    return (crossedWarnThreshold || pmlaWarnRetry) && capturedPmla
       ? {
           pmlaWarning: {
             cumulativePaise: capturedPmla.cumulativePaise.toString(),
