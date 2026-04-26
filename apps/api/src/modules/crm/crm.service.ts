@@ -95,7 +95,7 @@ export class CrmService {
     if (!row) throw new NotFoundException({ code: 'crm.customer_not_found' });
     void auditLog(this.pool, {
       action: AuditAction.CRM_CUSTOMER_UPDATED, subjectType: 'customer', subjectId: id, actorUserId: ctx.userId,
-      after: { ...dto, pan: dto.pan ? 'PAN_REDACTED' : undefined },
+      after: { fieldsUpdated: Object.keys(dto).filter(k => k !== 'pan'), panUpdated: 'pan' in dto },
     }).catch(() => undefined);
     return rowToResponse(row);
   }
@@ -107,6 +107,12 @@ export class CrmService {
   private async getShopKekArn(shopUuid: string): Promise<string> {
     const r = await this.pool.query<{ kek_key_arn: string | null }>(`SELECT kek_key_arn FROM shops WHERE id = $1`, [shopUuid]);
     const arn = r.rows[0]?.kek_key_arn;
-    return arn ?? `shop:${shopUuid}`;
+    if (!arn) {
+      throw new Error(
+        `KMS key ARN not configured for shop ${shopUuid}. ` +
+        `Cannot encrypt PAN — set kek_key_arn on the shop record.`
+      );
+    }
+    return arn;
   }
 }
