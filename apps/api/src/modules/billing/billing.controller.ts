@@ -19,6 +19,8 @@ import { ShareService } from './share.service';
 import type { ShareWhatsAppResult } from './share.service';
 import { GstrExportService } from './gstr-export.service';
 import type { GstrType } from './gstr-export.service';
+import { UrdService } from './urd.service';
+import type { RecordUrdPurchaseDto, UrdPurchaseResponse } from './urd.service';
 
 @Controller('/api/v1/billing')
 export class BillingController {
@@ -28,6 +30,7 @@ export class BillingController {
     @Inject(VoidService)       private readonly voids: VoidService,
     @Inject(ShareService)      private readonly share: ShareService,
     @Inject(GstrExportService) private readonly gstr: GstrExportService,
+    @Inject(UrdService)        private readonly urd: UrdService,
   ) {}
 
   // Walker: missing idempotency-key header → service throws 400 BadRequest.
