@@ -82,6 +82,10 @@ module.exports = {
         '**/apps/api/src/modules/crm/crm.module.ts',
         'apps/api/src/workers/compliance-pmla.processor.ts',
         '**/apps/api/src/workers/compliance-pmla.processor.ts',
+        'apps/api/src/modules/crm/crm.module.ts',
+        '**/apps/api/src/modules/crm/crm.module.ts',
+        'apps/api/src/modules/crm/dpdpa-deletion.service.ts',
+        '**/apps/api/src/modules/crm/dpdpa-deletion.service.ts',
       ],
       rules: {
         'no-restricted-imports': ['error', {
