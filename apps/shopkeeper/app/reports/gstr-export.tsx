@@ -19,8 +19,26 @@ function formatMonthLabel(month: string): string {
   return new Intl.DateTimeFormat('hi-IN', { month: 'long', year: 'numeric' }).format(d);
 }
 
+// MVP scope: the CSV is shared as message text via React Native's Share API.
+// Receiver apps cap EXTRA_TEXT around 100 KB on Android, so very large months
+// will be truncated by the receiver. SHARE_TEXT_LIMIT_BYTES forces a clear
+// Hindi error in that case rather than silently producing a corrupt file.
+// Phase-4 follow-up: wire expo-file-system + expo-sharing to write the CSV
+// to documentDirectory and pass a file URI to Sharing.shareAsync().
+const SHARE_TEXT_LIMIT_BYTES = 80 * 1024;
+
+class GstrTooLargeError extends Error {
+  constructor() { super('csv_too_large_for_share'); }
+}
+
+function utf8ByteLength(s: string): number {
+  // TextEncoder is available in modern React Native (Hermes 0.74+).
+  return new TextEncoder().encode(s).length;
+}
+
 async function downloadGstr(month: string, type: GstrType): Promise<void> {
   const res = await api.get<GstrResponse>('/api/v1/billing/compliance/gstr', { params: { month, type } });
+  if (utf8ByteLength(res.data.csv) > SHARE_TEXT_LIMIT_BYTES) throw new GstrTooLargeError();
   await Share.share({ title: res.data.filename, message: res.data.csv });
 }
 
@@ -32,9 +50,17 @@ export default function GstrExportScreen(): JSX.Element {
   const handleExport = async (type: GstrType): Promise<void> => {
     setError(null);
     setExporting(type);
-    try { await downloadGstr(month, type); }
-    catch { setError('Export नहीं हो सका। दोबारा कोशिश करें।'); }
-    finally { setExporting(null); }
+    try {
+      await downloadGstr(month, type);
+    } catch (err) {
+      if (err instanceof GstrTooLargeError) {
+        setError('यह महीना बहुत बड़ा है — कृपया छोटा महीना चुनें या CI से डाउनलोड करें।');
+      } else {
+        setError('Export नहीं हो सका। दोबारा कोशिश करें।');
+      }
+    } finally {
+      setExporting(null);
+    }
   };
 
   const shiftMonth = (delta: number): void => {

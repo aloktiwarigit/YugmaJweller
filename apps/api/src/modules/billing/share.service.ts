@@ -59,7 +59,7 @@ export class ShareService {
       action: AuditAction.INVOICE_SHARED,
       subjectType: 'invoice',
       subjectId: invoiceId,
-      metadata: { method: 'whatsapp' },
+      metadata: { method: 'whatsapp', phoneResolved: waPhone !== null },
       actorUserId: ctx.authenticated ? ctx.userId : undefined,
     });
 

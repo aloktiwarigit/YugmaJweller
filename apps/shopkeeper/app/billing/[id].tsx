@@ -23,6 +23,7 @@ export default function InvoiceDetailScreen(): JSX.Element {
   const userRole = useAuthStore((s) => s.user?.role);
   const [voidSheetVisible, setVoidSheetVisible] = useState(false);
   const [celebrationVisible, setCelebrationVisible] = useState(celebrate === '1');
+  const [shareError, setShareError] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery<InvoiceResponse>({
     queryKey: ['invoice', id],
@@ -35,8 +36,12 @@ export default function InvoiceDetailScreen(): JSX.Element {
       api
         .post<ShareResult>(`/api/v1/billing/invoices/${id}/share/whatsapp`)
         .then((r) => r.data),
+    onMutate: () => setShareError(null),
     onSuccess: (result) => {
       void Linking.openURL(result.whatsappUrl);
+    },
+    onError: () => {
+      setShareError('Share नहीं हो सका। दोबारा कोशिश करें।');
     },
   });
 
@@ -114,9 +119,17 @@ export default function InvoiceDetailScreen(): JSX.Element {
         visible={celebrationVisible}
         invoiceNumber={data.invoiceNumber}
         totalFormatted={paiseToRupees(data.totalPaise)}
-        onShare={() => shareMutation.mutate()}
+        onShare={() => {
+          if (!shareMutation.isPending) shareMutation.mutate();
+        }}
         onDismiss={() => setCelebrationVisible(false)}
       />
+
+      {shareError ? (
+        <View style={styles.shareErrorBanner} accessibilityRole="alert">
+          <Text style={styles.shareErrorText}>{shareError}</Text>
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -196,5 +209,18 @@ const styles = StyleSheet.create({
     fontFamily: 'NotoSansDevanagari',
     color: '#a8a29e',
     marginTop: 4,
+  },
+  shareErrorBanner: {
+    marginTop: 12,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    borderRadius: 10,
+    padding: 12,
+  },
+  shareErrorText: {
+    fontSize: 14,
+    fontFamily: 'NotoSansDevanagari',
+    color: '#b91c1c',
   },
 });

@@ -148,6 +148,12 @@ function buildInvoiceHtml(
 </html>`;
 }
 
+// MVP scope: this service produces a self-contained HTML invoice (.html stored
+// in object storage), not a binary PDF. The HTML renders correctly in any
+// mobile browser and is the link customers receive over WhatsApp. A real
+// PDF binary (Puppeteer / wkhtmltopdf) is a Phase 4+ addition; the service
+// name + result.publicUrl are kept as `pdf` for future-proofing — when binary
+// PDF lands, only the storage key extension and Content-Type change.
 @Injectable()
 export class InvoicePdfService {
   constructor(
