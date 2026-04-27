@@ -14,6 +14,10 @@ import { BillingService } from './billing.service';
 import { PaymentService } from './payment.service';
 import { VoidService } from './void.service';
 import type { CreditNoteResponse } from './void.service';
+import { ShareService } from './share.service';
+import type { ShareWhatsAppResult } from './share.service';
+import { GstrExportService } from './gstr-export.service';
+import type { GstrType } from './gstr-export.service';
 
 @Controller('/api/v1/billing')
 export class BillingController {
@@ -21,6 +25,8 @@ export class BillingController {
     private readonly svc: BillingService,
     private readonly payments: PaymentService,
     private readonly voids: VoidService,
+    private readonly share: ShareService,
+    private readonly gstr: GstrExportService,
   ) {}
 
   // Walker: missing idempotency-key header → service throws 400 BadRequest.
@@ -156,5 +162,35 @@ export class BillingController {
       id,
       { reason: dto?.reason ?? '' },
     );
+  }
+
+  @TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-0000-0000-000000000000' } })
+  @Post('/invoices/:id/share/whatsapp')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async shareWhatsApp(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ShareWhatsAppResult> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.share.shareInvoiceWhatsApp(id);
+  }
+
+  @TenantWalkerRoute({ expectedStatus: 400 })
+  @Get('/compliance/gstr')
+  @Roles('shop_admin')
+  async exportGstr(
+    @TenantContextDec() ctx: TenantContext,
+    @Query('month') month: string,
+    @Query('type') type: GstrType,
+  ): Promise<{ csv: string; filename: string }> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (!month) throw new BadRequestException({ code: 'gstr.month_required' });
+    if (type !== 'gstr1' && type !== 'gstr3b') {
+      throw new BadRequestException({ code: 'gstr.invalid_type' });
+    }
+    const csv = type === 'gstr1'
+      ? await this.gstr.generateGstr1Csv(month)
+      : await this.gstr.generateGstr3bSummary(month);
+    return { csv, filename: `${type}-${month}.csv` };
   }
 }
