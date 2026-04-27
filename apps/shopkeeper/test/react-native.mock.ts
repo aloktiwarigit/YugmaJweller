@@ -43,10 +43,24 @@ const TextInputMock = React.forwardRef<unknown, AnyProps>(
   },
 );
 
+// Modal renders children inline when visible; null when not visible.
+const ModalMock = React.forwardRef<unknown, AnyProps>(
+  ({ visible, children, testID, ...rest }, ref) => {
+    if (visible === false) return null;
+    const extraProps: AnyProps = {};
+    if (testID !== undefined) extraProps['data-testid'] = testID;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock shim @why
+    return React.createElement('modal', { ...(rest as any), ...extraProps, ref }, children as React.ReactNode);
+  },
+);
+
 export const View = passthrough('view');
 export const Text = passthrough('text');
 export const Pressable = PressableMock;
 export const TextInput = TextInputMock;
+export const Modal = ModalMock;
+export const ScrollView = passthrough('scroll-view');
+export const ActivityIndicator = passthrough('activity-indicator');
 export const StyleSheet = {
   create: <T>(s: T): T => s,
   flatten: (s: unknown): Record<string, unknown> =>
