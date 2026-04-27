@@ -163,7 +163,7 @@ export class InvoicePdfService {
     const data = await this.repo.getInvoice(invoiceId);
     if (!data) throw new NotFoundException({ code: 'invoice.not_found' });
 
-    const shopRow = await this.fetchShopRow(ctx.shopId);
+    const shopRow = await this.fetchShopRow();
     const address = shopRow.address_json
       ? this.formatAddress(shopRow.address_json as Record<string, unknown>)
       : '';
@@ -183,11 +183,12 @@ export class InvoicePdfService {
     return { storageKey: key, publicUrl };
   }
 
-  private async fetchShopRow(shopId: string): Promise<ShopRow> {
+  private async fetchShopRow(): Promise<ShopRow> {
+    const ctx = tenantContext.requireCurrent();
     return withTenantTx(this.pool, async (tx) => {
       const r = await tx.query<ShopRow>(
         `SELECT display_name, gstin, address_json, logo_url FROM shops WHERE id = $1`,
-        [shopId],
+        [ctx.shopId],
       );
       if (!r.rows[0]) throw new NotFoundException({ code: 'shop.not_found' });
       return r.rows[0];
