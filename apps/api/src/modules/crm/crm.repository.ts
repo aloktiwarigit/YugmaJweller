@@ -47,15 +47,17 @@ export class CrmRepository {
       const dataParams: unknown[] = [limit, offset];
       if (q) dataParams.push(`%${q}%`);
       const countParams = q ? [`%${q}%`] : [];
-      const dataQ = await tx.query<CustomerRow>(`SELECT * FROM customers WHERE shop_id = current_setting('app.current_shop_id')::uuid ${dataFilter} ORDER BY created_at DESC LIMIT $1 OFFSET $2`, dataParams);
-      const countQ = await tx.query<{ total: string }>(`SELECT COUNT(*)::text AS total FROM customers WHERE shop_id = current_setting('app.current_shop_id')::uuid ${countFilter}`, countParams);
+      // deleted_at IS NULL excludes DPDPA-soft-deleted customers (Story 6.8).
+      const dataQ = await tx.query<CustomerRow>(`SELECT * FROM customers WHERE shop_id = current_setting('app.current_shop_id')::uuid AND deleted_at IS NULL ${dataFilter} ORDER BY created_at DESC LIMIT $1 OFFSET $2`, dataParams);
+      const countQ = await tx.query<{ total: string }>(`SELECT COUNT(*)::text AS total FROM customers WHERE shop_id = current_setting('app.current_shop_id')::uuid AND deleted_at IS NULL ${countFilter}`, countParams);
       return { rows: dataQ.rows, total: parseInt(countQ.rows[0].total, 10) };
     });
   }
 
   async getCustomerById(id: string): Promise<CustomerRow | null> {
     return withTenantTx(this.pool, async (tx) => {
-      const r = await tx.query<CustomerRow>(`SELECT * FROM customers WHERE id = $1 AND shop_id = current_setting('app.current_shop_id')::uuid`, [id]);
+      // deleted_at IS NULL excludes DPDPA-soft-deleted customers (Story 6.8).
+      const r = await tx.query<CustomerRow>(`SELECT * FROM customers WHERE id = $1 AND shop_id = current_setting('app.current_shop_id')::uuid AND deleted_at IS NULL`, [id]);
       return r.rows[0] ?? null;
     });
   }
