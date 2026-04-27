@@ -43,4 +43,5 @@ export enum AuditAction {
   PMLA_BLOCK_THRESHOLD_REACHED     = 'PMLA_BLOCK_THRESHOLD_REACHED', // reserved for Story 5.6
   INVOICE_VOIDED                   = 'INVOICE_VOIDED',
   CREDIT_NOTE_ISSUED               = 'CREDIT_NOTE_ISSUED',
+  INVOICE_SHARED                   = 'INVOICE_SHARED',
 }
