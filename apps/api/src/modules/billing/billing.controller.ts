@@ -1,5 +1,5 @@
 import {
-  BadRequestException, Body, Controller, Get, Headers, Param, Post, Query,
+  BadRequestException, Body, Controller, Get, Headers, Inject, Param, Post, Query,
   ParseIntPipe, ParseUUIDPipe, UnauthorizedException,
 } from '@nestjs/common';
 import { TenantContextDec } from '@goldsmith/tenant-context';
@@ -22,11 +22,11 @@ import type { GstrType } from './gstr-export.service';
 @Controller('/api/v1/billing')
 export class BillingController {
   constructor(
-    private readonly svc: BillingService,
-    private readonly payments: PaymentService,
-    private readonly voids: VoidService,
-    private readonly share: ShareService,
-    private readonly gstr: GstrExportService,
+    @Inject(BillingService)    private readonly svc: BillingService,
+    @Inject(PaymentService)    private readonly payments: PaymentService,
+    @Inject(VoidService)       private readonly voids: VoidService,
+    @Inject(ShareService)      private readonly share: ShareService,
+    @Inject(GstrExportService) private readonly gstr: GstrExportService,
   ) {}
 
   // Walker: missing idempotency-key header → service throws 400 BadRequest.

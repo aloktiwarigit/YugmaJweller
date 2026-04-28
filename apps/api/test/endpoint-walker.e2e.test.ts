@@ -40,6 +40,10 @@ describeFn('endpoint-walker — real tenant-scoped assertions (E2-S1 deferral #4
   const seeded: SeededTenantToken[] = [];
 
   beforeAll(async () => {
+    // Clear any stale emulator host set by prior test files in the same run.
+    // Without this, startFirebaseAuthEmulator reuses the prior test's emulator
+    // (different project) and verifyIdToken fails for our goldsmith-walker-test tokens.
+    delete process.env['FIREBASE_AUTH_EMULATOR_HOST'];
     ({ port: emulatorPort } = await startFirebaseAuthEmulator({ projectId }));
     container = await new PostgreSqlContainer('postgres:15.6').start();
     pool = createPool({ connectionString: container.getConnectionUri() });
