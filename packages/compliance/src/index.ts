@@ -41,3 +41,4 @@ export {
   enforce269ss,
 } from './cash-restriction/section-269ss';
 export type { CashRestrictionType } from './cash-restriction/section-269ss';
+export { TCS_THRESHOLD_PAISE, TCS_RATE_BP, computeTcs } from './tcs/tcs-206c';

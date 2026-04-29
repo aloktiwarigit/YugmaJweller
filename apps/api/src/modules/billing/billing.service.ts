@@ -22,6 +22,7 @@ import {
   normalizeGstin,
   getStateCodeFromGstin,
   determineGstTreatment,
+  computeTcs,
 } from '@goldsmith/compliance';
 import { encryptColumn, decryptColumn, serializeEnvelope, deserializeEnvelope } from '@goldsmith/crypto-envelope';
 import type { KmsAdapter } from '@goldsmith/crypto-envelope';
@@ -117,6 +118,7 @@ function rowToInvoiceResponse(invoice: InvoiceRow, items: InvoiceItemRow[]): Inv
     voidedAt:          invoice.voided_at?.toISOString() ?? null,
     voidedByUserId:    invoice.voided_by_user_id ?? null,
     voidReason:        invoice.void_reason ?? null,
+    tcsCollectedPaise: invoice.tcs_collected_paise.toString(),
   };
 }
 
@@ -458,10 +460,16 @@ export class BillingService {
     }
 
 
-    // 6b. PAN Rule 114B hard-block — now that total is known
+    // 6b. TCS Section 206C(1D) — 1% collected server-side when invoice total > Rs 2,00,000.
+    // Computed on GST-inclusive total. TCS is added to totalPaise so the payment service
+    // can collect the full statutory amount. Never trust client-supplied TCS values.
+    const tcsCollectedPaise = computeTcs(totalPaise);
+    totalPaise += tcsCollectedPaise; // grand total = subtotal + GST + TCS
+
+    // 6c. PAN Rule 114B hard-block — evaluated on grand total (post-TCS)
     enforcePanRequired({ totalPaise, pan: normalizedPan, form60Data: dto.form60Data ?? null });
 
-    // 6c. Encrypt PAN / Form 60 if provided (only reaches here when total >= Rs 2L or pan/form60 supplied)
+    // 6d. Encrypt PAN / Form 60 if provided (only reaches here when total >= Rs 2L or pan/form60 supplied)
     let panCiphertext: Buffer | null = null;
     let panKeyId: string | null = null;
     let form60Encrypted: Buffer | null = null;
@@ -516,6 +524,7 @@ export class BillingService {
         panKeyId,
         form60Encrypted,
         form60KeyId,
+        tcsCollectedPaise,
         items: lines.map(({ input, product, computed, ratePerGramPaise, effectiveMakingPct }, i) => ({
           productId:           input.productId ?? null,
           description:         input.description,

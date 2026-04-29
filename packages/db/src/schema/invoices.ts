@@ -38,6 +38,8 @@ export const invoices = tenantScopedTable('invoices', {
   sgst_making_paise:    bigint('sgst_making_paise',  { mode: 'bigint' }).notNull().default(0n),
   igst_metal_paise:     bigint('igst_metal_paise',   { mode: 'bigint' }).notNull().default(0n),
   igst_making_paise:    bigint('igst_making_paise',  { mode: 'bigint' }).notNull().default(0n),
+  // Section 206C(1D) TCS — 1% collected when invoice total > Rs 2,00,000
+  tcs_collected_paise:  bigint('tcs_collected_paise', { mode: 'bigint' }).notNull().default(0n),
   // Story 5.11: void columns (null until invoice is voided)
   voided_at:            timestamp('voided_at',    { withTimezone: true }),
   voided_by_user_id:    uuid('voided_by_user_id'),

@@ -33,6 +33,7 @@ function invoiceRow(overrides: Partial<Record<string, unknown>> = {}): Record<st
     issued_at: issuedAt(60_000),
     created_by_user_id: OWNER,
     pan_ciphertext: null, pan_key_id: null, form60_encrypted: null, form60_key_id: null,
+    tcs_collected_paise: 0n,
     voided_at: null, voided_by_user_id: null, void_reason: null,
     created_at: new Date(), updated_at: new Date(),
     ...overrides,
