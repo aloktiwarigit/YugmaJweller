@@ -29,11 +29,11 @@ export default function NewCustomerScreen(): JSX.Element {
     onError: (err: unknown) => {
       const apiErr = err as { response?: { data?: { code?: string } } };
       if (apiErr.response?.data?.code === 'crm.phone_exists') {
-        Alert.alert('ग्राहक पहले से मौजूद है', 'इस नंबर का ग्राहक पहले से है। प्रोफाइल देखें?', [
-          { text: 'रद्द करें', style: 'cancel' },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          { text: 'प्रोफाइल देखें', onPress: () => router.push(`/customers?q=${encodeURIComponent(phone)}` as any) },
-        ]);
+        Alert.alert(
+          'ग्राहक पहले से मौजूद है',
+          'इस नंबर का ग्राहक पहले से रजिस्टर है। ग्राहक सूची से खोजें।',
+          [{ text: 'ठीक है', style: 'default' }],
+        );
       } else {
         Alert.alert('त्रुटि', 'ग्राहक जोड़ने में समस्या हुई। फिर से कोशिश करें।');
       }

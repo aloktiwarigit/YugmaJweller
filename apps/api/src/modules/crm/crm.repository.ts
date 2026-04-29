@@ -42,11 +42,13 @@ export class CrmRepository {
 
   async listCustomers(q: string | undefined, limit: number, offset: number): Promise<ListCustomersResult> {
     return withTenantTx(this.pool, async (tx) => {
-      const filter = q ? `AND (name ILIKE $3 OR phone ILIKE $3)` : '';
-      const params: unknown[] = [limit, offset];
-      if (q) params.push(`%${q}%`);
-      const dataQ = await tx.query<CustomerRow>(`SELECT * FROM customers WHERE shop_id = current_setting('app.current_shop_id')::uuid ${filter} ORDER BY created_at DESC LIMIT $1 OFFSET $2`, params);
-      const countQ = await tx.query<{ total: string }>(`SELECT COUNT(*)::text AS total FROM customers WHERE shop_id = current_setting('app.current_shop_id')::uuid ${filter}`, q ? [`%${q}%`] : []);
+      const dataFilter  = q ? `AND (name ILIKE $3 OR phone ILIKE $3)` : '';
+      const countFilter = q ? `AND (name ILIKE $1 OR phone ILIKE $1)` : '';
+      const dataParams: unknown[] = [limit, offset];
+      if (q) dataParams.push(`%${q}%`);
+      const countParams = q ? [`%${q}%`] : [];
+      const dataQ = await tx.query<CustomerRow>(`SELECT * FROM customers WHERE shop_id = current_setting('app.current_shop_id')::uuid ${dataFilter} ORDER BY created_at DESC LIMIT $1 OFFSET $2`, dataParams);
+      const countQ = await tx.query<{ total: string }>(`SELECT COUNT(*)::text AS total FROM customers WHERE shop_id = current_setting('app.current_shop_id')::uuid ${countFilter}`, countParams);
       return { rows: dataQ.rows, total: parseInt(countQ.rows[0].total, 10) };
     });
   }
