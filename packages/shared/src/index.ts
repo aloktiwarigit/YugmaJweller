@@ -171,3 +171,16 @@ export type {
   InvoiceItemResponse,
   RecordCashPaymentDto,
 } from './schemas/invoice.schema';
+
+export {
+  CreateCustomerSchema,
+  UpdateCustomerSchema,
+  CustomerListQuerySchema,
+  CustomerResponseSchema,
+} from './schemas/customer.schema';
+export type {
+  CreateCustomerDto,
+  UpdateCustomerDto,
+  CustomerListQuery,
+  CustomerResponse,
+} from './schemas/customer.schema';

@@ -22,6 +22,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { SyncModule } from './modules/sync/sync.module';
+import { CrmModule } from './modules/crm/crm.module';
 import { DrizzleTenantLookup } from './drizzle-tenant-lookup';
 import { TenantAuditReporter } from './modules/tenant-boot/tenant-audit-reporter';
 
@@ -65,6 +66,7 @@ class ConditionalTenantInterceptor implements NestInterceptor {
     CatalogModule,
     SyncModule,
     BillingModule,
+    CrmModule,
   ],
   controllers: [HealthController],
   providers: [
