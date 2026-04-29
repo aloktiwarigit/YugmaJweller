@@ -100,7 +100,7 @@ export class CatalogController {
   @SkipAuth()
   @SkipTenant()
   async recordProductView(
-    @Param('id', new ParseUUIDPipe({ optional: true })) productId: string,
+    @Param('id', new ParseUUIDPipe()) productId: string,
     @Headers('x-tenant-id') shopId: string,
     @Ip() ip: string,
     @Body() body: { sessionId?: string; customerId?: string; durationSeconds?: number },
@@ -112,12 +112,12 @@ export class CatalogController {
     this.viewRateCache.set(rateCacheKey, true);
     setTimeout(() => this.viewRateCache.delete(rateCacheKey), 60_000);
 
-    await this.analyticsService.recordView({
+    void this.analyticsService.recordView({
       shopId,
       productId,
       customerId: body.customerId,
       sessionId: body.sessionId,
       durationSeconds: body.durationSeconds,
-    });
+    }).catch(() => undefined);
   }
 }
