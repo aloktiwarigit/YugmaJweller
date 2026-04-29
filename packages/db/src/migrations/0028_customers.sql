@@ -25,16 +25,9 @@ CREATE TABLE customers (
 ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customers FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY customers_tenant_select ON customers
-  FOR SELECT
-  USING (shop_id = current_setting('app.current_shop_id')::uuid);
-
-CREATE POLICY customers_tenant_insert ON customers
-  FOR INSERT
-  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
-
-CREATE POLICY customers_tenant_update ON customers
-  FOR UPDATE
+CREATE POLICY customers_tenant_isolation ON customers
+  AS PERMISSIVE
+  FOR ALL
   USING      (shop_id = current_setting('app.current_shop_id')::uuid)
   WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
 

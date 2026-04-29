@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, Alert, StyleSheet } from 'react-native';
+import { Text, ScrollView, TextInput, Pressable, Alert, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../../src/api/client';
@@ -40,7 +40,7 @@ export default function NewCustomerScreen(): JSX.Element {
     },
   });
 
-  const handleSave = () => {
+  const handleSave = (): void => {
     const normalizedPhone = normalizePhone(phone);
     const normalizedPan = pan.trim().toUpperCase();
     if (!name.trim()) { Alert.alert('जानकारी आवश्यक', 'ग्राहक का नाम डालें।'); return; }
