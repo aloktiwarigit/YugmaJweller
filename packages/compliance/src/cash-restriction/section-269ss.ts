@@ -11,7 +11,6 @@ export type CashRestrictionType = 'advance' | 'deposit' | 'repayment';
 export function enforce269ss(amountPaise: bigint, type: CashRestrictionType): void {
   if (amountPaise >= RESTRICTION_269SS_THRESHOLD_PAISE) {
     throw new ComplianceHardBlockError('compliance.section_269ss', {
-      code:           'SECTION_269SS',
       type,
       amountPaise:    amountPaise.toString(),
       thresholdPaise: RESTRICTION_269SS_THRESHOLD_PAISE.toString(),

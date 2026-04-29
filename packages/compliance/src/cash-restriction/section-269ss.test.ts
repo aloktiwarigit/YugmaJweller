@@ -19,13 +19,13 @@ describe('enforce269ss', () => {
     expect(() => enforce269ss(5_000_000n, 'advance')).toThrow(ComplianceHardBlockError);
   });
 
-  it('throws with code SECTION_269SS in meta', () => {
+  it('throws with compliance.section_269ss code (stable API code)', () => {
     try {
       enforce269ss(RESTRICTION_269SS_THRESHOLD_PAISE, 'advance');
       expect.fail('should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(ComplianceHardBlockError);
-      expect((e as ComplianceHardBlockError).meta['code']).toBe('SECTION_269SS');
+      expect((e as ComplianceHardBlockError).code).toBe('compliance.section_269ss');
     }
   });
 
