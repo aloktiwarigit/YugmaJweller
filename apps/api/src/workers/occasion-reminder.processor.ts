@@ -49,8 +49,13 @@ export class OccasionReminderProcessor extends WorkerHost {
           `crm.occasion_reminder: shopId=${occ.shop_id} customerId=${occ.customer_id} type=${occ.occasion_type} next=${occ.next_occurrence}`,
         );
 
-        // Advance to next year via SECURITY DEFINER fn (Feb 29 → Mar 1 fallback inside).
-        await client.query(`SELECT advance_occasion_to_next_year($1::uuid)`, [occ.id]);
+        // Only advance to next year on the actual occasion date, not on pre-event
+        // reminder dates. Reminder rows have next_occurrence < todayIST (returned
+        // by get_due_occasions because reminderDays > 0), so advancing them early
+        // would roll the anniversary forward before the real event fires.
+        if (occ.next_occurrence === todayIST) {
+          await client.query(`SELECT advance_occasion_to_next_year($1::uuid)`, [occ.id]);
+        }
       }
 
       this.logger.log(`occasion-reminder: processed ${r.rows.length} occasions`);

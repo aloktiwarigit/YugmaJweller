@@ -16,7 +16,7 @@ interface PurchaseHistorySummary {
   invoiceId:      string;
   invoiceNumber:  string;
   issuedAt:       string | null;
-  totalFormatted: string;
+  totalPaise: string;
   lineCount:      number;
   paymentMethod:  string;
   status:         string;
@@ -38,6 +38,12 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   PENDING: 'बाकी',
 };
 
+function formatPaise(paise: string): string {
+  const n = parseInt(paise, 10);
+  if (isNaN(n)) return '₹—';
+  return new Intl.NumberFormat('hi-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n / 100);
+}
+
 function formatDate(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -55,7 +61,7 @@ export function PurchaseHistoryList({ customerId }: Props): React.ReactElement {
   const [allInvoices, setAllInvoices] = useState<PurchaseHistorySummary[]>([]);
   const [total, setTotal] = useState(0);
 
-  const { isLoading, isFetching, data: queryData } = useQuery<PurchaseHistoryResponse>({
+  const { isLoading, isFetching, data: queryData, isPlaceholderData } = useQuery<PurchaseHistoryResponse>({
     queryKey: ['purchase-history', customerId, offset],
     queryFn:  async () =>
       (await api.get<PurchaseHistoryResponse>(
@@ -65,7 +71,7 @@ export function PurchaseHistoryList({ customerId }: Props): React.ReactElement {
   });
 
   useEffect(() => {
-    if (queryData) {
+    if (queryData && !isPlaceholderData) {
       if (offset === 0) {
         setAllInvoices(queryData.invoices);
       } else {
@@ -119,14 +125,14 @@ export function PurchaseHistoryList({ customerId }: Props): React.ReactElement {
           style={styles.row}
           onPress={() => handlePress(item.invoiceId)}
           accessibilityRole="button"
-          accessibilityLabel={`चालान ${item.invoiceNumber}, ${item.totalFormatted}`}
+          accessibilityLabel={`चालान ${item.invoiceNumber}, ${formatPaise(item.totalPaise)}`}
         >
           <View style={styles.rowLeft}>
             <Text style={styles.invoiceDate}>{formatDate(item.issuedAt)}</Text>
             <Text style={styles.invoiceNumber}>#{item.invoiceNumber}</Text>
           </View>
           <View style={styles.rowRight}>
-            <Text style={styles.total}>{item.totalFormatted}</Text>
+            <Text style={styles.total}>{formatPaise(item.totalPaise)}</Text>
             <View style={styles.badges}>
               <View style={[styles.badge, styles.paymentBadge]}>
                 <Text style={styles.badgeText}>

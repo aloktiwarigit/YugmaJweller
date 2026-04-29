@@ -5,7 +5,9 @@ import {
   NotFoundException,
   BadRequestException,
   UnprocessableEntityException,
+  Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Pool } from 'pg';
 import type { Redis } from '@goldsmith/cache';
 import { computeProductPrice } from '@goldsmith/money';
@@ -170,6 +172,7 @@ export class BillingService {
     @Inject('KMS_ADAPTER')      private readonly kms: KmsAdapter,
     @Inject(SettingsCache)      private readonly settingsCache: SettingsCache,
     @Inject(SettingsRepository) private readonly settingsRepo: SettingsRepository,
+    @Optional() @Inject(EventEmitter2) private readonly events?: EventEmitter2,
   ) {}
 
   private async resolveMakingChargePct(
@@ -578,6 +581,8 @@ export class BillingService {
     // 10. Build response and cache for idempotent replay
     const resp = rowToInvoiceResponse(result.invoice, result.items);
     this.cacheResponse(ctx.shopId, idempotencyKey, resp);
+    // Notify BalanceService (and other listeners) that an invoice was created.
+    this.events?.emit('invoice.created', { invoiceId: resp.id, customerId: resp.customerId, shopId: ctx.shopId });
     return resp;
   }
 
