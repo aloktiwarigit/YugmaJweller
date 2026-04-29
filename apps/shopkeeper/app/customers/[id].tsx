@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../src/api/client';
 import type { FamilyMemberResponse, CustomerResponse } from '@goldsmith/shared';
 import { FamilyLinker } from '../../src/features/crm/components/FamilyLinker';
+import { LoyaltyCard } from '../../src/features/crm/components/LoyaltyCard';
 
 interface CustomerSearchResult { id: string; name: string; phone: string; }
 
@@ -20,6 +21,7 @@ export default function CustomerDetailScreen(): JSX.Element {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {customer && (<View style={styles.header}><Text style={styles.customerName}>{customer.name}</Text><Text style={styles.customerPhone}>{customer.phone}</Text></View>)}
       <FamilyLinker customerId={id ?? ''} links={familyLinks} loading={familyLoading} onLinkAdd={async (relatedCustomerId, relationship) => { await linkMutation.mutateAsync({ relatedCustomerId, relationship }); }} onLinkRemove={async (linkId) => { await unlinkMutation.mutateAsync(linkId); }} onSearchCustomers={searchCustomers} />
+      {id && <LoyaltyCard customerId={id} />}
     </ScrollView>
   );
 }
