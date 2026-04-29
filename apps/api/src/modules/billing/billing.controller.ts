@@ -12,6 +12,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { TenantWalkerRoute } from '../../common/decorators/tenant-walker-route.decorator';
 import { BillingService } from './billing.service';
+import { EstimateService } from './estimate.service';
+import type { CreateEstimateInput, EstimateResponse } from './estimate.service';
 import { PaymentService } from './payment.service';
 import { VoidService } from './void.service';
 import type { CreditNoteResponse } from './void.service';
@@ -26,6 +28,7 @@ import type { RecordUrdPurchaseDto, UrdPurchaseResponse } from './urd.service';
 export class BillingController {
   constructor(
     @Inject(BillingService)    private readonly svc: BillingService,
+    @Inject(EstimateService)   private readonly estimates: EstimateService,
     @Inject(PaymentService)    private readonly payments: PaymentService,
     @Inject(VoidService)       private readonly voids: VoidService,
     @Inject(ShareService)      private readonly share: ShareService,
@@ -184,6 +187,74 @@ export class BillingController {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.share.shareInvoiceWhatsApp(id);
   }
+
+  // ── Estimate endpoints (FR41 + FR42) ──────────────────────────────────────
+
+  @TenantWalkerRoute({
+    expectedStatus: 400,
+    body: { lineItems: [], goldRatePaisePerGram: '684200', subtotalPaise: '0', gstPaise: '0', totalPaise: '0' },
+  })
+  @Post('/estimates')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async createEstimate(
+    @TenantContextDec() ctx: TenantContext,
+    @Body() dto: CreateEstimateInput,
+  ): Promise<EstimateResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (!dto.totalPaise || dto.totalPaise <= 0n) {
+      throw new BadRequestException({ code: 'estimate.total_must_be_positive' });
+    }
+    return this.estimates.createEstimate(dto);
+  }
+
+  @TenantWalkerRoute()
+  @Get('/estimates')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async listEstimates(
+    @TenantContextDec() ctx: TenantContext,
+    @Query('page',     new ParseIntPipe({ optional: true })) page?: number,
+    @Query('pageSize', new ParseIntPipe({ optional: true })) pageSize?: number,
+  ): Promise<EstimateResponse[]> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    const limit  = Math.min(Math.max(pageSize ?? 20, 1), 100);
+    const offset = (Math.max(page ?? 1, 1) - 1) * limit;
+    return this.estimates.listEstimates(ctx.shopId, limit, offset);
+  }
+
+  @TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-0000-0000-000000000000' } })
+  @Get('/estimates/:id')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async getEstimate(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<EstimateResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.estimates.getEstimate(id, ctx.shopId);
+  }
+
+  @TenantWalkerRoute({ expectedStatus: 400, pathParams: { id: '00000000-0000-0000-0000-000000000000' } })
+  @Post('/estimates/:id/convert')
+  @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async convertEstimate(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Headers('idempotency-key') idempotencyKey: string,
+  ): Promise<InvoiceResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    if (!idempotencyKey?.trim()) {
+      throw new BadRequestException({ code: 'invoice.idempotency_key_required' });
+    }
+    try {
+      return await this.svc.convertEstimateToInvoice(id, idempotencyKey);
+    } catch (err) {
+      if (err instanceof ComplianceHardBlockError) {
+        throw new UnprocessableEntityException({ code: err.code, ...err.meta });
+      }
+      throw err;
+    }
+  }
+
+  // ── Compliance GSTR ───────────────────────────────────────────────────────
 
   @TenantWalkerRoute({ expectedStatus: 400 })
   @Get('/compliance/gstr')

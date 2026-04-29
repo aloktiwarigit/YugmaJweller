@@ -13,6 +13,7 @@ import { LoyaltyModule }   from '../loyalty/loyalty.module';
 import { SettingsRepository } from '../settings/settings.repository';
 import { BillingController } from './billing.controller';
 import { BillingService }    from './billing.service';
+import { EstimateService }   from './estimate.service';
 import { BillingRepository } from './billing.repository';
 import { PaymentService }    from './payment.service';
 import { VoidService }       from './void.service';
@@ -40,6 +41,7 @@ import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
   controllers: [BillingController, ComplianceReportsController],
   providers: [
     BillingService,
+    EstimateService,
     BillingRepository,
     PaymentService,
     VoidService,
