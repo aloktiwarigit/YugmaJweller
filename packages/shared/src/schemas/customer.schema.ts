@@ -40,3 +40,19 @@ export type CreateCustomerDto  = z.infer<typeof CreateCustomerSchema>;
 export type UpdateCustomerDto  = z.infer<typeof UpdateCustomerSchema>;
 export type CustomerListQuery  = z.infer<typeof CustomerListQuerySchema>;
 export type CustomerResponse   = z.infer<typeof CustomerResponseSchema>;
+export const FAMILY_RELATIONSHIPS = ['SPOUSE', 'PARENT', 'CHILD', 'SIBLING', 'IN_LAW', 'OTHER'] as const;
+export const LinkFamilySchema = z.object({
+  relatedCustomerId: z.string().uuid(),
+  relationship: z.enum(FAMILY_RELATIONSHIPS),
+});
+export const FamilyMemberResponseSchema = z.object({
+  id: z.string().uuid(),
+  customerId: z.string().uuid(),
+  relatedCustomerId: z.string().uuid(),
+  relationship: z.string(),
+  relatedName: z.string(),
+  relatedPhone: z.string(),
+  createdAt: z.string(),
+});
+export type LinkFamilyDto        = z.infer<typeof LinkFamilySchema>;
+export type FamilyMemberResponse = z.infer<typeof FamilyMemberResponseSchema>;
