@@ -79,6 +79,12 @@ export class ConsentRepository {
          RETURNING *`,
         [input.customerId, input.consentGiven, input.ip ?? null, input.userAgent ?? null],
       );
+      // Keep customers.viewing_consent boolean in sync so existing customer APIs
+      // (GET /customers/:id) reflect the current consent state immediately.
+      await tx.query(
+        `UPDATE customers SET viewing_consent = $1 WHERE id = $2 AND shop_id = ${shop}`,
+        [input.consentGiven, input.customerId],
+      );
       return { before, after: r.rows[0]! };
     });
   }
@@ -90,6 +96,7 @@ export class ConsentRepository {
            SELECT 1 FROM customers
            WHERE id = $1
              AND shop_id = current_setting('app.current_shop_id')::uuid
+             AND deleted_at IS NULL
          ) AS exists`,
         [customerId],
       );

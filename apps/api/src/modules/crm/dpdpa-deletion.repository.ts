@@ -199,6 +199,12 @@ export class DpdpaDeletionRepository {
         );
       }
 
+      // Remove viewing_consent before deleting the customer (FK: viewing_consent.customer_id → customers.id).
+      await tx.query(
+        `DELETE FROM viewing_consent WHERE customer_id = $1 AND shop_id = ${TENANT_SQL}`,
+        [customerId],
+      );
+
       // Detach invoices: retain rows for tax/PMLA, null the customer link.
       await tx.query(
         `UPDATE invoices SET
