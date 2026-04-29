@@ -68,8 +68,23 @@ afterAll(async () => {
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-function invoiceId(suffix: string): string {
-  return `11111111-1111-4000-8000-${suffix.padStart(12, '0')}`;
+let invoiceSuffix = 1;
+
+// Inserts a minimal ISSUED invoice and returns its UUID. invoices.id is required
+// as FK by loyalty_transactions.invoice_id, so each accrual test needs a real row.
+async function seedInvoice(shopId: string, cId: string): Promise<string> {
+  const suffix = String(invoiceSuffix++).padStart(6, '0');
+  const r = await pool.query<{ id: string }>(
+    `INSERT INTO invoices
+       (shop_id, invoice_number, customer_id, customer_name,
+        subtotal_paise, gst_metal_paise, gst_making_paise, total_paise,
+        idempotency_key, status, created_by_user_id)
+     VALUES ($1, $2, $3, 'Ravi Kumar', 6842000, 205260, 34210, 7081470,
+             $4, 'ISSUED', $5)
+     RETURNING id`,
+    [shopId, `INV-TEST-${suffix}`, cId, `idem-${suffix}`, USER_A],
+  );
+  return r.rows[0]!.id;
 }
 
 async function getBalance(cId: string, shopId: string): Promise<number> {
@@ -82,8 +97,8 @@ async function getBalance(cId: string, shopId: string): Promise<number> {
 describe('loyalty accrual integration (Story 8.1)', () => {
   it('math precision — ₹68,420 gold at 1% earn rate → 684 points', async () => {
     const goldValuePaise = 6_842_000n; // ₹68,420.00
+    const iid = await seedInvoice(SHOP_A, customerId);
 
-    const iid = invoiceId('000001');
     const result = await tenantContext.runWith(makeCtx(SHOP_A), () =>
       service.accruePoints({ customerId, invoiceId: iid, goldValuePaise }),
     );
@@ -95,13 +110,17 @@ describe('loyalty accrual integration (Story 8.1)', () => {
 
   it('concurrency — 2 parallel accruals serialize via FOR UPDATE; final balance = sum', async () => {
     const balanceBefore = await getBalance(customerId, SHOP_A);
+    const [iid2, iid3] = await Promise.all([
+      seedInvoice(SHOP_A, customerId),
+      seedInvoice(SHOP_A, customerId),
+    ]);
 
     const [r1, r2] = await Promise.all([
       tenantContext.runWith(makeCtx(SHOP_A), () =>
-        service.accruePoints({ customerId, invoiceId: invoiceId('000002'), goldValuePaise: 1_000_000n }),
+        service.accruePoints({ customerId, invoiceId: iid2, goldValuePaise: 1_000_000n }),
       ),
       tenantContext.runWith(makeCtx(SHOP_A), () =>
-        service.accruePoints({ customerId, invoiceId: invoiceId('000003'), goldValuePaise: 1_000_000n }),
+        service.accruePoints({ customerId, invoiceId: iid3, goldValuePaise: 1_000_000n }),
       ),
     ]);
 
@@ -113,7 +132,7 @@ describe('loyalty accrual integration (Story 8.1)', () => {
 
   it('idempotency — duplicate invoiceId → unique index blocks; balance unchanged', async () => {
     const balanceBefore = await getBalance(customerId, SHOP_A);
-    const dupId = invoiceId('000004');
+    const dupId = await seedInvoice(SHOP_A, customerId);
 
     // First call succeeds.
     await tenantContext.runWith(makeCtx(SHOP_A), () =>
@@ -138,7 +157,7 @@ describe('loyalty accrual integration (Story 8.1)', () => {
     const listener = new LoyaltyEventListener(mockQueue as never);
 
     await listener.onInvoiceCreated({
-      invoiceId:      invoiceId('000010'),
+      invoiceId:      'ffffffff-ffff-4000-8000-ffffffffffff',
       shopId:         SHOP_A,
       customerId:     null,
       goldValuePaise: '100000',
@@ -153,7 +172,7 @@ describe('loyalty accrual integration (Story 8.1)', () => {
     const listener = new LoyaltyEventListener(mockQueue as never);
 
     await listener.onInvoiceCreated({
-      invoiceId:      invoiceId('000011'),
+      invoiceId:      'eeeeeeee-eeee-4000-8000-eeeeeeeeeeee',
       shopId:         SHOP_A,
       customerId,
       goldValuePaise: '0',
@@ -164,7 +183,7 @@ describe('loyalty accrual integration (Story 8.1)', () => {
   });
 
   it('tenant isolation — SHOP_B cannot see SHOP_A loyalty aggregate (RLS → null)', async () => {
-    // Ensure SHOP_A has an aggregate row by this point.
+    // SHOP_A has an aggregate row from earlier tests.
     const stateA = await tenantContext.runWith(makeCtx(SHOP_A), () => repo.getState(customerId));
     expect(stateA).not.toBeNull();
 
@@ -174,34 +193,34 @@ describe('loyalty accrual integration (Story 8.1)', () => {
   });
 
   it('DB trigger — UPDATE loyalty_transactions as app_user raises permission error', async () => {
-    // Seed a transaction row as superuser to have something to UPDATE.
+    // Find a transaction row to attempt UPDATE on.
     const txRows = await pool.query<{ id: string }>(
-      `SELECT id FROM loyalty_transactions
-       WHERE shop_id = $1 AND customer_id = $2
-       LIMIT 1`,
-      [SHOP_A, customerId],
+      `SELECT id FROM loyalty_transactions WHERE shop_id = $1 LIMIT 1`,
+      [SHOP_A],
     );
     expect(txRows.rows.length).toBeGreaterThan(0);
     const txId = txRows.rows[0]!.id;
 
-    // Open a plain client, SET ROLE app_user, attempt UPDATE → must fail.
+    // Use BEGIN + SET LOCAL ROLE inside a transaction so the role change is effective.
     const client = await pool.connect();
     try {
-      await client.query(`SET app.current_shop_id = '${SHOP_A}'`);
-      await client.query(`SET LOCAL ROLE app_user`);
+      await client.query('BEGIN');
+      await client.query(`SET LOCAL app.current_shop_id = '${SHOP_A}'`);
+      await client.query('SET LOCAL ROLE app_user');
 
       await expect(
         client.query(`UPDATE loyalty_transactions SET reason = 'tampered' WHERE id = $1`, [txId]),
       ).rejects.toMatchObject({ code: expect.stringMatching(/^(42501|P0001)$/) });
       // 42501 = insufficient_privilege (role-level grant denial)
-      // P0001 = raise_exception (SECURITY DEFINER trigger fires before the role check on some pg builds)
+      // P0001 = raise_exception (SECURITY DEFINER trigger, fires on some Postgres builds before grant check)
     } finally {
+      await client.query('ROLLBACK').catch(() => undefined);
       client.release();
     }
   });
 
   it('adjustPoints negative cap — balance 100, adjust -500 → UnprocessableEntityException', async () => {
-    // First set up a fresh customer with a known balance.
+    // Create a fresh customer with a known 100-point balance.
     const r = await tenantContext.runWith(makeCtx(SHOP_A), () =>
       withTenantTx(pool, async (tx) =>
         tx.query<{ id: string }>(
@@ -213,28 +232,31 @@ describe('loyalty accrual integration (Story 8.1)', () => {
       ),
     );
     const adjustCustomerId = r.rows[0]!.id;
+    const seedInvoiceId = await seedInvoice(SHOP_A, adjustCustomerId);
 
-    // Seed 100 points directly.
-    await withTenantTx(pool, async (tx) => {
-      await repo.lockOrCreateAggregate(tx, SHOP_A, adjustCustomerId);
-      await repo.insertTransaction(tx, SHOP_A, {
-        customerId: adjustCustomerId,
-        invoiceId: invoiceId('000020'),
-        type: 'ACCRUAL',
-        pointsDelta: 100,
-        balanceBefore: 0,
-        balanceAfter: 100,
-        reason: 'seed for adjust test',
-        createdByUserId: null,
-      });
-      await repo.updateAggregate(tx, SHOP_A, {
-        customerId: adjustCustomerId,
-        pointsDelta: 100,
-        lifetimeDelta: 100,
-      });
-    });
+    // Seed 100 points inside tenant context (withTenantTx requires it).
+    await tenantContext.runWith(makeCtx(SHOP_A), () =>
+      withTenantTx(pool, async (tx) => {
+        await repo.lockOrCreateAggregate(tx, SHOP_A, adjustCustomerId);
+        await repo.insertTransaction(tx, SHOP_A, {
+          customerId: adjustCustomerId,
+          invoiceId: seedInvoiceId,
+          type: 'ACCRUAL',
+          pointsDelta: 100,
+          balanceBefore: 0,
+          balanceAfter: 100,
+          reason: 'seed for adjust test',
+          createdByUserId: null,
+        });
+        await repo.updateAggregate(tx, SHOP_A, {
+          customerId: adjustCustomerId,
+          pointsDelta: 100,
+          lifetimeDelta: 100,
+        });
+      }),
+    );
 
-    // Attempt -500 → should throw 422.
+    // Attempt -500 → should throw UnprocessableEntityException.
     await expect(
       tenantContext.runWith(makeAuthCtx(SHOP_A), () =>
         service.adjustPoints(adjustCustomerId, { pointsDelta: -500, reason: 'refund test' }),
