@@ -45,9 +45,9 @@ export class CrmController {
   }
 
   @Delete('customers/:id/family/:linkId') @Roles('shop_admin', 'shop_manager')
-  async unlinkFamily(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) _id: string, @Param('linkId', ParseUUIDPipe) linkId: string): Promise<void> {
+  async unlinkFamily(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) customerId: string, @Param('linkId', ParseUUIDPipe) linkId: string): Promise<void> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
-    return this.familySvc.unlinkFamily(ctx, linkId);
+    return this.familySvc.unlinkFamily(ctx, customerId, linkId);
   }
 
   @Get('customers/:id/family') @Roles('shop_admin', 'shop_manager', 'shop_staff')

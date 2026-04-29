@@ -77,8 +77,10 @@ export class FamilyService {
     return this.rowToResponse(row as FamilyMemberWithCustomerRow & { related_name?: string; related_phone?: string });
   }
 
-  async unlinkFamily(ctx: AuthenticatedTenantContext, linkId: string): Promise<void> {
-    const link = await this.repo.unlinkByIdAtomic(linkId);
+  async unlinkFamily(ctx: AuthenticatedTenantContext, customerId: string, linkId: string): Promise<void> {
+    const ok = await this.repo.customerBelongsToShop(ctx.shopId, customerId);
+    if (!ok) throw new NotFoundException({ code: 'crm.customer_not_found', message: 'Customer not found' });
+    const link = await this.repo.unlinkByIdAtomic(linkId, customerId);
     if (!link) {
       throw new NotFoundException({ code: 'crm.family_link_not_found', message: 'Family link not found' });
     }

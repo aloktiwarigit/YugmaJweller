@@ -25,13 +25,14 @@ interface Props {
   customerId: string;
   links: FamilyMemberResponse[];
   loading?: boolean;
+  canRemove?: boolean;
   onLinkAdd: (relatedCustomerId: string, relationship: string) => Promise<void>;
   onLinkRemove: (linkId: string) => Promise<void>;
   onSearchCustomers: (query: string) => Promise<FamilySearchResult[]>;
 }
 
 export function FamilyLinker({
-  links, loading, onLinkAdd, onLinkRemove, onSearchCustomers,
+  links, loading, canRemove = false, onLinkAdd, onLinkRemove, onSearchCustomers,
 }: Props): React.ReactElement {
   const [showModal, setShowModal] = useState(false);
   const [searchResults, setSearchResults] = useState<FamilySearchResult[]>([]);
@@ -97,7 +98,8 @@ export function FamilyLinker({
               renderItem={({ item }) => (
                 <FamilyChip
                   link={item}
-                  onRemove={() => void onLinkRemove(item.id)}
+                  canRemove={canRemove}
+                  onRemove={canRemove ? () => void onLinkRemove(item.id) : undefined}
                 />
               )}
             />
@@ -171,20 +173,19 @@ export function FamilyLinker({
   );
 }
 
-function FamilyChip({ link, onRemove }: { link: FamilyMemberResponse; onRemove: () => void }): React.ReactElement {
+function FamilyChip({ link, canRemove, onRemove }: { link: FamilyMemberResponse; canRemove?: boolean; onRemove?: () => void }): React.ReactElement {
   const [pressing, setPressing] = useState(false);
   return (
     <Pressable
       testID={`family-chip-${link.id}`}
       style={[styles.chip, pressing && styles.chipPressing]}
-      onLongPress={() => {
-        setPressing(false);
-        onRemove();
-      }}
+      onLongPress={canRemove && onRemove ? () => { setPressing(false); onRemove(); } : undefined}
       onPressIn={() => setPressing(true)}
       onPressOut={() => setPressing(false)}
       accessibilityRole="button"
-      accessibilityLabel={`${RELATIONSHIP_LABELS[link.relationship] ?? link.relationship} — ${link.relatedName}. हटाने के लिए देर तक दबाएं।`}
+      accessibilityLabel={canRemove
+        ? `${RELATIONSHIP_LABELS[link.relationship] ?? link.relationship} — ${link.relatedName}. हटाने के लिए देर तक दबाएं।`
+        : `${RELATIONSHIP_LABELS[link.relationship] ?? link.relationship} — ${link.relatedName}`}
     >
       <Text style={styles.chipLabel}>{RELATIONSHIP_LABELS[link.relationship] ?? link.relationship}</Text>
       <Text style={styles.chipName}>{link.relatedName}</Text>
