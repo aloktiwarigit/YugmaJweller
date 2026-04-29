@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, Pressable, ActivityIndicator, StyleSheet,
 } from 'react-native';
@@ -57,21 +57,26 @@ function TrendChart({ data, loading }: { data: ChartPoint[]; loading: boolean })
     );
   }
 
+  const values = useMemo(() => data.map((d) => d.totalViews), [data]);
+  const minV = useMemo(() => Math.min(...values), [values]);
+  const maxV = useMemo(() => Math.max(...values) || 1, [values]);
+  const range = useMemo(() => maxV - minV || 1, [maxV, minV]);
+
   const chartW = svgWidth - PAD.left - PAD.right;
   const chartH = CHART_HEIGHT - PAD.top - PAD.bottom;
-  const values = data.map((d) => d.totalViews);
-  const minV = Math.min(...values);
-  const maxV = Math.max(...values) || 1;
-  const range = maxV - minV || 1;
 
-  const points = data.map((d, i) => ({
-    x: PAD.left + (data.length > 1 ? (i / (data.length - 1)) * chartW : chartW / 2),
-    y: PAD.top + (1 - (d.totalViews - minV) / range) * chartH,
-    label: d.label,
-    totalViews: d.totalViews,
-  }));
+  const points = useMemo(
+    () =>
+      data.map((d, i) => ({
+        x: PAD.left + (data.length > 1 ? (i / (data.length - 1)) * chartW : chartW / 2),
+        y: PAD.top + (1 - (d.totalViews - minV) / range) * chartH,
+        label: d.label,
+        totalViews: d.totalViews,
+      })),
+    [data, chartW, chartH, minV, range],
+  );
 
-  const polyline = points.map((p) => `${p.x},${p.y}`).join(' ');
+  const polyline = useMemo(() => points.map((p) => `${p.x},${p.y}`).join(' '), [points]);
 
   return (
     <View onLayout={onLayout} style={styles.chartWrapper} testID="analytics-chart-svg-container">
@@ -123,7 +128,10 @@ export default function ProductAnalyticsScreen(): React.ReactElement {
   const { data, isLoading, error } = useProductAnalytics(id);
 
   const chartData: ChartPoint[] = data
-    ? PERIOD_OPTIONS.map((p) => ({ label: p.label, totalViews: data[p.key].totalViews }))
+    ? PERIOD_OPTIONS.map((p) => ({
+        label: p.label,
+        totalViews: data[p.key]?.totalViews ?? 0,
+      }))
     : [];
 
   const summary: ViewSummary | undefined = data?.[period];
@@ -199,7 +207,7 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontFamily: 'NotoSansDevanagari_400Regular',
-    fontSize: 13,
+    fontSize: 14,
     color: colors.textSecondary,
     marginBottom: spacing.xs ?? 4,
   },
@@ -261,7 +269,7 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontFamily: 'NotoSansDevanagari_400Regular',
-    fontSize: 12,
+    fontSize: 14,
     color: colors.textSecondary,
     textAlign: 'center',
     marginTop: spacing.xs ?? 4,
