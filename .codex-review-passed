@@ -1,1 +1,7 @@
-codex review passed 2026-04-29 — P1+P2 applied (invoice FK, tenant ctx, role txn)
+story: feat/story-compliance-str
+reviewed-at: 2026-04-29
+model: gpt-5.5
+findings:
+  P1-fixed: BigInt transactionAmountPaise serialized as string in StrTemplateJson
+  P2-accepted: firebase_uid lookup is correct — ctx.userId IS the firebase_uid per interceptor.ts
+result: passed
