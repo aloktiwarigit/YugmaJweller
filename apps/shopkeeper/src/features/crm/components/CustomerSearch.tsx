@@ -34,7 +34,8 @@ export function CustomerSearch({ onSearch, onSelect, placeholder }: Props): Reac
   const [source, setSource] = useState<'meilisearch' | 'postgres' | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seqRef       = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -57,17 +58,22 @@ export function CustomerSearch({ onSearch, onSelect, placeholder }: Props): Reac
       }
 
       debounceRef.current = setTimeout(() => {
+        const seq = ++seqRef.current;
         setLoading(true);
         onSearch(text.trim())
           .then((result) => {
+            if (seq !== seqRef.current) return; // stale response — discard
             setHits(result.hits);
             setSource(result.source);
           })
           .catch(() => {
+            if (seq !== seqRef.current) return;
             setError('खोज में समस्या हुई। पुनः प्रयास करें।');
             setHits([]);
           })
-          .finally(() => setLoading(false));
+          .finally(() => {
+            if (seq === seqRef.current) setLoading(false);
+          });
       }, 300);
     },
     [onSearch],

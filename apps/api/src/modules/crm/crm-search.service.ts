@@ -29,6 +29,13 @@ export class CrmSearchService {
       this.logger.debug(
         `search: source=meilisearch shopId=${ctx.shopId} q="${query.q}" hits=${result.hits.length}`,
       );
+      // Fall back to Postgres when Meilisearch returns 0 hits: the index may
+      // not have been backfilled yet (e.g. pre-existing customers created before
+      // this feature shipped). Postgres always has authoritative data.
+      if (result.hits.length === 0 && (query.q ?? '').trim().length > 0) {
+        this.logger.debug(`search: meilisearch returned 0 hits, falling back to postgres for backfill safety`);
+        return this.postgresSearch(ctx.shopId, query);
+      }
       return result;
     } catch (err) {
       if (err instanceof MeilisearchUnavailableError) {

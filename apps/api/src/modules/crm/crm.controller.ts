@@ -68,8 +68,8 @@ export class CrmController {
     return this.searchSvc.searchCustomers(ctx, {
       q: q ?? '',
       city,
-      limit:  Math.min(parseInt(limitStr ?? '20', 10) || 20, 100),
-      offset: parseInt(offsetStr ?? '0', 10) || 0,
+      limit:  Math.max(1, Math.min(parseInt(limitStr ?? '20', 10) || 20, 100)),
+      offset: Math.max(0, parseInt(offsetStr ?? '0', 10) || 0),
     });
   }
 
