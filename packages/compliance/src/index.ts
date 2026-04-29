@@ -34,3 +34,8 @@ export {
 export type { PmlaThresholdStatus, PmlaCumulativeResult, CtrDocument } from './pmla';
 export { RCM_RATE_BP, buildUrdSelfInvoice } from './urd-rcm';
 export type { UrdSelfInvoiceParams, UrdSelfInvoiceResult } from './urd-rcm';
+export {
+  RESTRICTION_269SS_THRESHOLD_PAISE,
+  enforce269ss,
+} from './cash-restriction/section-269ss';
+export type { CashRestrictionType } from './cash-restriction/section-269ss';

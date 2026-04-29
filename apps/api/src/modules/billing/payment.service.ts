@@ -11,6 +11,7 @@ import {
   getPmlaThresholdStatus,
   istMonthStr,
   ComplianceHardBlockError,
+  enforce269ss,
 } from '@goldsmith/compliance';
 import type { CashCapOverride, PmlaCumulativeResult } from '@goldsmith/compliance';
 import { auditLog, AuditAction } from '@goldsmith/audit';
@@ -558,6 +559,20 @@ export class PaymentService {
     } finally {
       client.release();
     }
+  }
+
+  // Stub: records a cash advance against a custom order.
+  // enforce269ss wired here — see Wave 3 (feat/story-custom-orders) for full deposit flow.
+  // Full implementation: persist advance to custom_order_advances table, emit event, decrement deposit balance.
+  async recordAdvanceCashPayment(
+    customOrderId: string,
+    cashAmountPaise: bigint,
+  ): Promise<void> {
+    // Section 269SS: cash advances ≥ Rs 20,000 are prohibited — no override.
+    enforce269ss(cashAmountPaise, 'advance');
+    // TODO(Wave 3): DB write — INSERT INTO custom_order_advances (...) within withTenantTx
+    void customOrderId;
+    throw new Error('recordAdvanceCashPayment: full implementation in Wave 3 (feat/story-custom-orders)');
   }
 
   async listPayments(invoiceId: string): Promise<Payment[]> {
