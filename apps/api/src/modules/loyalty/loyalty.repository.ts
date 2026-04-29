@@ -164,4 +164,39 @@ export class LoyaltyRepository {
       return r.rows.length > 0;
     });
   }
+
+  // Returns the total invoice spend in paise for this customer over the last 12 months.
+  // Tier thresholds (thresholdPaise) represent spend in paise — compare against this value,
+  // not against points earned, so the units match across different earn rates.
+  async getEarnings12m(customerId: string): Promise<bigint> {
+    return withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query(
+        `SELECT COALESCE(SUM(i.total_paise), 0) AS total
+         FROM loyalty_transactions lt
+         JOIN invoices i ON i.id = lt.invoice_id
+         WHERE lt.customer_id = $1
+           AND lt.type = 'ACCRUAL'
+           AND lt.created_at > NOW() - INTERVAL '12 months'`,
+        [customerId],
+      );
+      const raw = (r.rows[0] as { total: string | number } | undefined)?.total ?? 0;
+      return BigInt(raw);
+    });
+  }
+
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal; shopId from context
+  async setTier(
+    tx: TxLike,
+    shopId: string,
+    customerId: string,
+    tier: string | null,
+    tierSince: Date,
+  ): Promise<void> {
+    await tx.query(
+      `UPDATE customer_loyalty
+       SET current_tier = $1, tier_since = $2, last_updated_at = now()
+       WHERE shop_id = $3 AND customer_id = $4`,
+      [tier, tierSince, shopId, customerId],
+    );
+  }
 }

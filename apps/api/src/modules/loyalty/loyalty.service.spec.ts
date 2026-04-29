@@ -56,6 +56,8 @@ function fakeRepo(overrides: Partial<LoyaltyRepository> = {}): LoyaltyRepository
     getState:              vi.fn(async () => null),
     getRecentTransactions: vi.fn(async () => []),
     customerExists:        vi.fn(async () => true),
+    getEarnings12m:        vi.fn(async () => 0n),
+    setTier:               vi.fn(async () => undefined),
     ...overrides,
   } as unknown as LoyaltyRepository;
 }
@@ -354,5 +356,124 @@ describe('adjustPoints', () => {
         svc.adjustPoints(CUSTOMER, { pointsDelta: 100, reason: 'goodwill' }),
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+// ─── redeemPointsInTx ────────────────────────────────────────────────────────
+
+describe('redeemPointsInTx', () => {
+  it('throws loyalty.insufficient_balance when points_balance < pointsToRedeem', async () => {
+    const repo = fakeRepo({
+      lockOrCreateAggregate: vi.fn(async () => fakeAggregate({ points_balance: 50 })),
+    });
+    const svc = makeSvc({ repo });
+    const tx = fakeTx();
+
+    await expect(
+      svc.redeemPointsInTx(tx as any, SHOP, {
+        customerId:     CUSTOMER,
+        invoiceId:      INVOICE,
+        pointsToRedeem: 100,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'loyalty.insufficient_balance' } });
+  });
+
+  it('inserts REDEMPTION transaction with correct delta and balances', async () => {
+    const repo = fakeRepo({
+      lockOrCreateAggregate: vi.fn(async () => fakeAggregate({ points_balance: 200 })),
+    });
+    const svc = makeSvc({ repo });
+    const tx = fakeTx();
+
+    await svc.redeemPointsInTx(tx as any, SHOP, {
+      customerId:     CUSTOMER,
+      invoiceId:      INVOICE,
+      pointsToRedeem: 150,
+    });
+
+    expect(repo.insertTransaction).toHaveBeenCalledOnce();
+    const insertCall = (repo.insertTransaction as any).mock.calls[0][2];
+    expect(insertCall).toMatchObject({
+      customerId:      CUSTOMER,
+      invoiceId:       INVOICE,
+      type:            'REDEMPTION',
+      pointsDelta:     -150,
+      balanceBefore:   200,
+      balanceAfter:    50,
+      createdByUserId: null,
+    });
+  });
+
+  it('calls updateAggregate with negative pointsDelta and 0 lifetimeDelta', async () => {
+    const repo = fakeRepo({
+      lockOrCreateAggregate: vi.fn(async () => fakeAggregate({ points_balance: 200 })),
+    });
+    const svc = makeSvc({ repo });
+    const tx = fakeTx();
+
+    await svc.redeemPointsInTx(tx as any, SHOP, {
+      customerId:     CUSTOMER,
+      invoiceId:      INVOICE,
+      pointsToRedeem: 150,
+    });
+
+    const updateCall = (repo.updateAggregate as any).mock.calls[0][2];
+    expect(updateCall).toMatchObject({ pointsDelta: -150, lifetimeDelta: 0 });
+  });
+});
+
+// ─── checkAndUpgradeTier ─────────────────────────────────────────────────────
+
+describe('checkAndUpgradeTier', () => {
+  it('no-op when earnings12m is below all tier thresholds', async () => {
+    const repo = fakeRepo({
+      getEarnings12m: vi.fn(async () => 100n),
+      getState:       vi.fn(async () => null),
+    });
+    const svc = makeSvc({ repo });
+
+    await svc.checkAndUpgradeTier(CUSTOMER, SHOP);
+
+    expect(repo.setTier).not.toHaveBeenCalled();
+  });
+
+  it('upgrades to Silver when earnings12m >= 5_000_000', async () => {
+    const repo = fakeRepo({
+      getEarnings12m: vi.fn(async () => 5_000_000n),
+      getState:       vi.fn(async () => null),
+    });
+    const svc = makeSvc({ repo });
+
+    await svc.checkAndUpgradeTier(CUSTOMER, SHOP);
+
+    expect(repo.setTier).toHaveBeenCalledOnce();
+    const [, , , tier] = (repo.setTier as any).mock.calls[0];
+    expect(tier).toBe('Silver');
+  });
+
+  it('upgrades to Gold when earnings12m >= 15_000_000', async () => {
+    const repo = fakeRepo({
+      getEarnings12m: vi.fn(async () => 15_000_000n),
+      getState:       vi.fn(async () => fakeAggregate({ current_tier: 'Silver' })),
+    });
+    const svc = makeSvc({ repo });
+
+    await svc.checkAndUpgradeTier(CUSTOMER, SHOP);
+
+    expect(repo.setTier).toHaveBeenCalledOnce();
+    const [, , , tier] = (repo.setTier as any).mock.calls[0];
+    expect(tier).toBe('Gold');
+  });
+
+  it('no-op when tier is already correct (same tier)', async () => {
+    const repo = fakeRepo({
+      getEarnings12m: vi.fn(async () => 5_000_000n),
+      getState:       vi.fn(async () => fakeAggregate({ current_tier: 'Silver' })),
+    });
+    const svc = makeSvc({ repo });
+
+    await svc.checkAndUpgradeTier(CUSTOMER, SHOP);
+
+    expect(repo.setTier).not.toHaveBeenCalled();
   });
 });

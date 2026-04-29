@@ -1,5 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
+
 import { withTenantTx } from '@goldsmith/db';
 
 export interface InvoiceRow {
@@ -154,7 +155,10 @@ export class BillingRepository {
    * IdempotencyKeyConflictError so the service can fetch & return the
    * existing invoice instead of erroring.
    */
-  async insertInvoice(input: InsertInvoiceInput): Promise<{ invoice: InvoiceRow; items: InvoiceItemRow[] }> {
+  async insertInvoice(
+    input: InsertInvoiceInput,
+    opts?: { onAfterInsert?: (tx: PoolClient, invoiceId: string) => Promise<void> },
+  ): Promise<{ invoice: InvoiceRow; items: InvoiceItemRow[] }> {
     return withTenantTx(this.pool, async (tx) => {
       try {
         const invRes = await tx.query<InvoiceRow>(
@@ -187,6 +191,10 @@ export class BillingRepository {
           ],
         );
         const invoice = invRes.rows[0]!;
+
+        if (opts?.onAfterInsert) {
+          await opts.onAfterInsert(tx, invoice.id);
+        }
 
         const items = await this.insertItems(tx, invoice.id, input.items);
 

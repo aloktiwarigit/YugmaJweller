@@ -8,7 +8,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import type { Redis } from '@goldsmith/cache';
 import { computeProductPrice } from '@goldsmith/money';
 import {
@@ -49,6 +49,7 @@ import { generateInvoiceNumber } from './invoice-number';
 import { InventoryService } from '../inventory/inventory.service';
 import { PricingService } from '../pricing/pricing.service';
 import { SettingsRepository } from '../settings/settings.repository';
+import { LoyaltyService } from '../loyalty/loyalty.service';
 
 // Re-export so consumers can import from billing module without needing @goldsmith/compliance
 export { ComplianceHardBlockError };
@@ -177,6 +178,7 @@ export class BillingService {
     @Inject(SettingsCache)      private readonly settingsCache: SettingsCache,
     @Inject(SettingsRepository) private readonly settingsRepo: SettingsRepository,
     @Optional() @Inject(EventEmitter2) private readonly events?: EventEmitter2,
+    @Optional() @Inject(LoyaltyService) private readonly loyaltyService?: LoyaltyService,
   ) {}
 
   private async resolveMakingChargePct(
@@ -496,6 +498,17 @@ export class BillingService {
       }
     }
 
+    // 6e. Loyalty redemption — deduct from totalPaise (atomic with invoice insert below)
+    // Compliance checks (PAN 114B, 269ST) already ran on pre-discount totalPaise above.
+    const loyaltyPointsToRedeem = dto.loyaltyPointsToRedeem ?? 0;
+    const loyaltyDiscountPaise = BigInt(loyaltyPointsToRedeem);
+    // Only apply discount when the redemption callback will actually run.
+    // Walk-in invoices (no customerId) must not receive a discount without a debit.
+    const willRedeem = loyaltyDiscountPaise > 0n && dto.customerId != null && this.loyaltyService != null;
+    if (willRedeem) {
+      totalPaise = totalPaise > loyaltyDiscountPaise ? totalPaise - loyaltyDiscountPaise : 0n;
+    }
+
     // 7. Generate invoice number
     const invoiceNumber = generateInvoiceNumber(ctx.shopId);
 
@@ -556,7 +569,17 @@ export class BillingService {
         })),
       };
 
-      result = await this.repo.insertInvoice(insertInput);
+      const onAfterInsert = willRedeem
+        ? async (tx: PoolClient, invoiceId: string) => {
+            await this.loyaltyService!.redeemPointsInTx(tx, ctx.shopId, {
+              customerId:     dto.customerId!,
+              invoiceId,
+              pointsToRedeem: loyaltyPointsToRedeem,
+            });
+          }
+        : undefined;
+
+      result = await this.repo.insertInvoice(insertInput, { onAfterInsert });
     } catch (err) {
       if (err instanceof IdempotencyKeyConflictError) {
         const existing = await this.repo.getInvoiceByIdempotencyKey(idempotencyKey);

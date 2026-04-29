@@ -1,5 +1,5 @@
 import { Injectable, Inject, UnprocessableEntityException, NotFoundException } from '@nestjs/common';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
@@ -208,6 +208,77 @@ export class LoyaltyService {
 
       return { pointsDelta: dto.pointsDelta, newBalance: balanceAfter };
     });
+  }
+
+  // Called from billing service within an existing transaction.
+  // Must NOT create its own withTenantTx — operates on the passed-in tx.
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal; shopId from billing caller context
+  async redeemPointsInTx(
+    tx: PoolClient,
+    shopId: string,
+    params: { customerId: string; invoiceId: string; pointsToRedeem: number },
+  ): Promise<void> {
+    const aggregate = await this.repo.lockOrCreateAggregate(tx, shopId, params.customerId);
+    if (aggregate.points_balance < params.pointsToRedeem) {
+      throw new UnprocessableEntityException({ code: 'loyalty.insufficient_balance' });
+    }
+    const balanceBefore = aggregate.points_balance;
+    const balanceAfter  = balanceBefore - params.pointsToRedeem;
+
+    await this.repo.insertTransaction(tx, shopId, {
+      customerId:      params.customerId,
+      invoiceId:       params.invoiceId,
+      type:            'REDEMPTION',
+      pointsDelta:     -params.pointsToRedeem,
+      balanceBefore,
+      balanceAfter,
+      reason:          `invoice:${params.invoiceId}`,
+      createdByUserId: null,
+    });
+
+    await this.repo.updateAggregate(tx, shopId, {
+      customerId:    params.customerId,
+      pointsDelta:   -params.pointsToRedeem,
+      lifetimeDelta: 0,
+    });
+
+    void auditLog(this.pool, {
+      action:      AuditAction.LOYALTY_POINTS_REDEEMED,
+      subjectType: 'customer',
+      subjectId:   params.customerId,
+      after: {
+        invoice_id:      params.invoiceId,
+        points_redeemed: params.pointsToRedeem,
+        balance_after:   balanceAfter,
+      },
+    }).catch(() => undefined);
+  }
+
+  // Best-effort — caller wraps in try/catch.
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal; shopId from worker job payload
+  async checkAndUpgradeTier(customerId: string, shopId: string): Promise<void> {
+    const config = (await this.settingsCache.getLoyalty()) ?? LOYALTY_DEFAULTS;
+    const earnings12m = await this.repo.getEarnings12m(customerId);
+
+    // Sort tiers by thresholdPaise descending → first match is the highest qualifying tier.
+    const sortedTiers = [...config.tiers].sort((a, b) => b.thresholdPaise - a.thresholdPaise);
+    const newTier = sortedTiers.find((t) => earnings12m >= BigInt(t.thresholdPaise))?.name ?? null;
+
+    const row = await this.repo.getState(customerId);
+    const currentTier = row?.current_tier ?? null;
+
+    if (newTier === currentTier) return;
+
+    await withTenantTx(this.pool, async (tx) => {
+      await this.repo.setTier(tx, shopId, customerId, newTier, new Date());
+    });
+
+    void auditLog(this.pool, {
+      action:      AuditAction.LOYALTY_TIER_UPGRADED,
+      subjectType: 'customer',
+      subjectId:   customerId,
+      after: { old_tier: currentTier, new_tier: newTier },
+    }).catch(() => undefined);
   }
 }
 
