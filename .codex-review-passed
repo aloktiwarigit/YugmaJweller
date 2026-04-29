@@ -1,1 +1,5 @@
-codex-review-passed: 2026-04-29. P1 (TCS not in total_paise) + P2 (missing fixtures) fixed. Re-review: clean.
+story: huid-exemptions
+reviewed-at: 2026-04-29
+model: gpt-5.5
+findings: 1 P1 (conditional spread for undefined exemption on manual lines) — fixed
+verdict: PASSED

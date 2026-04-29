@@ -212,6 +212,9 @@ importers:
       '@goldsmith/auth-client':
         specifier: workspace:*
         version: link:../../packages/auth-client
+      '@goldsmith/compliance':
+        specifier: workspace:*
+        version: link:../../packages/compliance
       '@goldsmith/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
