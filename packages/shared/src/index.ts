@@ -193,3 +193,11 @@ export type {
   RequestDeletionDto,
   DeletionRequestResponse,
 } from './schemas/customer.schema';
+export {
+  UpdateViewingConsentSchema,
+  ViewingConsentResponseSchema,
+} from './schemas/viewing-consent.schema';
+export type {
+  UpdateViewingConsentDto,
+  ViewingConsentResponse,
+} from './schemas/viewing-consent.schema';
