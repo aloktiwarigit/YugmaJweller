@@ -228,4 +228,35 @@ export class BillingController {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.payments.listPayments(id);
   }
+
+  @TenantWalkerRoute({ expectedStatus: 400 })
+  @Post('/urd-purchases')
+  @Roles('shop_admin', 'shop_manager')
+  async recordUrdPurchase(
+    @TenantContextDec() ctx: TenantContext,
+    @Body() dto: RecordUrdPurchaseDto,
+  ): Promise<UrdPurchaseResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.urd.recordUrdPurchase(ctx as AuthenticatedTenantContext, dto);
+  }
+
+  @TenantWalkerRoute()
+  @Get('/urd-purchases')
+  @Roles('shop_admin', 'shop_manager')
+  async listUrdPurchases(@TenantContextDec() ctx: TenantContext): Promise<UrdPurchaseResponse[]> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.urd.listUrdPurchases(ctx as AuthenticatedTenantContext);
+  }
+
+  @TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-0000-0000-000000000000', purchaseId: '00000000-0000-0000-0000-000000000000' } })
+  @Post('/invoices/:id/urd-apply/:purchaseId')
+  @Roles('shop_admin', 'shop_manager')
+  async applyUrdToInvoice(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) invoiceId: string,
+    @Param('purchaseId', ParseUUIDPipe) purchaseId: string,
+  ): Promise<void> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    await this.urd.applyUrdToInvoice(ctx as AuthenticatedTenantContext, purchaseId, invoiceId);
+  }
 }

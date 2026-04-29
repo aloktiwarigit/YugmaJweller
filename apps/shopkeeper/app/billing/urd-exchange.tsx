@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, Pressable, TextInput, Alert, StyleSheet, ActivityIndicator, Share } from 'react-native';
-import { router } from 'expo-router';
+import { View, Text, ScrollView, Pressable, TextInput, Alert, ActivityIndicator, Share } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../../src/api/client';
 
@@ -20,7 +19,7 @@ function formatPaise(paise: bigint): string {
   return `₹${(Number(paise)/100).toLocaleString('hi-IN',{minimumFractionDigits:2})}`;
 }
 
-function calcPreview(weightG: string, rate: string) {
+function calcPreview(weightG: string, rate: string): { goldValue: bigint; rcmGst: bigint; netToCustomer: bigint } | null {
   try {
     const w = parseFloat(weightG); const r = parseFloat(rate);
     if (!isFinite(w)||w<=0||!isFinite(r)||r<=0) return null;
