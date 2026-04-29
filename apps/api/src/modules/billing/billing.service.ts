@@ -597,8 +597,12 @@ export class BillingService {
     // 10. Build response and cache for idempotent replay
     const resp = rowToInvoiceResponse(result.invoice, result.items);
     this.cacheResponse(ctx.shopId, idempotencyKey, resp);
-    // Notify BalanceService (and other listeners) that an invoice was created.
-    this.events?.emit('invoice.created', { invoiceId: resp.id, customerId: resp.customerId, shopId: ctx.shopId });
+    // Compute total gold value for loyalty accrual (sum of item goldValuePaise).
+    const goldValuePaise = result.items
+      .reduce((sum, item) => sum + item.gold_value_paise, 0n)
+      .toString();
+    // Notify BalanceService and LoyaltyEventListener.
+    this.events?.emit('invoice.created', { invoiceId: resp.id, customerId: resp.customerId, shopId: ctx.shopId, goldValuePaise });
     return resp;
   }
 

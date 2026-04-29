@@ -86,8 +86,11 @@ GRANT SELECT, INSERT ON loyalty_transactions TO app_user;
 -- Indexes — customer timeline + tenant scope
 CREATE INDEX idx_loyalty_transactions_customer
   ON loyalty_transactions(shop_id, customer_id, created_at DESC);
-CREATE INDEX idx_loyalty_transactions_invoice
-  ON loyalty_transactions(shop_id, invoice_id) WHERE invoice_id IS NOT NULL;
+-- Unique constraint prevents double-accrual if Redis idempotency key expires
+-- (e.g. after a Redis flush or long-running retry window).
+CREATE UNIQUE INDEX idx_loyalty_transactions_invoice_unique
+  ON loyalty_transactions(shop_id, invoice_id)
+  WHERE invoice_id IS NOT NULL AND txn_type = 'ACCRUAL';
 
 -- ============================================================================
 -- 2. customer_loyalty — running aggregate (one row per customer)

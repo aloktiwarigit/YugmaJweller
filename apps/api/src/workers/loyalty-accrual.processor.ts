@@ -38,9 +38,8 @@ export class LoyaltyAccrualProcessor extends WorkerHost {
       return { skipped: true };
     }
 
-    const ctx = await this.buildTenantCtx(shopId);
-
     try {
+      const ctx = await this.buildTenantCtx(shopId);
       const result = await tenantContext.runWith(ctx, () =>
         this.loyaltySvc.accruePoints({
           customerId,
