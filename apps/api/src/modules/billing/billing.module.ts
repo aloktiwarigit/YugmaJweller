@@ -16,6 +16,8 @@ import { VoidService }       from './void.service';
 import { ShareService }      from './share.service';
 import { InvoicePdfService } from './invoice-pdf.service';
 import { GstrExportService } from './gstr-export.service';
+import { ComplianceReportsController } from './compliance-reports.controller';
+import { ComplianceReportsService } from './compliance-reports.service';
 import { CompliancePmlaProcessor } from '../../workers/compliance-pmla.processor';
 import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
 
@@ -28,7 +30,7 @@ import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
     BullModule.registerQueue({ name: 'compliance-pmla' }),
     BullModule.registerQueue({ name: 'gstr-export' }),
   ],
-  controllers: [BillingController],
+  controllers: [BillingController, ComplianceReportsController],
   providers: [
     BillingService,
     BillingRepository,
@@ -37,6 +39,7 @@ import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
     ShareService,
     InvoicePdfService,
     GstrExportService,
+    ComplianceReportsService,
     CompliancePmlaProcessor,
     GstrExportProcessor,
     SettingsRepository,

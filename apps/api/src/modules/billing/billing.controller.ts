@@ -1,7 +1,8 @@
 import {
   BadRequestException, Body, Controller, Get, Headers, Inject, Param, Post, Query,
-  ParseIntPipe, ParseUUIDPipe, UnauthorizedException,
+  ParseIntPipe, ParseUUIDPipe, UnauthorizedException, UnprocessableEntityException,
 } from '@nestjs/common';
+import { ComplianceHardBlockError } from '@goldsmith/compliance';
 import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext } from '@goldsmith/tenant-context';
 import { CreateInvoiceSchema, RecordCashPaymentSchema } from '@goldsmith/shared';
@@ -102,12 +103,19 @@ export class BillingController {
     if (!idempotencyKey?.trim()) {
       throw new BadRequestException({ code: 'payment.idempotency_key_required' });
     }
-    return this.payments.recordCashPayment(
-      invoiceId,
-      BigInt(dto.amountPaise),
-      idempotencyKey,
-      dto.override,
-    );
+    try {
+      return await this.payments.recordCashPayment(
+        invoiceId,
+        BigInt(dto.amountPaise),
+        idempotencyKey,
+        dto.override,
+      );
+    } catch (err) {
+      if (err instanceof ComplianceHardBlockError && err.code === 'compliance.pmla_threshold_blocked') {
+        throw new UnprocessableEntityException({ code: err.code, ...err.meta });
+      }
+      throw err;
+    }
   }
 
 
@@ -141,7 +149,6 @@ export class BillingController {
       id,
       { reason: dto?.reason ?? '' },
     );
-    // Fetch with line items so the response is complete (toInvoiceResponse returns lines:[]).
     return this.svc.getInvoice(id);
   }
 
@@ -163,6 +170,7 @@ export class BillingController {
       { reason: dto?.reason ?? '' },
     );
   }
+
 
   @TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-0000-0000-000000000000' } })
   @Post('/invoices/:id/share/whatsapp')
