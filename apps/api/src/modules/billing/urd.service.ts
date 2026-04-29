@@ -130,17 +130,24 @@ export class UrdService {
       const urd = urdRes.rows[0];
       if (!urd) throw new NotFoundException({ code: 'urd.not_found' });
       if (urd.linked_invoice_id !== null) throw new ConflictException({ code: 'urd.already_applied' });
-      const invRes = await tx.query<{ id: string }>(
-        'SELECT id FROM invoices WHERE id = $1', [invoiceId],
+      const invRes = await tx.query<{ id: string; status: string; total_paise: string }>(
+        `SELECT id, status, total_paise FROM invoices WHERE id = $1 FOR UPDATE`, [invoiceId],
       );
       if (!invRes.rows[0]) throw new NotFoundException({ code: 'invoice.not_found' });
+      if (invRes.rows[0].status !== 'ISSUED') throw new UnprocessableEntityException({ code: 'invoice.not_payable' });
+      const paidRes = await tx.query<{ paid: string }>(
+        `SELECT COALESCE(SUM(amount_paise),0)::text AS paid FROM payments WHERE invoice_id = $1 AND status = 'CONFIRMED'`,
+        [invoiceId],
+      );
+      const remaining = BigInt(invRes.rows[0].total_paise) - BigInt(paidRes.rows[0]?.paid ?? '0');
+      if (BigInt(urd.net_to_customer_paise) > remaining) throw new UnprocessableEntityException({ code: 'payment.exceeds_balance' });
       await tx.query(
         'UPDATE urd_purchases SET linked_invoice_id = $1 WHERE id = $2',
         [invoiceId, urdPurchaseId],
       );
       await tx.query(
-        `INSERT INTO payments (shop_id, invoice_id, method, amount_paise, created_by_user_id)
-         VALUES (current_setting('app.current_shop_id')::uuid, $1, 'OLD_GOLD', $2, $3)`,
+        `INSERT INTO payments (shop_id, invoice_id, method, amount_paise, status, created_by_user_id, webhook_status)
+         VALUES (current_setting('app.current_shop_id')::uuid, $1, 'OLD_GOLD', $2, 'CONFIRMED', $3, 'NA')`,
         [invoiceId, urd.net_to_customer_paise, ctx.userId],
       );
     });
@@ -156,11 +163,13 @@ export class UrdService {
   ): Promise<UrdPurchaseResponse[]> {
     const page = Math.max(1, opts.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, opts.pageSize ?? 20));
-    const res = await this.pool.query<UrdPurchaseRow>(
-      `SELECT ${URD_COLS} FROM urd_purchases ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
-      [pageSize, (page - 1) * pageSize],
-    );
-    return res.rows.map(toResponse);
+    return withTenantTx(this.pool, async (tx) => {
+      const res = await tx.query<UrdPurchaseRow>(
+        `SELECT ${URD_COLS} FROM urd_purchases ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+        [pageSize, (page - 1) * pageSize],
+      );
+      return res.rows.map(toResponse);
+    });
   }
 
   async getSelfInvoice(
