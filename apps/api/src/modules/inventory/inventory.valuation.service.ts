@@ -56,7 +56,13 @@ export class InventoryValuationService {
 
     try {
       const cached = await this.redis.get(cacheKey);
-      if (cached !== null) return this.deserialize(cached);
+      if (cached !== null) {
+        try {
+          return this.deserialize(cached);
+        } catch (deserErr) {
+          this.logger.warn(`Valuation cache deserialize failed — recomputing: ${String(deserErr)}`);
+        }
+      }
     } catch (err) {
       this.logger.warn(`Valuation cache read failed — computing fresh: ${String(err)}`);
     }
