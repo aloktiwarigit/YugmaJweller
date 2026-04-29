@@ -45,6 +45,7 @@ export enum AuditAction {
   CREDIT_NOTE_ISSUED               = 'CREDIT_NOTE_ISSUED',
   INVOICE_SHARED                   = 'INVOICE_SHARED',
   CTR_ACCESSED                     = 'CTR_ACCESSED',
+  STR_TEMPLATE_ACCESSED            = 'STR_TEMPLATE_ACCESSED',
   CRM_CUSTOMER_CREATED             = 'CRM_CUSTOMER_CREATED',
   CRM_CUSTOMER_UPDATED             = 'CRM_CUSTOMER_UPDATED',
   PAYMENT_INITIATED                = 'PAYMENT_INITIATED',

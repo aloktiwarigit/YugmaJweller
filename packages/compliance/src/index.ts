@@ -30,7 +30,9 @@ export {
   istDateStr,
   buildCtrDocument,
   renderCtrText,
+  buildStrDocument,
+  renderStrText,
 } from './pmla';
-export type { PmlaThresholdStatus, PmlaCumulativeResult, CtrDocument } from './pmla';
+export type { PmlaThresholdStatus, PmlaCumulativeResult, CtrDocument, StrDocument, StrInput } from './pmla';
 export { RCM_RATE_BP, buildUrdSelfInvoice } from './urd-rcm';
 export type { UrdSelfInvoiceParams, UrdSelfInvoiceResult } from './urd-rcm';
