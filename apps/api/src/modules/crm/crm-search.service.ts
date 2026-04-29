@@ -39,6 +39,7 @@ export class CrmSearchService {
     }
   }
 
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal search helper; shopId comes from authenticated ctx
   private async postgresSearch(shopId: string, query: CustomerSearchQuery): Promise<CustomerSearchResult> {
     const { q, city, limit, offset } = query;
     const conditions: string[] = ['c.shop_id = $1'];
@@ -98,6 +99,7 @@ export class CrmSearchService {
     }
   }
 
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal indexing; shopId from auth context
   async indexCustomer(shopId: string, customer: CustomerSearchDoc): Promise<void> {
     try {
       await this.searchPort.indexCustomer(shopId, customer);
@@ -113,6 +115,7 @@ export class CrmSearchService {
     }
   }
 
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal search helper; shopId from auth context
   async removeFromIndex(shopId: string, customerId: string): Promise<void> {
     try {
       await this.searchPort.removeCustomer(shopId, customerId);

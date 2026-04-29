@@ -94,7 +94,7 @@ export function CustomerSearch({ onSearch, onSelect, placeholder }: Props): Reac
         <View
           testID="degraded-notice"
           style={styles.degradedNotice}
-          accessibilityRole="status"
+          accessibilityRole="none"
           accessibilityLabel="खोज सीमित मोड में है"
         >
           <Text style={styles.degradedText}>सीमित खोज — पूर्ण खोज अनुपलब्ध</Text>
