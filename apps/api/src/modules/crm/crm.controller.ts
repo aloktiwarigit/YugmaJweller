@@ -5,14 +5,27 @@ import { CreateCustomerSchema, UpdateCustomerSchema, CustomerListQuerySchema, Li
 import type { CreateCustomerDto, UpdateCustomerDto, CustomerResponse, LinkFamilyDto, FamilyMemberResponse } from '@goldsmith/shared';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { Inject } from '@nestjs/common';
 import { CrmService } from './crm.service';
 import { FamilyService } from './family.service';
+import { HistoryService } from './history.service';
+import type { PurchaseHistoryResponse } from './history.service';
+import { BalanceService } from './balance.service';
+import type { CustomerBalance } from './balance.service';
+import { NotesService } from './notes.service';
+import type { NoteResponse } from './notes.service';
+import { OccasionsService } from './occasions.service';
+import type { OccasionResponse, AddOccasionDto } from './occasions.service';
 
 @Controller('/api/v1/crm')
 export class CrmController {
   constructor(
-    private readonly svc: CrmService,
-    private readonly familySvc: FamilyService,
+    @Inject(CrmService)       private readonly svc: CrmService,
+    @Inject(FamilyService)    private readonly familySvc: FamilyService,
+    @Inject(HistoryService)   private readonly historySvc: HistoryService,
+    @Inject(BalanceService)   private readonly balanceSvc: BalanceService,
+    @Inject(NotesService)     private readonly notesSvc: NotesService,
+    @Inject(OccasionsService) private readonly occasionsSvc: OccasionsService,
   ) {}
 
   @Post('customers') @Roles('shop_admin', 'shop_manager', 'shop_staff')
@@ -54,5 +67,61 @@ export class CrmController {
   async getFamilyLinks(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string): Promise<FamilyMemberResponse[]> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.familySvc.getFamilyLinks(ctx, id);
+  }
+
+  @Post('customers/:id/notes') @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async addNote(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string, @Body() body: { body: string }): Promise<NoteResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.notesSvc.addNote(ctx, id, body.body);
+  }
+
+  @Get('customers/:id/notes') @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async listNotes(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string): Promise<NoteResponse[]> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.notesSvc.listNotes(ctx, id);
+  }
+
+  @Delete('customers/:id/notes/:noteId') @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async deleteNote(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) _id: string, @Param('noteId', ParseUUIDPipe) noteId: string): Promise<void> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.notesSvc.deleteNote(ctx, noteId, ctx.userId, ctx.role);
+  }
+
+  @Post('customers/:id/occasions') @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async addOccasion(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: AddOccasionDto): Promise<OccasionResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.occasionsSvc.addOccasion(ctx, id, dto);
+  }
+
+  @Get('customers/:id/occasions') @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async listOccasions(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string): Promise<OccasionResponse[]> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.occasionsSvc.listOccasions(ctx, id);
+  }
+
+  @Delete('customers/:id/occasions/:occId') @Roles('shop_admin', 'shop_manager')
+  async deleteOccasion(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) _id: string, @Param('occId', ParseUUIDPipe) occId: string): Promise<void> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.occasionsSvc.deleteOccasion(ctx, occId);
+  }
+
+  @Get('customers/:id/history') @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async getPurchaseHistory(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ): Promise<PurchaseHistoryResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.historySvc.getPurchaseHistory(ctx, id, {
+      limit:  Math.min(100, Math.max(1, parseInt(limit ?? '20', 10) || 20)),
+      offset: Math.max(0, parseInt(offset ?? '0', 10) || 0),
+    });
+  }
+
+  @Get('customers/:id/balance') @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async getBalance(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string): Promise<CustomerBalance> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.balanceSvc.getBalance(ctx, id);
   }
 }

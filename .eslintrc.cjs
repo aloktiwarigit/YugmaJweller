@@ -78,6 +78,8 @@ module.exports = {
         '**/apps/api/src/modules/webhooks/razorpay.controller.ts',
         'apps/api/src/modules/webhooks/webhooks.module.ts',
         '**/apps/api/src/modules/webhooks/webhooks.module.ts',
+        'apps/api/src/modules/crm/crm.module.ts',
+        '**/apps/api/src/modules/crm/crm.module.ts',
         'apps/api/src/workers/compliance-pmla.processor.ts',
         '**/apps/api/src/workers/compliance-pmla.processor.ts',
       ],

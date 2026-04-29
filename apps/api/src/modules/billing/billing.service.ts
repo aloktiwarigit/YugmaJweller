@@ -5,7 +5,9 @@ import {
   NotFoundException,
   BadRequestException,
   UnprocessableEntityException,
+  Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Pool } from 'pg';
 import type { Redis } from '@goldsmith/cache';
 import { computeProductPrice } from '@goldsmith/money';
@@ -147,6 +149,16 @@ function idemKey(shopUuid: string, key: string): string {
 const PAN_DECRYPT_RATE_LIMIT_KEY = (shopUuid: string): string =>
   `billing:pan_decrypt:${shopUuid}:${new Date().toISOString().slice(0, 13)}`; // hour bucket
 
+export interface PurchaseHistorySummary {
+  invoiceId:     string;
+  invoiceNumber: string;
+  issuedAt:      string | null;
+  totalPaise:    string;
+  status:        string;
+  lineCount:     number;
+  paymentMethod: string;
+}
+
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
@@ -160,6 +172,7 @@ export class BillingService {
     @Inject('KMS_ADAPTER')      private readonly kms: KmsAdapter,
     @Inject(SettingsCache)      private readonly settingsCache: SettingsCache,
     @Inject(SettingsRepository) private readonly settingsRepo: SettingsRepository,
+    @Optional() @Inject(EventEmitter2) private readonly events?: EventEmitter2,
   ) {}
 
   private async resolveMakingChargePct(
@@ -568,6 +581,8 @@ export class BillingService {
     // 10. Build response and cache for idempotent replay
     const resp = rowToInvoiceResponse(result.invoice, result.items);
     this.cacheResponse(ctx.shopId, idempotencyKey, resp);
+    // Notify BalanceService (and other listeners) that an invoice was created.
+    this.events?.emit('invoice.created', { invoiceId: resp.id, customerId: resp.customerId, shopId: ctx.shopId });
     return resp;
   }
 
@@ -631,5 +646,26 @@ export class BillingService {
     this.redis
       .setex(idemKey(shopUuid, key), IDEM_TTL_SEC, JSON.stringify(resp))
       .catch((e: unknown) => this.logger.warn(`Idempotency cache write failed: ${String(e)}`));
+  }
+
+  async getPurchaseHistoryForCustomer(
+    customerId: string,
+    params: { limit: number; offset: number },
+  ): Promise<{ invoices: PurchaseHistorySummary[]; total: number }> {
+    const { rows, total } = await this.repo.listInvoicesForCustomer(customerId, params.limit, params.offset);
+    const invoices: PurchaseHistorySummary[] = rows.map((r) => {
+      const methods = r.payment_methods ?? [];
+      const paymentMethod = methods.length === 0 ? 'PENDING' : methods.length === 1 ? methods[0]! : 'SPLIT';
+      return {
+        invoiceId:     r.invoice_id,
+        invoiceNumber: r.invoice_number,
+        issuedAt:      r.issued_at?.toISOString() ?? null,
+        totalPaise:    r.total_paise.toString(),
+        status:        r.status,
+        lineCount:     r.line_count,
+        paymentMethod,
+      };
+    });
+    return { invoices, total };
   }
 }

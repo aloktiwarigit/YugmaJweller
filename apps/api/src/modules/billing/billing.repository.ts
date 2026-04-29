@@ -317,4 +317,47 @@ export class BillingRepository {
       return r.rows;
     });
   }
+
+  async listInvoicesForCustomer(
+    customerId: string,
+    limit: number,
+    offset: number,
+  ): Promise<{ rows: CustomerInvoiceSummaryRow[]; total: number }> {
+    return withTenantTx(this.pool, async (tx) => {
+      const dataR = await tx.query<CustomerInvoiceSummaryRow>(
+        `SELECT
+           i.id             AS invoice_id,
+           i.invoice_number,
+           i.issued_at,
+           i.total_paise,
+           i.status,
+           COUNT(DISTINCT ii.id)::integer           AS line_count,
+           ARRAY_AGG(DISTINCT p.method)
+             FILTER (WHERE p.method IS NOT NULL)    AS payment_methods
+         FROM invoices i
+         LEFT JOIN invoice_items ii ON ii.invoice_id = i.id
+         LEFT JOIN payments p ON p.invoice_id = i.id
+         WHERE i.customer_id = $1
+         GROUP BY i.id, i.invoice_number, i.issued_at, i.total_paise, i.status
+         ORDER BY i.issued_at DESC NULLS LAST, i.created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [customerId, limit, offset],
+      );
+      const countR = await tx.query<{ total: string }>(
+        `SELECT COUNT(*)::text AS total FROM invoices WHERE customer_id = $1`,
+        [customerId],
+      );
+      return { rows: dataR.rows, total: parseInt(countR.rows[0]?.total ?? '0', 10) };
+    });
+  }
+}
+
+export interface CustomerInvoiceSummaryRow {
+  invoice_id:      string;
+  invoice_number:  string;
+  issued_at:       Date | null;
+  total_paise:     bigint;
+  status:          string;
+  line_count:      number;
+  payment_methods: string[] | null;
 }

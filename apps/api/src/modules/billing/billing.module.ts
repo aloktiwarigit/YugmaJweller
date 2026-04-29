@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { BullModule } from '@nestjs/bullmq';
 import { Redis } from '@goldsmith/cache';
 import { LocalKMS, DevKmsAdapter } from '@goldsmith/crypto-envelope';
@@ -25,6 +26,7 @@ import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
 
 @Module({
   imports: [
+    EventEmitterModule.forRoot({ wildcard: false }),
     AuthModule,
     InventoryModule,
     PricingModule,
