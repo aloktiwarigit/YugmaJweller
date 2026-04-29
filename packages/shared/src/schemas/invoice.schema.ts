@@ -47,6 +47,8 @@ export const CreateInvoiceSchema = z.object({
   invoiceType:       z.enum(['B2C', 'B2B_WHOLESALE']).default('B2C'),
   buyerGstin:        z.string().length(15).optional(),
   buyerBusinessName: z.string().min(2).max(200).optional(),
+  // 1 point = 1 paise (platform default). Only applied when customerId is present.
+  loyaltyPointsToRedeem: z.number().int().nonnegative().optional(),
 }).refine(
   (data) => data.invoiceType !== 'B2B_WHOLESALE' || data.buyerGstin != null,
   { message: 'buyerGstin is required for B2B_WHOLESALE invoices', path: ['buyerGstin'] },

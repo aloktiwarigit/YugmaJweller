@@ -9,6 +9,7 @@ import { RazorpayAdapter, StubPaymentsAdapter } from '@goldsmith/integrations-pa
 import { AuthModule }      from '../auth/auth.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { PricingModule }   from '../pricing/pricing.module';
+import { LoyaltyModule }   from '../loyalty/loyalty.module';
 import { SettingsRepository } from '../settings/settings.repository';
 import { BillingController } from './billing.controller';
 import { BillingService }    from './billing.service';
@@ -30,6 +31,7 @@ import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
     AuthModule,
     InventoryModule,
     PricingModule,
+    LoyaltyModule,
     StorageModule,
     BullModule.registerQueue({ name: 'compliance-pmla' }),
     BullModule.registerQueue({ name: 'gstr-export' }),
