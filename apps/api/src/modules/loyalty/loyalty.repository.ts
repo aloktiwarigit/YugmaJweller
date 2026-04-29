@@ -165,14 +165,18 @@ export class LoyaltyRepository {
     });
   }
 
+  // Returns the total invoice spend in paise for this customer over the last 12 months.
+  // Tier thresholds (thresholdPaise) represent spend in paise — compare against this value,
+  // not against points earned, so the units match across different earn rates.
   async getEarnings12m(customerId: string): Promise<bigint> {
     return withTenantTx(this.pool, async (tx) => {
       const r = await tx.query(
-        `SELECT COALESCE(SUM(points_delta), 0) AS total
-         FROM loyalty_transactions
-         WHERE customer_id = $1
-           AND type = 'ACCRUAL'
-           AND created_at > NOW() - INTERVAL '12 months'`,
+        `SELECT COALESCE(SUM(i.total_paise), 0) AS total
+         FROM loyalty_transactions lt
+         JOIN invoices i ON i.id = lt.invoice_id
+         WHERE lt.customer_id = $1
+           AND lt.type = 'ACCRUAL'
+           AND lt.created_at > NOW() - INTERVAL '12 months'`,
         [customerId],
       );
       const raw = (r.rows[0] as { total: string | number } | undefined)?.total ?? 0;

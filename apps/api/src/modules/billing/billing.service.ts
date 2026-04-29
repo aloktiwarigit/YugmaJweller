@@ -496,7 +496,10 @@ export class BillingService {
     // Compliance checks (PAN 114B, 269ST) already ran on pre-discount totalPaise above.
     const loyaltyPointsToRedeem = dto.loyaltyPointsToRedeem ?? 0;
     const loyaltyDiscountPaise = BigInt(loyaltyPointsToRedeem);
-    if (loyaltyDiscountPaise > 0n) {
+    // Only apply discount when the redemption callback will actually run.
+    // Walk-in invoices (no customerId) must not receive a discount without a debit.
+    const willRedeem = loyaltyDiscountPaise > 0n && dto.customerId != null && this.loyaltyService != null;
+    if (willRedeem) {
       totalPaise = totalPaise > loyaltyDiscountPaise ? totalPaise - loyaltyDiscountPaise : 0n;
     }
 
@@ -560,7 +563,7 @@ export class BillingService {
         })),
       };
 
-      const onAfterInsert = loyaltyDiscountPaise > 0n && dto.customerId && this.loyaltyService
+      const onAfterInsert = willRedeem
         ? async (tx: PoolClient, invoiceId: string) => {
             await this.loyaltyService!.redeemPointsInTx(tx, ctx.shopId, {
               customerId:     dto.customerId!,
