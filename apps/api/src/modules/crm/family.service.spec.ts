@@ -131,7 +131,7 @@ describe('unlinkFamily', () => {
   it('deletes both directed edges atomically via single TX call', async () => {
     const repo = fakeRepo({ unlinkByIdAtomic: vi.fn(async () => baseFamilyRow()) });
     const svc = makeSvc(repo);
-    await svc.unlinkFamily(authCtx(), LINK_ID);
+    await svc.unlinkFamily(authCtx(), CUSTOMER_A, LINK_ID);
     expect(repo.unlinkByIdAtomic).toHaveBeenCalledOnce();
     const call = (repo.unlinkByIdAtomic as any).mock.calls[0][0];
     expect(call).toBe(LINK_ID);
@@ -140,7 +140,7 @@ describe('unlinkFamily', () => {
   it('wrong tenant (link not found) throws NotFoundException', async () => {
     const repo = fakeRepo({ unlinkByIdAtomic: vi.fn(async () => null) });
     const svc = makeSvc(repo);
-    await expect(svc.unlinkFamily(authCtx(), LINK_ID)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.unlinkFamily(authCtx(), CUSTOMER_A, LINK_ID)).rejects.toBeInstanceOf(NotFoundException);
   });
 });
 
