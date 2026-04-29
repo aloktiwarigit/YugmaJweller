@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UnauthorizedException, ParseUUIDPipe } from '@nestjs/common';
+import { z } from 'zod';
 import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext } from '@goldsmith/tenant-context';
 import { CreateCustomerSchema, UpdateCustomerSchema, CustomerListQuerySchema, LinkFamilySchema } from '@goldsmith/shared';
@@ -16,6 +17,17 @@ import { NotesService } from './notes.service';
 import type { NoteResponse } from './notes.service';
 import { OccasionsService } from './occasions.service';
 import type { OccasionResponse, AddOccasionDto } from './occasions.service';
+
+const AddNoteSchema = z.object({
+  body: z.string().trim().min(1, 'Note body required').max(5000),
+});
+
+const AddOccasionSchema = z.object({
+  occasionType: z.enum(['BIRTHDAY', 'ANNIVERSARY', 'FESTIVAL', 'OTHER']),
+  label: z.string().trim().max(100).optional(),
+  monthDay: z.string().regex(/^\d{2}-\d{2}$/, 'monthDay must be MM-DD'),
+  reminderDays: z.number().int().min(1).max(365).optional(),
+});
 
 @Controller('/api/v1/crm')
 export class CrmController {
@@ -70,7 +82,7 @@ export class CrmController {
   }
 
   @Post('customers/:id/notes') @Roles('shop_admin', 'shop_manager', 'shop_staff')
-  async addNote(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string, @Body() body: { body: string }): Promise<NoteResponse> {
+  async addNote(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodValidationPipe(AddNoteSchema)) body: { body: string }): Promise<NoteResponse> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.notesSvc.addNote(ctx, id, body.body);
   }
@@ -88,7 +100,7 @@ export class CrmController {
   }
 
   @Post('customers/:id/occasions') @Roles('shop_admin', 'shop_manager', 'shop_staff')
-  async addOccasion(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: AddOccasionDto): Promise<OccasionResponse> {
+  async addOccasion(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodValidationPipe(AddOccasionSchema)) dto: AddOccasionDto): Promise<OccasionResponse> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.occasionsSvc.addOccasion(ctx, id, dto);
   }
