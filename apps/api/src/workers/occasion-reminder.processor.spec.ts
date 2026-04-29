@@ -92,9 +92,10 @@ describe('process', () => {
     vi.setSystemTime(new Date('2026-04-26T12:00:00+05:30'));
 
     // Cross-tenant scan: SECURITY DEFINER function bypasses RLS — see processor comment + migration 0035
+    // Both occasions due today (next_occurrence === todayIST) so both get advanced.
     const client = fakeClient([
       occRow({ id: 'occ-shop-a', shop_id: SHOP_A, next_occurrence: '2026-04-26' }),
-      occRow({ id: 'occ-shop-b', shop_id: SHOP_B, next_occurrence: '2026-05-03' }),
+      occRow({ id: 'occ-shop-b', shop_id: SHOP_B, next_occurrence: '2026-04-26' }),
     ]);
     const proc = new OccasionReminderProcessor(fakePool(client));
 
