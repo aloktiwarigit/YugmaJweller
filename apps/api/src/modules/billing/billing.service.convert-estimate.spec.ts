@@ -161,7 +161,19 @@ describe('BillingService.convertEstimateToInvoice', () => {
 
     expect(result.id).toBe(INV_ID);
     expect(repo.insertInvoice).toHaveBeenCalledOnce();
-    expect(estimateSvc.markConverted).toHaveBeenCalledWith(EST_ID, INV_ID, SHOP);
+    // P1b: onAfterInsert callback passed to repo — estimate update is inside the invoice transaction
+    const insertCall = repo.insertInvoice.mock.calls[0];
+    expect(insertCall?.[1]?.onAfterInsert).toBeTypeOf('function');
+  });
+
+  it('throws when estimate has a past expiresAt even if status is still draft (P2)', async () => {
+    const pastExpiry = new Date(Date.now() - 3600_000).toISOString();
+    const svc = buildSvc({
+      estimateSvc: fakeEstimateService(makeEstimate({ status: 'draft', expiresAt: pastExpiry })),
+    });
+    await expect(svc.convertEstimateToInvoice(EST_ID, IDEM_KEY)).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   it('throws when estimate is already converted', async () => {

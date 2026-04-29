@@ -856,7 +856,12 @@ export class BillingService {
   // re-fetched (invariant: snapshotted rate at estimate creation time).
   // Compliance: TCS 206C(1D) is computed on the estimate total; PAN 114B hard-block applies;
   // 269ST and PMLA fire at payment time (not invoice creation).
-  async convertEstimateToInvoice(estimateId: string, idempotencyKey: string): Promise<InvoiceResponse> {
+  // P1b fix: estimate status is marked converted within the same pg transaction as invoice insert.
+  async convertEstimateToInvoice(
+    estimateId: string,
+    idempotencyKey: string,
+    opts: { pan?: string | null; form60Data?: Record<string, unknown> | null } = {},
+  ): Promise<InvoiceResponse> {
     const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
 
     if (!this.estimateService) {
@@ -887,19 +892,56 @@ export class BillingService {
     if (estimate.status === 'expired') {
       throw new BadRequestException({ code: 'estimate.expired' });
     }
+    // P2 fix: also reject if expires_at timestamp has passed (status may still be 'draft')
+    if (estimate.expiresAt != null && new Date(estimate.expiresAt) < new Date()) {
+      throw new BadRequestException({ code: 'estimate.expired' });
+    }
 
-    // 3. Compute TCS on snapshotted total (compliance — fires on conversion)
+    // 3. PAN validation — eagerly validate format if provided (P1a fix)
+    let normalizedPan: string | null = null;
+    if (opts.pan != null) {
+      normalizedPan = normalizePan(opts.pan);
+      if (!validatePanFormat(normalizedPan)) {
+        throw new BadRequestException({ code: 'invoice.pan_format_invalid' });
+      }
+    }
+    if (opts.form60Data != null) {
+      validateForm60(opts.form60Data);
+    }
+
+    // 4. Compute TCS on snapshotted total (compliance — fires on conversion)
     const baseTotalPaise = BigInt(estimate.totalPaise);
     const tcsCollectedPaise = computeTcs(baseTotalPaise);
-    let totalPaise = baseTotalPaise + tcsCollectedPaise;
+    const totalPaise = baseTotalPaise + tcsCollectedPaise;
 
-    // 4. PAN Rule 114B hard-block on the final total (TCS-inclusive)
-    enforcePanRequired({ totalPaise, pan: null, form60Data: null });
+    // 5. PAN Rule 114B hard-block on the final total (TCS-inclusive) — P1a: pass caller-supplied PAN
+    enforcePanRequired({ totalPaise, pan: normalizedPan, form60Data: opts.form60Data ?? null });
 
-    // 5. Generate invoice number
+    // 6. Encrypt PAN / Form 60 if provided
+    let panCiphertext: Buffer | null = null;
+    let panKeyId: string | null = null;
+    let form60Encrypted: Buffer | null = null;
+    let form60KeyId: string | null = null;
+
+    if (normalizedPan != null || opts.form60Data != null) {
+      const keyArn = await this.getShopKekArn(ctx.shopId);
+      if (normalizedPan != null) {
+        const env = await encryptColumn(this.kms, keyArn, normalizedPan);
+        panCiphertext = serializeEnvelope(env);
+        panKeyId = keyArn;
+      }
+      if (opts.form60Data != null) {
+        const form60Json = JSON.stringify(opts.form60Data);
+        const env = await encryptColumn(this.kms, keyArn, form60Json);
+        form60Encrypted = serializeEnvelope(env);
+        form60KeyId = keyArn;
+      }
+    }
+
+    // 7. Generate invoice number
     const invoiceNumber = generateInvoiceNumber(ctx.shopId);
 
-    // 6. Build InsertInvoiceInput from estimate's snapshotted line items
+    // 8. Build InsertInvoiceInput from estimate's snapshotted line items
     const subtotalPaise  = BigInt(estimate.subtotalPaise);
     const gstMetalPaise  = BigInt(estimate.gstPaise);   // estimate stores combined GST
     const gstMakingPaise = 0n;
@@ -928,10 +970,10 @@ export class BillingService {
       idempotencyKey,
       issuedAt:             new Date(),
       createdByUserId:      ctx.userId,
-      panCiphertext:        null,
-      panKeyId:             null,
-      form60Encrypted:      null,
-      form60KeyId:          null,
+      panCiphertext,
+      panKeyId,
+      form60Encrypted,
+      form60KeyId,
       tcsCollectedPaise,
       items: estimate.lineItems.map((li, i) => ({
         productId:         li.productId ?? null,
@@ -954,10 +996,20 @@ export class BillingService {
       })),
     };
 
-    // 7. Insert invoice (idempotency-safe) + mark estimate converted — atomic via repo
+    // 9. Insert invoice + atomically mark estimate converted (P1b fix: same pg tx)
     let result: { invoice: InvoiceRow; items: InvoiceItemRow[] };
     try {
-      result = await this.repo.insertInvoice(insertInput);
+      result = await this.repo.insertInvoice(insertInput, {
+        onAfterInsert: async (tx, invoiceId) => {
+          // Mark estimate converted within the same transaction — prevents duplicate conversions
+          await tx.query(
+            `UPDATE estimates
+             SET status = 'converted', converted_invoice_id = $1
+             WHERE id = $2 AND status NOT IN ('converted','expired')`,
+            [invoiceId, estimateId],
+          );
+        },
+      });
     } catch (err) {
       if (err instanceof IdempotencyKeyConflictError) {
         const existing = await this.repo.getInvoiceByIdempotencyKey(idempotencyKey);
@@ -970,8 +1022,8 @@ export class BillingService {
       throw err;
     }
 
-    // 8. Mark estimate converted (best-effort after invoice committed)
-    await this.estimateService.markConverted(estimateId, result.invoice.id, ctx.shopId);
+    // 10. Sync EstimateService cache (best-effort: tx already committed the status above)
+    await this.estimateService.markConverted(estimateId, result.invoice.id, ctx.shopId).catch(() => undefined);
 
     void auditLog(this.pool, {
       action: AuditAction.INVOICE_CREATED,

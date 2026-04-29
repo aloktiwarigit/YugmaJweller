@@ -239,13 +239,17 @@ export class BillingController {
     @TenantContextDec() ctx: TenantContext,
     @Param('id', ParseUUIDPipe) id: string,
     @Headers('idempotency-key') idempotencyKey: string,
+    @Body() body?: { pan?: string; form60Data?: Record<string, unknown> },
   ): Promise<InvoiceResponse> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     if (!idempotencyKey?.trim()) {
       throw new BadRequestException({ code: 'invoice.idempotency_key_required' });
     }
     try {
-      return await this.svc.convertEstimateToInvoice(id, idempotencyKey);
+      return await this.svc.convertEstimateToInvoice(id, idempotencyKey, {
+        pan:        body?.pan,
+        form60Data: body?.form60Data,
+      });
     } catch (err) {
       if (err instanceof ComplianceHardBlockError) {
         throw new UnprocessableEntityException({ code: err.code, ...err.meta });
