@@ -23,6 +23,7 @@ export class AnalyticsService {
   constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
 
   async recordView(params: RecordViewParams): Promise<void> {
+    // Fire-and-forget: drop silently on invalid input rather than surfacing errors to anonymous callers.
     if (!UUID_RE.test(params.shopId) || !UUID_RE.test(params.productId) || !UUID_RE.test(params.sessionId)) {
       return;
     }
@@ -71,6 +72,9 @@ export class AnalyticsService {
     productId: string;
     days: 30 | 90 | 365;
   }): Promise<ViewSummary> {
+    if (!UUID_RE.test(params.shopId) || !UUID_RE.test(params.productId)) {
+      throw new Error('analytics.invalid_params');
+    }
     return this.withShopTx(params.shopId, async (tx) => {
       const r = await tx.query<{
         total_views: string;
