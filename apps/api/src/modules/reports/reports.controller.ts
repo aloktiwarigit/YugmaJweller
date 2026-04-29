@@ -16,7 +16,10 @@ export class ReportsController {
   getDailySummary(
     @Query('date') date?: string,
   ): Promise<DailySummaryResult> {
-    const target = date ?? new Date().toISOString().slice(0, 10);
+    // Use IST (UTC+5:30) for the default date so it matches the SQL's Asia/Kolkata grouping.
+    // new Date().toISOString() would return the UTC date, which is the previous calendar day
+    // for Indian users between midnight and 05:29 IST.
+    const target = date ?? new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
     return this.svc.getDailySummary(target);
   }
 
