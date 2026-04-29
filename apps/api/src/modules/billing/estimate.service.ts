@@ -8,15 +8,21 @@ import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 export interface EstimateLineItem {
   productId?:          string | null;
   description:         string;
+  hsnCode?:            string | null;
+  huid?:               string | null;
   metalType?:          string | null;
   purity?:             string | null;
   netWeightG?:         string | null;
+  ratePerGramPaise?:   string | null;
+  makingChargePct?:    string | null;
   goldValuePaise:      string;
   makingChargePaise:   string;
   stoneChargesPaise:   string;
   hallmarkFeePaise:    string;
-  gstPaise:            string;
+  gstMetalPaise:       string;
+  gstMakingPaise:      string;
   lineTotalPaise:      string;
+  sortOrder?:          number;
 }
 
 export interface CreateEstimateInput {
@@ -144,7 +150,7 @@ export class EstimateService {
     return rowToResponse(row);
   }
 
-  async listEstimates(shopId: string, limit = 50, offset = 0): Promise<EstimateResponse[]> {
+  async listEstimates(_shopId: string, limit = 50, offset = 0): Promise<EstimateResponse[]> {
     const rows = await withTenantTx(this.pool, async (tx) => {
       const r = await tx.query<EstimateRow>(
         `SELECT id, shop_id, customer_id, line_items, gold_rate_paise_per_gram,
@@ -158,7 +164,6 @@ export class EstimateService {
       return r.rows;
     });
 
-    void shopId; // RLS already scopes to current tenant; shopId used for type safety only
     return rows.map(rowToResponse);
   }
 
@@ -193,7 +198,7 @@ export class EstimateService {
     return rowToResponse(row);
   }
 
-  async markConverted(id: string, invoiceId: string, shopId: string): Promise<void> {
+  async markConverted(id: string, invoiceId: string, _shopId: string): Promise<void> {
     const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
 
     const r = await withTenantTx(this.pool, async (tx) => {
@@ -210,8 +215,6 @@ export class EstimateService {
     if (!r) {
       throw new NotFoundException({ code: 'estimate.not_found_or_already_converted' });
     }
-
-    void shopId;
 
     void auditLog(this.pool, {
       action: AuditAction.ESTIMATE_CONVERTED,

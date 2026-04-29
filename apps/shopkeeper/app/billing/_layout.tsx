@@ -14,6 +14,9 @@ export default function BillingLayout(): React.ReactElement {
       <Stack.Screen name="[id]" options={{ title: 'Invoice' }} />
       <Stack.Screen name="scan" options={{ title: 'बारकोड स्कैन' }} />
       <Stack.Screen name="urd-exchange" options={{ title: 'पुराना सोना खरीद' }} />
+      <Stack.Screen name="estimate/index" options={{ title: 'अनुमान' }} />
+      <Stack.Screen name="estimate/new" options={{ title: 'नया अनुमान' }} />
+      <Stack.Screen name="estimate/[id]" options={{ title: 'अनुमान विवरण' }} />
     </Stack>
   );
 }
