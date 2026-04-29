@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import { AnalyticsService } from './analytics.service';
 
@@ -38,7 +38,7 @@ function setupClientForInsert(
    .mockResolvedValueOnce({ rows: opts.dedupRow   ? [opts.dedupRow]   : [] }) // dedup SELECT
    .mockResolvedValueOnce(undefined)                                  // INSERT
    .mockResolvedValueOnce(undefined)                                  // COMMIT
-   .mockResolvedValue(undefined);                                     // POISON (finally)
+   .mockRejectedValue(new Error('unexpected extra query call'));       // POISON (finally)
 }
 
 // Anonymous view: no consent query (skipped), just dedup + INSERT
@@ -50,7 +50,21 @@ function setupClientForAnonymous(client: ReturnType<typeof makeMockClient>) {
    .mockResolvedValueOnce({ rows: [] })   // dedup SELECT (no prior view)
    .mockResolvedValueOnce(undefined)      // INSERT
    .mockResolvedValueOnce(undefined)      // COMMIT
-   .mockResolvedValue(undefined);         // POISON
+   .mockRejectedValue(new Error('unexpected extra query call')); // POISON
+}
+
+// For the dedup short-circuit path: implementation stops after dedup SELECT (no INSERT/COMMIT)
+function setupClientForDedupShortCircuit(
+  client: ReturnType<typeof makeMockClient>,
+) {
+  const q = client.query as Mock;
+  q.mockResolvedValueOnce(undefined)                             // BEGIN
+   .mockResolvedValueOnce(undefined)                             // SET LOCAL ROLE
+   .mockResolvedValueOnce(undefined)                             // SET LOCAL shop_id
+   .mockResolvedValueOnce({ rows: [{ consent_given: true }] })   // consent SELECT → passes
+   .mockResolvedValueOnce({ rows: [{ id: SESSION }] })           // dedup SELECT → short-circuit here
+   .mockResolvedValueOnce(undefined)                             // COMMIT (fn returns normally, no throw)
+   .mockRejectedValue(new Error('unexpected extra query call')); // POISON
 }
 
 describe('AnalyticsService.recordView', () => {
@@ -95,7 +109,7 @@ describe('AnalyticsService.recordView', () => {
 
   it('does NOT insert when same session viewed same product within 30s', async () => {
     const client = makeMockClient();
-    setupClientForInsert(client, { consentRow: { consent_given: true }, dedupRow: { id: SESSION } });
+    setupClientForDedupShortCircuit(client);
     const svc = makeService(makePool(client));
 
     await svc.recordView({ shopId: SHOP, productId: PRODUCT, customerId: CUSTOMER, sessionId: SESSION });
@@ -131,7 +145,7 @@ describe('AnalyticsService.getProductViewSummary', () => {
        rows: [{ total_views: '42', unique_viewers: '17', avg_duration_seconds: '12.5' }],
      })                                 // aggregate SELECT
      .mockResolvedValueOnce(undefined)  // COMMIT
-     .mockResolvedValue(undefined);     // POISON
+     .mockRejectedValue(new Error('unexpected extra query call')); // POISON
 
     const svc = makeService(makePool(client));
     const result = await svc.getProductViewSummary({ shopId: SHOP, productId: PRODUCT, days: 30 });
@@ -142,14 +156,14 @@ describe('AnalyticsService.getProductViewSummary', () => {
   it('returns null avgDurationSeconds when no durations recorded', async () => {
     const client = makeMockClient();
     const q = client.query as Mock;
-    q.mockResolvedValueOnce(undefined)
-     .mockResolvedValueOnce(undefined)
-     .mockResolvedValueOnce(undefined)
+    q.mockResolvedValueOnce(undefined)  // BEGIN
+     .mockResolvedValueOnce(undefined)  // SET LOCAL ROLE
+     .mockResolvedValueOnce(undefined)  // SET LOCAL shop_id
      .mockResolvedValueOnce({
        rows: [{ total_views: '0', unique_viewers: '0', avg_duration_seconds: null }],
-     })
-     .mockResolvedValueOnce(undefined)
-     .mockResolvedValue(undefined);
+     })                                 // aggregate SELECT
+     .mockResolvedValueOnce(undefined)  // COMMIT
+     .mockRejectedValue(new Error('unexpected extra query call')); // POISON
 
     const svc = makeService(makePool(client));
     const result = await svc.getProductViewSummary({ shopId: SHOP, productId: PRODUCT, days: 90 });
