@@ -322,6 +322,22 @@ export class BillingService {
       validateForm60(dto.form60Data as Record<string, unknown>);
     }
 
+    // 3b1. Validate customerId belongs to the current tenant (defense-in-depth: explicit
+    // shop_id filter on the platform pool, in addition to RLS on the tenant pool).
+    // Drives loyalty accrual via invoice.created event (Story 8.1).
+    if (dto.customerId != null) {
+      const customerCheck = await this.pool.query<{ exists: boolean }>(
+        `SELECT EXISTS(SELECT 1 FROM customers WHERE id = $1 AND shop_id = $2) AS exists`,
+        [dto.customerId, ctx.shopId],
+      );
+      if (!customerCheck.rows[0]?.exists) {
+        throw new BadRequestException({
+          code: 'invoice.customer_not_found',
+          message: 'customerId does not belong to this shop',
+        });
+      }
+    }
+
     // 3c. B2B GSTIN validation
     let normalizedGstin: string | null = null;
     let gstTreatment: 'CGST_SGST' | 'IGST' = 'CGST_SGST';
@@ -484,7 +500,7 @@ export class BillingService {
         sgstMakingPaise,
         igstMetalPaise,
         igstMakingPaise,
-        customerId:          null,
+        customerId:          dto.customerId ?? null,
         customerName:        dto.customerName,
         customerPhone:       dto.customerPhone ?? null,
         status:              'ISSUED',
@@ -581,8 +597,12 @@ export class BillingService {
     // 10. Build response and cache for idempotent replay
     const resp = rowToInvoiceResponse(result.invoice, result.items);
     this.cacheResponse(ctx.shopId, idempotencyKey, resp);
-    // Notify BalanceService (and other listeners) that an invoice was created.
-    this.events?.emit('invoice.created', { invoiceId: resp.id, customerId: resp.customerId, shopId: ctx.shopId });
+    // Compute total gold value for loyalty accrual (sum of item goldValuePaise).
+    const goldValuePaise = result.items
+      .reduce((sum, item) => sum + item.gold_value_paise, 0n)
+      .toString();
+    // Notify BalanceService and LoyaltyEventListener.
+    this.events?.emit('invoice.created', { invoiceId: resp.id, customerId: resp.customerId, shopId: ctx.shopId, goldValuePaise });
     return resp;
   }
 

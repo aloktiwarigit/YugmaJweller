@@ -201,3 +201,15 @@ export type {
   UpdateViewingConsentDto,
   ViewingConsentResponse,
 } from './schemas/viewing-consent.schema';
+export {
+  LoyaltyStateSchema,
+  LoyaltyTransactionSchema,
+  LoyaltyTransactionTypeSchema,
+  AdjustPointsBodySchema,
+} from './schemas/loyalty.schema';
+export type {
+  LoyaltyState,
+  LoyaltyTransaction,
+  LoyaltyTransactionType,
+  AdjustPointsBody,
+} from './schemas/loyalty.schema';
