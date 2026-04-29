@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -48,28 +48,32 @@ interface Props {
   customerId: string;
 }
 
-export function PurchaseHistoryList({ customerId }: Props) {
+export function PurchaseHistoryList({ customerId }: Props): React.ReactElement {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [offset, setOffset] = useState(0);
   const [allInvoices, setAllInvoices] = useState<PurchaseHistorySummary[]>([]);
   const [total, setTotal] = useState(0);
 
-  const { isLoading, isFetching } = useQuery<PurchaseHistoryResponse>({
+  const { isLoading, isFetching, data: queryData } = useQuery<PurchaseHistoryResponse>({
     queryKey: ['purchase-history', customerId, offset],
     queryFn:  async () =>
       (await api.get<PurchaseHistoryResponse>(
         `/api/v1/crm/customers/${customerId}/history?limit=${PAGE_SIZE}&offset=${offset}`,
       )).data,
-    onSuccess(data) {
-      if (offset === 0) {
-        setAllInvoices(data.invoices);
-      } else {
-        setAllInvoices((prev) => [...prev, ...data.invoices]);
-      }
-      setTotal(data.total);
-    },
-    keepPreviousData: true,
+    placeholderData: (prev) => prev,
   });
+
+  useEffect(() => {
+    if (queryData) {
+      if (offset === 0) {
+        setAllInvoices(queryData.invoices);
+      } else {
+        setAllInvoices((prev) => [...prev, ...queryData.invoices]);
+      }
+      setTotal(queryData.total);
+    }
+  }, [queryData, offset]);
 
   const loadMore = useCallback(() => {
     if (!isFetching && allInvoices.length < total) {

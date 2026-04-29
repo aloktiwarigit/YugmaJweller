@@ -24,7 +24,7 @@ function paiseToRupees(paise: string): string {
   }).format(n / 100);
 }
 
-export function BalanceCard({ customerId }: Props) {
+export function BalanceCard({ customerId }: Props): React.ReactElement | null {
   const { data, isLoading } = useQuery<CustomerBalance>({
     queryKey: ['customer-balance', customerId],
     queryFn:  async () => (await api.get<CustomerBalance>(`/api/v1/crm/customers/${customerId}/balance`)).data,

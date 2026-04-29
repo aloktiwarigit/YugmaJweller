@@ -157,7 +157,7 @@ describe('addOccasion', () => {
     expect(result.reminderDays).toBe(7);
 
     // verify the parameters passed to INSERT
-    const params = tx.query.mock.calls[0][1];
+    const params = ((tx.query as any).mock.calls[0][1] as string);
     expect(params).toEqual([CUSTOMER, 'BIRTHDAY', null, '06-15', '2026-06-15', 7]);
   });
 
@@ -175,7 +175,7 @@ describe('addOccasion', () => {
       reminderDays: 14,
     });
 
-    const params = tx.query.mock.calls[0][1];
+    const params = ((tx.query as any).mock.calls[0][1] as string);
     expect(params[5]).toBe(14);
   });
 
@@ -210,7 +210,7 @@ describe('listOccasions', () => {
 
     await svc.listOccasions(authCtx(), CUSTOMER);
 
-    const sql = tx.query.mock.calls[0][0];
+    const sql = ((tx.query as any).mock.calls[0][0] as string);
     expect(sql).toContain('ORDER BY next_occurrence ASC NULLS LAST');
   });
 
@@ -263,7 +263,7 @@ describe('tenant isolation', () => {
 
     await svc.addOccasion(authCtx(), CUSTOMER, { occasionType: 'BIRTHDAY', monthDay: '06-15' });
 
-    const sql = tx.query.mock.calls[0][0];
+    const sql = ((tx.query as any).mock.calls[0][0] as string);
     expect(sql).toMatch(/current_setting\('app\.current_shop_id'\)/);
     expect(withTenantTx).toHaveBeenCalled();
   });

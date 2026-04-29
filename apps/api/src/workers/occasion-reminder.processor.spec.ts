@@ -62,7 +62,7 @@ describe('process', () => {
     await proc.process({ name: 'daily-check' } as any);
 
     expect(client.query).toHaveBeenCalledOnce();
-    const sqlCall = client.query.mock.calls[0];
+    const sqlCall = (client.query as any).mock.calls[0] as [string, string[]];
     expect(sqlCall[0]).toContain('get_due_occasions($1::date)');
     expect(sqlCall[1]).toEqual(['2026-04-26']);
   });
@@ -80,7 +80,7 @@ describe('process', () => {
 
     // SELECT get_due_occasions, then SELECT advance_occasion_to_next_year
     expect(client.query).toHaveBeenCalledTimes(2);
-    const advanceCall = client.query.mock.calls[1];
+    const advanceCall = (client.query as any).mock.calls[1] as [string, string[]];
     expect(advanceCall[0]).toContain('advance_occasion_to_next_year($1::uuid)');
     expect(advanceCall[1]).toEqual(['occ-1']);
     // Note: leap-year + Feb 29 → Mar 1 logic now lives inside the SQL function
@@ -102,8 +102,8 @@ describe('process', () => {
 
     // 1 SELECT + 2 advance fn calls
     expect(client.query).toHaveBeenCalledTimes(3);
-    expect(client.query.mock.calls[1][1]).toEqual(['occ-shop-a']);
-    expect(client.query.mock.calls[2][1]).toEqual(['occ-shop-b']);
+    expect((client.query as any).mock.calls[1][1]).toEqual(['occ-shop-a']);
+    expect((client.query as any).mock.calls[2][1]).toEqual(['occ-shop-b']);
   });
 
   it('handles empty result set without UPDATE calls', async () => {
@@ -143,7 +143,7 @@ describe('RLS bypass via SECURITY DEFINER', () => {
 
     await proc.process({ name: 'daily-check' } as any);
 
-    const sql = client.query.mock.calls[0][0];
+    const sql = client.query.mock.calls[0][0] as unknown;
     // Must call the SECURITY DEFINER fn — raw SELECT FROM customer_occasions would
     // be blocked by FORCE RLS + provider.ts poison-UUID seed.
     expect(sql).not.toMatch(/SELECT\s+\*\s+FROM\s+customer_occasions/);

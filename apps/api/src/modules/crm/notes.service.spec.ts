@@ -74,7 +74,7 @@ describe('addNote', () => {
       authorUserId: USER_AUTHOR,
     });
     expect(tx.query).toHaveBeenCalledOnce();
-    const sql = tx.query.mock.calls[0][0];
+    const sql = ((tx.query as any).mock.calls[0][0] as string);
     expect(sql).toContain('INSERT INTO customer_notes');
     expect(sql).toContain("current_setting('app.current_shop_id')");
   });
@@ -107,7 +107,7 @@ describe('listNotes', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].body).toBe('visible');
-    const sql = tx.query.mock.calls[0][0];
+    const sql = ((tx.query as any).mock.calls[0][0] as string);
     expect(sql).toContain('deleted_at IS NULL');
     expect(sql).toContain('ORDER BY created_at DESC');
   });
@@ -202,7 +202,7 @@ describe('deleteNote — author/owner guard', () => {
       svc.deleteNote(authCtx(), NOTE_ID, USER_AUTHOR, 'shop_admin'),
     ).rejects.toBeInstanceOf(NotFoundException);
 
-    const sql = tx.query.mock.calls[0][0];
+    const sql = ((tx.query as any).mock.calls[0][0] as string);
     expect(sql).toContain('deleted_at IS NULL');
   });
 });
@@ -216,7 +216,7 @@ describe('tenant isolation', () => {
     await svc.addNote(authCtx(), CUSTOMER, 'note');
 
     // SQL must reference current_setting (not a hardcoded shop_id binding)
-    const sql = tx.query.mock.calls[0][0];
+    const sql = ((tx.query as any).mock.calls[0][0] as string);
     expect(sql).toMatch(/current_setting\('app\.current_shop_id'\)/);
 
     // withTenantTx wraps every write — service never bypasses it
