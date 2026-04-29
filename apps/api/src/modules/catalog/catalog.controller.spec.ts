@@ -11,6 +11,7 @@ import request from 'supertest';
 import { RatesUnavailableError } from '@goldsmith/rates';
 import { CatalogController } from './catalog.controller';
 import { PricingService } from '../pricing/pricing.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -34,6 +35,10 @@ const mockPricingService = {
   getCurrentRates: vi.fn(),
 };
 
+const mockAnalyticsService = {
+  recordView: vi.fn().mockResolvedValue(undefined),
+};
+
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
@@ -45,7 +50,10 @@ describe('CatalogController', () => {
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CatalogController],
-      providers: [{ provide: PricingService, useValue: mockPricingService }],
+      providers: [
+        { provide: PricingService, useValue: mockPricingService },
+        { provide: AnalyticsService, useValue: mockAnalyticsService },
+      ],
     }).compile();
 
     controller = module.get<CatalogController>(CatalogController);
