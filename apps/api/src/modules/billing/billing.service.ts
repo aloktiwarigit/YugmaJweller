@@ -303,12 +303,15 @@ export class BillingService {
 
     // 3. Compliance hard-block — uses PRODUCT's HUID and exemption category, not the request's
     validateHuidPresence(
-      dto.lines.map((line, i) => ({
-        lineIndex: i,
-        huid: line.huid ?? null,
-        productHuidOnRecord: resolvedProducts[i]?.huid ?? null,
-        huidExemptionCategory: resolvedProducts[i]?.huid_exemption_category as HuidExemptionCategory | undefined,
-      })),
+      dto.lines.map((line, i) => {
+        const product = resolvedProducts[i];
+        return {
+          lineIndex: i,
+          huid: line.huid ?? null,
+          productHuidOnRecord: product?.huid ?? null,
+          ...(product ? { huidExemptionCategory: product.huid_exemption_category as HuidExemptionCategory } : {}),
+        };
+      }),
     );
 
     // 3b. PAN Rule 114B pre-check (total unknown at this point, validated again after pricing).
