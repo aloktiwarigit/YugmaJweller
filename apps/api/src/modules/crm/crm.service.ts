@@ -6,6 +6,7 @@ import type { KmsAdapter } from '@goldsmith/crypto-envelope';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import type { CreateCustomerDto, UpdateCustomerDto, CustomerResponse } from '@goldsmith/shared';
+import { trackEvent } from '@goldsmith/observability';
 import { CrmRepository } from './crm.repository';
 import type { CustomerRow } from './crm.repository';
 import { CrmSearchService } from './crm-search.service';
@@ -68,6 +69,7 @@ export class CrmService {
       id: row.id, name: row.name, phoneLast4: row.phone.slice(-4),
       city: row.city, updatedAt: Date.now(),
     }).catch(() => undefined);
+    trackEvent(ctx.shopId, 'customer.created');
     return rowToResponse(row);
   }
 

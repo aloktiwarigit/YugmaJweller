@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { Queue } from '@goldsmith/queue';
+import { trackEvent } from '@goldsmith/observability';
 
 // Emitted by BillingService.createInvoice after a successful issue.
 // goldValuePaise is serialized as string because BigInt is not JSON-safe.
@@ -61,6 +62,7 @@ export class LoyaltyEventListener {
       },
     );
 
+    trackEvent(event.shopId, 'loyalty.accrued', { points: event.goldValuePaise });
     this.logger.log(
       `loyalty accrual enqueued: invoiceId=${event.invoiceId} customerId=${event.customerId} shopId=${event.shopId}`,
     );

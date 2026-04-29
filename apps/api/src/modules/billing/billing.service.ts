@@ -40,6 +40,7 @@ import type {
   MakingChargeConfig,
 } from '@goldsmith/shared';
 import { SettingsCache } from '@goldsmith/tenant-config';
+import { trackEvent } from '@goldsmith/observability';
 import { BillingRepository, IdempotencyKeyConflictError } from './billing.repository';
 import type { InvoiceRow, InvoiceItemRow, InsertInvoiceInput } from './billing.repository';
 import { generateInvoiceNumber } from './invoice-number';
@@ -603,6 +604,7 @@ export class BillingService {
       .toString();
     // Notify BalanceService and LoyaltyEventListener.
     this.events?.emit('invoice.created', { invoiceId: resp.id, customerId: resp.customerId, shopId: ctx.shopId, goldValuePaise });
+    trackEvent(ctx.shopId, 'invoice.created', { invoice_type: resp.invoiceType, total_paise: resp.totalPaise });
     return resp;
   }
 

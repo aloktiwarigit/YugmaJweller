@@ -23,7 +23,8 @@
     "@opentelemetry/sdk-node": "^0.51.0",
     "@opentelemetry/auto-instrumentations-node": "^0.43.0",
     "@sentry/node": "^7.109.0",
-    "pino": "^8.19.0"
+    "pino": "^8.19.0",
+    "posthog-node": "^4.0.0"
   },
   "devDependencies": { "vitest": "^1.4.0", "typescript": "^5.4.0" }
 }
