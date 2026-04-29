@@ -164,4 +164,35 @@ export class LoyaltyRepository {
       return r.rows.length > 0;
     });
   }
+
+  async getEarnings12m(customerId: string): Promise<bigint> {
+    return withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query(
+        `SELECT COALESCE(SUM(points_delta), 0) AS total
+         FROM loyalty_transactions
+         WHERE customer_id = $1
+           AND type = 'ACCRUAL'
+           AND created_at > NOW() - INTERVAL '12 months'`,
+        [customerId],
+      );
+      const raw = (r.rows[0] as { total: string | number } | undefined)?.total ?? 0;
+      return BigInt(raw);
+    });
+  }
+
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal; shopId from context
+  async setTier(
+    tx: TxLike,
+    shopId: string,
+    customerId: string,
+    tier: string | null,
+    tierSince: Date,
+  ): Promise<void> {
+    await tx.query(
+      `UPDATE customer_loyalty
+       SET current_tier = $1, tier_since = $2, last_updated_at = now()
+       WHERE shop_id = $3 AND customer_id = $4`,
+      [tier, tierSince, shopId, customerId],
+    );
+  }
 }

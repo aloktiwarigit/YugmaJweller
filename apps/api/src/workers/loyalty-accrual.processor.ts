@@ -50,6 +50,14 @@ export class LoyaltyAccrualProcessor extends WorkerHost {
       this.logger.log(
         `loyalty accrual ok: invoiceId=${invoiceId} customerId=${customerId} pointsDelta=${result.pointsDelta} newBalance=${result.newBalance}`,
       );
+      // Best-effort tier evaluation — must not fail the accrual job
+      try {
+        await this.loyaltySvc.checkAndUpgradeTier(customerId, shopId);
+      } catch (err: unknown) {
+        this.logger.warn(
+          `loyalty tier check failed (non-fatal): invoiceId=${invoiceId} customerId=${customerId} error=${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
       return { skipped: false, pointsDelta: result.pointsDelta };
     } catch (err: unknown) {
       // On failure, release the idempotency key so a retry can proceed.

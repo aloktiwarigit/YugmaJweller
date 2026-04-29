@@ -49,7 +49,8 @@ function fakePool() {
 
 function fakeService(overrides: Partial<LoyaltyService> = {}): LoyaltyService {
   return {
-    accruePoints: vi.fn(async () => ({ pointsDelta: 684, newBalance: 684 })),
+    accruePoints:        vi.fn(async () => ({ pointsDelta: 684, newBalance: 684 })),
+    checkAndUpgradeTier: vi.fn(async () => undefined),
     ...overrides,
   } as unknown as LoyaltyService;
 }
@@ -124,5 +125,26 @@ describe('LoyaltyAccrualProcessor', () => {
 
     await proc.process(makeJob());
     expect(observedShopId).toBe(SHOP);
+  });
+
+  it('calls checkAndUpgradeTier after successful accrual', async () => {
+    const svc = fakeService();
+    const proc = new LoyaltyAccrualProcessor(svc, fakeRedis(), fakePool());
+
+    await proc.process(makeJob());
+
+    expect(svc.checkAndUpgradeTier).toHaveBeenCalledOnce();
+    expect(svc.checkAndUpgradeTier).toHaveBeenCalledWith(CUSTOMER, SHOP);
+  });
+
+  it('logs warning but does not rethrow when checkAndUpgradeTier throws', async () => {
+    const svc = fakeService({
+      checkAndUpgradeTier: vi.fn(async () => { throw new Error('tier-check-boom'); }),
+    });
+    const proc = new LoyaltyAccrualProcessor(svc, fakeRedis(), fakePool());
+
+    const result = await proc.process(makeJob());
+    expect(result).toEqual({ skipped: false, pointsDelta: 684 });
+    expect(svc.accruePoints).toHaveBeenCalledOnce();
   });
 });
