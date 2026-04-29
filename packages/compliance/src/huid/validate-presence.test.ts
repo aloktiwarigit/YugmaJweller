@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { validateHuidPresence } from './validate-presence';
 import { ComplianceHardBlockError } from '../errors';
+import { HuidExemptionCategory } from './huid-exemption';
 
 describe('validateHuidPresence', () => {
   it('passes when no lines reference a hallmarked product', () => {
@@ -63,5 +64,68 @@ describe('validateHuidPresence', () => {
     } catch (e) {
       expect((e as ComplianceHardBlockError).meta).toEqual({ lineIndex: 1 });
     }
+  });
+
+  describe('HUID exemptions', () => {
+    it('passes when Kundan/Polki/Jadau product has no HUID (exempt by nature)', () => {
+      expect(() =>
+        validateHuidPresence([
+          {
+            lineIndex: 0,
+            huid: null,
+            productHuidOnRecord: null,
+            huidExemptionCategory: HuidExemptionCategory.KundanPolkiJadau,
+          },
+        ]),
+      ).not.toThrow();
+    });
+
+    it('passes when under-2g product has no HUID (BIS exempt)', () => {
+      expect(() =>
+        validateHuidPresence([
+          {
+            lineIndex: 0,
+            huid: null,
+            productHuidOnRecord: null,
+            huidExemptionCategory: HuidExemptionCategory.Under2g,
+          },
+        ]),
+      ).not.toThrow();
+    });
+
+    it('skips HUID check on exempt product even when productHuidOnRecord is set', () => {
+      // Edge case: product was hallmarked then reclassified as exempt — exemption wins.
+      expect(() =>
+        validateHuidPresence([
+          {
+            lineIndex: 0,
+            huid: null,
+            productHuidOnRecord: 'AB12CD',
+            huidExemptionCategory: HuidExemptionCategory.KundanPolkiJadau,
+          },
+        ]),
+      ).not.toThrow();
+    });
+
+    it('still hard-blocks non-exempt hallmarked product with no HUID (category=none)', () => {
+      expect(() =>
+        validateHuidPresence([
+          {
+            lineIndex: 0,
+            huid: null,
+            productHuidOnRecord: 'AB12CD',
+            huidExemptionCategory: HuidExemptionCategory.None,
+          },
+        ]),
+      ).toThrow(ComplianceHardBlockError);
+    });
+
+    it('backward-compatible: missing huidExemptionCategory defaults to non-exempt', () => {
+      expect(() =>
+        validateHuidPresence([
+          { lineIndex: 0, huid: null, productHuidOnRecord: 'AB12CD' },
+        ]),
+      ).toThrow(ComplianceHardBlockError);
+    });
   });
 });
