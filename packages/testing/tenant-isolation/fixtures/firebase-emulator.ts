@@ -14,6 +14,18 @@ function isPortOpen(host: string, port: number): Promise<boolean> {
   });
 }
 
+async function isEmulatorResponsive(host: string, port: number): Promise<boolean> {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 1500);
+    const r = await fetch(`http://${host}:${port}/`, { signal: ctrl.signal });
+    clearTimeout(t);
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 function parseEmulatorHost(value: string | undefined): { host: string; port: number } | undefined {
   if (!value) return undefined;
   const [host, portStr] = value.split(':');
@@ -41,12 +53,12 @@ export async function startFirebaseAuthEmulator(options: { projectId: string; po
   // If CI (or a prior setup) already provisioned an emulator, consume it.
   const preset = parseEmulatorHost(process.env['FIREBASE_AUTH_EMULATOR_HOST']);
   if (preset) {
-    const up = await isPortOpen(preset.host, preset.port);
-    if (up) {
+    const responsive = await isEmulatorResponsive(preset.host, preset.port);
+    if (responsive) {
       console.log(`[firebase-emulator] reusing emulator at ${preset.host}:${preset.port}`);
       return { port: preset.port };
     }
-    console.warn(`[firebase-emulator] FIREBASE_AUTH_EMULATOR_HOST=${preset.host}:${preset.port} set but port is closed — attempting to spawn.`);
+    console.warn(`[firebase-emulator] FIREBASE_AUTH_EMULATOR_HOST=${preset.host}:${preset.port} set but emulator not responsive — attempting to spawn.`);
   }
 
   const port = options.port ?? 9099;
@@ -54,11 +66,18 @@ export async function startFirebaseAuthEmulator(options: { projectId: string; po
 
   // Skip spawn if the port is already serving something (another test file in
   // the same process already started it, or a local `firebase emulators:start`
-  // is running).
+  // is running). Verify HTTP responsiveness, not just TCP — a dying emulator
+  // (SIGTERM sent but port not yet released) passes a TCP check but drops HTTP
+  // connections, causing verifyIdToken to fail with ECONNREFUSED mid-test.
   const alreadyUp = await isPortOpen('127.0.0.1', port);
   if (alreadyUp) {
-    console.log(`[firebase-emulator] port ${port} already open — reusing`);
-    return { port };
+    const live = await isEmulatorResponsive('127.0.0.1', port);
+    if (live) {
+      console.log(`[firebase-emulator] port ${port} already open — reusing`);
+      return { port };
+    }
+    console.log(`[firebase-emulator] port ${port} open but emulator unresponsive (dying) — waiting for port to close`);
+    await new Promise<void>((r) => setTimeout(r, 3000));
   }
 
   // Port configured in firebase.json. DO NOT pass --port (not a valid CLI flag).

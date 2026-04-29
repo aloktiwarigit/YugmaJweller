@@ -75,12 +75,17 @@ function gstr1Rows(invoice: InvoiceGstrRow): string[] {
   const gstin = invoice.buyer_gstin ?? '';
   const receiver = invoice.buyer_business_name ?? invoice.customer_name;
   const invoiceDate = formatDateDDMMYYYY(invoice.issued_at);
-  const placeOfSupply = invoice.seller_state_code || UP_STATE_CODE;
+  const isIGST = invoice.gst_treatment === 'IGST';
+  const buyerStateCode = invoice.buyer_gstin ? invoice.buyer_gstin.slice(0, 2) : '';
+  // Place of Supply (col 6) is buyer's state for IGST interstate (per GST portal spec).
+  // Falls back to seller state for intrastate CGST+SGST or when buyer GSTIN absent.
+  const placeOfSupply = isIGST && buyerStateCode
+    ? buyerStateCode
+    : (invoice.seller_state_code || UP_STATE_CODE);
   const totalRs = paiseToRupees(BigInt(invoice.total_paise));
 
   const gstMetal = BigInt(invoice.gst_metal_paise);
   const gstMaking = BigInt(invoice.gst_making_paise);
-  const isIGST = invoice.gst_treatment === 'IGST';
 
   if (gstMetal > 0n) {
     const metalTaxable = paiseToRupees((gstMetal * 10000n) / 300n);

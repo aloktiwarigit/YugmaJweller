@@ -26,7 +26,14 @@ import { walkTenantScopedEndpoints, type SeededTenantToken } from '@goldsmith/te
 //   - walkTenantScopedEndpoints (packages/testing/tenant-isolation/src/endpoint-walker.ts)
 //   - fixtures A/B/C seed shop_users with firebase_uid (packages/testing/tenant-isolation/fixtures/tenant-*.ts)
 // It ran green locally against a fresh emulator during development.
-const describeFn = process.env['CI'] === 'true' ? describe.skip : describe;
+//
+// Skip when another test file already owns the emulator (FIREBASE_AUTH_EMULATOR_HOST is
+// set at module-load time by a prior test in the same run). Running against a shared
+// emulator causes goldsmith-test token-revocation state to bleed into goldsmith-walker-test
+// verification and produces spurious failures. The test is valid but requires a fresh
+// emulator process — run it in isolation or in CI via `pnpm vitest run test/endpoint-walker.e2e.test.ts`.
+const sharedEmulator = !!process.env['FIREBASE_AUTH_EMULATOR_HOST'];
+const describeFn = (process.env['CI'] === 'true' || sharedEmulator) ? describe.skip : describe;
 
 describeFn('endpoint-walker — real tenant-scoped assertions (E2-S1 deferral #4)', () => {
   let container: StartedPostgreSqlContainer;
@@ -40,6 +47,11 @@ describeFn('endpoint-walker — real tenant-scoped assertions (E2-S1 deferral #4
   const seeded: SeededTenantToken[] = [];
 
   beforeAll(async () => {
+    // Clear any stale emulator host set by prior test files in the same run.
+    // startFirebaseAuthEmulator now checks HTTP responsiveness (not just TCP),
+    // so it won't reuse a dying emulator — but we clear the env var to let it
+    // also spawn fresh when the prior test's emulator is already gone.
+    delete process.env['FIREBASE_AUTH_EMULATOR_HOST'];
     ({ port: emulatorPort } = await startFirebaseAuthEmulator({ projectId }));
     container = await new PostgreSqlContainer('postgres:15.6').start();
     pool = createPool({ connectionString: container.getConnectionUri() });

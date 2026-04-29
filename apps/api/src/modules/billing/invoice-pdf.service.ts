@@ -148,6 +148,12 @@ function buildInvoiceHtml(
 </html>`;
 }
 
+// MVP scope: this service produces a self-contained HTML invoice (.html stored
+// in object storage), not a binary PDF. The HTML renders correctly in any
+// mobile browser and is the link customers receive over WhatsApp. A real
+// PDF binary (Puppeteer / wkhtmltopdf) is a Phase 4+ addition; the service
+// name + result.publicUrl are kept as `pdf` for future-proofing — when binary
+// PDF lands, only the storage key extension and Content-Type change.
 @Injectable()
 export class InvoicePdfService {
   constructor(
@@ -163,7 +169,7 @@ export class InvoicePdfService {
     const data = await this.repo.getInvoice(invoiceId);
     if (!data) throw new NotFoundException({ code: 'invoice.not_found' });
 
-    const shopRow = await this.fetchShopRow(ctx.shopId);
+    const shopRow = await this.fetchShopRow();
     const address = shopRow.address_json
       ? this.formatAddress(shopRow.address_json as Record<string, unknown>)
       : '';
@@ -183,11 +189,12 @@ export class InvoicePdfService {
     return { storageKey: key, publicUrl };
   }
 
-  private async fetchShopRow(shopId: string): Promise<ShopRow> {
+  private async fetchShopRow(): Promise<ShopRow> {
+    const ctx = tenantContext.requireCurrent();
     return withTenantTx(this.pool, async (tx) => {
       const r = await tx.query<ShopRow>(
         `SELECT display_name, gstin, address_json, logo_url FROM shops WHERE id = $1`,
-        [shopId],
+        [ctx.shopId],
       );
       if (!r.rows[0]) throw new NotFoundException({ code: 'shop.not_found' });
       return r.rows[0];

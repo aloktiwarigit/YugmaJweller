@@ -9,3 +9,6 @@ export type { RateWidgetProps, PublicRatesResponse, PublicRateEntry } from './Ra
 
 export { RateUpdateToast } from './RateUpdateToast';
 export type { RateUpdateToastProps } from './RateUpdateToast';
+
+export { InvoiceShareCelebration } from './InvoiceShareCelebration';
+export type { InvoiceShareCelebrationProps } from './InvoiceShareCelebration';

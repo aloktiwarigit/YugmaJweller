@@ -1,12 +1,14 @@
-import { View, Text, ScrollView, ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, StyleSheet, Linking } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { InvoiceLineItem } from '@goldsmith/ui-mobile';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { InvoiceLineItem, InvoiceShareCelebration } from '@goldsmith/ui-mobile';
 import { api } from '../../src/api/client';
 import { useAuthStore } from '../../src/stores/authStore';
 import { VoidInvoiceSheet } from '../../src/features/billing/components/VoidInvoiceSheet';
 import type { InvoiceResponse } from '@goldsmith/shared';
+
+interface ShareResult { whatsappUrl: string; pdfUrl: string }
 
 function paiseToRupees(paise: string): string {
   const n = Number(paise) / 100;
@@ -17,14 +19,30 @@ function paiseToRupees(paise: string): string {
 }
 
 export default function InvoiceDetailScreen(): JSX.Element {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, celebrate } = useLocalSearchParams<{ id: string; celebrate?: string }>();
   const userRole = useAuthStore((s) => s.user?.role);
   const [voidSheetVisible, setVoidSheetVisible] = useState(false);
+  const [celebrationVisible, setCelebrationVisible] = useState(celebrate === '1');
+  const [shareError, setShareError] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery<InvoiceResponse>({
     queryKey: ['invoice', id],
     queryFn:  () =>
       api.get<InvoiceResponse>(`/api/v1/billing/invoices/${id}`).then((r) => r.data),
+  });
+
+  const shareMutation = useMutation<ShareResult>({
+    mutationFn: () =>
+      api
+        .post<ShareResult>(`/api/v1/billing/invoices/${id}/share/whatsapp`)
+        .then((r) => r.data),
+    onMutate: () => setShareError(null),
+    onSuccess: (result) => {
+      void Linking.openURL(result.whatsappUrl);
+    },
+    onError: () => {
+      setShareError('Share नहीं हो सका। दोबारा कोशिश करें।');
+    },
   });
 
   if (isLoading) {
@@ -96,6 +114,23 @@ export default function InvoiceDetailScreen(): JSX.Element {
           onSuccess={() => setVoidSheetVisible(false)}
         />
       )}
+
+      <InvoiceShareCelebration
+        visible={celebrationVisible}
+        invoiceNumber={data.invoiceNumber}
+        totalFormatted={paiseToRupees(data.totalPaise)}
+        onShare={() => new Promise<void>((resolve, reject) => {
+          if (shareMutation.isPending) { resolve(); return; }
+          shareMutation.mutate(undefined, { onSuccess: () => resolve(), onError: (e) => reject(e) });
+        })}
+        onDismiss={() => setCelebrationVisible(false)}
+      />
+
+      {shareError ? (
+        <View style={styles.shareErrorBanner} accessibilityRole="alert">
+          <Text style={styles.shareErrorText}>{shareError}</Text>
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -175,5 +210,18 @@ const styles = StyleSheet.create({
     fontFamily: 'NotoSansDevanagari',
     color: '#a8a29e',
     marginTop: 4,
+  },
+  shareErrorBanner: {
+    marginTop: 12,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    borderRadius: 10,
+    padding: 12,
+  },
+  shareErrorText: {
+    fontSize: 14,
+    fontFamily: 'NotoSansDevanagari',
+    color: '#b91c1c',
   },
 });

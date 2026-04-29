@@ -56,7 +56,7 @@ export default function NewInvoiceScreen(): JSX.Element {
       return res.data;
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onSuccess: (invoice) => router.replace(`/billing/${invoice.id}` as any),
+    onSuccess: (invoice) => router.replace(`/billing/${invoice.id}?celebrate=1` as any),
     onError: (err) => {
       const body = (err as { response?: { data?: unknown; status?: number } }).response?.data;
       const status = (err as { response?: { status?: number } }).response?.status;

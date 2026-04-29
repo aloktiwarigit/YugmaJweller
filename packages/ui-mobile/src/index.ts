@@ -42,3 +42,6 @@ export { BillingLineBuilder } from './business/BillingLineBuilder';
 export type { BillingLineBuilderProps, BillingLineProduct, BillingLineValue } from './business/BillingLineBuilder';
 
 export { InvoiceLineItem } from './business/InvoiceLineItem';
+
+export { InvoiceShareCelebration } from './business/InvoiceShareCelebration';
+export type { InvoiceShareCelebrationProps } from './business/InvoiceShareCelebration';
