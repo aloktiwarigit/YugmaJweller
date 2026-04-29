@@ -1,1 +1,2 @@
 codex review passed 2026-04-29 — P1+P2 applied (invoice FK, tenant ctx, role txn)
+codex review passed 2026-04-29 feat/story-fixes-adr-rls — P2 applied (current_setting fail-loud fix in 0040_tenant_sync_cursors_rls.sql)
