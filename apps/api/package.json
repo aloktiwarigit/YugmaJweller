@@ -24,6 +24,7 @@
     "@goldsmith/crypto-envelope": "workspace:*",
     "@goldsmith/money": "workspace:*",
     "@goldsmith/db": "workspace:*",
+    "@goldsmith/integrations-payments": "workspace:*",
     "@goldsmith/integrations-search": "workspace:*",
     "@goldsmith/integrations-storage": "workspace:*",
     "@goldsmith/observability": "workspace:*",

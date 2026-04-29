@@ -83,6 +83,14 @@ function setupWithTenantTx(pool: ReturnType<typeof fakePool>) {
 
 const INVOICE_ROW = { id: INVOICE, status: 'ISSUED', total_paise: '100000000', customer_id: null, customer_phone: '+919999999999' };
 
+function fakeRedis() {
+  return { set: vi.fn().mockResolvedValue(null), del: vi.fn().mockResolvedValue(1) } as unknown as import('@goldsmith/cache').Redis;
+}
+
+function fakeAdapter() {
+  return { createOrder: vi.fn().mockResolvedValue({ orderId: 'stub', amountPaise: 0n }), verifyWebhookSignature: vi.fn().mockReturnValue(true), fetchPayment: vi.fn().mockResolvedValue({ id: 'p', status: 'captured', amountPaise: 0n }) } as unknown as import('@goldsmith/integrations-payments').PaymentsPort;
+}
+
 describe('PaymentService.recordCashPayment', () => {
   let svc: PaymentService;
 
@@ -93,7 +101,7 @@ describe('PaymentService.recordCashPayment', () => {
   it('records a cash payment below the limit without override', async () => {
     const pool = fakePool(INVOICE_ROW, 0n);
     setupWithTenantTx(pool);
-    svc = new PaymentService(pool, fakeQueue());
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), fakeQueue());
 
     await expect(svc.recordCashPayment(INVOICE, 10_000_000n, 'idem-1')).resolves.not.toHaveProperty('pmlaWarning');
     expect(pool._tx.query).toHaveBeenCalledWith(
@@ -105,7 +113,7 @@ describe('PaymentService.recordCashPayment', () => {
   it('throws NotFoundException when invoice not found', async () => {
     const pool = fakePool(null, 0n);
     setupWithTenantTx(pool);
-    svc = new PaymentService(pool, fakeQueue());
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), fakeQueue());
 
     await expect(svc.recordCashPayment(INVOICE, 1_000_000n, 'idem-2')).rejects.toMatchObject({
       response: { code: 'invoice.not_found' },
@@ -116,7 +124,7 @@ describe('PaymentService.recordCashPayment', () => {
     // Existing Rs 1,80,000 + new Rs 30,000 = Rs 2,10,000 > Rs 1,99,999
     const pool = fakePool(INVOICE_ROW, 18_000_000n);
     setupWithTenantTx(pool);
-    svc = new PaymentService(pool, fakeQueue());
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), fakeQueue());
 
     await expect(
       svc.recordCashPayment(INVOICE, 3_000_000n, 'idem-3'),
@@ -126,7 +134,7 @@ describe('PaymentService.recordCashPayment', () => {
   it('succeeds when exactly at limit (Rs 0 existing + Rs 1,99,999 new)', async () => {
     const pool = fakePool(INVOICE_ROW, 0n);
     setupWithTenantTx(pool);
-    svc = new PaymentService(pool, fakeQueue());
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), fakeQueue());
 
     await expect(
       svc.recordCashPayment(INVOICE, SECTION_269ST_LIMIT_PAISE, 'idem-4'),
@@ -136,7 +144,7 @@ describe('PaymentService.recordCashPayment', () => {
   it('allows override by shop_admin with valid justification', async () => {
     const pool = fakePool(INVOICE_ROW, 18_000_000n);
     setupWithTenantTx(pool);
-    svc = new PaymentService(pool, fakeQueue());
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), fakeQueue());
 
     await svc.recordCashPayment(INVOICE, 5_000_000n, 'idem-6', { justification: 'Known regular customer bulk purchase' });
 
@@ -150,7 +158,7 @@ describe('PaymentService.recordCashPayment', () => {
   it('fires COMPLIANCE_OVERRIDE_269ST audit log on override', async () => {
     const pool = fakePool(INVOICE_ROW, 18_000_000n);
     setupWithTenantTx(pool);
-    svc = new PaymentService(pool, fakeQueue());
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), fakeQueue());
 
     await svc.recordCashPayment(INVOICE, 5_000_000n, 'idem-7', { justification: 'Known regular customer bulk purchase' });
 
@@ -164,7 +172,7 @@ describe('PaymentService.recordCashPayment', () => {
     (tenantContext.requireCurrent as any).mockReturnValue(makeCtx('shop_staff'));
     const pool = fakePool(INVOICE_ROW, 18_000_000n);
     setupWithTenantTx(pool);
-    svc = new PaymentService(pool, fakeQueue());
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), fakeQueue());
 
     await expect(
       svc.recordCashPayment(INVOICE, 5_000_000n, 'idem-8', { justification: 'Staff trying to override' }),
@@ -174,7 +182,7 @@ describe('PaymentService.recordCashPayment', () => {
   it('does NOT fire audit log when no override was used', async () => {
     const pool = fakePool(INVOICE_ROW, 0n);
     setupWithTenantTx(pool);
-    svc = new PaymentService(pool, fakeQueue());
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), fakeQueue());
 
     await svc.recordCashPayment(INVOICE, 1_000_000n, 'idem-5');
 
@@ -187,7 +195,7 @@ describe('PaymentService.recordCashPayment', () => {
   it('does NOT write override metadata or audit when override provided but payment is within limit', async () => {
     const pool = fakePool(INVOICE_ROW, 0n); // zero existing — payment is within limit
     setupWithTenantTx(pool);
-    svc = new PaymentService(pool, fakeQueue());
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), fakeQueue());
 
     // override provided, but payment (Rs 1L) is under the limit (Rs 1.99999L)
     await svc.recordCashPayment(INVOICE, 10_000_000n, 'idem-9', { justification: 'Override not needed here at all' });
@@ -215,7 +223,7 @@ describe('PaymentService.recordCashPayment — PMLA threshold warnings', () => {
     const pool = fakePool(INVOICE_ROW, 0n, 80_300_000n); // monthly SUM = Rs 8,03,000
     setupWithTenantTx(pool);
     const q = fakeQueue();
-    svc = new PaymentService(pool, q);
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), q);
 
     const result = await svc.recordCashPayment(INVOICE, 800_000n, 'idem-pmla-warn');
 
@@ -232,7 +240,7 @@ describe('PaymentService.recordCashPayment — PMLA threshold warnings', () => {
     const pool = fakePool(INVOICE_ROW, 0n, 80_000_000n);
     setupWithTenantTx(pool);
     const q = fakeQueue();
-    svc = new PaymentService(pool, q);
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), q);
 
     await svc.recordCashPayment(INVOICE, 5_000_000n, 'idem-pmla-job');
 
@@ -246,7 +254,7 @@ describe('PaymentService.recordCashPayment — PMLA threshold warnings', () => {
     // Pre-payment = Rs 7,80,000 (ok), post = Rs 8,30,000 (warn) → crossing fires
     const pool = fakePool(INVOICE_ROW, 0n, 83_000_000n);
     setupWithTenantTx(pool);
-    svc = new PaymentService(pool, fakeQueue());
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), fakeQueue());
 
     await svc.recordCashPayment(INVOICE, 5_000_000n, 'idem-pmla-audit');
 
@@ -261,7 +269,7 @@ describe('PaymentService.recordCashPayment — PMLA threshold warnings', () => {
     const pool = fakePool(INVOICE_ROW, 0n, 90_000_000n);
     setupWithTenantTx(pool);
     const q = fakeQueue();
-    svc = new PaymentService(pool, q);
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), q);
 
     await svc.recordCashPayment(INVOICE, 5_000_000n, 'idem-pmla-no-dup');
 
@@ -275,7 +283,7 @@ describe('PaymentService.recordCashPayment — PMLA threshold warnings', () => {
   it('does NOT return pmlaWarning when monthly is below Rs 8,00,000 (ok)', async () => {
     const pool = fakePool(INVOICE_ROW, 0n, 50_000_000n); // Rs 5L — ok
     setupWithTenantTx(pool);
-    svc = new PaymentService(pool, fakeQueue());
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), fakeQueue());
 
     const result = await svc.recordCashPayment(INVOICE, 5_000_000n, 'idem-pmla-ok');
 
@@ -286,7 +294,7 @@ describe('PaymentService.recordCashPayment — PMLA threshold warnings', () => {
     const pool = fakePool(INVOICE_ROW, 0n, 50_000_000n);
     setupWithTenantTx(pool);
     const q = fakeQueue();
-    svc = new PaymentService(pool, q);
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), q);
 
     await svc.recordCashPayment(INVOICE, 5_000_000n, 'idem-pmla-nojob');
 
@@ -300,7 +308,7 @@ describe('PaymentService.recordCashPayment — PMLA threshold warnings', () => {
     // Service-layer test: just verify PMLA logic runs per-context.
     const pool = fakePool(INVOICE_ROW, 0n, 80_000_000n); // warn threshold
     setupWithTenantTx(pool);
-    svc = new PaymentService(pool, fakeQueue());
+    svc = new PaymentService(pool, fakeRedis(), fakeAdapter(), fakeQueue());
 
     const result = await svc.recordCashPayment(INVOICE, 5_000_000n, 'idem-tenant-pmla');
     expect(result).toHaveProperty('pmlaWarning');
