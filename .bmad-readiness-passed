@@ -14,7 +14,7 @@ project:          Goldsmith — white-label multi-tenant jewellery platform for 
 | 1 | PRD (BMAD Phase 2)                | _bmad-output/planning-artifacts/prd.md                                                    | ✓ PRESENT |
 | 2 | UX Design (Phase 3)               | _bmad-output/planning-artifacts/ux-design-specification.md                                | ✓ PRESENT |
 | 3 | Architecture (Phase 4)            | _bmad-output/planning-artifacts/architecture.md                                           | ✓ PRESENT |
-| 4 | Initial ADRs (0001–0012)          | _bmad-output/planning-artifacts/adr/0001..0012                                            | ✓ PRESENT |
+| 4 | Initial ADRs (0001–0016)          | docs/adr/0001..0016                                                                       | ✓ PRESENT |
 | 5 | Stories (Phase 5) — 138 stories   | _bmad-output/planning-artifacts/epics.md + epics-*.md                                     | ✓ PRESENT |
 | 6 | Threat Model (STRIDE)             | docs/threat-model.md                                                                      | ✓ PRESENT (326 lines, this gate) |
 | 7 | Operations Runbook                | docs/runbook.md                                                                           | ✓ PRESENT (453 lines, this gate) |

@@ -8,7 +8,7 @@ supersedes: none
 companionDocs:
   - docs/threat-model.md (STRIDE — mitigations S1-M* referenced here)
   - _bmad-output/planning-artifacts/architecture.md (12 ADRs, 14 bounded contexts)
-  - _bmad-output/planning-artifacts/adr/0011-compliance-package-hard-block-gateway.md
+  - docs/adr/0011-compliance-package-hard-block-gateway.md
 mvpScope: >
   ADR-0015 (startup-lean): LocalKMS only — no Azure Key Vault, no Redis, no
   cloud KMS until Infrastructure Story lands. Scripts reflect this scope.

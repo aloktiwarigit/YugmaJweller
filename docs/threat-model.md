@@ -8,9 +8,9 @@ supersedes: none
 inputDocuments:
   - _bmad-output/planning-artifacts/prd.md (126 FRs + 70 NFRs)
   - _bmad-output/planning-artifacts/architecture.md (12 ADRs, 14 bounded contexts)
-  - _bmad-output/planning-artifacts/adr/0002-multi-tenant-single-db-rls.md
-  - _bmad-output/planning-artifacts/adr/0005-tenant-context-defense-in-depth.md
-  - _bmad-output/planning-artifacts/adr/0011-compliance-package-hard-block-gateway.md
+  - docs/adr/0002-multi-tenant-single-db-rls.md
+  - docs/adr/0005-tenant-context-defense-in-depth.md
+  - docs/adr/0011-compliance-package-hard-block-gateway.md
   - C:/Alok/Business Projects/Goldsmith/CLAUDE.md (engineering rules)
 ---
 
