@@ -49,7 +49,7 @@ export function PaymentMethodSelector({
   onRecordCash,
   onRecordManual,
   onComplete,
-}: PaymentMethodSelectorProps) {
+}: PaymentMethodSelectorProps): React.ReactElement {
   const [lines, setLines] = useState<Record<PaymentMethod, string>>({
     CASH: '', UPI: '', CARD: '', NET_BANKING: '', OLD_GOLD: '', SCHEME: '',
   });
@@ -70,11 +70,11 @@ export function PaymentMethodSelector({
   const cashNearLimit = projectedCashPaise >= WARN_THRESHOLD_PAISE;
   const cashOverLimit = projectedCashPaise >= SECTION_269ST_LIMIT_PAISE;
 
-  function setAmount(method: PaymentMethod, value: string) {
+  function setAmount(method: PaymentMethod, value: string): void {
     setLines(prev => ({ ...prev, [method]: value }));
   }
 
-  async function handleUpi() {
+  async function handleUpi(): Promise<void> {
     const amt = lines['UPI'] ? BigInt(Math.round(parseFloat(lines['UPI']) * 100)) : 0n;
     if (amt <= 0n) { setError('UPI राशि दर्ज करें'); return; }
     setError(null);
@@ -89,7 +89,7 @@ export function PaymentMethodSelector({
     }
   }
 
-  async function handleComplete() {
+  async function handleComplete(): Promise<void> {
     if (!allAllocated) return;
     setError(null);
 

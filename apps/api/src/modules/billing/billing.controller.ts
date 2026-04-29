@@ -171,8 +171,6 @@ export class BillingController {
     );
   }
 
-<<<<<<< HEAD
-
   @TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-0000-0000-000000000000' } })
   @Post('/invoices/:id/share/whatsapp')
   @Roles('shop_admin', 'shop_manager', 'shop_staff')

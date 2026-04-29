@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Pool } from 'pg';
-import type { Redis } from 'ioredis';
+import type { Redis } from '@goldsmith/cache';
 
 // ── Mocks MUST be at top (hoisted by vitest) ─────────────────────────────────
 
@@ -119,7 +119,7 @@ describe('confirmWebhookPayment', () => {
     const { svc } = await makeService({ pool: pool as unknown as ReturnType<typeof makePool>, redis });
     await svc.confirmWebhookPayment('pay_rzp', 'order_rzp', 'shop_001');
     const updateCalls = pool._client.query.mock.calls.filter(
-      (c: unknown[]) => typeof c[0] === 'string' && (c[0] as string).includes("status='CONFIRMED'")
+      (c: unknown[]) => typeof c[0] === 'string' && /status\s*=\s*'CONFIRMED'/.test(c[0] as string)
     );
     expect(updateCalls.length).toBeGreaterThan(0);
   });
@@ -156,7 +156,7 @@ describe('confirmWebhookPayment', () => {
       new Promise<void>(res => setTimeout(() => svc.confirmWebhookPayment('pay_001', 'order_001', 'shop_001').then(res), 50)),
     ]);
     const calls = pool._client.query.mock.calls.filter(
-      (c: unknown[]) => typeof c[0] === 'string' && (c[0] as string).includes("status='CONFIRMED'")
+      (c: unknown[]) => typeof c[0] === 'string' && /status\s*=\s*'CONFIRMED'/.test(c[0] as string)
     );
     expect(calls).toHaveLength(1);
   });
