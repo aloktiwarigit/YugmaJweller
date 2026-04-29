@@ -4,14 +4,24 @@ import { withTenantTx } from '@goldsmith/db';
 import { decryptColumn, deserializeEnvelope } from '@goldsmith/crypto-envelope';
 import type { KmsAdapter } from '@goldsmith/crypto-envelope';
 import { auditLog, AuditAction } from '@goldsmith/audit';
-import { buildCtrDocument, renderCtrText } from '@goldsmith/compliance';
-import type { CtrDocument } from '@goldsmith/compliance';
+import { buildCtrDocument, renderCtrText, buildStrDocument, renderStrText } from '@goldsmith/compliance';
+import type { CtrDocument, StrDocument } from '@goldsmith/compliance';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 
 export interface CtrReportResult {
   text:     string;
   document: CtrDocument;
+}
+
+// JSON-serializable version of StrDocument — bigint converted to string for transport.
+export type StrTemplateJson = Omit<StrDocument, 'transactionAmountPaise'> & {
+  transactionAmountPaise: string;
+};
+
+export interface StrTemplateResult {
+  text:     string;
+  template: StrTemplateJson;
 }
 
 @Injectable()
@@ -156,5 +166,81 @@ export class ComplianceReportsService {
 
     const text = renderCtrText(doc!);
     return { text, document: doc! };
+  }
+
+  async getStrTemplate(): Promise<StrTemplateResult> {
+    const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
+
+    if (ctx.role !== 'shop_admin') {
+      throw new ForbiddenException({ code: 'str.owner_only' });
+    }
+
+    let template: StrDocument;
+
+    await withTenantTx(this.pool, async (tx) => {
+      const shopRes = await tx.query<{ // nosemgrep: goldsmith.require-tenant-transaction
+        id:           string;
+        display_name: string;
+        gstin:        string | null;
+        address_json: Record<string, string> | null;
+      }>(
+        `SELECT id::text, display_name, gstin, address_json
+         FROM shops
+         WHERE id = current_setting('app.current_shop_id', true)::uuid`,
+        [],
+      );
+      if (!shopRes.rows[0]) throw new NotFoundException({ code: 'shop.not_found' });
+      const shop = shopRes.rows[0];
+
+      const userRes = await tx.query<{ display_name: string }>( // nosemgrep: goldsmith.require-tenant-transaction
+        `SELECT display_name
+         FROM shop_users
+         WHERE firebase_uid = $1
+           AND shop_id = current_setting('app.current_shop_id', true)::uuid`,
+        [ctx.userId],
+      );
+      const officerName = userRes.rows[0]?.display_name ?? '[Reporting Officer]';
+
+      const addr = shop.address_json;
+      const shopAddress = addr
+        ? [addr['line1'], addr['line2'], addr['city'], addr['state'], addr['pincode']]
+            .filter(Boolean)
+            .join(', ')
+        : '[Shop Address]';
+
+      const today = new Date();
+
+      template = buildStrDocument({
+        shopId:                    shop.id,
+        shopName:                  shop.display_name,
+        shopAddress,
+        shopGstin:                 shop.gstin ?? 'N/A',
+        reportingOfficerName:      officerName,
+        suspiciousTransactionDate: today,
+        transactionAmountPaise:    0n,
+        transactionNature:         '[प्रकृति भरें / Fill transaction nature]',
+        customerName:              '[ग्राहक का नाम / Customer name]',
+        customerAddress:           '[ग्राहक का पता / Customer address]',
+        basisOfSuspicion:          '[संदेह का आधार / Basis of suspicion]',
+        actionsTaken:              '[की गई कार्रवाई / Actions taken]',
+        reportDate:                today,
+      });
+    });
+
+    await auditLog(this.pool, {
+      action:      AuditAction.STR_TEMPLATE_ACCESSED,
+      subjectType: 'str_template',
+      actorUserId: ctx.userId,
+      metadata:    {},
+    });
+
+    const text = renderStrText(template!);
+    return {
+      text,
+      template: {
+        ...template!,
+        transactionAmountPaise: template!.transactionAmountPaise.toString(),
+      },
+    };
   }
 }
