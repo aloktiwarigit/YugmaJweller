@@ -4,6 +4,7 @@ import {
   Text,
   ScrollView,
   Pressable,
+  TouchableOpacity,
   TextInput,
   Alert,
   StyleSheet,
@@ -18,6 +19,9 @@ import type { InvoiceResponse, CreateInvoiceDtoType } from '@goldsmith/shared';
 import { PanPromptSheet } from '../../src/features/billing/components/PanPromptSheet';
 import type { PanSubmitPayload } from '../../src/features/billing/components/PanPromptSheet';
 import { InvoiceTypeToggle } from '../../src/features/billing/components/InvoiceTypeToggle';
+import { CustomerSearch } from '../../src/features/crm/components/CustomerSearch';
+import type { CustomerHit } from '../../src/features/crm/components/CustomerSearch';
+import { LoyaltyRedeemSheet } from '../../src/features/billing/components/LoyaltyRedeemSheet';
 
 interface DraftLine extends BillingLineValue {
   product: BillingLineProduct;
@@ -41,6 +45,9 @@ export default function NewInvoiceScreen(): JSX.Element {
   const [buyerBusinessName, setBuyerBusinessName] = useState<string>('');
   const [customerName, setCustomerName] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('');
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
+  const [showLoyaltySheet, setShowLoyaltySheet] = useState(false);
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [idempotencyKey] = useState<string>(() => uuid());
 
@@ -79,6 +86,7 @@ export default function NewInvoiceScreen(): JSX.Element {
     (extra: PanSubmitPayload = {}): CreateInvoiceDtoType => ({
       customerName: customerName.trim(),
       ...(customerPhone.trim() ? { customerPhone: customerPhone.trim() } : {}),
+      ...(customerId != null ? { customerId } : {}),
       lines: lines.map((l) => ({
         productId: l.productId,
         description: l.description,
@@ -95,8 +103,18 @@ export default function NewInvoiceScreen(): JSX.Element {
         : {}),
       ...(extra.pan ? { pan: extra.pan } : {}),
       ...(extra.form60Data ? { form60Data: extra.form60Data } : {}),
+      ...(loyaltyPointsToRedeem > 0 ? { loyaltyPointsToRedeem } : {}),
     }),
-    [customerName, customerPhone, lines, invoiceType, buyerGstin, buyerBusinessName],
+    [
+      customerName,
+      customerPhone,
+      customerId,
+      lines,
+      invoiceType,
+      buyerGstin,
+      buyerBusinessName,
+      loyaltyPointsToRedeem,
+    ],
   );
 
   const onLineChange = useCallback((index: number, next: BillingLineValue) => {
@@ -135,6 +153,26 @@ export default function NewInvoiceScreen(): JSX.Element {
     setPanRequired(false);
   }, []);
 
+  const handleCustomerSelect = useCallback((hit: CustomerHit) => {
+    setCustomerId(hit.id);
+    setCustomerName(hit.name);
+    setLoyaltyPointsToRedeem(0);
+  }, []);
+
+  const handleCustomerSearch = useCallback(
+    (q: string) =>
+      api.post<{ hits: CustomerHit[]; total: number; source: 'meilisearch' | 'postgres' }>(
+        '/api/v1/crm/search',
+        { q },
+      ).then((r) => r.data),
+    [],
+  );
+
+  const clearCustomer = useCallback(() => {
+    setCustomerId(null);
+    setLoyaltyPointsToRedeem(0);
+  }, []);
+
   return (
     <>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -168,7 +206,56 @@ export default function NewInvoiceScreen(): JSX.Element {
             placeholder="9876543210"
             accessibilityLabel="Customer phone"
           />
+
+          <Text style={styles.label}>CRM से ग्राहक खोजें (वैकल्पिक)</Text>
+          {customerId == null ? (
+            <CustomerSearch
+              onSearch={handleCustomerSearch}
+              onSelect={handleCustomerSelect}
+            />
+          ) : (
+            <View style={styles.selectedCustomerChip}>
+              <Text style={styles.selectedCustomerText} numberOfLines={1}>
+                {customerName}
+              </Text>
+              <TouchableOpacity
+                onPress={clearCustomer}
+                accessibilityRole="button"
+                accessibilityLabel="ग्राहक हटाएं"
+                style={styles.chipClearBtn}
+              >
+                <Text style={styles.chipClearText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
+
+        {customerId != null && (
+          loyaltyPointsToRedeem === 0 ? (
+            <TouchableOpacity
+              style={styles.loyaltyButton}
+              onPress={() => setShowLoyaltySheet(true)}
+              accessibilityRole="button"
+              accessibilityLabel="लॉयल्टी पॉइंट भुनाएं"
+            >
+              <Text style={styles.loyaltyButtonText}>🎁 लॉयल्टी पॉइंट भुनाएं</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.loyaltyChip}>
+              <Text style={styles.loyaltyChipText}>
+                🎁 {loyaltyPointsToRedeem} पॉइंट भुनाए गए (₹{Math.floor(loyaltyPointsToRedeem / 100)} छूट)
+              </Text>
+              <TouchableOpacity
+                onPress={() => setLoyaltyPointsToRedeem(0)}
+                accessibilityRole="button"
+                accessibilityLabel="लॉयल्टी छूट हटाएं"
+                style={styles.chipClearBtn}
+              >
+                <Text style={styles.chipClearText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )
+        )}
 
         {lines.map((line, i) => (
           <BillingLineBuilder
@@ -211,6 +298,17 @@ export default function NewInvoiceScreen(): JSX.Element {
         onSubmit={onPanSubmit}
         onCancel={onPanCancel}
       />
+
+      {showLoyaltySheet && customerId != null && (
+        <LoyaltyRedeemSheet
+          customerId={customerId}
+          onRedeem={(points) => {
+            setLoyaltyPointsToRedeem(points);
+            setShowLoyaltySheet(false);
+          }}
+          onClose={() => setShowLoyaltySheet(false)}
+        />
+      )}
     </>
   );
 }
@@ -246,6 +344,68 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 12,
     minHeight: 48,
+  },
+  selectedCustomerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8E1',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#B8860B',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 48,
+    marginTop: 4,
+  },
+  selectedCustomerText: {
+    flex: 1,
+    fontFamily: 'NotoSansDevanagari',
+    fontSize: 15,
+    color: '#5C3D11',
+  },
+  chipClearBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minHeight: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chipClearText: {
+    fontSize: 14,
+    color: '#7A5400',
+  },
+  loyaltyButton: {
+    borderWidth: 1.5,
+    borderColor: '#B8860B',
+    borderRadius: 10,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginBottom: 12,
+    minHeight: 48,
+    backgroundColor: '#FFFDF7',
+  },
+  loyaltyButtonText: {
+    fontFamily: 'NotoSansDevanagari',
+    fontSize: 15,
+    color: '#7A5400',
+  },
+  loyaltyChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8E1',
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#B8860B',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+    minHeight: 48,
+  },
+  loyaltyChipText: {
+    flex: 1,
+    fontFamily: 'NotoSansDevanagari',
+    fontSize: 14,
+    color: '#5C3D11',
   },
   scanButton: {
     backgroundColor: '#e7e5e4',
