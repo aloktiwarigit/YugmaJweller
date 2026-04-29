@@ -82,7 +82,7 @@ describe('buildCtrDocument + renderCtrText — CTR generation', () => {
 describe('ComplianceReportsService — RBAC contract', () => {
   it('non-OWNER role throws ForbiddenException shape', () => {
     // Role check is the first guard in getCtrReport; replicating the guard logic
-    const role = 'shop_manager'; // MANAGER is not shop_admin
+    const role: string = 'shop_manager'; // MANAGER is not shop_admin
     let thrown: unknown;
     try {
       if (role !== 'shop_admin') throw new ForbiddenException({ code: 'ctr.owner_only' });
@@ -94,7 +94,7 @@ describe('ComplianceReportsService — RBAC contract', () => {
   });
 
   it('STAFF role also throws ForbiddenException', () => {
-    const role = 'shop_staff';
+    const role: string = 'shop_staff';
     let thrown: unknown;
     try {
       if (role !== 'shop_admin') throw new ForbiddenException({ code: 'ctr.owner_only' });

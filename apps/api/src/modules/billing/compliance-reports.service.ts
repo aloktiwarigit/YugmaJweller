@@ -76,11 +76,16 @@ export class ComplianceReportsService {
         pan_ciphertext:    Buffer | null;
         pan_key_id:        string | null;
       }>(
+        // P1 fix: filter by customer_id alone when it's provided; filtering by
+        // customer_phone IS NOT DISTINCT FROM NULL would drop invoices that
+        // retain the customer's phone number on the invoice row itself.
         `SELECT i.invoice_number, i.issued_at, i.customer_name, i.customer_phone,
                 i.pan_ciphertext, i.pan_key_id
          FROM invoices i
-         WHERE i.customer_id IS NOT DISTINCT FROM $1::uuid
-           AND i.customer_phone IS NOT DISTINCT FROM $2
+         WHERE (
+               ($1::uuid IS NOT NULL AND i.customer_id = $1::uuid)
+            OR ($1::uuid IS     NULL AND i.customer_phone IS NOT DISTINCT FROM $2)
+         )
            AND DATE_TRUNC('month', i.issued_at AT TIME ZONE 'Asia/Kolkata') =
                DATE_TRUNC('month', ($3 || '-01')::date)
            AND i.status = 'ISSUED'
@@ -114,7 +119,11 @@ export class ComplianceReportsService {
       const invoicesByDate = new Map<string, string>();
       for (const inv of invoiceRes.rows) {
         if (inv.issued_at) {
-          const dateStr = inv.issued_at.toISOString().slice(0, 10);
+          // P2 fix: aggregate_date is stored in IST; convert issued_at to IST
+          // date (UTC+5:30 = +330 min) before slicing to avoid off-by-one for
+          // invoices issued between midnight and 05:29 IST.
+          const istMs = inv.issued_at.getTime() + 330 * 60 * 1000;
+          const dateStr = new Date(istMs).toISOString().slice(0, 10);
           invoicesByDate.set(dateStr, inv.invoice_number);
         }
       }
