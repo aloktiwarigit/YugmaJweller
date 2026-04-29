@@ -90,7 +90,7 @@ CREATE INDEX idx_loyalty_transactions_customer
 -- (e.g. after a Redis flush or long-running retry window).
 CREATE UNIQUE INDEX idx_loyalty_transactions_invoice_unique
   ON loyalty_transactions(shop_id, invoice_id)
-  WHERE invoice_id IS NOT NULL AND txn_type = 'ACCRUAL';
+  WHERE invoice_id IS NOT NULL AND type = 'ACCRUAL';
 
 -- ============================================================================
 -- 2. customer_loyalty — running aggregate (one row per customer)

@@ -25,13 +25,8 @@ ALTER TABLE customers
   ADD COLUMN deletion_requested_by    TEXT
     CHECK (deletion_requested_by IS NULL OR deletion_requested_by IN ('customer','owner'));
 
--- Allow the worker (running as app_user with tenant context) to hard-delete the
--- soft-deleted row after the grace window expires.
-DROP POLICY IF EXISTS customers_tenant_delete ON customers;
-CREATE POLICY customers_tenant_delete ON customers
-  FOR DELETE
-  USING (shop_id = current_setting('app.current_shop_id')::uuid);
-
+-- The existing customers_tenant_isolation (FOR ALL) policy already covers DELETE.
+-- We only need to add the GRANT for DELETE to allow the worker to hard-delete.
 GRANT DELETE ON customers TO app_user;
 
 -- Hot-path index for the daily sweep that finds customers whose grace window
