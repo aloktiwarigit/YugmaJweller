@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, Pressable, FlatList, Modal, StyleSheet, ActivityIndicator,
+  View, Text, Pressable, FlatList, Modal, StyleSheet, ActivityIndicator, TextInput,
 } from 'react-native';
 import type { FamilyMemberResponse } from '@goldsmith/shared';
 
@@ -201,7 +201,6 @@ interface CustomerSearchInputProps {
 }
 
 function CustomerSearchInput({ value, onSearch, results, selected, onSelect }: CustomerSearchInputProps): React.ReactElement {
-  const { TextInput } = require('react-native') as typeof import('react-native');
   return (
     <View>
       <TextInput

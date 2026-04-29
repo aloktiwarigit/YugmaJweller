@@ -111,6 +111,7 @@ export class FamilyRepository {
     });
   }
 
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal tenant isolation check; shopId is always ctx.shopId from authenticated context
   async customerBelongsToShop(shopId: string, customerId: string): Promise<boolean> {
     const r = await this.pool.query<{ exists: boolean }>(
       `SELECT EXISTS(SELECT 1 FROM customers WHERE id = $1 AND shop_id = $2) AS exists`,
