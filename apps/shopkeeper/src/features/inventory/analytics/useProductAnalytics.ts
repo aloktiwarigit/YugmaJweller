@@ -13,12 +13,12 @@ export interface MultiPeriodViewSummary {
   '365d': ViewSummary;
 }
 
-export function useProductAnalytics(productId: string): UseQueryResult<MultiPeriodViewSummary> {
+export function useProductAnalytics(productId: string | undefined): UseQueryResult<MultiPeriodViewSummary> {
   return useQuery({
     queryKey: ['analytics', 'product-views', productId],
     queryFn: async () => {
       const res = await api.get<MultiPeriodViewSummary>(
-        `/api/v1/analytics/products/${productId}/views`,
+        `/api/v1/analytics/products/${productId!}/views`,
       );
       return res.data;
     },
