@@ -51,6 +51,7 @@ import { InventoryService } from '../inventory/inventory.service';
 import { PricingService } from '../pricing/pricing.service';
 import { SettingsRepository } from '../settings/settings.repository';
 import { LoyaltyService } from '../loyalty/loyalty.service';
+import { EstimateService } from './estimate.service';
 
 // Re-export so consumers can import from billing module without needing @goldsmith/compliance
 export { ComplianceHardBlockError };
@@ -180,6 +181,7 @@ export class BillingService {
     @Inject(SettingsRepository) private readonly settingsRepo: SettingsRepository,
     @Optional() @Inject(EventEmitter2) private readonly events?: EventEmitter2,
     @Optional() @Inject(LoyaltyService) private readonly loyaltyService?: LoyaltyService,
+    @Optional() @Inject(EstimateService) private readonly estimateService?: EstimateService,
   ) {}
 
   private async resolveMakingChargePct(
@@ -847,5 +849,145 @@ export class BillingService {
     }).catch(() => undefined);
 
     return { invoiceId: result.invoice.id, order: { id: orderId, status: 'DELIVERED' } };
+  }
+
+  // FR42: Convert a proforma estimate to a final invoice.
+  // Builds the invoice directly from the estimate's snapshotted data — gold rate is NOT
+  // re-fetched (invariant: snapshotted rate at estimate creation time).
+  // Compliance: TCS 206C(1D) is computed on the estimate total; PAN 114B hard-block applies;
+  // 269ST and PMLA fire at payment time (not invoice creation).
+  async convertEstimateToInvoice(estimateId: string, idempotencyKey: string): Promise<InvoiceResponse> {
+    const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
+
+    if (!this.estimateService) {
+      throw new BadRequestException({ code: 'estimate.service_unavailable' });
+    }
+
+    if (!idempotencyKey?.trim()) {
+      throw new BadRequestException({ code: 'invoice.idempotency_key_required' });
+    }
+
+    // 1. Redis idempotency check (re-uses invoice cache key)
+    try {
+      const cached = await this.redis.get(idemKey(ctx.shopId, idempotencyKey));
+      if (cached !== null) {
+        try { return JSON.parse(cached) as InvoiceResponse; } catch { /* evict below */ }
+        this.redis.del(idemKey(ctx.shopId, idempotencyKey)).catch(() => undefined);
+      }
+    } catch (e) {
+      this.logger.warn(`Redis unavailable on estimate conversion idempotency check: ${String(e)}`);
+    }
+
+    // 2. Fetch the estimate (RLS-scoped to current tenant)
+    const estimate = await this.estimateService.getEstimate(estimateId, ctx.shopId);
+
+    if (estimate.status === 'converted') {
+      throw new BadRequestException({ code: 'estimate.already_converted' });
+    }
+    if (estimate.status === 'expired') {
+      throw new BadRequestException({ code: 'estimate.expired' });
+    }
+
+    // 3. Compute TCS on snapshotted total (compliance — fires on conversion)
+    const baseTotalPaise = BigInt(estimate.totalPaise);
+    const tcsCollectedPaise = computeTcs(baseTotalPaise);
+    let totalPaise = baseTotalPaise + tcsCollectedPaise;
+
+    // 4. PAN Rule 114B hard-block on the final total (TCS-inclusive)
+    enforcePanRequired({ totalPaise, pan: null, form60Data: null });
+
+    // 5. Generate invoice number
+    const invoiceNumber = generateInvoiceNumber(ctx.shopId);
+
+    // 6. Build InsertInvoiceInput from estimate's snapshotted line items
+    const subtotalPaise  = BigInt(estimate.subtotalPaise);
+    const gstMetalPaise  = BigInt(estimate.gstPaise);   // estimate stores combined GST
+    const gstMakingPaise = 0n;
+
+    const insertInput: InsertInvoiceInput = {
+      invoiceNumber,
+      invoiceType:          'B2C',
+      buyerGstin:           null,
+      buyerBusinessName:    null,
+      sellerStateCode:      '09',
+      gstTreatment:         'CGST_SGST',
+      cgstMetalPaise:       0n,
+      sgstMetalPaise:       0n,
+      cgstMakingPaise:      0n,
+      sgstMakingPaise:      0n,
+      igstMetalPaise:       0n,
+      igstMakingPaise:      0n,
+      customerId:           estimate.customerId,
+      customerName:         'ग्राहक (अनुमान से)',
+      customerPhone:        null,
+      status:               'ISSUED',
+      subtotalPaise,
+      gstMetalPaise,
+      gstMakingPaise,
+      totalPaise,
+      idempotencyKey,
+      issuedAt:             new Date(),
+      createdByUserId:      ctx.userId,
+      panCiphertext:        null,
+      panKeyId:             null,
+      form60Encrypted:      null,
+      form60KeyId:          null,
+      tcsCollectedPaise,
+      items: estimate.lineItems.map((li, i) => ({
+        productId:         li.productId ?? null,
+        description:       li.description,
+        hsnCode:           li.hsnCode ?? '7113',
+        huid:              li.huid ?? null,
+        metalType:         li.metalType ?? null,
+        purity:            li.purity ?? null,
+        netWeightG:        li.netWeightG ?? null,
+        ratePerGramPaise:  li.ratePerGramPaise != null ? BigInt(li.ratePerGramPaise) : null,
+        makingChargePct:   li.makingChargePct ?? null,
+        goldValuePaise:    BigInt(li.goldValuePaise),
+        makingChargePaise: BigInt(li.makingChargePaise),
+        stoneChargesPaise: BigInt(li.stoneChargesPaise),
+        hallmarkFeePaise:  BigInt(li.hallmarkFeePaise),
+        gstMetalPaise:     BigInt(li.gstMetalPaise),
+        gstMakingPaise:    BigInt(li.gstMakingPaise),
+        lineTotalPaise:    BigInt(li.lineTotalPaise),
+        sortOrder:         li.sortOrder ?? i,
+      })),
+    };
+
+    // 7. Insert invoice (idempotency-safe) + mark estimate converted — atomic via repo
+    let result: { invoice: InvoiceRow; items: InvoiceItemRow[] };
+    try {
+      result = await this.repo.insertInvoice(insertInput);
+    } catch (err) {
+      if (err instanceof IdempotencyKeyConflictError) {
+        const existing = await this.repo.getInvoiceByIdempotencyKey(idempotencyKey);
+        if (existing) {
+          const resp = rowToInvoiceResponse(existing.invoice, existing.items);
+          this.cacheResponse(ctx.shopId, idempotencyKey, resp);
+          return resp;
+        }
+      }
+      throw err;
+    }
+
+    // 8. Mark estimate converted (best-effort after invoice committed)
+    await this.estimateService.markConverted(estimateId, result.invoice.id, ctx.shopId);
+
+    void auditLog(this.pool, {
+      action: AuditAction.INVOICE_CREATED,
+      subjectType: 'invoice',
+      subjectId: result.invoice.id,
+      actorUserId: ctx.userId,
+      after: {
+        invoice_number: result.invoice.invoice_number,
+        from_estimate:  estimateId,
+        total_paise:    result.invoice.total_paise.toString(),
+      },
+    }).catch(() => undefined);
+
+    const resp = rowToInvoiceResponse(result.invoice, result.items);
+    this.cacheResponse(ctx.shopId, idempotencyKey, resp);
+    trackEvent(ctx.shopId, 'estimate.converted', { invoice_id: result.invoice.id, estimate_id: estimateId });
+    return resp;
   }
 }
