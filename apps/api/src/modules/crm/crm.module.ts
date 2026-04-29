@@ -23,6 +23,8 @@ import { OccasionReminderProcessor } from '../../workers/occasion-reminder.proce
 import { DpdpaDeletionService, DPDPA_HARD_DELETE_QUEUE } from './dpdpa-deletion.service';
 import { DpdpaDeletionRepository } from './dpdpa-deletion.repository';
 import { DpdpaHardDeleteProcessor } from '../../workers/dpdpa-hard-delete.processor';
+import { ConsentService } from './consent.service';
+import { ConsentRepository } from './consent.repository';
 
 const OCCASION_REMINDER_CRON = '30 2 * * *';
 const DPDPA_SWEEP_CRON       = '30 20 * * *';
@@ -47,6 +49,7 @@ const DPDPA_SWEEP_CRON       = '30 20 * * *';
     OccasionReminderProcessor,
     DpdpaDeletionService, DpdpaDeletionRepository,
     DpdpaHardDeleteProcessor,
+    ConsentService, ConsentRepository,
     {
       provide: 'KMS_ADAPTER',
       useFactory: () => {
@@ -61,7 +64,7 @@ const DPDPA_SWEEP_CRON       = '30 20 * * *';
       },
     },
   ],
-  exports: [CrmService, CrmSearchService, FamilyService, NotesService, OccasionsService, DpdpaDeletionService],
+  exports: [CrmService, CrmSearchService, FamilyService, NotesService, OccasionsService, DpdpaDeletionService, ConsentService],
 })
 export class CrmModule implements OnModuleInit {
   private readonly logger = new Logger(CrmModule.name);

@@ -1,9 +1,9 @@
-import { BadRequestException, Body, Controller, Delete, Get, NotImplementedException, Param, Patch, Post, Query, UnauthorizedException, ParseUUIDPipe } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, NotImplementedException, Param, Patch, Post, Put, Query, UnauthorizedException, ParseUUIDPipe } from '@nestjs/common';
 import { z } from 'zod';
 import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext } from '@goldsmith/tenant-context';
-import { CreateCustomerSchema, UpdateCustomerSchema, CustomerListQuerySchema, LinkFamilySchema, RequestDeletionDtoSchema } from '@goldsmith/shared';
-import type { CreateCustomerDto, UpdateCustomerDto, CustomerResponse, LinkFamilyDto, FamilyMemberResponse, RequestDeletionDto, DeletionRequestResponse } from '@goldsmith/shared';
+import { CreateCustomerSchema, UpdateCustomerSchema, CustomerListQuerySchema, LinkFamilySchema, RequestDeletionDtoSchema, UpdateViewingConsentSchema } from '@goldsmith/shared';
+import type { CreateCustomerDto, UpdateCustomerDto, CustomerResponse, LinkFamilyDto, FamilyMemberResponse, RequestDeletionDto, DeletionRequestResponse, UpdateViewingConsentDto, ViewingConsentResponse } from '@goldsmith/shared';
 import type { CustomerSearchResult } from '@goldsmith/integrations-search';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SkipAuth } from '../../common/decorators/skip-auth.decorator';
@@ -12,6 +12,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { Inject } from '@nestjs/common';
 import { CrmService } from './crm.service';
 import { DpdpaDeletionService } from './dpdpa-deletion.service';
+import { ConsentService } from './consent.service';
 import { CrmSearchService } from './crm-search.service';
 import { FamilyService } from './family.service';
 import { HistoryService } from './history.service';
@@ -45,6 +46,7 @@ export class CrmController {
     @Inject(NotesService)        private readonly notesSvc: NotesService,
     @Inject(OccasionsService)        private readonly occasionsSvc: OccasionsService,
     @Inject(DpdpaDeletionService)    private readonly dpdpaSvc: DpdpaDeletionService,
+    @Inject(ConsentService)          private readonly consentSvc: ConsentService,
   ) {}
 
   @Post('customers') @Roles('shop_admin', 'shop_manager', 'shop_staff')
@@ -188,5 +190,17 @@ export class CrmController {
   @Delete('customer/me') @SkipAuth() @SkipTenant()
   customerSelfDelete(): never {
     throw new NotImplementedException({ code: 'deletion.customer_app_not_yet_available', message: 'Self-deletion via the customer app launches in Epic 7.' });
+  }
+
+  @Get('customers/:id/consent/viewing') @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async getViewingConsent(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string): Promise<ViewingConsentResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.consentSvc.getConsent(ctx, id);
+  }
+
+  @Put('customers/:id/consent/viewing') @Roles('shop_admin', 'shop_manager')
+  async updateViewingConsent(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodValidationPipe(UpdateViewingConsentSchema)) dto: UpdateViewingConsentDto): Promise<ViewingConsentResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.consentSvc.updateConsent(ctx, id, dto, { ip: null, userAgent: null });
   }
 }
