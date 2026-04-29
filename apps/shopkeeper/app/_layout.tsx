@@ -10,7 +10,7 @@ import PostHog, { PostHogProvider, usePostHog } from 'posthog-react-native';
 import { AuthProvider } from '../src/providers/AuthProvider';
 import { TenantProvider } from '../src/providers/TenantProvider';
 
-const POSTHOG_API_KEY = process.env['EXPO_PUBLIC_POSTHOG_API_KEY'];
+const POSTHOG_API_KEY = process.env.EXPO_PUBLIC_POSTHOG_API_KEY;
 const posthogClient = POSTHOG_API_KEY
   ? new PostHog(POSTHOG_API_KEY, { host: 'https://app.posthog.com' })
   : null;
