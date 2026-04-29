@@ -2,7 +2,7 @@ import React from 'react';
 import {
   View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { colors, spacing } from '@goldsmith/ui-tokens';
 import {
   useDailySummary, useOutstanding, useCustomerLtv, useLoyaltySummary,
@@ -77,7 +77,7 @@ export default function ReportsScreen(): React.ReactElement {
         metric={totalToday}
         metricLabel="आज की कुल बिक्री"
         loading={daily.isLoading}
-        onPress={() => router.push('/reports/daily-summary')}
+        onPress={() => router.push('/reports/daily-summary' as Href<string>)}
       />
 
       <ReportCard
@@ -85,7 +85,7 @@ export default function ReportsScreen(): React.ReactElement {
         metric={outstandingCount}
         metricLabel="लंबित चालान"
         loading={outstanding.isLoading}
-        onPress={() => router.push('/reports/outstanding')}
+        onPress={() => router.push('/reports/outstanding' as Href<string>)}
       />
 
       <ReportCard
@@ -93,7 +93,7 @@ export default function ReportsScreen(): React.ReactElement {
         metric={topCustomer}
         metricLabel="सर्वाधिक खरीदार"
         loading={ltv.isLoading}
-        onPress={() => router.push('/reports/customer-ltv')}
+        onPress={() => router.push('/reports/customer-ltv' as Href<string>)}
       />
 
       <ReportCard
@@ -101,13 +101,13 @@ export default function ReportsScreen(): React.ReactElement {
         metric={loyaltyMembers}
         metricLabel="कुल सदस्य"
         loading={loyalty.isLoading}
-        onPress={() => router.push('/reports/loyalty-summary')}
+        onPress={() => router.push('/reports/loyalty-summary' as Href<string>)}
       />
 
       {/* GSTR export link */}
       <Pressable
         style={({ pressed }) => [styles.gstrCard, pressed && styles.viewBtnPressed]}
-        onPress={() => router.push('/reports/gstr-export')}
+        onPress={() => router.push('/reports/gstr-export' as Href<string>)}
         accessibilityRole="button"
         accessibilityLabel="GSTR रिपोर्ट निर्यात करें"
       >
