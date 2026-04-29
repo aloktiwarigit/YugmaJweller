@@ -19,6 +19,7 @@ const B2C_INVOICE = {
   customer_name: 'Ramesh Sharma', buyer_gstin: null, buyer_business_name: null,
   seller_state_code: '09', gst_treatment: 'CGST_SGST',
   subtotal_paise: 100000n, gst_metal_paise: 3000n, gst_making_paise: 600n, total_paise: 103600n,
+  tcs_collected_paise: 0n,
   cgst_metal_paise: 1500n, sgst_metal_paise: 1500n, cgst_making_paise: 300n, sgst_making_paise: 300n,
   igst_metal_paise: 0n, igst_making_paise: 0n,
   issued_at: new Date('2026-04-15T09:00:00Z'),

@@ -100,6 +100,7 @@ describe('InvoiceResponseSchema', () => {
       createdAt: '2026-04-25T00:00:00.000Z',
       updatedAt: '2026-04-25T00:00:00.000Z',
       lines: [],
+      tcsCollectedPaise: '0',
     };
     expect(() => InvoiceResponseSchema.parse(sample)).not.toThrow();
   });
