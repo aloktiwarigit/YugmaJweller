@@ -13,7 +13,7 @@ export interface InvoiceShareCelebrationProps {
   visible: boolean;
   invoiceNumber: string;
   totalFormatted: string;
-  onShare: () => void;
+  onShare: () => Promise<void>;
   onDismiss: () => void;
 }
 
@@ -48,15 +48,15 @@ export function InvoiceShareCelebration({
     });
   }, [visible]);
 
-  const handleShare = (): void => {
+  const handleShare = async (): Promise<void> => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-explicit-any
       const Haptics = require('expo-haptics') as any;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch { /* not available in test/web */ }
+    await onShare();
     setShared(true);
-    onShare();
   };
 
   const cardBg = shimmer.interpolate({
@@ -85,7 +85,7 @@ export function InvoiceShareCelebration({
           ) : (
             <Pressable
               style={({ pressed }) => [styles.shareBtn, pressed && styles.shareBtnPressed]}
-              onPress={handleShare}
+              onPress={() => void handleShare()}
               accessibilityRole="button"
               accessibilityLabel="WhatsApp पर Invoice भेजें"
               hitSlop={8}

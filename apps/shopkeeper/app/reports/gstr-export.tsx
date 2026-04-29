@@ -19,11 +19,11 @@ function formatMonthLabel(month: string): string {
   return new Intl.DateTimeFormat('hi-IN', { month: 'long', year: 'numeric' }).format(d);
 }
 
-// MVP scope: the CSV is shared as message text via React Native's Share API.
-// Receiver apps cap EXTRA_TEXT around 100 KB on Android, so very large months
-// will be truncated by the receiver. SHARE_TEXT_LIMIT_BYTES forces a clear
-// Hindi error in that case rather than silently producing a corrupt file.
-// Phase-4 follow-up: wire expo-file-system + expo-sharing to write the CSV
+// MVP: CSV is shared as plain text via React Native's Share API. The recipient
+// must save the text to a .csv file before uploading to the GST portal.
+// Android caps EXTRA_TEXT at ~100 KB; very large months will be truncated.
+// SHARE_TEXT_LIMIT_BYTES forces a clear Hindi error rather than a silent truncation.
+// Phase-4: wire expo-file-system + expo-sharing to write a real .csv file
 // to documentDirectory and pass a file URI to Sharing.shareAsync().
 const SHARE_TEXT_LIMIT_BYTES = 80 * 1024;
 
@@ -116,7 +116,7 @@ export default function GstrExportScreen(): JSX.Element {
       </View>
 
       <Text style={[styles.hint, styles.deva]}>
-        CSV फ़ाइल GST पोर्टल पर upload के लिए तैयार रहेगी।
+        CSV text share होगा। GST पोर्टल upload के लिए उसे .csv file में save करें।
       </Text>
     </View>
   );

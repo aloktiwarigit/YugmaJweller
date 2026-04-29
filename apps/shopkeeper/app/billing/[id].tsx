@@ -119,9 +119,10 @@ export default function InvoiceDetailScreen(): JSX.Element {
         visible={celebrationVisible}
         invoiceNumber={data.invoiceNumber}
         totalFormatted={paiseToRupees(data.totalPaise)}
-        onShare={() => {
-          if (!shareMutation.isPending) shareMutation.mutate();
-        }}
+        onShare={() => new Promise<void>((resolve, reject) => {
+          if (shareMutation.isPending) { resolve(); return; }
+          shareMutation.mutate(undefined, { onSuccess: () => resolve(), onError: (e) => reject(e) });
+        })}
         onDismiss={() => setCelebrationVisible(false)}
       />
 
