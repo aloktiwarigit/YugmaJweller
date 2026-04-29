@@ -37,7 +37,7 @@ export function LoyaltyRedeemSheet({ customerId, onRedeem, onClose }: Props): Re
     ? Math.floor(parsedPoints / 100)
     : 0;
 
-  function handleConfirm() {
+  function handleConfirm(): void {
     const raw = parseInt(pointsInput, 10);
     if (!pointsInput || Number.isNaN(raw) || raw <= 0) {
       setValidationError('कम से कम 1 अंक दर्ज करें');
