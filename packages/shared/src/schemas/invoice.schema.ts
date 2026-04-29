@@ -110,6 +110,8 @@ export const InvoiceResponseSchema = z.object({
   voidedAt:           z.string().datetime().nullable().optional(),
   voidedByUserId:     Uuid.nullable().optional(),
   voidReason:         z.string().nullable().optional(),
+  // TCS Section 206C(1D) — 1% collected when invoice total > Rs 2,00,000
+  tcsCollectedPaise:  PaiseString,
 });
 
 export type InvoiceItemResponse = z.infer<typeof InvoiceItemResponseSchema>;

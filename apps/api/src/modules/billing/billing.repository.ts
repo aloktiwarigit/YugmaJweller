@@ -34,6 +34,7 @@ export interface InvoiceRow {
   pan_key_id:          string | null;
   form60_encrypted:    Buffer | null;
   form60_key_id:       string | null;
+  tcs_collected_paise: bigint;
   voided_at:           Date | null;
   voided_by_user_id:   string | null;
   void_reason:         string | null;
@@ -92,6 +93,7 @@ export interface InsertInvoiceInput {
   panKeyId:            string | null;
   form60Encrypted:     Buffer | null;
   form60KeyId:         string | null;
+  tcsCollectedPaise:   bigint;
   items: Array<{
     productId:           string | null;
     description:         string;
@@ -130,6 +132,7 @@ const INVOICE_COLS = `
   igst_metal_paise, igst_making_paise,
   idempotency_key, issued_at, created_by_user_id,
   pan_ciphertext, pan_key_id, form60_encrypted, form60_key_id,
+  tcs_collected_paise,
   voided_at, voided_by_user_id, void_reason,
   created_at, updated_at
 `;
@@ -163,10 +166,11 @@ export class BillingRepository {
               cgst_metal_paise, sgst_metal_paise, cgst_making_paise, sgst_making_paise,
               igst_metal_paise, igst_making_paise,
               idempotency_key, issued_at, created_by_user_id,
-              pan_ciphertext, pan_key_id, form60_encrypted, form60_key_id)
+              pan_ciphertext, pan_key_id, form60_encrypted, form60_key_id,
+              tcs_collected_paise)
            VALUES (current_setting('app.current_shop_id')::uuid,
                    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-                   $18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
+                   $18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
            RETURNING ${INVOICE_COLS}`,
           [
             input.invoiceNumber, input.invoiceType,
@@ -179,6 +183,7 @@ export class BillingRepository {
             input.idempotencyKey, input.issuedAt, input.createdByUserId,
             input.panCiphertext, input.panKeyId,
             input.form60Encrypted, input.form60KeyId,
+            input.tcsCollectedPaise,
           ],
         );
         const invoice = invRes.rows[0]!;
