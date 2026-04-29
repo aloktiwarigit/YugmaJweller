@@ -28,6 +28,8 @@ import type { DeadStockProduct } from './inventory.dead-stock.service';
 import { StockMovementService } from './stock-movement.service';
 import { RecordMovementBodySchema } from '@goldsmith/shared';
 import type { RecordMovementBodyDto, StockMovementResponse } from '@goldsmith/shared';
+import { InventoryValuationService } from './inventory.valuation.service';
+import type { ValuationSummary } from './inventory.valuation.service';
 
 @Controller('/api/v1/inventory')
 export class InventoryController {
@@ -38,7 +40,17 @@ export class InventoryController {
     private readonly searchSvc: InventorySearchService,
     private readonly deadStockSvc: InventoryDeadStockService,
     private readonly stockMovementSvc: StockMovementService,
+    private readonly valuationSvc: InventoryValuationService,
   ) {}
+
+  @Get('/valuation')
+  @Roles('shop_admin', 'shop_manager')
+  async getValuation(
+    @TenantContextDec() ctx: TenantContext,
+  ): Promise<ValuationSummary> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.valuationSvc.computeValuation(ctx);
+  }
 
   @Get('/search')
   @Roles('shop_admin', 'shop_manager', 'shop_staff')

@@ -45,3 +45,6 @@ export { InvoiceLineItem } from './business/InvoiceLineItem';
 
 export { InvoiceShareCelebration } from './business/InvoiceShareCelebration';
 export type { InvoiceShareCelebrationProps } from './business/InvoiceShareCelebration';
+
+export { DailySummaryCard } from './business/DailySummaryCard';
+export type { DailySummaryCardProps } from './business/DailySummaryCard';

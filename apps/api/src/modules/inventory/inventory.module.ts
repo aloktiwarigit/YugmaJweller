@@ -22,6 +22,8 @@ import { InventoryDeadStockService } from './inventory.dead-stock.service';
 import { StockMovementService } from './stock-movement.service';
 import { StockMovementRepository } from './stock-movement.repository';
 import { SyncModule } from '../sync/sync.module';
+import { PricingModule } from '../pricing/pricing.module';
+import { InventoryValuationService } from './inventory.valuation.service';
 
 const QUEUE_NAME = 'inventory-bulk-import';
 
@@ -33,6 +35,7 @@ const QUEUE_NAME = 'inventory-bulk-import';
     SearchModule,
     SyncModule,
     BullModule.registerQueue({ name: 'search-indexer' }),
+    PricingModule,
   ],
   controllers: [InventoryController],
   exports: [InventoryService],
@@ -46,6 +49,7 @@ const QUEUE_NAME = 'inventory-bulk-import';
     InventoryDeadStockService,
     StockMovementService,
     StockMovementRepository,
+    InventoryValuationService,
     SearchIndexerProcessor,
     {
       provide: 'INVENTORY_REDIS',
