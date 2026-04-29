@@ -169,7 +169,10 @@ export class CrmController {
     @Body(new ZodValidationPipe(RequestDeletionDtoSchema)) dto: RequestDeletionDto,
   ): Promise<DeletionRequestResponse> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
-    const customer = await this.svc.getCustomer(ctx, id);
+    // Use getCustomerIncludingDeleted so that a retry on an already-requested
+    // customer still reaches softDeleteAtomic (which returns already_requested),
+    // rather than failing with a misleading 404 from the standard read path.
+    const customer = await this.dpdpaSvc.getCustomerIncludingDeleted(ctx, id);
     if (customer.name.trim() !== dto.confirmationName.trim()) {
       throw new BadRequestException({ code: 'crm.deletion.confirmation_mismatch', message: 'Confirmation name does not match the customer record' });
     }

@@ -32,10 +32,11 @@ function fakeRepo(overrides: Partial<DpdpaDeletionRepository> = {}): DpdpaDeleti
   } as unknown as DpdpaDeletionRepository;
 }
 
-function makeSvc(overrides: { repo?: DpdpaDeletionRepository; pool?: any; queue?: any } = {}): DpdpaDeletionService {
+function makeSvc(overrides: { repo?: DpdpaDeletionRepository; pool?: any; queue?: any; searchSvc?: any } = {}): DpdpaDeletionService {
   return new DpdpaDeletionService(
     overrides.pool ?? fakePool(),
     overrides.repo ?? fakeRepo(),
+    overrides.searchSvc ?? ({ removeFromIndex: vi.fn().mockResolvedValue(undefined) } as any),
     overrides.queue ?? fakeQueue(),
   );
 }

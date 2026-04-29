@@ -6,6 +6,8 @@ import { auditLog, AuditAction } from '@goldsmith/audit';
 import type { AuthenticatedTenantContext, TenantContext } from '@goldsmith/tenant-context';
 import { DpdpaDeletionRepository } from './dpdpa-deletion.repository';
 import type { DueForHardDelete } from './dpdpa-deletion.repository';
+import { CrmSearchService } from './crm-search.service';
+import { withTenantTx } from '@goldsmith/db';
 
 export interface RequestDeletionResponse {
   scheduledAt:  string;
@@ -27,7 +29,8 @@ export class DpdpaDeletionService {
 
   constructor(
     @Inject('PG_POOL') private readonly pool: Pool,
-    private readonly repo: DpdpaDeletionRepository,
+    @Inject(DpdpaDeletionRepository) private readonly repo: DpdpaDeletionRepository,
+    @Inject(CrmSearchService) private readonly searchSvc: CrmSearchService,
     @InjectQueue(DPDPA_HARD_DELETE_QUEUE) private readonly queue: Queue<HardDeleteJobData>,
   ) {}
 
@@ -42,6 +45,9 @@ export class DpdpaDeletionService {
     requestedBy: 'customer' | 'owner',
   ): Promise<RequestDeletionResponse> {
     const { scheduledAt, hardDeleteAt } = await this.repo.softDeleteAtomic(customerId, requestedBy);
+
+    // Remove from Meilisearch immediately so search results don't expose deleted customers.
+    void this.searchSvc.removeFromIndex(ctx.shopId, customerId).catch(() => undefined);
 
     void auditLog(this.pool, {
       action:      AuditAction.CRM_CUSTOMER_DELETION_REQUESTED,
@@ -77,6 +83,26 @@ export class DpdpaDeletionService {
       scheduledAt:  scheduledAt.toISOString(),
       hardDeleteAt: hardDeleteAt.toISOString(),
     };
+  }
+
+  /**
+   * Read a customer row regardless of deleted_at. Used by requestDeletion so
+   * that a confirmation-name check on an already-requested customer still works
+   * (the standard getCustomer path excludes deleted rows).
+   */
+  async getCustomerIncludingDeleted(ctx: TenantContext, id: string): Promise<{ name: string }> {
+    return withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query<{ id: string; name: string }>(
+        `SELECT id, name FROM customers WHERE id = $1 AND shop_id = current_setting('app.current_shop_id')::uuid`,
+        [id],
+      );
+      if (!r.rows[0]) {
+        const { NotFoundException } = await import('@nestjs/common');
+        throw new NotFoundException({ code: 'crm.customer_not_found' });
+      }
+      void ctx;
+      return r.rows[0];
+    });
   }
 
   /**

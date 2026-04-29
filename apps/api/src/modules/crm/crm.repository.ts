@@ -81,7 +81,8 @@ export class CrmRepository {
       if (input.notes !== undefined) add('notes', input.notes);
       if (sets.length === 0) return this.getCustomerById(id);
       sets.push(`updated_at = now()`); params.push(id);
-      const r = await tx.query<CustomerRow>(`UPDATE customers SET ${sets.join(', ')} WHERE id = $${i} AND shop_id = current_setting('app.current_shop_id')::uuid RETURNING *`, params);
+      // deleted_at IS NULL prevents writes to DPDPA-scrubbed rows during the 30-day grace period.
+      const r = await tx.query<CustomerRow>(`UPDATE customers SET ${sets.join(', ')} WHERE id = $${i} AND shop_id = current_setting('app.current_shop_id')::uuid AND deleted_at IS NULL RETURNING *`, params);
       return r.rows[0] ?? null;
     });
   }
