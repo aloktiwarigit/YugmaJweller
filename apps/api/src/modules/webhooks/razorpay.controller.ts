@@ -75,9 +75,10 @@ export class RazorpayWebhookController {
       const entity = paymentEntity?.['entity'] as Record<string, unknown> | undefined;
       const razorpayPaymentId = typeof entity?.['id'] === 'string' ? entity['id'] : '';
       const razorpayOrderId   = typeof entity?.['order_id'] === 'string' ? entity['order_id'] : '';
-      // notes.shopId is UNTRUSTED — kept only as a debugging hint in the job payload.
-      // The actual shopId used for DB writes is resolved inside confirmWebhookPayment
-      // by looking up the payments row via razorpay_order_id.
+      // notes.shopId was set by OUR server at initiateUpiPayment time and is
+      // conveyed back to us via Razorpay's signed webhook. It is used to arm the
+      // tenant GUC for the initial payment row lookup; confirmWebhookPayment then
+      // validates the found row's shop_id matches before any DML.
       const notes    = (entity?.['notes'] as Record<string, string> | undefined) ?? {};
       const shopIdHint = notes['shopId'] ?? '';
 

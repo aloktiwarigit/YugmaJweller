@@ -69,7 +69,8 @@ beforeEach(() => {
   mockWithTenantTx.mockImplementation(async (_pool: Pool, fn: (tx: { query: ReturnType<typeof vi.fn> }) => Promise<void>) => {
     const tx = {
       query: vi.fn().mockImplementation((sql: string) => {
-        if (sql.includes('SELECT id, status FROM invoices')) return Promise.resolve({ rows: [{ id: 'inv_001', status: 'ISSUED' }] });
+        if (sql.includes('FROM invoices WHERE id')) return Promise.resolve({ rows: [{ id: 'inv_001', status: 'ISSUED', total_paise: '10000000' }] });
+        if (sql.includes('SUM(amount_paise)')) return Promise.resolve({ rows: [{ paid: '0' }] });
         if (sql.includes('RETURNING id')) return Promise.resolve({ rows: [{ id: 'pay_new_001' }] });
         return Promise.resolve({ rows: [] });
       }),
@@ -96,7 +97,8 @@ describe('initiateUpiPayment', () => {
     const { svc } = await makeService({ adapter });
     mockWithTenantTx.mockClear();
     await expect(svc.initiateUpiPayment(CTX as Ctx, 'inv_001', 100000n)).rejects.toThrow('5xx');
-    expect(mockWithTenantTx).not.toHaveBeenCalled();
+    // withTenantTx called once for validation; NOT a second time for the payment insert.
+    expect(mockWithTenantTx).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -114,8 +116,10 @@ describe('confirmWebhookPayment', () => {
     const redis = makeRedis();
     (redis.set as ReturnType<typeof vi.fn>).mockResolvedValueOnce('OK');
     const pool = makePool();
-    pool.query.mockResolvedValueOnce({ rows: [{ id: 'pay_001', invoice_id: 'inv_001', shop_id: 'shop_001' }] });
-    pool._client.query.mockResolvedValue({ rows: [] });
+    pool._client.query.mockImplementation((sql: string) => {
+      if (sql.includes('SELECT id, invoice_id, shop_id')) return Promise.resolve({ rows: [{ id: 'pay_001', invoice_id: 'inv_001', shop_id: 'shop_001' }] });
+      return Promise.resolve({ rows: [] });
+    });
     const { svc } = await makeService({ pool: pool as unknown as ReturnType<typeof makePool>, redis });
     await svc.confirmWebhookPayment('pay_rzp', 'order_rzp', 'shop_001');
     const updateCalls = pool._client.query.mock.calls.filter(
@@ -148,8 +152,10 @@ describe('confirmWebhookPayment', () => {
     const redis = makeRedis();
     (redis.set as ReturnType<typeof vi.fn>).mockImplementation(async () => nxCount++ === 0 ? 'OK' : null);
     const pool = makePool();
-    pool.query.mockResolvedValue({ rows: [{ id: 'pay_001', invoice_id: 'inv_001', shop_id: 'shop_001' }] });
-    pool._client.query.mockResolvedValue({ rows: [] });
+    pool._client.query.mockImplementation((sql: string) => {
+      if (sql.includes('SELECT id, invoice_id, shop_id')) return Promise.resolve({ rows: [{ id: 'pay_001', invoice_id: 'inv_001', shop_id: 'shop_001' }] });
+      return Promise.resolve({ rows: [] });
+    });
     const { svc } = await makeService({ pool: pool as unknown as ReturnType<typeof makePool>, redis });
     await Promise.all([
       svc.confirmWebhookPayment('pay_001', 'order_001', 'shop_001'),
