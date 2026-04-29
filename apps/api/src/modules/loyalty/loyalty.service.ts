@@ -212,9 +212,9 @@ export class LoyaltyService {
 
   // Called from billing service within an existing transaction.
   // Must NOT create its own withTenantTx — operates on the passed-in tx.
-  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal; shopId from billing caller context
   async redeemPointsInTx(
     tx: PoolClient,
+    // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal; shopId from billing caller context
     shopId: string,
     params: { customerId: string; invoiceId: string; pointsToRedeem: number },
   ): Promise<void> {

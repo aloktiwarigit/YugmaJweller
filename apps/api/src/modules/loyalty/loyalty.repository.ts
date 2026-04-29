@@ -184,9 +184,9 @@ export class LoyaltyRepository {
     });
   }
 
-  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal; shopId from context
   async setTier(
     tx: TxLike,
+    // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal; shopId from context
     shopId: string,
     customerId: string,
     tier: string | null,
