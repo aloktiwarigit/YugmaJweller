@@ -1,6 +1,7 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import type { Pool } from 'pg';
 import type { Redis } from '@goldsmith/cache';
+import { trackEvent } from '@goldsmith/observability';
 import { FallbackChain } from '@goldsmith/rates';
 import type { PurityRates } from '@goldsmith/rates';
 import { AuditAction } from '@goldsmith/audit';
@@ -391,6 +392,7 @@ export class PricingService {
     this.redis.del(overrideRedisKey(ctx, dto.purity)).catch((e: unknown) =>
       this.logger.warn(`Override cache eviction failed: ${String(e)}`),
     );
+    trackEvent(ctx.shopId, 'rate_override.set');
   }
 
   // -------------------------------------------------------------------------

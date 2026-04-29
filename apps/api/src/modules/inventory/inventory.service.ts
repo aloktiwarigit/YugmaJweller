@@ -10,6 +10,7 @@ import { validateHuidFormat } from '@goldsmith/compliance';
 import type { CreateProductDto, UpdateProductDto, ProductResponse } from '@goldsmith/shared';
 import type { StoragePort } from '@goldsmith/integrations-storage';
 import { STORAGE_PORT } from '@goldsmith/integrations-storage';
+import { trackEvent } from '@goldsmith/observability';
 import { InventoryRepository } from './inventory.repository';
 import type { ProductRow, ListProductsFilter } from './inventory.repository';
 
@@ -193,6 +194,7 @@ export class InventoryService {
     }).catch(() => undefined);
 
     // TODO Epic 7: emit domain event inventory.product_published
+    trackEvent(ctx.shopId, 'product.published');
     return mapRow(row);
   }
 
