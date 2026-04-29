@@ -13,6 +13,7 @@ import type { Redis } from '@goldsmith/cache';
 import { computeProductPrice } from '@goldsmith/money';
 import {
   validateHuidPresence,
+  HuidExemptionCategory,
   ComplianceHardBlockError,
   enforcePanRequired,
   validatePanFormat,
@@ -256,6 +257,7 @@ export class BillingService {
       purity: string;
       net_weight_g: string;
       huid: string | null;
+      huid_exemption_category: 'none' | 'kundan_polki_jadau' | 'under_2g';
       status: string;
       category: string | null;
     } | null;
@@ -299,12 +301,13 @@ export class BillingService {
       }
     });
 
-    // 3. Compliance hard-block — uses PRODUCT's HUID, not the request's
+    // 3. Compliance hard-block — uses PRODUCT's HUID and exemption category, not the request's
     validateHuidPresence(
       dto.lines.map((line, i) => ({
         lineIndex: i,
         huid: line.huid ?? null,
         productHuidOnRecord: resolvedProducts[i]?.huid ?? null,
+        huidExemptionCategory: resolvedProducts[i]?.huid_exemption_category as HuidExemptionCategory | undefined,
       })),
     );
 

@@ -8,6 +8,7 @@ const weightString = z
 const METAL = z.enum(['GOLD', 'SILVER', 'PLATINUM']);
 const STATUS = z.enum(['IN_STOCK', 'SOLD', 'RESERVED', 'ON_APPROVAL', 'WITH_KARIGAR']);
 const HUID = z.string().regex(/^[A-Z0-9]{6}$/, 'HUID_FORMAT_INVALID');
+const HUID_EXEMPTION_CATEGORY = z.enum(['none', 'kundan_polki_jadau', 'under_2g']);
 
 const ProductBaseSchema = z.object({
   categoryId:               z.string().uuid().optional(),
@@ -20,6 +21,7 @@ const ProductBaseSchema = z.object({
   stoneDetails:             z.string().max(500).optional(),
   makingChargeOverridePct:  z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
   huid:                     HUID.optional(),
+  huidExemptionCategory:    HUID_EXEMPTION_CATEGORY.optional().default('none'),
   status:                   STATUS.optional().default('IN_STOCK'),
 });
 
@@ -62,6 +64,7 @@ export const ProductResponseSchema = z.object({
   stoneDetails:             z.string().nullable(),
   makingChargeOverridePct:  z.string().nullable(),
   huid:                     z.string().nullable(),
+  huidExemptionCategory:    HUID_EXEMPTION_CATEGORY,
   status:                   STATUS,
   quantity:                 z.number().int().nonnegative(),
   publishedAt:              z.string().nullable(),

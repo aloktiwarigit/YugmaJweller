@@ -18,6 +18,7 @@ export interface ProductRow {
   stone_details: string | null;
   making_charge_override_pct: string | null;
   huid: string | null;
+  huid_exemption_category: 'none' | 'kundan_polki_jadau' | 'under_2g';
   status: string;
   quantity: number;
   published_at: Date | null;
@@ -54,6 +55,7 @@ export interface ProductBillingRow {
   purity: string;
   net_weight_g: string;
   huid: string | null;
+  huid_exemption_category: 'none' | 'kundan_polki_jadau' | 'under_2g';
   status: string;
   category: string | null;
 }
@@ -71,7 +73,7 @@ export interface ValuationProductRow {
 const SELECT_COLS = `
   id, shop_id, category_id, sku, metal, purity,
   gross_weight_g, net_weight_g, stone_weight_g, stone_details,
-  making_charge_override_pct, huid, status, quantity,
+  making_charge_override_pct, huid, huid_exemption_category, status, quantity,
   published_at, published_by_user_id, created_by_user_id, created_at, updated_at
 `;
 
@@ -88,8 +90,8 @@ export class InventoryRepository {
         `INSERT INTO products
            (shop_id, category_id, sku, metal, purity,
             gross_weight_g, net_weight_g, stone_weight_g, stone_details,
-            making_charge_override_pct, huid, status, created_by_user_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+            making_charge_override_pct, huid, huid_exemption_category, status, created_by_user_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
          RETURNING ${SELECT_COLS}`,
         [
           input.shopId,
@@ -103,6 +105,7 @@ export class InventoryRepository {
           input.stoneDetails ?? null,
           input.makingChargeOverridePct ?? null,
           input.huid ?? null,
+          input.huidExemptionCategory ?? 'none',
           input.status ?? 'IN_STOCK',
           input.createdByUserId,
         ],
@@ -126,7 +129,8 @@ export class InventoryRepository {
   async getProductBillingRow(id: string): Promise<ProductBillingRow | null> {
     return withTenantTx(this.pool, async (tx) => {
       const r = await tx.query<ProductBillingRow>(
-        `SELECT p.id, p.shop_id, p.metal, p.purity, p.net_weight_g, p.huid, p.status,
+        `SELECT p.id, p.shop_id, p.metal, p.purity, p.net_weight_g,
+                p.huid, p.huid_exemption_category, p.status,
                 pc.name AS category
            FROM products p
            LEFT JOIN product_categories pc ON pc.id = p.category_id
@@ -190,8 +194,8 @@ export class InventoryRepository {
               `INSERT INTO products
                  (shop_id, category_id, sku, metal, purity,
                   gross_weight_g, net_weight_g, stone_weight_g, stone_details,
-                  making_charge_override_pct, huid, status, created_by_user_id)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+                  making_charge_override_pct, huid, huid_exemption_category, status, created_by_user_id)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
               [
                 row.shopId,
                 row.categoryId ?? null,
@@ -204,6 +208,7 @@ export class InventoryRepository {
                 row.stoneDetails ?? null,
                 row.makingChargeOverridePct ?? null,
                 row.huid ?? null,
+                row.huidExemptionCategory ?? 'none',
                 row.status ?? 'IN_STOCK',
                 row.createdByUserId,
               ],
@@ -270,7 +275,8 @@ export class InventoryRepository {
         grossWeightG: 'gross_weight_g', netWeightG: 'net_weight_g',
         stoneWeightG: 'stone_weight_g', stoneDetails: 'stone_details',
         makingChargeOverridePct: 'making_charge_override_pct',
-        huid: 'huid', status: 'status', categoryId: 'category_id',
+        huid: 'huid', huidExemptionCategory: 'huid_exemption_category',
+        status: 'status', categoryId: 'category_id',
       };
 
       for (const [key, col] of Object.entries(fieldMap)) {

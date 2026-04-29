@@ -28,6 +28,7 @@ function mapRow(row: ProductRow): ProductResponse {
     stoneDetails: row.stone_details,
     makingChargeOverridePct: row.making_charge_override_pct,
     huid: row.huid,
+    huidExemptionCategory: row.huid_exemption_category,
     status: row.status as ProductResponse['status'],
     quantity: row.quantity,
     publishedAt: row.published_at?.toISOString() ?? null,
@@ -100,7 +101,9 @@ export class InventoryService {
    */
   async getProductRowForBilling(id: string): Promise<{
     id: string; shop_id: string; metal: string; purity: string;
-    net_weight_g: string; huid: string | null; status: string; category: string | null;
+    net_weight_g: string; huid: string | null;
+    huid_exemption_category: 'none' | 'kundan_polki_jadau' | 'under_2g';
+    status: string; category: string | null;
   }> {
     const row = await this.repo.getProductBillingRow(id);
     if (!row) throw new NotFoundException({ code: 'inventory.product_not_found' });

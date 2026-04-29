@@ -4,10 +4,12 @@ import { router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { colors, spacing, typography } from '@goldsmith/ui-tokens';
 import { t } from '@goldsmith/i18n';
+import { HuidExemptionCategory } from '@goldsmith/compliance';
 import { WeightField } from '../../src/features/inventory/components/WeightField';
 import { MetalSelector } from '../../src/features/inventory/components/MetalSelector';
 import { PuritySelector } from '../../src/features/inventory/components/PuritySelector';
 import { HuidInput } from '../../src/features/inventory/components/HuidInput';
+import { HuidExemptionPicker } from '../../src/features/inventory/components/HuidExemptionPicker';
 import { api } from '../../src/api/client';
 
 type Metal = 'GOLD' | 'SILVER' | 'PLATINUM';
@@ -22,6 +24,7 @@ interface FormState {
   stoneDetails: string;
   makingChargeOverridePct: string;
   huid: string;
+  huidExemptionCategory: HuidExemptionCategory;
 }
 
 interface FormErrors {
@@ -56,6 +59,7 @@ export default function NewProductScreen(): React.ReactElement {
     sku: '', metal: undefined, purity: '',
     grossWeightG: '', netWeightG: '', stoneWeightG: '',
     stoneDetails: '', makingChargeOverridePct: '', huid: '',
+    huidExemptionCategory: HuidExemptionCategory.None,
   });
   const [errors, setErrors] = useState<FormErrors>({});
 
@@ -71,6 +75,7 @@ export default function NewProductScreen(): React.ReactElement {
         stoneDetails: data.stoneDetails || undefined,
         makingChargeOverridePct: data.makingChargeOverridePct || undefined,
         huid: data.huid || undefined,
+        huidExemptionCategory: data.huidExemptionCategory,
       });
       return res.data;
     },
@@ -139,6 +144,11 @@ export default function NewProductScreen(): React.ReactElement {
         value={form.huid}
         onChangeText={(v) => setForm((p) => ({ ...p, huid: v }))}
         error={errors.huid}
+      />
+
+      <HuidExemptionPicker
+        value={form.huidExemptionCategory}
+        onChange={(cat) => setForm((p) => ({ ...p, huidExemptionCategory: cat }))}
       />
 
       <Pressable
