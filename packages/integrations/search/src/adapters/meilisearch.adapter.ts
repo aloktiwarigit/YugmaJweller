@@ -7,6 +7,10 @@ import type {
   SearchResult,
   SearchHit,
   SearchFilters,
+  CustomerSearchDoc,
+  CustomerSearchQuery,
+  CustomerSearchResult,
+  CustomerSearchHit,
 } from '../search.port';
 import { MeilisearchUnavailableError } from '../search.port';
 
@@ -20,6 +24,22 @@ const JEWELLERY_SYNONYMS: Record<string, string[]> = {
   'चेन':         ['chain'],
 };
 
+// Hindi ↔ English transliterations for common Indian customer names
+const CUSTOMER_NAME_SYNONYMS: Record<string, string[]> = {
+  priya:     ['प्रिया'],
+  ramesh:    ['रमेश'],
+  sunita:    ['सुनीता'],
+  suresh:    ['सुरेश'],
+  geeta:     ['गीता'],
+  kavita:    ['कविता'],
+  'प्रिया': ['priya'],
+  'रमेश':   ['ramesh'],
+  'सुनीता': ['sunita'],
+  'सुरेश':  ['suresh'],
+  'गीता':   ['geeta'],
+  'कविता':  ['kavita'],
+};
+
 export class MeilisearchAdapter implements SearchPort {
   private readonly client: MeiliSearch;
   /** Tracks which indexes have already been configured to avoid repeated updateSettings calls. */
@@ -29,16 +49,20 @@ export class MeilisearchAdapter implements SearchPort {
     this.client = new MeiliSearch({ host: url, apiKey });
   }
 
-  // ── Index name ──────────────────────────────────────────────────────────────
+  // ── Index names ─────────────────────────────────────────────────────────────
 
   private indexName(shopId: string): string {
     return `shop_${shopId.replace(/-/g, '_')}_products`;
   }
 
+  private customerIndexName(shopId: string): string {
+    return `shop_${shopId.replace(/-/g, '_')}_customers`;
+  }
+
   // ── ensureIndex ─────────────────────────────────────────────────────────────
 
   /**
-   * Idempotently creates and configures the per-tenant index.
+   * Idempotently creates and configures the per-tenant product index.
    * Results are cached on the instance — a second call for the same shopId is a no-op.
    */
   private async ensureIndex(shopId: string): Promise<Index> {
@@ -67,7 +91,32 @@ export class MeilisearchAdapter implements SearchPort {
     return index;
   }
 
-  // ── SearchPort implementation ───────────────────────────────────────────────
+  private async ensureCustomerIndex(shopId: string): Promise<Index> {
+    const name = this.customerIndexName(shopId);
+
+    let index: Index;
+    try {
+      index = await this.client.getIndex(name);
+    } catch {
+      const task = await this.client.createIndex(name, { primaryKey: 'id' });
+      await this.client.waitForTask(task.taskUid);
+      index = await this.client.getIndex(name);
+    }
+
+    if (!this.configuredIndexes.has(name)) {
+      await index.updateSettings({
+        searchableAttributes: ['name', 'phoneLast4', 'city'],
+        filterableAttributes: ['city'],
+        sortableAttributes:   ['updatedAt'],
+        synonyms:             CUSTOMER_NAME_SYNONYMS,
+      });
+      this.configuredIndexes.add(name);
+    }
+
+    return index;
+  }
+
+  // ── Product SearchPort implementation ───────────────────────────────────────
 
   async indexProduct(shopId: string, product: ProductSearchDoc): Promise<void> {
     try {
@@ -102,6 +151,52 @@ export class MeilisearchAdapter implements SearchPort {
 
       return {
         hits:   response.hits as SearchHit[],
+        total:  response.estimatedTotalHits ?? 0,
+        source: 'meilisearch',
+      };
+    } catch (err) {
+      if (err instanceof MeilisearchUnavailableError) throw err;
+      throw new MeilisearchUnavailableError(err);
+    }
+  }
+
+  // ── Customer SearchPort implementation ──────────────────────────────────────
+
+  async indexCustomer(shopId: string, customer: CustomerSearchDoc): Promise<void> {
+    try {
+      const index = await this.ensureCustomerIndex(shopId);
+      await index.addDocuments([customer]);
+    } catch (err) {
+      if (err instanceof MeilisearchUnavailableError) throw err;
+      throw new MeilisearchUnavailableError(err);
+    }
+  }
+
+  async removeCustomer(shopId: string, customerId: string): Promise<void> {
+    try {
+      const index = await this.ensureCustomerIndex(shopId);
+      await index.deleteDocument(customerId);
+    } catch (err) {
+      if (err instanceof MeilisearchUnavailableError) throw err;
+      throw new MeilisearchUnavailableError(err);
+    }
+  }
+
+  async searchCustomers(shopId: string, query: CustomerSearchQuery): Promise<CustomerSearchResult> {
+    try {
+      const index = await this.ensureCustomerIndex(shopId);
+      const filter = query.city ? `city = "${query.city}"` : undefined;
+
+      const searchParams = {
+        limit:  query.limit,
+        offset: query.offset,
+        ...(filter !== undefined ? { filter } : {}),
+      };
+
+      const response = await index.search(query.q, searchParams);
+
+      return {
+        hits:   response.hits as CustomerSearchHit[],
         total:  response.estimatedTotalHits ?? 0,
         source: 'meilisearch',
       };

@@ -5,6 +5,10 @@ export type {
   SearchResult,
   SearchHit,
   SearchFilters,
+  CustomerSearchDoc,
+  CustomerSearchQuery,
+  CustomerSearchResult,
+  CustomerSearchHit,
 } from './search.port';
 export { MeilisearchUnavailableError, SEARCH_PORT } from './search.port';
 export { StubSearchAdapter } from './adapters/stub.adapter';

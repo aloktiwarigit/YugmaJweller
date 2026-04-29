@@ -43,10 +43,38 @@ export interface SearchResult {
   source: 'meilisearch' | 'postgres'; // callers use this for degraded-UX notice
 }
 
+export interface CustomerSearchDoc {
+  id:         string;
+  name:       string;
+  phoneLast4: string;  // last 4 digits only — never full phone in search index
+  city:       string | null;
+  updatedAt:  number;  // unix ms
+}
+
+export interface CustomerSearchQuery {
+  q:      string;
+  city?:  string;
+  limit:  number;
+  offset: number;
+}
+
+export interface CustomerSearchHit extends CustomerSearchDoc {
+  _score?: number;
+}
+
+export interface CustomerSearchResult {
+  hits:   CustomerSearchHit[];
+  total:  number;
+  source: 'meilisearch' | 'postgres';
+}
+
 export interface SearchPort {
   indexProduct(shopId: string, product: ProductSearchDoc): Promise<void>;
   removeProduct(shopId: string, productId: string): Promise<void>;
   search(shopId: string, query: SearchQuery): Promise<SearchResult>;
+  indexCustomer(shopId: string, customer: CustomerSearchDoc): Promise<void>;
+  removeCustomer(shopId: string, customerId: string): Promise<void>;
+  searchCustomers(shopId: string, query: CustomerSearchQuery): Promise<CustomerSearchResult>;
 }
 
 export class MeilisearchUnavailableError extends Error {

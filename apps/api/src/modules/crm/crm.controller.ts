@@ -4,10 +4,12 @@ import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext } from '@goldsmith/tenant-context';
 import { CreateCustomerSchema, UpdateCustomerSchema, CustomerListQuerySchema, LinkFamilySchema } from '@goldsmith/shared';
 import type { CreateCustomerDto, UpdateCustomerDto, CustomerResponse, LinkFamilyDto, FamilyMemberResponse } from '@goldsmith/shared';
+import type { CustomerSearchResult } from '@goldsmith/integrations-search';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { Inject } from '@nestjs/common';
 import { CrmService } from './crm.service';
+import { CrmSearchService } from './crm-search.service';
 import { FamilyService } from './family.service';
 import { HistoryService } from './history.service';
 import type { PurchaseHistoryResponse } from './history.service';
@@ -32,12 +34,13 @@ const AddOccasionSchema = z.object({
 @Controller('/api/v1/crm')
 export class CrmController {
   constructor(
-    @Inject(CrmService)       private readonly svc: CrmService,
-    @Inject(FamilyService)    private readonly familySvc: FamilyService,
-    @Inject(HistoryService)   private readonly historySvc: HistoryService,
-    @Inject(BalanceService)   private readonly balanceSvc: BalanceService,
-    @Inject(NotesService)     private readonly notesSvc: NotesService,
-    @Inject(OccasionsService) private readonly occasionsSvc: OccasionsService,
+    @Inject(CrmService)          private readonly svc: CrmService,
+    @Inject(CrmSearchService)    private readonly searchSvc: CrmSearchService,
+    @Inject(FamilyService)       private readonly familySvc: FamilyService,
+    @Inject(HistoryService)      private readonly historySvc: HistoryService,
+    @Inject(BalanceService)      private readonly balanceSvc: BalanceService,
+    @Inject(NotesService)        private readonly notesSvc: NotesService,
+    @Inject(OccasionsService)    private readonly occasionsSvc: OccasionsService,
   ) {}
 
   @Post('customers') @Roles('shop_admin', 'shop_manager', 'shop_staff')
@@ -50,6 +53,24 @@ export class CrmController {
   async listCustomers(@TenantContextDec() ctx: TenantContext, @Query(new ZodValidationPipe(CustomerListQuerySchema)) query: { q?: string; limit: number; offset: number }): Promise<{ customers: CustomerResponse[]; total: number }> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.svc.listCustomers(ctx, query.q, query.limit ?? 20, query.offset ?? 0);
+  }
+
+  // Must be registered before `customers/:id` to avoid "search" being parsed as a UUID
+  @Get('customers/search') @Roles('shop_admin', 'shop_manager', 'shop_staff')
+  async searchCustomers(
+    @TenantContextDec() ctx: TenantContext,
+    @Query('q') q: string,
+    @Query('city') city?: string,
+    @Query('limit') limitStr?: string,
+    @Query('offset') offsetStr?: string,
+  ): Promise<CustomerSearchResult> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.searchSvc.searchCustomers(ctx, {
+      q: q ?? '',
+      city,
+      limit:  Math.max(1, Math.min(parseInt(limitStr ?? '20', 10) || 20, 100)),
+      offset: Math.max(0, parseInt(offsetStr ?? '0', 10) || 0),
+    });
   }
 
   @Get('customers/:id') @Roles('shop_admin', 'shop_manager', 'shop_staff')

@@ -25,11 +25,14 @@ function fakeRepo(rows: Record<string, unknown>[] = []) {
   const row = rows[0] ?? baseCustomerRow();
   return { insertCustomer: vi.fn(async () => row), listCustomers: vi.fn(async () => ({ rows: rows.length ? rows : [row], total: rows.length || 1 })), getCustomerById: vi.fn(async () => row), updateCustomer: vi.fn(async () => row) } as unknown as CrmRepository;
 }
+function fakeSearchSvc() {
+  return { indexCustomer: vi.fn(async () => undefined), removeFromIndex: vi.fn(async () => undefined), searchCustomers: vi.fn(async () => ({ hits: [], total: 0, source: 'postgres' as const })) };
+}
 function makeSvc(overrides: { repo?: CrmRepository; pool?: any; kms?: any } = {}) {
   const pool = overrides.pool ?? fakePool();
   const kms = overrides.kms ?? fakeKms();
   const repo = overrides.repo ?? fakeRepo();
-  return new CrmService(pool as any, kms as any, repo);
+  return new CrmService(pool as any, kms as any, repo, fakeSearchSvc() as any);
 }
 function authCtx(role = 'shop_admin') { return { authenticated: true as const, shopId: SHOP, userId: USER, role } as any; }
 
