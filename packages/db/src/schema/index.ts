@@ -26,3 +26,4 @@ export * from './family-members';
 export * from './viewing-consent';
 export * from './customer-loyalty';
 export * from './loyalty-transactions';
+export * from './custom-orders';

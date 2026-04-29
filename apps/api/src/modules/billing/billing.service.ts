@@ -735,7 +735,6 @@ export class BillingService {
   // The custom order status is set to DELIVERED atomically.
   async convertCustomOrderToInvoice(
     orderId: string,
-    shopId: string,
   ): Promise<{ invoiceId: string; order: { id: string; status: string } }> {
     const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
 
@@ -772,7 +771,7 @@ export class BillingService {
       throw new UnprocessableEntityException({ code: 'custom_order.fully_paid_already' });
     }
 
-    const invoiceNumber = generateInvoiceNumber(shopId);
+    const invoiceNumber = generateInvoiceNumber(ctx.shopId);
 
     const result = await this.repo.insertInvoice({
       invoiceNumber,

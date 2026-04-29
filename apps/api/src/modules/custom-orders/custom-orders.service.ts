@@ -220,8 +220,7 @@ export class CustomOrdersService {
   ): Promise<void> {
     const payment = await this.paymentsAdapter.fetchPayment(razorpayPaymentId);
 
-    // nosemgrep: goldsmith.require-tenant-transaction
-    const client = await this.pool.connect();
+    const client = await this.pool.connect(); // nosemgrep: goldsmith.require-tenant-transaction
     try {
       await client.query('BEGIN');
       // nosemgrep: goldsmith.no-raw-shop-id-param

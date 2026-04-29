@@ -167,7 +167,7 @@ export class CustomOrdersController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{ invoiceId: string; orderId: string; status: string }> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
-    const result = await this.billing.convertCustomOrderToInvoice(id, ctx.shopId);
+    const result = await this.billing.convertCustomOrderToInvoice(id);
     return { invoiceId: result.invoiceId, orderId: result.order.id, status: result.order.status };
   }
 
