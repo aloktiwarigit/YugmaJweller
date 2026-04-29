@@ -19,6 +19,7 @@ import { InvoicePdfService } from './invoice-pdf.service';
 import { GstrExportService } from './gstr-export.service';
 import { ComplianceReportsController } from './compliance-reports.controller';
 import { ComplianceReportsService } from './compliance-reports.service';
+import { UrdService }        from './urd.service';
 import { CompliancePmlaProcessor } from '../../workers/compliance-pmla.processor';
 import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
 
@@ -42,6 +43,7 @@ import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
     InvoicePdfService,
     GstrExportService,
     ComplianceReportsService,
+    UrdService,
     CompliancePmlaProcessor,
     GstrExportProcessor,
     SettingsRepository,

@@ -35,3 +35,4 @@ candidates-cleared:
 tests-passing: 418/418
 typecheck: clean
 {"timestamp": "2026-04-26T15:15:00-04:00", "story": "5.7", "branch": "feat/story-5.7-razorpay-payments", "reviewer": "Claude Sonnet 4.6", "result": "passed", "findings": 5, "notes": "P1-VULN-1 FIXED: Stub adapter as prod default — added NODE_ENV=production guard that throws on startup. P1-VULN-2 FIXED: shopId from webhook notes was attacker-controlled — now derived from payments row via razorpay_order_id. P1-VULN-3 FIXED: confirmWebhookPayment ran outside RLS context — now sets tenant GUC before all DML. P1-VULN-4 FIXED: rawBody fallback to JSON.stringify silently broke HMAC — removed fallback, hard 500 if absent. P2-VULN-5 FIXED: verifyWebhookSignature compared UTF-8 strings (length oracle) — now compares raw 32-byte hex-decoded Buffers."}
+{"timestamp":"2026-04-26","story":"5.9","reviewer":"security-review-skill","result":"passed","findings":0}
