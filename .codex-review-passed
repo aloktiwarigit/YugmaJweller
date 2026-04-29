@@ -1,5 +1,1 @@
-story: huid-exemptions
-reviewed-at: 2026-04-29
-model: gpt-5.5
-findings: 1 P1 (conditional spread for undefined exemption on manual lines) — fixed
-verdict: PASSED
+codex-review-passed: feat/story-reports-dashboard — 2026-04-29 — 1 P1 fixed (IST date default), no other issues
