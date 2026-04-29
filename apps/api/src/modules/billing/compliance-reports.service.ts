@@ -14,9 +14,14 @@ export interface CtrReportResult {
   document: CtrDocument;
 }
 
+// JSON-serializable version of StrDocument — bigint converted to string for transport.
+export type StrTemplateJson = Omit<StrDocument, 'transactionAmountPaise'> & {
+  transactionAmountPaise: string;
+};
+
 export interface StrTemplateResult {
   text:     string;
-  template: StrDocument;
+  template: StrTemplateJson;
 }
 
 @Injectable()
@@ -230,6 +235,12 @@ export class ComplianceReportsService {
     });
 
     const text = renderStrText(template!);
-    return { text, template: template! };
+    return {
+      text,
+      template: {
+        ...template!,
+        transactionAmountPaise: template!.transactionAmountPaise.toString(),
+      },
+    };
   }
 }

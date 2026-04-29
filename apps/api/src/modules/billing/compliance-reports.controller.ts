@@ -1,10 +1,11 @@
 import { Controller, Get, Query, UnauthorizedException } from '@nestjs/common';
 import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext } from '@goldsmith/tenant-context';
-import type { CtrDocument, StrDocument } from '@goldsmith/compliance';
+import type { CtrDocument } from '@goldsmith/compliance';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { TenantWalkerRoute } from '../../common/decorators/tenant-walker-route.decorator';
 import { ComplianceReportsService } from './compliance-reports.service';
+import type { StrTemplateResult } from './compliance-reports.service';
 
 @Controller('/api/v1/billing')
 export class ComplianceReportsController {
@@ -40,7 +41,7 @@ export class ComplianceReportsController {
   @Roles('shop_admin')
   async getStrTemplate(
     @TenantContextDec() ctx: TenantContext,
-  ): Promise<{ text: string; template: StrDocument }> {
+  ): Promise<StrTemplateResult> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.reports.getStrTemplate();
   }
