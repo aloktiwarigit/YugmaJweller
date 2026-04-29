@@ -1,7 +1,7 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { OnEvent } from '@nestjs/event-emitter';
-import type { Queue } from 'bullmq';
+import type { Queue } from '@goldsmith/queue';
 
 // Emitted by BillingService.createInvoice after a successful issue.
 // goldValuePaise is serialized as string because BigInt is not JSON-safe.

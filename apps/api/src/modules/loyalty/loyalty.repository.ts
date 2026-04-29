@@ -56,11 +56,12 @@ export class LoyaltyRepository {
   // Upserts an aggregate row (creating with zero balance/lifetime if missing) and returns
   // the row WITH a row-level FOR UPDATE lock held until the surrounding transaction commits.
   // Caller must already be inside a withTenantTx; the lock prevents concurrent accrual races.
+  /* eslint-disable goldsmith/no-raw-shop-id-param */
   async lockOrCreateAggregate(
     tx: TxLike,
     shopId: string,
     customerId: string,
-  ): Promise<CustomerLoyaltyRow> {
+  ): Promise<CustomerLoyaltyRow> { /* eslint-enable goldsmith/no-raw-shop-id-param */
     // INSERT ... ON CONFLICT DO NOTHING is idempotent; we then SELECT FOR UPDATE.
     // Using the unique (shop_id, customer_id) constraint added in 0037.
     await tx.query(
@@ -84,6 +85,7 @@ export class LoyaltyRepository {
     return r.rows[0] as CustomerLoyaltyRow;
   }
 
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal; shopId from auth context
   async insertTransaction(tx: TxLike, shopId: string, input: InsertTransactionInput): Promise<LoyaltyTransactionRow> {
     const r = await tx.query(
       `INSERT INTO loyalty_transactions
@@ -107,6 +109,7 @@ export class LoyaltyRepository {
     return r.rows[0] as LoyaltyTransactionRow;
   }
 
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal; shopId from auth context
   async updateAggregate(tx: TxLike, shopId: string, input: AggregateUpdateInput): Promise<void> {
     await tx.query(
       `UPDATE customer_loyalty
@@ -151,6 +154,7 @@ export class LoyaltyRepository {
   // Defense-in-depth: explicit shop_id predicate in addition to RLS scope.
   // Mirrors family.repository.customerBelongsToShop — never trust RLS alone
   // at the service boundary.
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal; shopId from auth context
   async customerExists(shopId: string, customerId: string): Promise<boolean> {
     return withTenantTx(this.pool, async (tx) => {
       const r = await tx.query(

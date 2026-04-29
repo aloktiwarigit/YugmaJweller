@@ -24,3 +24,5 @@ export * from './customers';
 export * from './urd-purchases';
 export * from './family-members';
 export * from './viewing-consent';
+export * from './customer-loyalty';
+export * from './loyalty-transactions';

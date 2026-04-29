@@ -80,6 +80,7 @@ export class LoyaltyAccrualProcessor extends WorkerHost {
   // Workers run outside the HTTP request cycle and have no tenant context set
   // by the NestJS interceptor. Build a minimal unauthenticated context here so
   // LoyaltyService.tenantContext.requireCurrent() works.
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- BullMQ worker; shopId from job payload, verified at enqueueing time
   private async buildTenantCtx(shopId: string): Promise<TenantContext> {
     const r = await this.pool.query<{ id: string; slug: string; display_name: string; status: string }>(
       `SELECT id, slug, display_name, status FROM shops WHERE id = $1`,
