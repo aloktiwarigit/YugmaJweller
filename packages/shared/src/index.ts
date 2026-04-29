@@ -180,6 +180,8 @@ export {
   LinkFamilySchema,
   FamilyMemberResponseSchema,
   FAMILY_RELATIONSHIPS,
+  RequestDeletionDtoSchema,
+  DeletionRequestResponseSchema,
 } from './schemas/customer.schema';
 export type {
   CreateCustomerDto,
@@ -188,4 +190,6 @@ export type {
   CustomerResponse,
   LinkFamilyDto,
   FamilyMemberResponse,
+  RequestDeletionDto,
+  DeletionRequestResponse,
 } from './schemas/customer.schema';

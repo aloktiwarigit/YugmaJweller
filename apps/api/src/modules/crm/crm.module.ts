@@ -20,9 +20,12 @@ import { BalanceService } from './balance.service';
 import { NotesService } from './notes.service';
 import { OccasionsService } from './occasions.service';
 import { OccasionReminderProcessor } from '../../workers/occasion-reminder.processor';
+import { DpdpaDeletionService, DPDPA_HARD_DELETE_QUEUE } from './dpdpa-deletion.service';
+import { DpdpaDeletionRepository } from './dpdpa-deletion.repository';
+import { DpdpaHardDeleteProcessor } from '../../workers/dpdpa-hard-delete.processor';
 
-// Daily reminder check at 08:00 IST (UTC+5:30 = 02:30 UTC)
 const OCCASION_REMINDER_CRON = '30 2 * * *';
+const DPDPA_SWEEP_CRON       = '30 20 * * *';
 
 @Module({
   imports: [
@@ -30,6 +33,7 @@ const OCCASION_REMINDER_CRON = '30 2 * * *';
     BillingModule,
     SearchModule,
     BullModule.registerQueue({ name: 'occasion-reminder' }),
+    BullModule.registerQueue({ name: DPDPA_HARD_DELETE_QUEUE }),
   ],
   controllers: [CrmController],
   providers: [
@@ -41,6 +45,8 @@ const OCCASION_REMINDER_CRON = '30 2 * * *';
     NotesService,
     OccasionsService,
     OccasionReminderProcessor,
+    DpdpaDeletionService, DpdpaDeletionRepository,
+    DpdpaHardDeleteProcessor,
     {
       provide: 'KMS_ADAPTER',
       useFactory: () => {
@@ -55,17 +61,17 @@ const OCCASION_REMINDER_CRON = '30 2 * * *';
       },
     },
   ],
-  exports: [CrmService, CrmSearchService, FamilyService, NotesService, OccasionsService],
+  exports: [CrmService, CrmSearchService, FamilyService, NotesService, OccasionsService, DpdpaDeletionService],
 })
 export class CrmModule implements OnModuleInit {
   private readonly logger = new Logger(CrmModule.name);
 
   constructor(
-    @InjectQueue('occasion-reminder') private readonly occasionQueue: Queue,
+    @InjectQueue('occasion-reminder')        private readonly occasionQueue: Queue,
+    @InjectQueue(DPDPA_HARD_DELETE_QUEUE)    private readonly dpdpaQueue: Queue,
   ) {}
 
   async onModuleInit(): Promise<void> {
-    // Register repeatable daily-check job — best-effort: Redis may be transiently unavailable at boot
     try {
       await this.occasionQueue.upsertJobScheduler(
         'occasion-reminder-daily',
@@ -75,6 +81,17 @@ export class CrmModule implements OnModuleInit {
     } catch (err) {
       this.logger.warn(
         `Occasion reminder job scheduler could not be registered at boot — will retry on next restart: ${String(err)}`,
+      );
+    }
+    try {
+      await this.dpdpaQueue.upsertJobScheduler(
+        'dpdpa-sweep-daily',
+        { pattern: DPDPA_SWEEP_CRON, tz: 'Asia/Kolkata' },
+        { name: 'sweep' },
+      );
+    } catch (err) {
+      this.logger.warn(
+        `dpdpa sweep job scheduler could not be registered at boot — will retry on next restart: ${String(err)}`,
       );
     }
   }

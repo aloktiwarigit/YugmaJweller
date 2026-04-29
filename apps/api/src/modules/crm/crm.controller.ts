@@ -1,14 +1,17 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UnauthorizedException, ParseUUIDPipe } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, NotImplementedException, Param, Patch, Post, Query, UnauthorizedException, ParseUUIDPipe } from '@nestjs/common';
 import { z } from 'zod';
 import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext } from '@goldsmith/tenant-context';
-import { CreateCustomerSchema, UpdateCustomerSchema, CustomerListQuerySchema, LinkFamilySchema } from '@goldsmith/shared';
-import type { CreateCustomerDto, UpdateCustomerDto, CustomerResponse, LinkFamilyDto, FamilyMemberResponse } from '@goldsmith/shared';
+import { CreateCustomerSchema, UpdateCustomerSchema, CustomerListQuerySchema, LinkFamilySchema, RequestDeletionDtoSchema } from '@goldsmith/shared';
+import type { CreateCustomerDto, UpdateCustomerDto, CustomerResponse, LinkFamilyDto, FamilyMemberResponse, RequestDeletionDto, DeletionRequestResponse } from '@goldsmith/shared';
 import type { CustomerSearchResult } from '@goldsmith/integrations-search';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { SkipAuth } from '../../common/decorators/skip-auth.decorator';
+import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { Inject } from '@nestjs/common';
 import { CrmService } from './crm.service';
+import { DpdpaDeletionService } from './dpdpa-deletion.service';
 import { CrmSearchService } from './crm-search.service';
 import { FamilyService } from './family.service';
 import { HistoryService } from './history.service';
@@ -40,7 +43,8 @@ export class CrmController {
     @Inject(HistoryService)      private readonly historySvc: HistoryService,
     @Inject(BalanceService)      private readonly balanceSvc: BalanceService,
     @Inject(NotesService)        private readonly notesSvc: NotesService,
-    @Inject(OccasionsService)    private readonly occasionsSvc: OccasionsService,
+    @Inject(OccasionsService)        private readonly occasionsSvc: OccasionsService,
+    @Inject(DpdpaDeletionService)    private readonly dpdpaSvc: DpdpaDeletionService,
   ) {}
 
   @Post('customers') @Roles('shop_admin', 'shop_manager', 'shop_staff')
@@ -156,5 +160,33 @@ export class CrmController {
   async getBalance(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string): Promise<CustomerBalance> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.balanceSvc.getBalance(ctx, id);
+  }
+
+  @Post('customers/:id/request-deletion') @Roles('shop_admin')
+  async requestDeletion(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(RequestDeletionDtoSchema)) dto: RequestDeletionDto,
+  ): Promise<DeletionRequestResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    // Use getCustomerIncludingDeleted so that a retry on an already-requested
+    // customer still reaches softDeleteAtomic (which returns already_requested),
+    // rather than failing with a misleading 404 from the standard read path.
+    const customer = await this.dpdpaSvc.getCustomerIncludingDeleted(ctx, id);
+    if (customer.name.trim() !== dto.confirmationName.trim()) {
+      throw new BadRequestException({ code: 'crm.deletion.confirmation_mismatch', message: 'Confirmation name does not match the customer record' });
+    }
+    return this.dpdpaSvc.requestDeletion(ctx, id, dto.requestedBy);
+  }
+
+  @Post('customers/:id/restore-deletion') @Roles('shop_admin')
+  async restoreDeletion(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string): Promise<never> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.dpdpaSvc.restoreDeletion(ctx, id);
+  }
+
+  @Delete('customer/me') @SkipAuth() @SkipTenant()
+  customerSelfDelete(): never {
+    throw new NotImplementedException({ code: 'deletion.customer_app_not_yet_available', message: 'Self-deletion via the customer app launches in Epic 7.' });
   }
 }

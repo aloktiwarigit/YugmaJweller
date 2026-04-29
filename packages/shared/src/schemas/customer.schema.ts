@@ -56,3 +56,18 @@ export const FamilyMemberResponseSchema = z.object({
 });
 export type LinkFamilyDto        = z.infer<typeof LinkFamilySchema>;
 export type FamilyMemberResponse = z.infer<typeof FamilyMemberResponseSchema>;
+
+// Story 6.8 — DPDPA deletion request payload.
+// confirmationName is the customer's full name as stored — the OWNER must type
+// it back to confirm intent and prevent fat-finger deletion of the wrong row.
+export const RequestDeletionDtoSchema = z.object({
+  requestedBy:      z.enum(['customer', 'owner']),
+  confirmationName: z.string().min(1).max(200),
+});
+export type RequestDeletionDto = z.infer<typeof RequestDeletionDtoSchema>;
+
+export const DeletionRequestResponseSchema = z.object({
+  scheduledAt:  z.string(),
+  hardDeleteAt: z.string(),
+});
+export type DeletionRequestResponse = z.infer<typeof DeletionRequestResponseSchema>;

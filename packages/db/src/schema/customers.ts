@@ -23,4 +23,10 @@ export const customers = tenantScopedTable('customers', {
   createdByUserId: uuid('created_by_user_id').notNull(),
   createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:       timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  // Story 6.8 — DPDPA deletion lifecycle. PII is scrubbed at deletedAt;
+  // the row itself is hard-deleted at hardDeleteScheduledAt (30 days later).
+  deletedAt:              timestamp('deleted_at',                { withTimezone: true }),
+  hardDeleteScheduledAt:  timestamp('hard_delete_scheduled_at',  { withTimezone: true }),
+  piiRedactedAt:          timestamp('pii_redacted_at',           { withTimezone: true }),
+  deletionRequestedBy:    text('deletion_requested_by'),
 }, { encryptedColumns: ['panCiphertext'] });

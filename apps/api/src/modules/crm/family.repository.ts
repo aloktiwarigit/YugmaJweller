@@ -114,8 +114,10 @@ export class FamilyRepository {
 
   // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal tenant isolation check; shopId is always ctx.shopId from authenticated context
   async customerBelongsToShop(shopId: string, customerId: string): Promise<boolean> {
+    // Excludes DPDPA-soft-deleted customers (Story 6.8) so they cannot be
+    // linked to / fetched after their deletion has been requested.
     const r = await this.pool.query<{ exists: boolean }>(
-      `SELECT EXISTS(SELECT 1 FROM customers WHERE id = $1 AND shop_id = $2) AS exists`,
+      `SELECT EXISTS(SELECT 1 FROM customers WHERE id = $1 AND shop_id = $2 AND deleted_at IS NULL) AS exists`,
       [customerId, shopId],
     );
     return r.rows[0]?.exists ?? false;
