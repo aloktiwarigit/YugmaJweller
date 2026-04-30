@@ -32,6 +32,16 @@ export class AnalyticsService {
     }
 
     await this.withShopTx(params.shopId, async (tx) => {
+      // P2 fix: verify the product belongs to this shop before recording any view.
+      // Prevents cross-tenant pollution where caller supplies their shop_id but a
+      // different tenant's product_id.
+      const ownerCheck = await tx.query<{ id: string }>(
+        // nosemgrep: goldsmith.require-tenant-transaction
+        `SELECT id FROM products WHERE id = $1 AND shop_id = $2 LIMIT 1`,
+        [params.productId, params.shopId],
+      );
+      if (ownerCheck.rows.length === 0) return;
+
       if (params.customerId !== undefined) {
         const consent = await tx.query<{ consent_given: boolean }>(
           // nosemgrep: goldsmith.require-tenant-transaction
@@ -102,6 +112,7 @@ export class AnalyticsService {
     });
   }
 
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param
   private async withShopTx<T>(shopId: string, fn: (tx: PoolClient) => Promise<T>): Promise<T> {
     const client = await this.pool.connect();
     try {

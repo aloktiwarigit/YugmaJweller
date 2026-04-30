@@ -42,24 +42,11 @@ function TrendChart({ data, loading }: { data: ChartPoint[]; loading: boolean })
     if (w > 0) setSvgWidth(w);
   }, []);
 
-  if (loading) {
-    return (
-      <View style={styles.chartPlaceholder} testID="analytics-chart-loading">
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
-  }
-  if (data.length === 0) {
-    return (
-      <View style={styles.chartPlaceholder}>
-        <Text style={styles.emptyText}>डेटा उपलब्ध नहीं</Text>
-      </View>
-    );
-  }
-
+  // All hooks must be called unconditionally (Rules of Hooks) — compute derived
+  // values before any early return, even when loading or data is empty.
   const values = useMemo(() => data.map((d) => d.totalViews), [data]);
-  const minV = useMemo(() => Math.min(...values), [values]);
-  const maxV = useMemo(() => Math.max(...values) || 1, [values]);
+  const minV = useMemo(() => (values.length > 0 ? Math.min(...values) : 0), [values]);
+  const maxV = useMemo(() => (values.length > 0 ? Math.max(...values) : 1) || 1, [values]);
   const range = useMemo(() => maxV - minV || 1, [maxV, minV]);
 
   const chartW = svgWidth - PAD.left - PAD.right;
@@ -77,6 +64,21 @@ function TrendChart({ data, loading }: { data: ChartPoint[]; loading: boolean })
   );
 
   const polyline = useMemo(() => points.map((p) => `${p.x},${p.y}`).join(' '), [points]);
+
+  if (loading) {
+    return (
+      <View style={styles.chartPlaceholder} testID="analytics-chart-loading">
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+  if (data.length === 0) {
+    return (
+      <View style={styles.chartPlaceholder}>
+        <Text style={styles.emptyText}>डेटा उपलब्ध नहीं</Text>
+      </View>
+    );
+  }
 
   return (
     <View onLayout={onLayout} style={styles.chartWrapper} testID="analytics-chart-svg-container">

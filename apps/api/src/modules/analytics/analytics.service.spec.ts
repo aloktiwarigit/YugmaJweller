@@ -24,32 +24,54 @@ function makeService(pool: import('pg').Pool): AnalyticsService {
   return new AnalyticsService(pool);
 }
 
-// Helper: set up client to handle the full withShopTx + consent + dedup + INSERT sequence
-// Query call order: BEGIN, SET ROLE, SET shop_id, consent SELECT, dedup SELECT, INSERT, COMMIT, POISON (finally)
+// Helper: set up client to handle the full withShopTx + ownership + consent + dedup + INSERT sequence.
+// Query call order:
+//   1. BEGIN
+//   2. SET LOCAL ROLE
+//   3. SET LOCAL shop_id
+//   4. ownership SELECT (products WHERE id=$1 AND shop_id=$2)
+//   5. consent SELECT (only when customerId provided)
+//   6. dedup SELECT
+//   7. INSERT
+//   8. COMMIT
+//   POISON (finally block)
 function setupClientForInsert(
   client: ReturnType<typeof makeMockClient>,
-  opts: { consentRow?: { consent_given: boolean }; dedupRow?: { id: string } },
+  opts: { ownerRow?: { id: string }; consentRow?: { consent_given: boolean }; dedupRow?: { id: string } },
 ) {
   const q = client.query as Mock;
-  q.mockResolvedValueOnce(undefined)                                  // BEGIN
-   .mockResolvedValueOnce(undefined)                                  // SET LOCAL ROLE
-   .mockResolvedValueOnce(undefined)                                  // SET LOCAL shop_id
+  q.mockResolvedValueOnce(undefined)                                          // BEGIN
+   .mockResolvedValueOnce(undefined)                                          // SET LOCAL ROLE
+   .mockResolvedValueOnce(undefined)                                          // SET LOCAL shop_id
+   .mockResolvedValueOnce({ rows: opts.ownerRow ? [opts.ownerRow] : [{ id: PRODUCT }] }) // ownership SELECT
    .mockResolvedValueOnce({ rows: opts.consentRow ? [opts.consentRow] : [] }) // consent SELECT
    .mockResolvedValueOnce({ rows: opts.dedupRow   ? [opts.dedupRow]   : [] }) // dedup SELECT
-   .mockResolvedValueOnce(undefined)                                  // INSERT
-   .mockResolvedValueOnce(undefined)                                  // COMMIT
-   .mockRejectedValue(new Error('unexpected extra query call'));       // POISON (finally)
+   .mockResolvedValueOnce(undefined)                                          // INSERT
+   .mockResolvedValueOnce(undefined)                                          // COMMIT
+   .mockRejectedValue(new Error('unexpected extra query call'));               // POISON (finally)
 }
 
-// Anonymous view: no consent query (skipped), just dedup + INSERT
+// Anonymous view: no consent query (skipped), just ownership + dedup + INSERT
 function setupClientForAnonymous(client: ReturnType<typeof makeMockClient>) {
   const q = client.query as Mock;
-  q.mockResolvedValueOnce(undefined)      // BEGIN
-   .mockResolvedValueOnce(undefined)      // SET LOCAL ROLE
-   .mockResolvedValueOnce(undefined)      // SET LOCAL shop_id
-   .mockResolvedValueOnce({ rows: [] })   // dedup SELECT (no prior view)
-   .mockResolvedValueOnce(undefined)      // INSERT
-   .mockResolvedValueOnce(undefined)      // COMMIT
+  q.mockResolvedValueOnce(undefined)              // BEGIN
+   .mockResolvedValueOnce(undefined)              // SET LOCAL ROLE
+   .mockResolvedValueOnce(undefined)              // SET LOCAL shop_id
+   .mockResolvedValueOnce({ rows: [{ id: PRODUCT }] }) // ownership SELECT → passes
+   .mockResolvedValueOnce({ rows: [] })           // dedup SELECT (no prior view)
+   .mockResolvedValueOnce(undefined)              // INSERT
+   .mockResolvedValueOnce(undefined)              // COMMIT
+   .mockRejectedValue(new Error('unexpected extra query call')); // POISON
+}
+
+// Cross-tenant rejection: ownership check returns 0 rows → early return, no further queries.
+function setupClientForOwnershipFailure(client: ReturnType<typeof makeMockClient>) {
+  const q = client.query as Mock;
+  q.mockResolvedValueOnce(undefined)   // BEGIN
+   .mockResolvedValueOnce(undefined)   // SET LOCAL ROLE
+   .mockResolvedValueOnce(undefined)   // SET LOCAL shop_id
+   .mockResolvedValueOnce({ rows: [] }) // ownership SELECT → empty, short-circuit
+   .mockResolvedValueOnce(undefined)   // COMMIT (fn returns normally)
    .mockRejectedValue(new Error('unexpected extra query call')); // POISON
 }
 
@@ -58,13 +80,14 @@ function setupClientForDedupShortCircuit(
   client: ReturnType<typeof makeMockClient>,
 ) {
   const q = client.query as Mock;
-  q.mockResolvedValueOnce(undefined)                             // BEGIN
-   .mockResolvedValueOnce(undefined)                             // SET LOCAL ROLE
-   .mockResolvedValueOnce(undefined)                             // SET LOCAL shop_id
-   .mockResolvedValueOnce({ rows: [{ consent_given: true }] })   // consent SELECT → passes
-   .mockResolvedValueOnce({ rows: [{ id: SESSION }] })           // dedup SELECT → short-circuit here
-   .mockResolvedValueOnce(undefined)                             // COMMIT (fn returns normally, no throw)
-   .mockRejectedValue(new Error('unexpected extra query call')); // POISON
+  q.mockResolvedValueOnce(undefined)                               // BEGIN
+   .mockResolvedValueOnce(undefined)                               // SET LOCAL ROLE
+   .mockResolvedValueOnce(undefined)                               // SET LOCAL shop_id
+   .mockResolvedValueOnce({ rows: [{ id: PRODUCT }] })             // ownership SELECT → passes
+   .mockResolvedValueOnce({ rows: [{ consent_given: true }] })     // consent SELECT → passes
+   .mockResolvedValueOnce({ rows: [{ id: SESSION }] })             // dedup SELECT → short-circuit here
+   .mockResolvedValueOnce(undefined)                               // COMMIT (fn returns normally, no throw)
+   .mockRejectedValue(new Error('unexpected extra query call'));   // POISON
 }
 
 describe('AnalyticsService.recordView', () => {
@@ -131,6 +154,20 @@ describe('AnalyticsService.recordView', () => {
       (c: unknown[]) => typeof c[0] === 'string' && (c[0] as string).includes('INSERT INTO product_views'),
     );
     expect(insertCall).toBeDefined();
+  });
+
+  it('does NOT insert when product does not belong to the shop (cross-tenant guard)', async () => {
+    const client = makeMockClient();
+    setupClientForOwnershipFailure(client);
+    const svc = makeService(makePool(client));
+
+    // Supply a productId that doesn't belong to SHOP (ownership check will return 0 rows)
+    await svc.recordView({ shopId: SHOP, productId: PRODUCT, sessionId: SESSION });
+
+    const insertCall = (client.query as Mock).mock.calls.find(
+      (c: unknown[]) => typeof c[0] === 'string' && (c[0] as string).includes('INSERT INTO product_views'),
+    );
+    expect(insertCall).toBeUndefined();
   });
 });
 
