@@ -173,6 +173,7 @@ export class RateLockBookingsService {
 
   // Plain superuser pool read — explicit shop_id filter provides tenant isolation.
   // Called before withTenantTx in billing.service.ts; no PoolClient available yet.
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal; shopId from billing TenantContext caller
   async peekActiveLock(customerId: string, shopId: string): Promise<ActiveLockPeek | null> {
     const res = await this.pool.query<{ id: string; locked_rate_24k_paise_per_gram: bigint }>(
       `SELECT id, locked_rate_24k_paise_per_gram

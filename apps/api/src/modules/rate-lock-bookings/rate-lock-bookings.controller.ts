@@ -35,7 +35,7 @@ export class RateLockBookingsController {
 
   @Post()
   @Roles('shop_admin', 'shop_manager')
-  async createBooking(@Body() body: CreateBookingDto) {
+  async createBooking(@Body() body: CreateBookingDto): Promise<unknown> {
     return this.svc.createBooking({
       customerId:         body.customerId,
       depositAmountPaise: BigInt(body.depositAmountPaise),
@@ -47,13 +47,13 @@ export class RateLockBookingsController {
   async listBookings(
     @Query('customerId') customerId?: string,
     @Query('status') status?: string,
-  ) {
+  ): Promise<unknown> {
     return this.svc.listBookings({ customerId, status });
   }
 
   @Get(':id')
   @Roles('shop_admin', 'shop_manager', 'shop_staff')
-  async getBooking(@Param('id') id: string) {
+  async getBooking(@Param('id') id: string): Promise<unknown> {
     return this.svc.getBooking(id);
   }
 

@@ -90,6 +90,8 @@ module.exports = {
         '**/apps/api/src/modules/crm/crm.module.ts',
         'apps/api/src/modules/crm/dpdpa-deletion.service.ts',
         '**/apps/api/src/modules/crm/dpdpa-deletion.service.ts',
+        'apps/api/src/modules/rate-lock-bookings/rate-lock-bookings.module.ts',
+        '**/apps/api/src/modules/rate-lock-bookings/rate-lock-bookings.module.ts',
       ],
       rules: {
         'no-restricted-imports': ['error', {
