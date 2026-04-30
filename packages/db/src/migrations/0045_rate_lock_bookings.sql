@@ -26,8 +26,8 @@ ALTER TABLE rate_lock_bookings FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS rls_rate_lock_bookings_tenant_isolation ON rate_lock_bookings;
 CREATE POLICY rls_rate_lock_bookings_tenant_isolation ON rate_lock_bookings
   FOR ALL
-  USING      (shop_id = current_setting('app.current_shop_id')::uuid)
-  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
 
 REVOKE ALL ON rate_lock_bookings FROM app_user;
 GRANT SELECT, INSERT, UPDATE ON rate_lock_bookings TO app_user;
