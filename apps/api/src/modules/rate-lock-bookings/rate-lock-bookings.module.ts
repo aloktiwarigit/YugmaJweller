@@ -2,7 +2,7 @@ import { Module, OnModuleInit } from '@nestjs/common';
 import { BullModule, InjectQueue } from '@nestjs/bullmq';
 import { Redis } from '@goldsmith/cache';
 import { RazorpayAdapter, StubPaymentsAdapter } from '@goldsmith/integrations-payments';
-import type { Queue } from '@goldsmith/queue';
+import { Queue } from '@goldsmith/queue';
 import { AuthModule }    from '../auth/auth.module';
 import { PricingModule } from '../pricing/pricing.module';
 import { RateLockBookingsController } from './rate-lock-bookings.controller';

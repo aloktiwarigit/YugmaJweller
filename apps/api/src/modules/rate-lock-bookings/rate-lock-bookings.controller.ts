@@ -13,7 +13,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import type { PaymentsPort } from '@goldsmith/integrations-payments';
+import { PaymentsPort } from '@goldsmith/integrations-payments';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SkipAuth } from '../../common/decorators/skip-auth.decorator';
 import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
