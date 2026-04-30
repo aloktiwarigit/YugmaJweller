@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-native",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["nativewind/types", "node"],
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "app/**/*",
+    "src/**/*",
+    "test/**/*",
+    "app.config.ts",
+    "expo-env.d.ts"
+  ]
+}
