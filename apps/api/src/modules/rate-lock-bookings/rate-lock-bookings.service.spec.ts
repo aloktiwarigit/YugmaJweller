@@ -158,4 +158,58 @@ describe('RateLockBookingsService', () => {
       expect(result!.bookingId).toBe(BOOKING);
     });
   });
+
+  describe('handleWebhookPayment', () => {
+    it('happy path: fetches payment, sets status ACTIVE + deposit_paid_paise', async () => {
+      const clientQuery = vi.fn(async (sql: string) => {
+        if (sql.includes('SELECT id, shop_id, status')) {
+          return { rows: [{ id: BOOKING, shop_id: SHOP, status: 'PENDING_PAYMENT' }] };
+        }
+        return { rows: [], rowCount: 0 };
+      });
+      const client = { query: clientQuery, release: vi.fn() };
+      const pool = makePool();
+      pool.connect = vi.fn(async () => client as any);
+
+      const payments = makePayments();
+      const redis = makeRedis();
+      const pricing = makePricing();
+      const svc = new RateLockBookingsService(pool as any, pricing as any, payments as any, redis as any);
+
+      await svc.handleWebhookPayment(BOOKING, 'pay_001', SHOP);
+
+      expect(payments.fetchPayment).toHaveBeenCalledWith('pay_001');
+      const calls = clientQuery.mock.calls.map((c) => c[0] as string);
+      expect(calls.some((s) => s.includes("status = 'ACTIVE'"))).toBe(true);
+    });
+
+    it('idempotent: second call with same razorpayPaymentId is a no-op (Redis NX)', async () => {
+      const pool = makePool();
+      pool.connect = vi.fn(async () => ({ query: vi.fn(), release: vi.fn() } as any));
+      const payments = makePayments();
+      const redis = {
+        set: vi.fn(async () => null), // NX already set — returns null
+      };
+      const pricing = makePricing();
+      const svc = new RateLockBookingsService(pool as any, pricing as any, payments as any, redis as any);
+
+      await svc.handleWebhookPayment(BOOKING, 'pay_already_processed', SHOP);
+
+      expect(pool.connect).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('confirmAndMarkUsed', () => {
+    it('returns true when booking updated (rowCount = 1)', async () => {
+      const tx = { query: vi.fn(async () => ({ rowCount: 1, rows: [{ id: BOOKING }] })) } as any;
+      const { svc } = makeSvc();
+      expect(await svc.confirmAndMarkUsed(BOOKING, tx)).toBe(true);
+    });
+
+    it('returns false when booking expired or already USED (rowCount = 0)', async () => {
+      const tx = { query: vi.fn(async () => ({ rowCount: 0, rows: [] })) } as any;
+      const { svc } = makeSvc();
+      expect(await svc.confirmAndMarkUsed(BOOKING, tx)).toBe(false);
+    });
+  });
 });

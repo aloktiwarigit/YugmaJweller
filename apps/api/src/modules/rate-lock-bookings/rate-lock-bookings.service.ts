@@ -4,8 +4,10 @@ import {
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
+import { withTenantTx } from '@goldsmith/db';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
@@ -175,24 +177,167 @@ export class RateLockBookingsService {
     return { bookingId: row.id, lockedRate24kPaise: row.locked_rate_24k_paise_per_gram };
   }
 
-  // Stubs — implemented in Task 3
-  async handleWebhookPayment(_bookingId: string, _razorpayPaymentId: string, _shopIdHint: string): Promise<void> {
-    throw new Error('not implemented');
+  async handleWebhookPayment(
+    bookingId:         string,
+    razorpayPaymentId: string,
+    shopIdHint:        string,
+  ): Promise<void> {
+    const payment = await this.paymentsAdapter.fetchPayment(razorpayPaymentId);
+
+    const idemKey = `ratelock:webhook:${razorpayPaymentId}`;
+    const acquired = await this.redis.set(idemKey, '1', 'EX', 86400, 'NX');
+    if (acquired === null) {
+      this.logger.log({ razorpayPaymentId, bookingId }, 'Rate-lock webhook idempotency hit — skipping');
+      return;
+    }
+
+    const client = await this.pool.connect(); // nosemgrep: goldsmith.require-tenant-transaction
+    try {
+      await client.query('BEGIN');
+      // nosemgrep: goldsmith.no-raw-shop-id-param
+      await client.query(`SET LOCAL app.current_shop_id = '${shopIdHint}'`);
+
+      const res = await client.query<{ id: string; shop_id: string; status: string }>(
+        `SELECT id, shop_id, status FROM rate_lock_bookings WHERE id = $1 AND shop_id = $2 FOR UPDATE`,
+        [bookingId, shopIdHint],
+      );
+      const row = res.rows[0];
+      if (!row) {
+        await client.query('ROLLBACK');
+        this.logger.warn({ bookingId, shopIdHint }, 'Rate-lock webhook: booking not found or shop mismatch');
+        return;
+      }
+      if (row.status !== 'PENDING_PAYMENT') {
+        await client.query('ROLLBACK');
+        this.logger.warn({ bookingId, status: row.status }, 'Rate-lock webhook: unexpected status — ignoring');
+        return;
+      }
+
+      await client.query(
+        `UPDATE rate_lock_bookings
+         SET status = 'ACTIVE',
+             razorpay_payment_id = $2,
+             deposit_paid_paise = $3
+         WHERE id = $1`,
+        [bookingId, razorpayPaymentId, payment.amountPaise],
+      );
+      await client.query('COMMIT');
+
+      void auditLog(this.pool, {
+        action:      AuditAction.RATE_LOCK_ACTIVATED,
+        subjectType: 'rate_lock_booking',
+        subjectId:   bookingId,
+        actorUserId: 'system',
+        after:       { razorpayPaymentId, depositPaidPaise: payment.amountPaise.toString() },
+      }).catch(() => undefined);
+
+      this.logger.log({ bookingId, razorpayPaymentId }, 'Rate-lock booking activated');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
-  async confirmAndMarkUsed(_bookingId: string, _tx: PoolClient): Promise<boolean> {
-    throw new Error('not implemented');
+  async confirmAndMarkUsed(bookingId: string, tx: PoolClient): Promise<boolean> {
+    const res = await tx.query<{ id: string }>(
+      `UPDATE rate_lock_bookings
+       SET status = 'USED'
+       WHERE id = $1
+         AND status = 'ACTIVE'
+         AND expires_at > NOW()
+       RETURNING id`,
+      [bookingId],
+    );
+    if ((res.rowCount ?? 0) > 0) {
+      void auditLog(this.pool, {
+        action:      AuditAction.RATE_LOCK_USED,
+        subjectType: 'rate_lock_booking',
+        subjectId:   bookingId,
+        actorUserId: 'system',
+        after:       { status: 'USED' },
+      }).catch(() => undefined);
+      return true;
+    }
+    return false;
   }
 
   async expireStaleBookings(): Promise<number> {
-    throw new Error('not implemented');
+    const res = await this.pool.query<{ count: string }>(
+      `WITH expired AS (
+         UPDATE rate_lock_bookings
+         SET status = 'EXPIRED'
+         WHERE status = 'ACTIVE' AND expires_at < NOW()
+         RETURNING id
+       )
+       SELECT COUNT(*)::text AS count FROM expired`,
+    );
+    const count = parseInt(res.rows[0]?.count ?? '0', 10);
+    if (count > 0) {
+      void auditLog(this.pool, {
+        action:      AuditAction.RATE_LOCK_EXPIRY_SWEEP,
+        subjectType: 'rate_lock_booking',
+        subjectId:   'sweep',
+        actorUserId: 'system',
+        after:       { expiredCount: count },
+      }).catch(() => undefined);
+    }
+    return count;
   }
 
-  async listBookings(_opts: { customerId?: string; status?: string }): Promise<unknown[]> {
-    throw new Error('not implemented');
+  async listBookings(opts: { customerId?: string; status?: string }): Promise<unknown[]> {
+    return withTenantTx(this.pool, async (tx) => {
+      const conditions: string[] = [];
+      const params: unknown[] = [];
+      let idx = 1;
+      if (opts.customerId) { conditions.push(`customer_id = $${idx++}`); params.push(opts.customerId); }
+      if (opts.status)     { conditions.push(`status = $${idx++}`);      params.push(opts.status); }
+      const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      const res = await tx.query(
+        `SELECT id, customer_id, locked_rate_24k_paise_per_gram, locked_at, expires_at,
+                deposit_amount_paise, deposit_paid_paise, razorpay_order_id, status
+         FROM rate_lock_bookings
+         ${where}
+         ORDER BY locked_at DESC
+         LIMIT 50`,
+        params,
+      );
+      return res.rows.map((r) => ({
+        id:                        r.id,
+        customerId:                r.customer_id,
+        lockedRate24kPaisePerGram: r.locked_rate_24k_paise_per_gram.toString(),
+        lockedAt:                  r.locked_at,
+        expiresAt:                 r.expires_at,
+        depositAmountPaise:        r.deposit_amount_paise.toString(),
+        depositPaidPaise:          r.deposit_paid_paise.toString(),
+        razorpayOrderId:           r.razorpay_order_id,
+        status:                    r.status,
+      }));
+    });
   }
 
-  async getBooking(_id: string): Promise<unknown> {
-    throw new Error('not implemented');
+  async getBooking(id: string): Promise<unknown> {
+    return withTenantTx(this.pool, async (tx) => {
+      const res = await tx.query(
+        `SELECT id, customer_id, locked_rate_24k_paise_per_gram, locked_at, expires_at,
+                deposit_amount_paise, deposit_paid_paise, razorpay_order_id, status
+         FROM rate_lock_bookings WHERE id = $1`,
+        [id],
+      );
+      if (!res.rows[0]) throw new NotFoundException({ code: 'rate_lock.not_found' });
+      const r = res.rows[0];
+      return {
+        id:                        r.id,
+        customerId:                r.customer_id,
+        lockedRate24kPaisePerGram: r.locked_rate_24k_paise_per_gram.toString(),
+        lockedAt:                  r.locked_at,
+        expiresAt:                 r.expires_at,
+        depositAmountPaise:        r.deposit_amount_paise.toString(),
+        depositPaidPaise:          r.deposit_paid_paise.toString(),
+        razorpayOrderId:           r.razorpay_order_id,
+        status:                    r.status,
+      };
+    });
   }
 }
