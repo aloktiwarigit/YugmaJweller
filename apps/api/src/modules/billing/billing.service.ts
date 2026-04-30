@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Pool, PoolClient } from 'pg';
+import { withTenantTx } from '@goldsmith/db';
 import type { Redis } from '@goldsmith/cache';
 import { computeProductPrice } from '@goldsmith/money';
 import {
@@ -727,5 +728,124 @@ export class BillingService {
       };
     });
     return { invoices, total };
+  }
+
+  // Converts a custom order (status READY or IN_PROGRESS) to a final invoice.
+  // The invoice total = quotedAmountPaise - deposit_paid_paise (remaining balance).
+  // The custom order status is set to DELIVERED atomically.
+  async convertCustomOrderToInvoice(
+    orderId: string,
+  ): Promise<{ invoiceId: string; order: { id: string; status: string } }> {
+    const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
+
+    // Fetch the custom order (tenant-scoped via withTenantTx to arm GUC)
+    type CustomOrderFetchRow = {
+      id: string;
+      customer_id: string | null;
+      description: string;
+      quoted_amount_paise: bigint | null;
+      deposit_paid_paise: bigint;
+      status: string;
+    };
+    const order = await withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query<CustomOrderFetchRow>(
+        `SELECT id, customer_id, description, quoted_amount_paise, deposit_paid_paise, status
+         FROM custom_orders
+         WHERE id = $1
+           AND shop_id = current_setting('app.current_shop_id', true)::uuid`,
+        [orderId],
+      );
+      return r.rows[0];
+    });
+    if (!order) throw new NotFoundException({ code: 'custom_order.not_found' });
+
+    if (!['READY', 'IN_PROGRESS'].includes(order.status)) {
+      throw new UnprocessableEntityException({ code: 'custom_order.must_be_ready_to_convert' });
+    }
+    if (order.quoted_amount_paise == null) {
+      throw new UnprocessableEntityException({ code: 'custom_order.quoted_amount_required_for_invoice' });
+    }
+
+    const remainingPaise = order.quoted_amount_paise - order.deposit_paid_paise;
+    if (remainingPaise <= 0n) {
+      throw new UnprocessableEntityException({ code: 'custom_order.fully_paid_already' });
+    }
+
+    const invoiceNumber = generateInvoiceNumber(ctx.shopId);
+
+    const result = await this.repo.insertInvoice({
+      invoiceNumber,
+      invoiceType:       'B2C',
+      buyerGstin:        null,
+      buyerBusinessName: null,
+      sellerStateCode:   '09',
+      gstTreatment:      'CGST_SGST',
+      cgstMetalPaise:    0n,
+      sgstMetalPaise:    0n,
+      cgstMakingPaise:   0n,
+      sgstMakingPaise:   0n,
+      igstMetalPaise:    0n,
+      igstMakingPaise:   0n,
+      customerId:        order.customer_id,
+      customerName:      'Custom Order',
+      customerPhone:     null,
+      status:            'ISSUED',
+      subtotalPaise:     remainingPaise,
+      gstMetalPaise:     0n,
+      gstMakingPaise:    0n,
+      totalPaise:        remainingPaise,
+      idempotencyKey:    `co-invoice:${orderId}`,
+      issuedAt:          new Date(),
+      createdByUserId:   ctx.userId,
+      panCiphertext:     null,
+      panKeyId:          null,
+      form60Encrypted:   null,
+      form60KeyId:       null,
+      tcsCollectedPaise: 0n,
+      items: [
+        {
+          productId:          null,
+          description:        `Custom Order: ${order.description.slice(0, 200)}`,
+          hsnCode:            '7113',
+          huid:               null,
+          metalType:          null,
+          purity:             null,
+          netWeightG:         null,
+          ratePerGramPaise:   null,
+          makingChargePct:    null,
+          goldValuePaise:     remainingPaise,
+          makingChargePaise:  0n,
+          stoneChargesPaise:  0n,
+          hallmarkFeePaise:   0n,
+          gstMetalPaise:      0n,
+          gstMakingPaise:     0n,
+          lineTotalPaise:     remainingPaise,
+          sortOrder:          0,
+        },
+      ],
+    });
+
+    // Mark order DELIVERED (tenant-scoped)
+    await withTenantTx(this.pool, async (tx) => {
+      await tx.query(
+        `UPDATE custom_orders SET status = 'DELIVERED'
+         WHERE id = $1
+           AND shop_id = current_setting('app.current_shop_id', true)::uuid`,
+        [orderId],
+      );
+    });
+
+    void auditLog(this.pool, {
+      action:      AuditAction.CUSTOM_ORDER_CONVERTED,
+      subjectType: 'custom_order',
+      subjectId:   orderId,
+      actorUserId: ctx.userId,
+      after: {
+        invoiceId:      result.invoice.id,
+        remainingPaise: remainingPaise.toString(),
+      },
+    }).catch(() => undefined);
+
+    return { invoiceId: result.invoice.id, order: { id: orderId, status: 'DELIVERED' } };
   }
 }

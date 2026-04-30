@@ -28,6 +28,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { CustomOrdersModule } from './modules/custom-orders/custom-orders.module';
 import { DrizzleTenantLookup } from './drizzle-tenant-lookup';
 import { TenantAuditReporter } from './modules/tenant-boot/tenant-audit-reporter';
 
@@ -77,6 +78,7 @@ class ConditionalTenantInterceptor implements NestInterceptor {
     LoyaltyModule,
     ReportsModule,
     AnalyticsModule,
+    CustomOrdersModule,
   ],
   controllers: [HealthController],
   providers: [
