@@ -132,6 +132,7 @@ export class EstimateService {
     return rowToResponse(row);
   }
 
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal; shopId from TenantContext caller
   async getEstimate(id: string, shopId: string): Promise<EstimateResponse> {
     const row = await withTenantTx(this.pool, async (tx) => {
       const r = await tx.query<EstimateRow>(
@@ -167,6 +168,7 @@ export class EstimateService {
     return rows.map(rowToResponse);
   }
 
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal; shopId from TenantContext caller
   async expireEstimate(id: string, shopId: string): Promise<EstimateResponse> {
     const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
 
