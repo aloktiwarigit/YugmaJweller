@@ -98,6 +98,18 @@ export class RateLockBookingsService {
     );
     const rateLockDays = daysRow.rows[0]?.rate_lock_days ?? 1;
 
+    // Validate the customer belongs to this tenant before creating the booking.
+    // The FK on customer_id only proves the customer exists, not that it belongs to ctx.shopId.
+    if (dto.customerId) {
+      const ownerCheck = await this.pool.query<{ exists: boolean }>(
+        `SELECT EXISTS(SELECT 1 FROM customers WHERE id = $1 AND shop_id = $2) AS exists`,
+        [dto.customerId, ctx.shopId],
+      );
+      if (!ownerCheck.rows[0]?.exists) {
+        throw new BadRequestException({ code: 'customer.not_found_in_shop' });
+      }
+    }
+
     // Insert booking row
     const insertRes = await this.pool.query<{ id: string; expires_at: Date }>(
       `INSERT INTO rate_lock_bookings

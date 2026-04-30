@@ -105,6 +105,10 @@ export class RateLockBookingsController {
       await this.svc.handleWebhookPayment(bookingId, razorpayPaymentId, shopIdHint);
     } catch (err) {
       this.logger.error({ bookingId, razorpayPaymentId, err }, 'Rate-lock webhook processing failed');
+      // Re-throw so Razorpay receives a non-200 response and will retry delivery.
+      // Swallowing the error here would leave the booking in PENDING_PAYMENT permanently
+      // while Razorpay believes the webhook was successfully processed.
+      throw new InternalServerErrorException({ code: 'rate_lock.webhook_processing_failed' });
     }
 
     return { status: 'ok' };

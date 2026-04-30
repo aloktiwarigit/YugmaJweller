@@ -595,10 +595,9 @@ export class BillingService {
             if (hasRateLock) {
               const marked = await this.rateLockService!.confirmAndMarkUsed(rateLockPeek!.bookingId, tx);
               if (!marked) {
-                this.logger.warn(
-                  { bookingId: rateLockPeek!.bookingId },
-                  'Rate lock expired between peek and invoice commit',
-                );
+                // The lock expired or was consumed concurrently after peek. Abort the transaction
+                // so the invoice is not committed at the discounted locked rate without a valid booking.
+                throw new BadRequestException({ code: 'rate_lock.expired_or_consumed' });
               }
             }
           }
