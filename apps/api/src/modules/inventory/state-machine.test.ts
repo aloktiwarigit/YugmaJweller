@@ -9,11 +9,11 @@ import {
 
 describe('ProductStatus state machine', () => {
   describe('TRANSITIONS table', () => {
-    it('IN_STOCK can transition to RESERVED, ON_APPROVAL, WITH_KARIGAR, SOLD', () => {
+    it('IN_STOCK can transition to RESERVED, ON_APPROVAL, WITH_KARIGAR, SOLD, IN_TRY_AT_HOME', () => {
       expect(TRANSITIONS.IN_STOCK).toEqual(
-        expect.arrayContaining(['RESERVED', 'ON_APPROVAL', 'WITH_KARIGAR', 'SOLD']),
+        expect.arrayContaining(['RESERVED', 'ON_APPROVAL', 'WITH_KARIGAR', 'SOLD', 'IN_TRY_AT_HOME']),
       );
-      expect(TRANSITIONS.IN_STOCK).toHaveLength(4);
+      expect(TRANSITIONS.IN_STOCK).toHaveLength(5);
     });
 
     it('RESERVED can transition to IN_STOCK, ON_APPROVAL, SOLD', () => {

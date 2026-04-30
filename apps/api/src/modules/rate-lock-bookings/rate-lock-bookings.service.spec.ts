@@ -46,6 +46,10 @@ function makePool(opts: {
         }
         return { rows: [] };
       }
+      // customer ownership check
+      if (sql.includes('EXISTS') && sql.includes('customers')) {
+        return { rows: [{ exists: true }] };
+      }
       if (sql.includes('rate_lock_days')) {
         return { rows: [{ rate_lock_days: opts.rateLockDays ?? 3 }] };
       }
