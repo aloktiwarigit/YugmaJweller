@@ -29,6 +29,7 @@ CREATE TABLE rate_lock_bookings (
   locked_rate_24k_paise_per_gram  BIGINT NOT NULL,
   locked_at                       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   expires_at                      TIMESTAMPTZ NOT NULL,
+  deposit_amount_paise            BIGINT NOT NULL CHECK (deposit_amount_paise > 0),
   deposit_paid_paise              BIGINT NOT NULL DEFAULT 0,
   razorpay_order_id               TEXT,
   razorpay_payment_id             TEXT,
@@ -38,6 +39,10 @@ CREATE TABLE rate_lock_bookings (
 ```
 
 **`locked_rate_24k_paise_per_gram`** — IBJA 24K gold rate (paise/gram) at the moment the booking is created. Column name is intentionally explicit about which purity is stored. All other gold karat rates are derived proportionally at honor time.
+
+**`deposit_amount_paise`** — what the customer agreed to pay at booking creation time. Set once at INSERT, never updated.
+
+**`deposit_paid_paise`** — actual amount confirmed by Razorpay webhook. Starts at 0; set to `paymentsAdapter.fetchPayment().amountPaise` when `payment.captured` fires. Mirrors the custom-orders pattern.
 
 **`expires_at`** — computed at insert time as `locked_at + rate_lock_days * INTERVAL '1 day'` where `rate_lock_days` comes from `shop_settings`. Default to 1 day if `rate_lock_days` is NULL.
 
@@ -93,6 +98,7 @@ apps/api/src/modules/rate-lock-bookings/
 ```
 
 `RateLockBookingsModule` imports: `PricingModule`, `BullMQ queue('rate-lock-expiry')`.  
+`RateLockBookingsService` dependencies: `@Inject(DB_POOL)`, `@Inject(REDIS)`, `@Inject('PAYMENTS_ADAPTER') paymentsAdapter: PaymentsPort`, `PricingService`.  
 `BillingModule` imports `RateLockBookingsModule` as an optional peer (same as LoyaltyModule).
 
 ---
@@ -118,19 +124,34 @@ apps/api/src/modules/rate-lock-bookings/
 
 ### `handleWebhookPayment(bookingId, razorpayPaymentId, shopIdHint)`
 
-1. `withTenantTx` (GUC armed from `shopIdHint`).
-2. Redis NX: `SET ratelock:webhook:${razorpayPaymentId} 1 NX EX 86400` → no-op if already set (idempotency).
-3. `SELECT id, status, shop_id FROM rate_lock_bookings WHERE id = $1 FOR UPDATE`.
-4. Validate: row exists, `status = 'PENDING_PAYMENT'`, `shop_id` matches `shopIdHint`.
-5. `UPDATE SET status = 'ACTIVE', razorpay_payment_id = $1, deposit_paid_paise = <amount from Razorpay entity>`.
-6. `auditLog(AuditAction.RATE_LOCK_ACTIVATED, { bookingId, razorpayPaymentId })`.
+Uses manual `client.query('BEGIN/COMMIT')` (same pattern as `custom-orders.service.ts:handleRazorpayWebhook`):
+1. `const payment = await this.paymentsAdapter.fetchPayment(razorpayPaymentId)` — get confirmed amount.
+2. Redis NX: `SET ratelock:webhook:${razorpayPaymentId} 1 NX EX 86400` → return early if already set (idempotency).
+3. Open client, SET LOCAL GUC to `shopIdHint`, BEGIN.
+4. `SELECT id, status, shop_id FROM rate_lock_bookings WHERE id = $1 AND shop_id = $2 FOR UPDATE`.
+5. Validate: row exists, `status = 'PENDING_PAYMENT'`.
+6. `UPDATE SET status = 'ACTIVE', razorpay_payment_id = $1, deposit_paid_paise = $2`.
+7. COMMIT. `auditLog(AuditAction.RATE_LOCK_ACTIVATED, { bookingId, razorpayPaymentId })`.
 
-### `honorRateLockIfPresent(customerId, shopId, client: PoolClient): { lockedRate24kPaise: bigint; bookingId: string } | null`
+### Two-phase billing integration methods
 
-- Runs **inside** an already-open `PoolClient` (the billing tx). No new transaction.
-- `SELECT id, locked_rate_24k_paise_per_gram FROM rate_lock_bookings WHERE customer_id = $1 AND shop_id = $2 AND status = 'ACTIVE' AND expires_at > NOW() LIMIT 1 FOR UPDATE`
-- Returns `null` if no row found; returns `{ lockedRate24kPaise, bookingId }` otherwise.
-- Does NOT update status — caller (billing) does so atomically after invoice insert.
+Rate-lock billing integration requires two separate methods to avoid a TOCTOU problem: rate
+scaling must happen BEFORE line computation (outside `withTenantTx`), but the FOR UPDATE lock
+and status update must be INSIDE the invoice transaction.
+
+**`peekActiveLock(customerId, shopId): Promise<{ lockedRate24kPaise: bigint; bookingId: string } | null>`**
+- Plain `SELECT` on the platform pool (no PoolClient, no FOR UPDATE).
+- `SELECT id, locked_rate_24k_paise_per_gram FROM rate_lock_bookings WHERE customer_id = $1 AND shop_id = $2 AND status = 'ACTIVE' AND expires_at > NOW() LIMIT 1`
+- Called before step 4 (rate fetch) in `createInvoice`. Used only for rate scaling.
+- No lock acquired here — the FOR UPDATE happens in `confirmAndMarkUsed` inside the tx.
+
+**`confirmAndMarkUsed(bookingId, tx: PoolClient): Promise<boolean>`**
+- Runs **inside** the `withTenantTx` (invoice tx), after invoice INSERT.
+- `UPDATE rate_lock_bookings SET status = 'USED' WHERE id = $1 AND status = 'ACTIVE' AND expires_at > NOW()` → returns `rowCount > 0`.
+- If returns `false` (lock expired in the TOCTOU window): invoice is already committed at the
+  locked rate. For MVP, accept this outcome — the window is milliseconds and the customer-
+  favorable pricing is acceptable. Log a warning for observability.
+- Audit log `AuditAction.RATE_LOCK_USED` on success.
 
 ### `expireStaleBookings()`
 
@@ -145,35 +166,43 @@ WHERE status = 'ACTIVE' AND expires_at < NOW()
 
 ## Billing Integration (`billing.service.ts`)
 
-Insertion point: **after** step 3b1 (customer ownership check), **before** step 4 (rate fetch).
-
+Constructor addition:
 ```typescript
 @Optional() @Inject(RateLockBookingsService)
 private readonly rateLockService?: RateLockBookingsService,
 ```
 
-### Rate-scaling logic (inside `withTenantTx`, after invoice INSERT, before tx commit)
+### Two-phase integration — exact insertion points
+
+**Phase 1 — before step 4 (rate fetch):** `peekActiveLock` is a plain pool read; no tx needed.
 
 ```typescript
-// 1. Honor rate lock if present (runs inside tx — PoolClient passed in)
-const rateLockHonor = dto.customerId && this.rateLockService
-  ? await this.rateLockService.honorRateLockIfPresent(dto.customerId, ctx.shopId, tx)
+// After step 3b1 (customer ownership check), before step 4 (rate fetch):
+const rateLockPeek = dto.customerId && this.rateLockService
+  ? await this.rateLockService.peekActiveLock(dto.customerId, ctx.shopId)
   : null;
 
-// 2. Scale all GOLD_* purity rates proportionally
-const effectiveRates = rateLockHonor
-  ? applyRateLockScaling(rates, rateLockHonor.lockedRate24kPaise)
+// Step 4 — unchanged:
+const rates = await this.pricing.getCurrentRatesForTenant(ctx);
+
+// Step 4b — scale rates if locked:
+const effectiveRates = rateLockPeek
+  ? applyRateLockScaling(rates, rateLockPeek.lockedRate24kPaise)
   : rates;
+// All subsequent line computation uses effectiveRates (not rates).
+```
 
-// (lines computed using effectiveRates, not rates)
+**Phase 2 — inside `withTenantTx`, after invoice INSERT:**
 
-// 3. After invoice INSERT — mark booking USED (atomic, same tx)
-if (rateLockHonor) {
-  await tx.query(
-    `UPDATE rate_lock_bookings SET status = 'USED' WHERE id = $1`,
-    [rateLockHonor.bookingId],
-  );
-  await auditLog(tx, AuditAction.RATE_LOCK_USED, { bookingId: rateLockHonor.bookingId, invoiceId });
+```typescript
+// After invoice + items INSERT (step 8), before tx commit:
+if (rateLockPeek && this.rateLockService) {
+  const marked = await this.rateLockService.confirmAndMarkUsed(rateLockPeek.bookingId, tx);
+  if (!marked) {
+    // TOCTOU: lock expired between peek and commit (millisecond window).
+    // Invoice is committed at the locked rate — customer-favorable; acceptable for MVP.
+    this.logger.warn({ bookingId: rateLockPeek.bookingId }, 'Rate lock expired between peek and invoice commit');
+  }
 }
 ```
 
@@ -262,7 +291,7 @@ Controller: `RateLockBookingsController`, prefix `/api/v1/rate-lock/bookings`
 | Webhook for unknown bookingId | logged, 200 no-op | 200 |
 | Webhook replayed (Redis NX hit) | logged, 200 no-op | 200 |
 | Expired booking at honor time | `WHERE expires_at > NOW()` → returns null → live rates | — |
-| Walk-in invoice (no customerId) | `honorRateLockIfPresent` skipped | — |
+| Walk-in invoice (no customerId) | `peekActiveLock` skipped | — |
 | `current24k === 0n` in scaling | guard: fall back to live rates | — |
 
 ---
@@ -270,19 +299,22 @@ Controller: `RateLockBookingsController`, prefix `/api/v1/rate-lock/bookings`
 ## Test Plan
 
 ### Unit (`rate-lock-bookings.service.spec.ts`)
-1. `createBooking` — happy path: inserts row, creates Razorpay order, returns bookingId
+1. `createBooking` — happy path: inserts row with `deposit_amount_paise`, creates Razorpay order, returns bookingId
 2. `createBooking` — 409 when ACTIVE lock exists for same customer+shop
 3. `createBooking` — `depositAmountPaise <= 0` → 400
-4. `handleWebhookPayment` — idempotent: second call with same razorpayPaymentId is a no-op
-5. `honorRateLockIfPresent` — returns null when no ACTIVE lock
-6. `honorRateLockIfPresent` — returns locked rate when ACTIVE lock present and not expired
-7. `honorRateLockIfPresent` — returns null when lock exists but expires_at < NOW()
+4. `handleWebhookPayment` — idempotent: second call with same razorpayPaymentId is a no-op (Redis NX)
+5. `handleWebhookPayment` — happy path: `deposit_paid_paise` set from `paymentsAdapter.fetchPayment()`, status → ACTIVE
+6. `peekActiveLock` — returns null when no ACTIVE lock exists
+7. `peekActiveLock` — returns locked rate when ACTIVE lock present and not expired
+8. `peekActiveLock` — returns null when lock is ACTIVE but expires_at < NOW()
+9. `confirmAndMarkUsed` — returns true and sets status USED for valid ACTIVE non-expired booking
+10. `confirmAndMarkUsed` — returns false (no-op) when booking already expired or USED
 
 ### Integration (`billing.service.rate-lock.spec.ts`)
-1. Invoice at locked rate: `effectiveRates` contain scaled values; invoice totalPaise reflects locked rate
-2. Invoice after lock expiry: live rates used; booking remains ACTIVE (not USED)
-3. Invoice marks booking USED atomically: tx rollback leaves booking ACTIVE
-4. Walk-in invoice: `honorRateLockIfPresent` not called when `customerId` is null
+1. Invoice at locked rate: `applyRateLockScaling` output used; invoice totalPaise reflects locked rate
+2. Invoice after lock expiry (`peekActiveLock` returns null): live rates used; booking untouched
+3. `confirmAndMarkUsed` called atomically after insert: tx rollback leaves booking ACTIVE
+4. Walk-in invoice: `peekActiveLock` not called when `customerId` is null
 
 ### Webhook controller (`rate-lock-bookings.controller.spec.ts`)
 1. Missing signature → 401
@@ -321,4 +353,6 @@ apps/shopkeeper/src/features/rate-lock/
   CreateRateLockSheet.tsx                                        (new)
 ```
 
-**Do not touch:** TCS block, loyalty block, estimate-conversion block in `billing.service.ts`. Insert rate-lock honor AFTER the existing `honorRateLockIfPresent` placeholder comment position (after step 3b1, before step 4 rate fetch).
+**Do not touch:** TCS block, loyalty block, estimate-conversion block in `billing.service.ts`.
+- Phase 1 (`peekActiveLock` + `applyRateLockScaling`) inserts after step 3b1 and wraps the `rates` variable — add `effectiveRates` and replace all downstream `rates[purity]` references with `effectiveRates[purity]`.
+- Phase 2 (`confirmAndMarkUsed`) inserts inside `withTenantTx` after invoice INSERT, before tx commit — same location as loyalty `redeemPointsInTx`.
