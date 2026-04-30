@@ -1,1 +1,1 @@
-security-review-passed: 2026-04-29. Zero findings. TCS server-side only, parameterized SQL, no new attack surface.
+passed 2026-04-30T20:54:29Z
