@@ -180,7 +180,7 @@ describe('RateLockBookingsService', () => {
 
       expect(payments.fetchPayment).toHaveBeenCalledWith('pay_001');
       const calls = clientQuery.mock.calls.map((c) => c[0] as string);
-      expect(calls.some((s) => s.includes("status = 'ACTIVE'"))).toBe(true);
+      expect(calls.some((s) => /status\s*=\s*'ACTIVE'/.test(s))).toBe(true);
     });
 
     it('idempotent: second call with same razorpayPaymentId is a no-op (Redis NX)', async () => {

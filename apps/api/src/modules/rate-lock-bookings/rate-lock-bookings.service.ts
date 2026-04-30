@@ -182,6 +182,12 @@ export class RateLockBookingsService {
     razorpayPaymentId: string,
     shopIdHint:        string,
   ): Promise<void> {
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(shopIdHint)) {
+      this.logger.warn({ shopIdHint }, 'Rate-lock webhook: invalid shopIdHint format — rejecting');
+      return;
+    }
+
     const payment = await this.paymentsAdapter.fetchPayment(razorpayPaymentId);
 
     const idemKey = `ratelock:webhook:${razorpayPaymentId}`;
@@ -194,6 +200,7 @@ export class RateLockBookingsService {
     const client = await this.pool.connect(); // nosemgrep: goldsmith.require-tenant-transaction
     try {
       await client.query('BEGIN');
+      await client.query('SET LOCAL ROLE app_user');
       // nosemgrep: goldsmith.no-raw-shop-id-param
       await client.query(`SET LOCAL app.current_shop_id = '${shopIdHint}'`);
 
@@ -215,11 +222,12 @@ export class RateLockBookingsService {
 
       await client.query(
         `UPDATE rate_lock_bookings
-         SET status = 'ACTIVE',
+         SET status              = 'ACTIVE',
              razorpay_payment_id = $2,
-             deposit_paid_paise = $3
-         WHERE id = $1`,
-        [bookingId, razorpayPaymentId, payment.amountPaise],
+             deposit_paid_paise  = $3
+         WHERE id = $1
+           AND shop_id = $4`,
+        [bookingId, razorpayPaymentId, payment.amountPaise, shopIdHint],
       );
       await client.query('COMMIT');
 
