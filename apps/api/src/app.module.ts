@@ -29,6 +29,7 @@ import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { CustomOrdersModule } from './modules/custom-orders/custom-orders.module';
+import { TryAtHomeBookingsModule } from './modules/try-at-home-bookings/try-at-home-bookings.module';
 import { DrizzleTenantLookup } from './drizzle-tenant-lookup';
 import { TenantAuditReporter } from './modules/tenant-boot/tenant-audit-reporter';
 
@@ -79,6 +80,7 @@ class ConditionalTenantInterceptor implements NestInterceptor {
     ReportsModule,
     AnalyticsModule,
     CustomOrdersModule,
+    TryAtHomeBookingsModule,
   ],
   controllers: [HealthController],
   providers: [

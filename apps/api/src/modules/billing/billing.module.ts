@@ -91,6 +91,6 @@ import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
       inject: ['BILLING_REDIS'],
     },
   ],
-  exports: [PaymentService, 'PAYMENTS_ADAPTER'],
+  exports: [BillingService, PaymentService, 'PAYMENTS_ADAPTER'],
 })
 export class BillingModule {}

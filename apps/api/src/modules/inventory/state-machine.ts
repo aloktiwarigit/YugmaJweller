@@ -5,14 +5,16 @@ export type ProductStatus =
   | 'SOLD'
   | 'RESERVED'
   | 'ON_APPROVAL'
-  | 'WITH_KARIGAR';
+  | 'WITH_KARIGAR'
+  | 'IN_TRY_AT_HOME';
 
 export const TRANSITIONS: Record<ProductStatus, ProductStatus[]> = {
-  IN_STOCK:     ['RESERVED', 'ON_APPROVAL', 'WITH_KARIGAR', 'SOLD'],
-  RESERVED:     ['IN_STOCK', 'ON_APPROVAL', 'SOLD'],
-  ON_APPROVAL:  ['IN_STOCK', 'RESERVED', 'SOLD'],
-  WITH_KARIGAR: ['IN_STOCK'],
-  SOLD:         [],
+  IN_STOCK:        ['RESERVED', 'ON_APPROVAL', 'WITH_KARIGAR', 'SOLD', 'IN_TRY_AT_HOME'],
+  RESERVED:        ['IN_STOCK', 'ON_APPROVAL', 'SOLD'],
+  ON_APPROVAL:     ['IN_STOCK', 'RESERVED', 'SOLD'],
+  WITH_KARIGAR:    ['IN_STOCK'],
+  SOLD:            [],
+  IN_TRY_AT_HOME:  ['IN_STOCK', 'SOLD'],
 };
 
 export function isValidTransition(from: ProductStatus, to: ProductStatus): boolean {
