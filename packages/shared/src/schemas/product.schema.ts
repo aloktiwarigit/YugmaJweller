@@ -6,7 +6,7 @@ const weightString = z
   .refine((v) => parseFloat(v) > 0, 'WEIGHT_MUST_BE_POSITIVE');
 
 const METAL = z.enum(['GOLD', 'SILVER', 'PLATINUM']);
-const STATUS = z.enum(['IN_STOCK', 'SOLD', 'RESERVED', 'ON_APPROVAL', 'WITH_KARIGAR']);
+const STATUS = z.enum(['IN_STOCK', 'SOLD', 'RESERVED', 'ON_APPROVAL', 'WITH_KARIGAR', 'IN_TRY_AT_HOME']);
 const HUID = z.string().regex(/^[A-Z0-9]{6}$/, 'HUID_FORMAT_INVALID');
 const HUID_EXEMPTION_CATEGORY = z.enum(['none', 'kundan_polki_jadau', 'under_2g']);
 
