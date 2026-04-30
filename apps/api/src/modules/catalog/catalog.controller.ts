@@ -1,7 +1,8 @@
-import { Controller, Get, Header, Headers, HttpException, HttpStatus, Inject } from '@nestjs/common';
+import { Body, Controller, Get, Header, Headers, HttpCode, HttpException, HttpStatus, Inject, Ip, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { SkipAuth } from '../../common/decorators/skip-auth.decorator';
 import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
 import { PricingService } from '../pricing/pricing.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 import { RatesUnavailableError } from '@goldsmith/rates';
 
 // ---------------------------------------------------------------------------
@@ -42,7 +43,12 @@ function toPublicEntry(paise: bigint, fetchedAt: Date): PublicRateEntry {
 
 @Controller('/api/v1/catalog')
 export class CatalogController {
-  constructor(@Inject(PricingService) private readonly pricingService: PricingService) {}
+  private readonly viewRateCache = new Map<string, true>();
+
+  constructor(
+    @Inject(PricingService) private readonly pricingService: PricingService,
+    @Inject(AnalyticsService) private readonly analyticsService: AnalyticsService,
+  ) {}
 
   // TODO Epic 7: implement full catalog with search + filters
   @Get('products')
@@ -81,5 +87,37 @@ export class CatalogController {
       }
       throw err;
     }
+  }
+
+  /**
+   * POST /api/v1/catalog/products/:id/view
+   * Public — no auth or tenant context required.
+   * Rate-limited per IP+product: max 1 event per 60s (in-memory Map).
+   * Consent gate and 30s session dedup enforced in AnalyticsService.
+   */
+  @Post('products/:id/view')
+  @HttpCode(204)
+  @SkipAuth()
+  @SkipTenant()
+  async recordProductView(
+    @Param('id', new ParseUUIDPipe()) productId: string,
+    @Headers('x-tenant-id') shopId: string,
+    @Ip() ip: string,
+    @Body() body: { sessionId?: string; customerId?: string; durationSeconds?: number },
+  ): Promise<void> {
+    if (!shopId || !body.sessionId) return;
+
+    const rateCacheKey = `${ip}:${productId}`;
+    if (this.viewRateCache.has(rateCacheKey)) return;
+    this.viewRateCache.set(rateCacheKey, true);
+    setTimeout(() => this.viewRateCache.delete(rateCacheKey), 60_000);
+
+    void this.analyticsService.recordView({
+      shopId,
+      productId,
+      customerId: body.customerId,
+      sessionId: body.sessionId,
+      durationSeconds: body.durationSeconds,
+    }).catch(() => undefined);
   }
 }
