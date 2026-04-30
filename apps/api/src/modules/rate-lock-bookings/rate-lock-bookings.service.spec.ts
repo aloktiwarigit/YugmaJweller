@@ -137,7 +137,7 @@ describe('RateLockBookingsService', () => {
         .rejects.toThrow('razorpay timeout');
       // Verify DELETE was called with the booking id
       const deleteCalls = (pool.query as ReturnType<typeof vi.fn>).mock.calls.filter(
-        ([sql]: [string]) => sql.includes('DELETE FROM rate_lock_bookings'),
+        (args: unknown[]) => typeof args[0] === 'string' && args[0].includes('DELETE FROM rate_lock_bookings'),
       );
       expect(deleteCalls.length).toBe(1);
       expect(deleteCalls[0][1]).toEqual([BOOKING]);

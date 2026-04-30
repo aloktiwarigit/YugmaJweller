@@ -10,6 +10,7 @@ import { AuthModule }      from '../auth/auth.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { PricingModule }   from '../pricing/pricing.module';
 import { LoyaltyModule }   from '../loyalty/loyalty.module';
+import { RateLockBookingsModule } from '../rate-lock-bookings/rate-lock-bookings.module';
 import { SettingsRepository } from '../settings/settings.repository';
 import { BillingController } from './billing.controller';
 import { BillingService }    from './billing.service';
@@ -33,6 +34,7 @@ import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
     InventoryModule,
     PricingModule,
     LoyaltyModule,
+    RateLockBookingsModule,
     StorageModule,
     BullModule.registerQueue({ name: 'compliance-pmla' }),
     BullModule.registerQueue({ name: 'gstr-export' }),
