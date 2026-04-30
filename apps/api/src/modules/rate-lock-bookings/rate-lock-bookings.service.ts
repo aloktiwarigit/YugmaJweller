@@ -42,7 +42,7 @@ export function applyRateLockScaling(
     const entry = (rates as unknown as Record<string, { perGramPaise: bigint; fetchedAt: Date }>)[purity];
     (scaled as unknown as Record<string, { perGramPaise: bigint; fetchedAt: Date }>)[purity] = {
       ...entry,
-      perGramPaise: (entry.perGramPaise * lockedRate24kPaise) / current24k,
+      perGramPaise: (entry.perGramPaise * lockedRate24kPaise + current24k / 2n) / current24k,
     };
   }
   return scaled;
@@ -71,10 +71,13 @@ export class RateLockBookingsService {
       throw new BadRequestException({ code: 'rate_lock.deposit_amount_required' });
     }
 
-    // One active lock per customer+shop
+    // One active/pending lock per customer+shop (blocks duplicate PENDING_PAYMENT at app layer;
+    // the DB unique index uq_rate_lock_bookings_one_active remains the definitive ACTIVE guard)
     const conflict = await this.pool.query<{ id: string }>(
       `SELECT id FROM rate_lock_bookings
-       WHERE customer_id = $1 AND shop_id = $2 AND status = 'ACTIVE' AND expires_at > NOW()
+       WHERE customer_id = $1 AND shop_id = $2
+         AND status IN ('ACTIVE', 'PENDING_PAYMENT')
+         AND expires_at > NOW()
        LIMIT 1`,
       [dto.customerId, ctx.shopId],
     );
@@ -103,18 +106,29 @@ export class RateLockBookingsService {
     );
     const booking = insertRes.rows[0]!;
 
-    // Create Razorpay order
-    const order = await this.paymentsAdapter.createOrder({
-      amountPaise: dto.depositAmountPaise,
-      currency:    'INR',
-      receiptId:   `rl-${booking.id.slice(0, 8)}`,
-      notes: {
-        shopId:     ctx.shopId,
-        bookingId:  booking.id,
-        customerId: dto.customerId,
-        type:       'rate_lock_deposit',
-      },
-    });
+    // Create Razorpay order; clean up the booking row if this fails so we don't leave
+    // a dangling PENDING_PAYMENT row with no order ID.
+    let order: { orderId: string; amountPaise: bigint };
+    try {
+      order = await this.paymentsAdapter.createOrder({
+        amountPaise: dto.depositAmountPaise,
+        currency:    'INR',
+        receiptId:   `rl-${booking.id.slice(0, 8)}`,
+        notes: {
+          shopId:     ctx.shopId,
+          bookingId:  booking.id,
+          customerId: dto.customerId,
+          type:       'rate_lock_deposit',
+        },
+      });
+    } catch (err) {
+      // Best-effort cleanup — ignore secondary failure so original error propagates
+      await this.pool.query(
+        `DELETE FROM rate_lock_bookings WHERE id = $1`,
+        [booking.id],
+      ).catch(() => undefined);
+      throw err;
+    }
 
     await this.pool.query(
       `UPDATE rate_lock_bookings SET razorpay_order_id = $1 WHERE id = $2`,

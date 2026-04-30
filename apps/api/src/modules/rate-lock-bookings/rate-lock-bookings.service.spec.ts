@@ -32,9 +32,17 @@ function makePool(opts: {
 } = {}) {
   return {
     query: vi.fn(async (sql: string) => {
-      if (sql.includes('SELECT id') && sql.includes("status = 'ACTIVE'")) {
+      // peekActiveLock: selects locked_rate_24k_paise_per_gram column
+      if (sql.includes('locked_rate_24k_paise_per_gram') && !sql.includes('INSERT')) {
         if (opts.activeBooking) {
           return { rows: [{ id: BOOKING, locked_rate_24k_paise_per_gram: 700_000n }] };
+        }
+        return { rows: [] };
+      }
+      // conflict check: SELECT id with status IN ('ACTIVE', 'PENDING_PAYMENT')
+      if (sql.includes('SELECT id') && sql.includes('status IN')) {
+        if (opts.activeBooking) {
+          return { rows: [{ id: BOOKING }] };
         }
         return { rows: [] };
       }
@@ -120,6 +128,19 @@ describe('RateLockBookingsService', () => {
       const { svc } = makeSvc();
       await expect(svc.createBooking({ customerId: CUSTOMER, depositAmountPaise: 0n }))
         .rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('deletes dangling booking row when Razorpay createOrder fails', async () => {
+      const { svc, pool, payments } = makeSvc();
+      payments.createOrder.mockRejectedValueOnce(new Error('razorpay timeout'));
+      await expect(svc.createBooking({ customerId: CUSTOMER, depositAmountPaise: 50_000n }))
+        .rejects.toThrow('razorpay timeout');
+      // Verify DELETE was called with the booking id
+      const deleteCalls = (pool.query as ReturnType<typeof vi.fn>).mock.calls.filter(
+        ([sql]: [string]) => sql.includes('DELETE FROM rate_lock_bookings'),
+      );
+      expect(deleteCalls.length).toBe(1);
+      expect(deleteCalls[0][1]).toEqual([BOOKING]);
     });
   });
 
