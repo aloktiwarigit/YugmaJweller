@@ -178,9 +178,8 @@ describe('BillingService rate-lock integration', () => {
     const svc = makeSvc(makeRateLockSvc(true), makeRepo((r) => { capturedRate = r; }));
     await svc.createInvoice(invoiceDto as any, 'idem-rl-001');
     // GOLD_22K live = 641_667, locked24k = 630_000, current24k = 700_000
-    // scaled = round((641_667 × 630_000) / 700_000) = 577_500 (or similar rounded value)
-    expect(capturedRate).toBeLessThan(641_667n); // must be lower than live rate
-    expect(capturedRate).toBeGreaterThan(0n);
+    // scaled = (641_667 × 630_000 + 350_000) / 700_000 = 404_250_560_000 / 700_000 = 577_500
+    expect(capturedRate).toBe(577_500n);
   });
 
   it('uses live rate when no active lock exists', async () => {
