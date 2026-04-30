@@ -52,6 +52,7 @@ import { PricingService } from '../pricing/pricing.service';
 import { SettingsRepository } from '../settings/settings.repository';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { EstimateService } from './estimate.service';
+import { RateLockBookingsService, applyRateLockScaling } from '../rate-lock-bookings/rate-lock-bookings.service';
 
 // Re-export so consumers can import from billing module without needing @goldsmith/compliance
 export { ComplianceHardBlockError };
@@ -182,6 +183,7 @@ export class BillingService {
     @Optional() @Inject(EventEmitter2) private readonly events?: EventEmitter2,
     @Optional() @Inject(LoyaltyService) private readonly loyaltyService?: LoyaltyService,
     @Optional() @Inject(EstimateService) private readonly estimateService?: EstimateService,
+    @Optional() @Inject(RateLockBookingsService) private readonly rateLockService?: RateLockBookingsService,
   ) {}
 
   private async resolveMakingChargePct(
@@ -352,6 +354,11 @@ export class BillingService {
       }
     }
 
+    // Rate-lock peek — plain pool read; explicit shop_id filter provides tenant isolation
+    const rateLockPeek = dto.customerId != null && this.rateLockService != null
+      ? await this.rateLockService.peekActiveLock(dto.customerId, ctx.shopId)
+      : null;
+
     // 3c. B2B GSTIN validation
     let normalizedGstin: string | null = null;
     let gstTreatment: 'CGST_SGST' | 'IGST' = 'CGST_SGST';
@@ -372,6 +379,9 @@ export class BillingService {
 
     // 4. Fetch live tenant rates (with override applied)
     const rates = await this.pricing.getCurrentRatesForTenant(ctx);
+    const effectiveRates = rateLockPeek != null
+      ? applyRateLockScaling(rates, rateLockPeek.lockedRate24kPaise)
+      : rates;
 
     // 5. Resolve making charges per line (settings cache → DB fallback → 12% hardcoded default).
     // DTO override wins; absent DTO value + productId → look up shop settings by category.
@@ -404,7 +414,7 @@ export class BillingService {
       const purity    = product ? toPurityKey(product.purity) : toPurityKey(input.purity ?? '');
       const netWeightG = product ? product.net_weight_g : (input.netWeightG ?? null);
 
-      if (!purity || !(purity in rates)) {
+      if (!purity || !(purity in effectiveRates)) {
         throw new BadRequestException({
           code: 'invoice.purity_required',
           lineIndex: i,
@@ -417,7 +427,7 @@ export class BillingService {
         });
       }
 
-      const ratePerGramPaise = (rates as unknown as Record<string, { perGramPaise: bigint }>)[purity].perGramPaise;
+      const ratePerGramPaise = (effectiveRates as unknown as Record<string, { perGramPaise: bigint }>)[purity].perGramPaise;
       const effectiveMakingPct = effectiveMakingPcts[i];
 
       const computed = computeProductPrice({
@@ -572,13 +582,24 @@ export class BillingService {
         })),
       };
 
-      const onAfterInsert = willRedeem
+      const hasRateLock = rateLockPeek != null && this.rateLockService != null;
+      const onAfterInsert = (willRedeem || hasRateLock)
         ? async (tx: PoolClient, invoiceId: string) => {
-            await this.loyaltyService!.redeemPointsInTx(tx, ctx.shopId, {
-              customerId:     dto.customerId!,
-              invoiceId,
-              pointsToRedeem: loyaltyPointsToRedeem,
-            });
+            if (willRedeem) {
+              await this.loyaltyService!.redeemPointsInTx(tx, ctx.shopId, {
+                customerId:     dto.customerId!,
+                invoiceId,
+                pointsToRedeem: loyaltyPointsToRedeem,
+              });
+            }
+            if (hasRateLock) {
+              const marked = await this.rateLockService!.confirmAndMarkUsed(rateLockPeek!.bookingId, tx);
+              if (!marked) {
+                // The lock expired or was consumed concurrently after peek. Abort the transaction
+                // so the invoice is not committed at the discounted locked rate without a valid booking.
+                throw new BadRequestException({ code: 'rate_lock.expired_or_consumed' });
+              }
+            }
           }
         : undefined;
 

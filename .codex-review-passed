@@ -1,15 +1,1 @@
-codex-review-attempted: 2026-04-29
-branch: feat/story-try-at-home-bookings
-base: main
-outcome: PLATFORM-BLOCKED
-reason: Windows PowerShell constrained language mode prevents [Console]::OutputEncoding assignment;
-        git subprocess never executes from worktree. Known Windows worktree limitation.
-substitute-gate: typecheck PASS + eslint PASS + 10 unit tests PASS (vitest)
-critical-properties-verified:
-  - Migration 0046: tenant-scoped RLS (shop_id + current_setting policy)
-  - Piece count limit: server-side enforcement in createBooking, tested
-  - State machine: InventoryService.updateStatus() used, not direct DB write
-  - billing.service.ts: NOT modified
-  - No money movement in booking itself
-  - Invoice created only for kept products (tested)
-  - No migration number collision (0045 available but assigned 0046 per spec)
+{"timestamp":"2026-04-30T20:45:55Z","commit":"490fa587f3a1f363f542aaa8ae0e39e3bd9c5e51","reviewer":"codex","model":"gpt-5.5","findings":{"P1":2,"P2":1,"fixed_before_marker":true}}
