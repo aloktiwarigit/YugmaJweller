@@ -39,7 +39,7 @@ export function CreateRateLockSheet({
   const [error, setError]                 = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: rates, isLoading: ratesLoading } = useQuery<RatesResponse>({
+  const { data: rates, isLoading: ratesLoading, isError: ratesError } = useQuery<RatesResponse>({
     queryKey: ['current-rates'],
     queryFn: () =>
       api.get<RatesResponse>('/api/v1/rates/current').then((r) => r.data),
@@ -96,14 +96,18 @@ export function CreateRateLockSheet({
 
           {ratesLoading ? (
             <ActivityIndicator color="#B8860B" style={styles.loader} />
-          ) : live24kRupees != null ? (
+          ) : ratesError || live24kRupees == null ? (
+            <Text style={styles.rateErrorText} accessibilityRole="alert">
+              दर लोड नहीं हो सकी। बुकिंग जारी रखने के लिए पुनः प्रयास करें।
+            </Text>
+          ) : (
             <View style={styles.rateBox}>
               <Text style={styles.rateLabel}>आज की 24K सोने की दर</Text>
               <Text style={styles.rateValue}>
                 ₹{live24kRupees.toLocaleString('en-IN')}/g
               </Text>
             </View>
-          ) : null}
+          )}
 
           <Text style={styles.inputLabel}>जमा राशि (₹)</Text>
           <TextInput
@@ -200,6 +204,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   errorText:         { color: '#DC2626', fontSize: 14, marginBottom: 12 },
+  rateErrorText:     { color: '#DC2626', fontSize: 14, marginBottom: 16, textAlign: 'center' },
   submitBtn: {
     backgroundColor: '#B8860B',
     borderRadius: 12,

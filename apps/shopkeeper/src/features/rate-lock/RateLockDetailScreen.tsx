@@ -22,12 +22,12 @@ interface RateLockDetail {
   status: string;
 }
 
-const KARAT_FRACTIONS: { label: string; fraction: number }[] = [
-  { label: '24K', fraction: 1 },
-  { label: '22K', fraction: 22 / 24 },
-  { label: '20K', fraction: 20 / 24 },
-  { label: '18K', fraction: 18 / 24 },
-  { label: '14K', fraction: 14 / 24 },
+const KARAT_FRACTIONS: { label: string; numerator: number; denominator: number }[] = [
+  { label: '24K', numerator: 24, denominator: 24 },
+  { label: '22K', numerator: 22, denominator: 24 },
+  { label: '20K', numerator: 20, denominator: 24 },
+  { label: '18K', numerator: 18, denominator: 24 },
+  { label: '14K', numerator: 14, denominator: 24 },
 ];
 
 function formatRupees(paise: string | number): string {
@@ -55,7 +55,7 @@ export function RateLockDetailScreen({
 }: Props): React.ReactElement {
   const [countdown, setCountdown] = useState('');
 
-  const { data: booking, isLoading, isError } = useQuery<RateLockDetail>({
+  const { data: booking, isLoading, isError, refetch } = useQuery<RateLockDetail>({
     queryKey: ['rate-lock-booking', bookingId],
     queryFn: () =>
       api
@@ -87,11 +87,12 @@ export function RateLockDetailScreen({
         <Text style={styles.errorText} accessibilityRole="alert">
           जानकारी लोड नहीं हो सकी।
         </Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={() => void refetch()} accessibilityLabel="पुनः प्रयास करें">
+          <Text style={styles.retryBtnText}>पुनः प्रयास</Text>
+        </TouchableOpacity>
       </View>
     );
   }
-
-  const base24kRupees = Math.round(Number(booking.lockedRate24kPaisePerGram) / 100);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -100,11 +101,11 @@ export function RateLockDetailScreen({
       {/* Locked rates by karat */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>बंद की गई दरें</Text>
-        {KARAT_FRACTIONS.map(({ label, fraction }) => (
+        {KARAT_FRACTIONS.map(({ label, numerator, denominator }) => (
           <View key={label} style={styles.rateRow}>
             <Text style={styles.karatLabel}>{label}</Text>
             <Text style={styles.rateValue}>
-              ₹{Math.round(base24kRupees * fraction).toLocaleString('en-IN')}/g
+              ₹{Math.round(Number(booking.lockedRate24kPaisePerGram) * numerator / denominator / 100).toLocaleString('en-IN')}/g
             </Text>
           </View>
         ))}
@@ -214,4 +215,6 @@ const styles = StyleSheet.create({
   },
   invoiceBtnText: { color: '#FFF', fontSize: 17, fontWeight: '700' },
   errorText:    { color: '#DC2626', fontSize: 16 },
+  retryBtn:     { backgroundColor: '#B8860B', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10, minHeight: 44, marginTop: 12 },
+  retryBtnText: { color: '#FFF', fontWeight: '600', fontSize: 15 },
 });
