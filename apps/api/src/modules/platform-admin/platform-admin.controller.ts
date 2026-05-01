@@ -71,9 +71,11 @@ export class PlatformAdminController {
     @Query('pageSize') pageSize = '20',
     @Query('search') search?: string,
   ): Promise<unknown> {
+    const parsedPage = parseInt(page, 10);
+    const parsedSize = parseInt(pageSize, 10);
     return this.tenants.listShops({
-      page: Math.max(1, parseInt(page, 10) || 1),
-      pageSize: Math.min(100, Math.max(1, parseInt(pageSize, 10) || 20)),
+      page: Math.max(1, Number.isFinite(parsedPage) ? parsedPage : 1),
+      pageSize: Math.min(100, Math.max(1, Number.isFinite(parsedSize) ? parsedSize : 20)),
       search,
     });
   }
