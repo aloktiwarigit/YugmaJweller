@@ -25,8 +25,46 @@ export interface PublicRatesResponse {
 export interface PublicProduct {
   id: string;
   name: string;
-  // The catalog/products endpoint currently returns an empty array (Epic 7 stub on the API side)
-  // — additional fields will land when the catalog story ships.
+}
+
+export interface CatalogEstimatedPrice {
+  totalFormatted: string;
+  totalPaise:     string;
+  breakdown: {
+    goldValuePaise:    string;
+    makingChargePaise: string;
+    gstMetalPaise:     string;
+    gstMakingPaise:    string;
+  };
+}
+
+export interface CatalogProduct {
+  id:                    string;
+  sku:                   string;
+  metal:                 string;
+  purity:                string;
+  categoryId:            string | null;
+  categoryName:          string | null;
+  grossWeightG:          string;
+  netWeightG:            string;
+  huid:                  string | null;
+  huidExemptionCategory: string;
+  quantity:              number;
+  priceAvailable:        boolean;
+  estimatedPrice?:       CatalogEstimatedPrice;
+  publishedAt:           string;
+}
+
+export interface CatalogProductsResponse {
+  items: CatalogProduct[];
+  total: number;
+  page:  number;
+}
+
+export interface HuidVerifyResult {
+  verified:       boolean;
+  huid:           string;
+  certifyingBody: string;
 }
 
 export interface PublicProductsResponse {
@@ -91,6 +129,36 @@ export async function listPublicProducts(opts: { limit?: number } = {}): Promise
   const res = await api.get<PublicProductsResponse>('/api/v1/catalog/products', {
     params: opts.limit ? { limit: opts.limit } : undefined,
   });
+  return res.data;
+}
+
+export async function getCatalogProducts(opts: {
+  metal?:      string;
+  search?:     string;
+  categoryId?: string;
+  page?:       number;
+  limit?:      number;
+} = {}): Promise<CatalogProductsResponse> {
+  const params: Record<string, string | number> = {};
+  if (opts.metal)      params['metal']      = opts.metal;
+  if (opts.search)     params['search']     = opts.search;
+  if (opts.categoryId) params['categoryId'] = opts.categoryId;
+  if (opts.page)       params['page']       = opts.page;
+  if (opts.limit)      params['limit']      = opts.limit;
+  const res = await api.get<CatalogProductsResponse>('/api/v1/catalog/products', { params });
+  return res.data;
+}
+
+export async function getCatalogProduct(id: string): Promise<CatalogProduct> {
+  const res = await api.get<CatalogProduct>(`/api/v1/catalog/products/${id}`);
+  return res.data;
+}
+
+export async function verifyHuid(productId: string, qrPayload: string): Promise<HuidVerifyResult> {
+  const res = await api.get<HuidVerifyResult>(
+    `/api/v1/catalog/products/${productId}/verify-huid`,
+    { params: { payload: qrPayload } },
+  );
   return res.data;
 }
 

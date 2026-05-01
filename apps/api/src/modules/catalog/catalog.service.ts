@@ -1,4 +1,4 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { PricingService } from '../pricing/pricing.service';
 import type { CurrentRatesResult } from '../pricing/pricing.service';
@@ -58,8 +58,45 @@ export interface GetProductsParams {
   shopId:      string;
   categoryId?: string;
   search?:     string;
+  metal?:      string;
   page:        number;
   limit:       number;
+}
+
+export interface HuidVerifyResult {
+  verified:       boolean;
+  huid:           string;
+  certifyingBody: string;
+}
+
+// ---------------------------------------------------------------------------
+// HUID QR parsing helpers
+// ---------------------------------------------------------------------------
+
+// Boundary: the 6-char HUID must be followed by a non-alphanumeric char or end-of-string.
+// This prevents `AB1234ZZ` from matching as `AB1234`.
+const HUID_BOUNDARY = '(?=[^A-Za-z0-9]|$)';
+
+function parseHuidFromQr(payload: string): string | null {
+  const trimmed = payload.trim();
+  // BIS URL format: ?huid=AB1234 or &huid=AB1234
+  const queryMatch = trimmed.match(new RegExp(`[?&]huid=([A-Za-z0-9]{6})${HUID_BOUNDARY}`, 'i'));
+  if (queryMatch) return queryMatch[1].toUpperCase();
+  // Path format: /huid/AB1234
+  const pathMatch = trimmed.match(new RegExp(`\\/huid\\/([A-Za-z0-9]{6})${HUID_BOUNDARY}`, 'i'));
+  if (pathMatch) return pathMatch[1].toUpperCase();
+  // HUID: prefix
+  const prefixMatch = trimmed.match(new RegExp(`^HUID:([A-Za-z0-9]{6})${HUID_BOUNDARY}`, 'i'));
+  if (prefixMatch) return prefixMatch[1].toUpperCase();
+  // Raw 6-char alphanumeric
+  if (/^[A-Za-z0-9]{6}$/.test(trimmed)) return trimmed.toUpperCase();
+  return null;
+}
+
+function certifyingBodyFromQr(payload: string): string {
+  if (/bis\.gov\.in/i.test(payload)) return 'BIS';
+  if (/jewel\.bis/i.test(payload)) return 'BIS';
+  return 'BIS';
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +160,7 @@ export class CatalogService {
   }
 
   async getProducts(params: GetProductsParams): Promise<CatalogProductsResponse> {
-    const { shopId, categoryId, search, page, limit } = params;
+    const { shopId, categoryId, search, metal, page, limit } = params;
     const safePage  = Math.max(1, page);
     const safeLimit = Math.min(50, Math.max(1, limit));
     const offset    = (safePage - 1) * safeLimit;
@@ -134,6 +171,10 @@ export class CatalogService {
     if (categoryId) {
       queryParams.push(categoryId);
       whereExtra += ` AND p.category_id = $${queryParams.length}`;
+    }
+    if (metal && metal.trim().length > 0) {
+      queryParams.push(metal.trim().toUpperCase());
+      whereExtra += ` AND p.metal = $${queryParams.length}`;
     }
     if (search && search.trim().length > 0) {
       const term = `%${search.trim()}%`;
@@ -213,6 +254,27 @@ export class CatalogService {
     const mcMap = new Map<string, string>(configs.map((c) => [c.category, c.value]));
 
     return this.computeCatalogProduct(productResult.rows[0], ratesResult, mcMap);
+  }
+
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint; shopId from slug lookup, not TenantContext
+  async verifyHuid(productId: string, shopId: string, qrPayload: string): Promise<HuidVerifyResult> {
+    const extractedHuid = parseHuidFromQr(qrPayload);
+    if (!extractedHuid) {
+      throw new BadRequestException({ code: 'catalog.huid_qr_invalid' });
+    }
+    const certifyingBody = certifyingBodyFromQr(qrPayload);
+
+    const r = await this.pool.query<{ huid: string | null }>(
+      `SELECT huid FROM products WHERE id = $1 AND shop_id = $2 AND status = 'PUBLISHED'`,
+      [productId, shopId],
+    );
+    if (r.rows.length === 0) {
+      throw new NotFoundException({ code: 'catalog.product_not_found' });
+    }
+
+    const productHuid = r.rows[0].huid;
+    const verified = productHuid !== null && productHuid.toUpperCase() === extractedHuid;
+    return { verified, huid: extractedHuid, certifyingBody };
   }
 
   private computeCatalogProduct(

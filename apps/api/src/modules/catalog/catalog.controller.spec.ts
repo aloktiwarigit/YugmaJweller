@@ -1,5 +1,5 @@
 /**
- * Story 4.4 + Wave 5A — CatalogController unit + HTTP integration tests
+ * Story 4.4 + Wave 5A + Wave 5C — CatalogController unit + HTTP integration tests
  */
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
 import type { Mock } from 'vitest';
@@ -39,6 +39,7 @@ const mockCatalogService = {
   getTenantConfig: vi.fn().mockResolvedValue(mockTenantConfig),
   getProducts:     vi.fn().mockResolvedValue(mockProductsResponse),
   getProduct:      vi.fn().mockRejectedValue(new NotFoundException()),
+  verifyHuid:      vi.fn(),
 };
 
 describe('CatalogController', () => {
@@ -71,6 +72,7 @@ describe('CatalogController', () => {
     mockCatalogService.getTenantConfig.mockResolvedValue(mockTenantConfig);
     mockCatalogService.getProducts.mockResolvedValue(mockProductsResponse);
     mockCatalogService.getProduct.mockRejectedValue(new NotFoundException());
+    mockCatalogService.verifyHuid.mockResolvedValue({ verified: true, huid: 'AB1234', certifyingBody: 'BIS' });
   });
 
   describe('getPublicRates() — unit', () => {
@@ -145,6 +147,65 @@ describe('CatalogController', () => {
       await request(app.getHttpServer())
         .get('/api/v1/catalog/products/00000000-0000-0000-0000-000000000001')
         .set('X-Tenant-Id', 'shop-uuid').expect(404);
+    });
+  });
+
+  describe('GET /api/v1/catalog/products/:id/verify-huid', () => {
+    const PRODUCT_ID = '00000000-0000-0000-0000-000000000001';
+    const BASE_URL   = `/api/v1/catalog/products/${PRODUCT_ID}/verify-huid`;
+
+    it('returns 400 when X-Tenant-Id missing', async () => {
+      await request(app.getHttpServer())
+        .get(`${BASE_URL}?payload=AB1234`).expect(400);
+    });
+
+    it('returns 400 when payload param missing', async () => {
+      await request(app.getHttpServer())
+        .get(BASE_URL).set('X-Tenant-Id', 'shop-uuid').expect(400);
+    });
+
+    it('returns verified=true when HUID matches', async () => {
+      mockCatalogService.verifyHuid.mockResolvedValue({
+        verified: true, huid: 'AB1234', certifyingBody: 'BIS',
+      });
+      const res = await request(app.getHttpServer())
+        .get(`${BASE_URL}?payload=AB1234`)
+        .set('X-Tenant-Id', 'shop-uuid')
+        .expect(200);
+      expect(res.body).toMatchObject({ verified: true, huid: 'AB1234', certifyingBody: 'BIS' });
+    });
+
+    it('returns verified=false when HUID does not match', async () => {
+      mockCatalogService.verifyHuid.mockResolvedValue({
+        verified: false, huid: 'ZZ9999', certifyingBody: 'BIS',
+      });
+      const res = await request(app.getHttpServer())
+        .get(`${BASE_URL}?payload=ZZ9999`)
+        .set('X-Tenant-Id', 'shop-uuid')
+        .expect(200);
+      expect(res.body.verified).toBe(false);
+    });
+
+    it('has Cache-Control: no-store', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`${BASE_URL}?payload=AB1234`)
+        .set('X-Tenant-Id', 'shop-uuid')
+        .expect(200);
+      expect(res.headers['cache-control']).toBe('no-store');
+    });
+
+    it('accepts BIS URL format payload', async () => {
+      mockCatalogService.verifyHuid.mockResolvedValue({
+        verified: true, huid: 'AB1234', certifyingBody: 'BIS',
+      });
+      const payload = encodeURIComponent('https://jewel.bis.gov.in/?huid=AB1234');
+      await request(app.getHttpServer())
+        .get(`${BASE_URL}?payload=${payload}`)
+        .set('X-Tenant-Id', 'shop-uuid')
+        .expect(200);
+      expect(mockCatalogService.verifyHuid).toHaveBeenCalledWith(
+        PRODUCT_ID, 'shop-uuid', 'https://jewel.bis.gov.in/?huid=AB1234',
+      );
     });
   });
 });
