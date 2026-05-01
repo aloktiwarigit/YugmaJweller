@@ -7,3 +7,4 @@ export type {
   Tenant, ShopUserRole,
 } from './context';
 export type { TenantAuditPort } from './audit-port';
+export type { ImpersonationSessionPort } from './impersonation-port';

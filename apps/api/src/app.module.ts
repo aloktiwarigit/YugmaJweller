@@ -36,6 +36,7 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
 import { CustomerModule } from './modules/customer/customer.module';
 import { DrizzleTenantLookup } from './drizzle-tenant-lookup';
 import { TenantAuditReporter } from './modules/tenant-boot/tenant-audit-reporter';
+import { ImpersonationSessionAdapter } from './modules/platform-admin/impersonation-session.adapter';
 
 @Injectable()
 class ConditionalTenantInterceptor implements NestInterceptor {
@@ -93,11 +94,16 @@ class ConditionalTenantInterceptor implements NestInterceptor {
   controllers: [HealthController],
   providers: [
     HttpTenantResolver,
+    ImpersonationSessionAdapter,
     {
       provide: TenantInterceptor,
-      useFactory: (resolver: HttpTenantResolver, tenants: DrizzleTenantLookup, audit: TenantAuditReporter) =>
-        new TenantInterceptor(resolver, tenants, audit),
-      inject: [HttpTenantResolver, DrizzleTenantLookup, TenantAuditReporter],
+      useFactory: (
+        resolver: HttpTenantResolver,
+        tenants: DrizzleTenantLookup,
+        audit: TenantAuditReporter,
+        impersonation: ImpersonationSessionAdapter,
+      ) => new TenantInterceptor(resolver, tenants, audit, impersonation),
+      inject: [HttpTenantResolver, DrizzleTenantLookup, TenantAuditReporter, ImpersonationSessionAdapter],
     },
     {
       provide: APP_GUARD,

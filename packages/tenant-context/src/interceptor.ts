@@ -9,9 +9,10 @@ import {
 import { from, Observable } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { tenantContext } from './als';
-import type { TenantContext, ShopUserRole } from './context';
+import type { TenantContext, AuthenticatedTenantContext, ShopUserRole } from './context';
 import type { TenantLookup } from './tenant-cache';
 import type { TenantAuditPort } from './audit-port';
+import type { ImpersonationSessionPort } from './impersonation-port';
 
 export interface RequestLike {
   headers: Record<string, string | string[] | undefined>;
@@ -24,6 +25,8 @@ export interface RequestLike {
     role?: ShopUserRole;
     /** DB UUID from the goldsmith_uid custom claim; undefined on very first /session call */
     goldsmith_uid?: string;
+    /** Set by FirebaseJwtStrategy when a platform_admin presents a valid X-Impersonation-Token. */
+    impersonationSessionId?: string;
   };
 }
 
@@ -44,6 +47,7 @@ export class TenantInterceptor implements NestInterceptor {
     private readonly resolver: TenantResolver,
     private readonly tenants: TenantLookup,
     private readonly audit?: TenantAuditPort,
+    private readonly impersonation?: ImpersonationSessionPort,
   ) {}
 
   intercept(ctx: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -96,10 +100,19 @@ export class TenantInterceptor implements NestInterceptor {
     // the client force-refreshes and subsequent calls carry goldsmith_uid.
     // NOTE: "user_id" is a reserved Firebase claim — it gets overridden with the Firebase UID.
     if (req.user?.uid && req.user.role && req.user.shop_id === shopId && req.user.goldsmith_uid) {
-      return {
+      const ctx: AuthenticatedTenantContext = {
         shopId: tenant.id, tenant,
         authenticated: true, userId: req.user.goldsmith_uid, role: req.user.role,
       };
+      if (req.user.impersonationSessionId) {
+        if (!this.impersonation) {
+          throw new UnauthorizedException({ code: 'tenant.impersonation_port_missing' });
+        }
+        const active = await this.impersonation.isActive(req.user.impersonationSessionId);
+        if (!active) throw new UnauthorizedException({ code: 'auth.impersonation_session_inactive' });
+        return { ...ctx, isImpersonating: true, impersonationAuditId: req.user.impersonationSessionId };
+      }
+      return ctx;
     }
     return { shopId: tenant.id, tenant, authenticated: false };
   }
