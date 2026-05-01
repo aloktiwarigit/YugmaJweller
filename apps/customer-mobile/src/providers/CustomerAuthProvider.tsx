@@ -2,8 +2,9 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import Constants from 'expo-constants';
 import { useCustomerSessionStore } from '../stores/customerSessionStore';
 import { useTenantStore } from '../stores/tenantStore';
-import { saveSecureSession, loadSecureSession } from '../lib/secure-storage';
+import { saveSecureSession, loadSecureSession, clearSecureSession } from '../lib/secure-storage';
 import {
+  DEV_MOCK_BEARER_PREFIX,
   DEV_MOCK_CUSTOMER_NAME,
   DEV_MOCK_CUSTOMER_PHONE,
   buildDevMockBearer,
@@ -51,12 +52,24 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
         //    dev-mode boot OR after real customer auth ships in EPIC7-S1).
         const persisted = await loadSecureSession();
         if (cancelled) return;
-        if (persisted && persisted.shopId === tenant.id) {
-          setSession(
-            { id: persisted.customerId, shopId: persisted.shopId, name: DEV_MOCK_CUSTOMER_NAME, phoneE164: DEV_MOCK_CUSTOMER_PHONE },
-            persisted.bearer,
-          );
-          return;
+        if (persisted) {
+          const isDevMock = persisted.bearer.startsWith(DEV_MOCK_BEARER_PREFIX);
+          // A persisted DEV-MOCK session must NOT survive a flag flip from
+          // devAuth=1 to devAuth=0 — that would bypass the documented Phone
+          // OTP placeholder mode. Real customer auth (EPIC7-S1) will use a
+          // non-DEV-MOCK bearer shape that legitimately survives without the
+          // dev flag.
+          if (isDevMock && !devAuth) {
+            await clearSecureSession();
+            // Fall through to the dev-mode-injection branch (which will no-op
+            // because devAuth is false).
+          } else if (persisted.shopId === tenant.id) {
+            setSession(
+              { id: persisted.customerId, shopId: persisted.shopId, name: DEV_MOCK_CUSTOMER_NAME, phoneE164: DEV_MOCK_CUSTOMER_PHONE },
+              persisted.bearer,
+            );
+            return;
+          }
         }
 
         // 2. Dev-mode mock — only fires when EXPO_PUBLIC_DEV_AUTH=1.
