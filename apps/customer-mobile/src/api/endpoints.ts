@@ -94,6 +94,73 @@ export async function listPublicProducts(opts: { limit?: number } = {}): Promise
   return res.data;
 }
 
+// ── Customer-specific authenticated endpoints ──────────────────────────────────
+
+export interface LoyaltyState {
+  pointsBalance:  number;
+  lifetimePoints: number;
+  currentTier:    string | null;
+  tierSince:      string | null;
+}
+
+export interface LoyaltyTransaction {
+  id:          string;
+  pointsDelta: number;
+  reason:      string;
+  createdAt:   string;
+}
+
+export interface LoyaltyResponse {
+  state:        LoyaltyState;
+  transactions: LoyaltyTransaction[];
+}
+
+export interface RateLockBookingResult {
+  bookingId:                 string;
+  razorpayOrderId:           string;
+  razorpayKeyId:             string;
+  expiresAt:                 string;
+  lockedRate24kPaisePerGram: string;
+}
+
+export interface TryAtHomeBookingResponse {
+  id:          string;
+  shopId:      string;
+  customerId:  string;
+  productIds:  string[];
+  status:      string;
+  requestedAt: string;
+  dispatchAt:  string | null;
+  returnDueAt: string | null;
+  notes:       string | null;
+}
+
+export async function getCustomerLoyalty(): Promise<LoyaltyResponse> {
+  const res = await api.get<LoyaltyResponse>('/api/v1/customer/loyalty');
+  return res.data;
+}
+
+export async function createCustomerRateLockBooking(
+  depositAmountPaise: string,
+): Promise<RateLockBookingResult> {
+  const res = await api.post<RateLockBookingResult>(
+    '/api/v1/customer/rate-lock/bookings',
+    { depositAmountPaise },
+  );
+  return res.data;
+}
+
+export async function createCustomerTryAtHomeBooking(
+  productIds: string[],
+  notes?: string,
+): Promise<TryAtHomeBookingResponse> {
+  const res = await api.post<TryAtHomeBookingResponse>(
+    '/api/v1/customer/try-at-home/bookings',
+    { productIds, notes },
+  );
+  return res.data;
+}
+
 export async function customerSelfDelete(): Promise<void> {
   try {
     await api.delete('/api/v1/crm/customer/me');

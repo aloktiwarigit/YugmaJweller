@@ -36,6 +36,13 @@ vi.mock('@react-native-firebase/auth', () => ({
   }),
 }));
 
+// Mock expo-router — LoyaltyPointsCard uses useRouter for navigation.
+vi.mock('expo-router', () => ({
+  useRouter: vi.fn(() => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() })),
+  Redirect:  vi.fn(() => null),
+  Tabs:      { Screen: vi.fn(() => null) },
+}));
+
 // Mock @react-native-async-storage/async-storage with an in-memory map.
 // Defensive — no first-party code in this app uses AsyncStorage (we use SecureStore
 // per the auth-token invariant), but transitive deps may require it at module load.
