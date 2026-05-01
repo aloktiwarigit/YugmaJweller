@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
-import { PG_POOL_ADMIN } from '../platform-admin.module';
+import { PG_POOL_ADMIN } from '../platform-admin.tokens';
 
 // Pool here is PG_POOL_ADMIN, which connects directly as platform_admin.
 // BEGIN/COMMIT remains for atomicity — the export queries + audit insert read consistent

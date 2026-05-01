@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Pool } from 'pg';
 import type { ImpersonationSessionPort } from '@goldsmith/tenant-context';
-import { PG_POOL_ADMIN } from './platform-admin.module';
+import { PG_POOL_ADMIN } from './platform-admin.tokens';
 
 @Injectable()
 export class ImpersonationSessionAdapter implements ImpersonationSessionPort {

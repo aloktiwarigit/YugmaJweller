@@ -10,6 +10,7 @@ import { MetricsService } from './services/metrics.service';
 import { ImpersonationService } from './services/impersonation.service';
 import { DataExportService } from './services/data-export.service';
 import { ImpersonationSessionAdapter } from './impersonation-session.adapter';
+import { PG_POOL_ADMIN } from './platform-admin.tokens';
 
 // Dedicated platform_admin connection pool. The default `app_user` role (used by `PG_POOL`)
 // has no membership in `platform_admin`, so `SET ROLE platform_admin` from an app_user
@@ -23,7 +24,11 @@ import { ImpersonationSessionAdapter } from './impersonation-session.adapter';
 //
 // Falls back to DATABASE_URL for dev convenience when DATABASE_URL_ADMIN isn't set
 // (acceptable: dev Postgres typically uses a single superuser role with no RLS separation).
-export const PG_POOL_ADMIN = 'PG_POOL_ADMIN';
+//
+// PG_POOL_ADMIN token lives in ./platform-admin.tokens.ts to break the import cycle:
+// services need the token at @Inject decoration time, but they're loaded as providers
+// of THIS module — putting the const here would land services in our partial-exports
+// during module load and resolve PG_POOL_ADMIN to undefined at DI time.
 
 @Module({
   // TenantLookupModule provides the singleton DrizzleTenantLookup that TenantInterceptor

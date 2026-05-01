@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
 import { DrizzleTenantLookup } from '../../../drizzle-tenant-lookup';
-import { PG_POOL_ADMIN } from '../platform-admin.module';
+import { PG_POOL_ADMIN } from '../platform-admin.tokens';
 
 export interface CreateShopArgs {
   slug: string;
@@ -90,6 +90,9 @@ export class TenantManagementService {
     if (fields.length === 0) return;
     fields.push(`updated_at = now()`);
     params.push(a.shopId);
+    // Cache invalidation must happen AFTER COMMIT, not inside the tx — otherwise a parallel
+    // request can repopulate the cache from the still-old (uncommitted) row and serve stale
+    // ACTIVE for up to 60s after suspend.
     await inTx(this.pool, async (c) => {
       const r = await c.query(`UPDATE shops SET ${fields.join(', ')} WHERE id = $${i}`, params);
       if (r.rowCount === 0) throw new NotFoundException({ code: 'tenant.not_found' });
@@ -98,8 +101,8 @@ export class TenantManagementService {
          VALUES ($1, $2, $3, $4::jsonb)`,
         ['tenant.updated', a.platformUserId, a.shopId, JSON.stringify(a.patch)],
       );
-      this.cache.invalidate(a.shopId);
     });
+    this.cache.invalidate(a.shopId);
   }
 
   async suspendShop(shopId: string, reason: string, platformUserId: string): Promise<void> {
@@ -114,8 +117,9 @@ export class TenantManagementService {
          VALUES ($1, $2, $3, $4::jsonb)`,
         ['tenant.suspended', platformUserId, shopId, JSON.stringify({ reason })],
       );
-      this.cache.invalidate(shopId);
     });
+    // Invalidate AFTER COMMIT — see updateShop comment.
+    this.cache.invalidate(shopId);
   }
 
   async unsuspendShop(shopId: string, platformUserId: string): Promise<void> {
@@ -130,8 +134,9 @@ export class TenantManagementService {
          VALUES ($1, $2, $3, $4::jsonb)`,
         ['tenant.unsuspended', platformUserId, shopId, '{}'],
       );
-      this.cache.invalidate(shopId);
     });
+    // Invalidate AFTER COMMIT — see updateShop comment.
+    this.cache.invalidate(shopId);
   }
 
   async listShops(a: ListShopsArgs): Promise<ListShopsResult> {

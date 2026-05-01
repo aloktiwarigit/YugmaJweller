@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
 import { signImpersonationToken } from '../impersonation-token';
-import { PG_POOL_ADMIN } from '../platform-admin.module';
+import { PG_POOL_ADMIN } from '../platform-admin.tokens';
 
 const TTL_SECONDS = 30 * 60;
 

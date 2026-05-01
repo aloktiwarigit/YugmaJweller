@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
-import { PG_POOL_ADMIN } from '../platform-admin.module';
+import { PG_POOL_ADMIN } from '../platform-admin.tokens';
 
 export type SubscriptionPlan = 'trial' | 'starter' | 'growth' | 'enterprise';
 export type SubscriptionStatus = 'active' | 'suspended' | 'cancelled';

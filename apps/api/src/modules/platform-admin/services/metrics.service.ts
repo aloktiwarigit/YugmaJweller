@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Pool } from 'pg';
-import { PG_POOL_ADMIN } from '../platform-admin.module';
+import { PG_POOL_ADMIN } from '../platform-admin.tokens';
 
 export interface PlatformMetrics {
   totalShops: number;
