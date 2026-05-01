@@ -81,6 +81,12 @@ export class FirebaseJwtStrategy extends PassportStrategy(BearerStrategy, 'fireb
       this.logger.error('IMPERSONATION_JWT_SECRET not configured — refusing impersonation');
       throw new UnauthorizedException({ code: 'auth.impersonation_misconfigured' });
     }
+    if (secret.length < 32) {
+      // HS256 keysize floor — runbook §16 requires `openssl rand -base64 48`. Reject weak
+      // secrets at request time rather than silently accept them and weaken HMAC strength.
+      this.logger.error('IMPERSONATION_JWT_SECRET shorter than 32 bytes — refusing impersonation');
+      throw new UnauthorizedException({ code: 'auth.impersonation_misconfigured' });
+    }
 
     let impClaims;
     try {
@@ -89,6 +95,18 @@ export class FirebaseJwtStrategy extends PassportStrategy(BearerStrategy, 'fireb
       const reason = err instanceof ImpersonationTokenError ? err.reason : 'unknown';
       this.logger.warn({ reason }, 'impersonation token rejected');
       throw new UnauthorizedException({ code: 'auth.impersonation_token_invalid', reason });
+    }
+
+    // Bind the impersonation token to the caller. impClaims.sub is the platform admin's
+    // Firebase UID at sign time (controller uses req.user.uid). If admin A's token leaks to
+    // admin B, B's outer Firebase ID token has a different uid → reject so audit attribution
+    // can never point to the wrong admin.
+    if (impClaims.sub !== decoded.uid) {
+      this.logger.warn(
+        { tokenSub: impClaims.sub, callerUid: decoded.uid },
+        'impersonation token caller mismatch',
+      );
+      throw new UnauthorizedException({ code: 'auth.impersonation_token_caller_mismatch' });
     }
 
     // The DB-side liveness check (ended_at IS NULL AND expires_at > now()) is performed by the

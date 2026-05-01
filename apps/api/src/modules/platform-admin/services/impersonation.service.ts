@@ -46,6 +46,11 @@ export class ImpersonationService {
   async startImpersonation(a: StartImpersonationArgs): Promise<StartImpersonationResult> {
     const secret = process.env['IMPERSONATION_JWT_SECRET'];
     if (!secret) throw new UnauthorizedException({ code: 'impersonation.secret_missing' });
+    if (secret.length < 32) {
+      // HS256 keysize floor — runbook §16 requires `openssl rand -base64 48`. Refuse to mint
+      // tokens with a weak HMAC key rather than emit signatures the strategy will later reject.
+      throw new UnauthorizedException({ code: 'impersonation.secret_invalid' });
+    }
 
     return withPlatformAdmin(this.pool, async (c) => {
       const expiresAt = new Date(Date.now() + TTL_SECONDS * 1000);

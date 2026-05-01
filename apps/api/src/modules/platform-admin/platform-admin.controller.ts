@@ -38,6 +38,7 @@ type FirebaseRequest = Request & { user?: { uid?: string } };
 
 @Controller('platform/admin')
 @Roles('platform_admin')
+// nosemgrep: goldsmith.skip-tenant-requires-skip-auth -- @Roles('platform_admin') + global FirebaseJwt strategy authenticate the caller before the SkipTenant interceptor runs; SkipAuth would be wrong here (we DO require auth).
 @SkipTenant()
 export class PlatformAdminController {
   constructor(

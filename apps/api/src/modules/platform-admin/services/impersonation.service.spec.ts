@@ -91,4 +91,14 @@ describe('ImpersonationService', () => {
       response: { code: 'impersonation.secret_missing' },
     });
   });
+
+  it('refuses when IMPERSONATION_JWT_SECRET is shorter than 32 bytes', async () => {
+    process.env['IMPERSONATION_JWT_SECRET'] = 'too-short';
+    const svc = new ImpersonationService(pool as never);
+    await expect(
+      svc.startImpersonation({ platformUserId: 'p', targetShopId: SHOP_ID, reason: 'r' }),
+    ).rejects.toMatchObject({
+      response: { code: 'impersonation.secret_invalid' },
+    });
+  });
 });

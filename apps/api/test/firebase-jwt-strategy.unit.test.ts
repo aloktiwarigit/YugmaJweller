@@ -46,6 +46,8 @@ describe('FirebaseJwtStrategy — impersonation', () => {
   afterEach(() => { delete process.env['IMPERSONATION_JWT_SECRET']; });
 
   it('rewrites shop_id/role for platform_admin with valid impersonation header', async () => {
+    // Impersonation token sub MUST match the Firebase ID token uid (caller-binding check),
+    // because the controller signs with platformUserId = req.user.uid (Firebase UID).
     const fakeFb = makeAdmin({
       uid: 'p-uid', role: 'platform_admin', shop_id: undefined, goldsmith_uid: 'p-id',
       phone_number: undefined,
@@ -53,7 +55,7 @@ describe('FirebaseJwtStrategy — impersonation', () => {
     const strategy = new FirebaseJwtStrategy(fakeFb as never, undefined);
     const token = signImpersonationToken({
       sessionId: '11111111-1111-1111-1111-111111111111',
-      platformUserId: 'p-id',
+      platformUserId: 'p-uid',
       targetShopId: '22222222-2222-2222-2222-222222222222',
       ttlSeconds: 1800,
       secret: SECRET,
@@ -63,7 +65,7 @@ describe('FirebaseJwtStrategy — impersonation', () => {
     expect(claims.shop_id).toBe('22222222-2222-2222-2222-222222222222');
     expect(claims.role).toBe('shop_admin');
     expect(claims.impersonationSessionId).toBe('11111111-1111-1111-1111-111111111111');
-    expect(claims.impersonatorPlatformUserId).toBe('p-id');
+    expect(claims.impersonatorPlatformUserId).toBe('p-uid');
     // goldsmith_uid MUST be the session UUID (not the Firebase UID), so tenant write paths
     // can insert it into UUID columns without type errors.
     expect(claims.goldsmith_uid).toBe('11111111-1111-1111-1111-111111111111');
@@ -100,6 +102,39 @@ describe('FirebaseJwtStrategy — impersonation', () => {
     expect(claims.role).toBe('platform_admin');
     expect(claims.shop_id).toBeUndefined();
     expect(claims.impersonationSessionId).toBeUndefined();
+  });
+
+  it('rejects when impersonation token sub does not match the caller (token leak / replay)', async () => {
+    // Outer Firebase token authenticates 'admin-A'; the impersonation token was minted by 'admin-B'.
+    const fakeFb = makeAdmin({
+      uid: 'admin-A', role: 'platform_admin', shop_id: undefined, goldsmith_uid: 'admin-A-id',
+      phone_number: undefined,
+    });
+    const strategy = new FirebaseJwtStrategy(fakeFb as never, undefined);
+    const tokenForAdminB = signImpersonationToken({
+      sessionId: '11111111-1111-1111-1111-111111111111',
+      platformUserId: 'admin-B',
+      targetShopId: '22222222-2222-2222-2222-222222222222',
+      ttlSeconds: 1800,
+      secret: SECRET,
+    });
+    const req = { headers: { 'x-impersonation-token': tokenForAdminB } } as never;
+    await expect(strategy.validate(req, 'firebase-id-token-blob')).rejects.toMatchObject({
+      response: { code: 'auth.impersonation_token_caller_mismatch' },
+    });
+  });
+
+  it('rejects when IMPERSONATION_JWT_SECRET is shorter than 32 bytes', async () => {
+    process.env['IMPERSONATION_JWT_SECRET'] = 'too-short';
+    const fakeFb = makeAdmin({
+      uid: 'p-uid', role: 'platform_admin', shop_id: undefined, goldsmith_uid: 'p-id',
+      phone_number: undefined,
+    });
+    const strategy = new FirebaseJwtStrategy(fakeFb as never, undefined);
+    const req = { headers: { 'x-impersonation-token': 'doesnt-matter' } } as never;
+    await expect(strategy.validate(req, 'firebase-id-token-blob')).rejects.toMatchObject({
+      response: { code: 'auth.impersonation_misconfigured' },
+    });
   });
 
   it('rejects with 401 when impersonation token is malformed', async () => {
