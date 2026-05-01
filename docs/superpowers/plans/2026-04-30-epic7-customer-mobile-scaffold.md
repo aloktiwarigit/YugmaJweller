@@ -17,6 +17,29 @@ pre-flight-done: false
 
 **Font note:** The prompt asks for *Noto Sans Devanagari*; CLAUDE.md lists Noto as primary with Mukta as fallback. Mukta (`MuktaVaani-400/500/600/700`) ships in this repo and is wired into `@goldsmith/ui-tokens` and `apps/shopkeeper`. Noto Sans Devanagari is **not** in the repo. To preserve consistency with the shopkeeper app and avoid sneaking new font binaries in via this scaffold story, this plan reuses the existing Mukta family (which is the documented fallback). A separate ticket should add Noto Sans Devanagari, swap `typography.body.family`, and re-run the visual diff against both apps. **Inter is NOT used anywhere — that constraint is fully respected.**
 
+## Resume Point (checkpoint 2026-04-30 20:30 ET)
+
+This plan is **partially executed**. WS-A and WS-B are landed and reviewed; WS-C, WS-D, WS-E remain.
+
+- **Branch tip:** `0150b29` (15 commits ahead of `main`)
+- **Verification baseline:** typecheck 0, lint 0, **18/18** unit tests pass
+- **Worktree:** `C:/gs-cust-mob` on `feat/epic7-customer-mobile-scaffold`
+- **Test infra additions** (not in original plan but required to make tests run):
+  - `apps/customer-mobile/test/react-native.mock.ts` — passthrough mock for RN components in jsdom (mirrors shopkeeper)
+  - `apps/customer-mobile/vitest.config.ts` — `react-native` alias + esbuild tsconfig override
+  - `apps/customer-mobile/.eslintrc.cjs` — CJS-config + test-mock + provider/api overrides (mirrors shopkeeper)
+  - `apps/customer-mobile/test/setup.ts` — added `@react-native-async-storage/async-storage` mock (defensive)
+- **Code-review fixes already applied** (do not re-do):
+  - `TenantProvider` 304 path guarded; AsyncStorage tenant cache deliberately deferred (TODO comment in file)
+  - `customerSelfDelete` uses `axios.isAxiosError` type guard
+  - `TenantBrandHeader` logo placeholder marked `accessible={false}`
+  - tsconfig extends `expo/tsconfig.base`; `@types/node` pinned to `^20.11.0`
+- **Customer-session store shape is FINAL** — `setSession(c, b)` + `clear()`. WS-C only adds tests, never changes shape.
+
+Resume by reading this plan, then dispatch the WS-C implementer subagent. WS-E will write a story-complete memory entry.
+
+---
+
 **Out of scope (deferred to follow-up Class A story `EPIC7-S1 — Customer Phone OTP`):**
 - Real customer phone OTP via Firebase
 - Migration adding `customers.firebase_uid`
