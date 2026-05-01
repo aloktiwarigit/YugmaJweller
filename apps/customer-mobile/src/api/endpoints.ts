@@ -1,6 +1,12 @@
 import axios from 'axios';
 import { api } from './client';
-import type { Tenant } from '../stores/tenantStore';
+import type { Tenant, TenantBranding } from '../stores/tenantStore';
+
+interface TenantBootApiResponse {
+  id: string;
+  display_name: string;
+  config: Record<string, unknown> | null;
+}
 
 export interface PublicRateEntry {
   perGramRupees: string;
@@ -37,7 +43,7 @@ export async function getTenantBoot(
   slug: string,
   etag?: string,
 ): Promise<{ tenant: Tenant; etag: string | null; notModified: boolean }> {
-  const res = await api.get<Tenant>(`/api/v1/tenant/boot`, {
+  const res = await api.get<TenantBootApiResponse>(`/api/v1/tenant/boot`, {
     params: { slug },
     headers: etag ? { 'If-None-Match': etag } : undefined,
     validateStatus: (s: number) => s === 200 || s === 304,
@@ -45,8 +51,19 @@ export async function getTenantBoot(
   if (res.status === 304) {
     return { tenant: null as unknown as Tenant, etag: etag ?? null, notModified: true };
   }
+  // The API returns snake_case `{ id, display_name, config }`. The mobile
+  // Tenant shape is `{ id, slug, displayName, branding }`. Map here:
+  // slug is supplied by the caller (it is the lookup key, not in the response);
+  // branding comes from `config.branding` if present, else defaults to {}.
+  const config = (res.data.config ?? null) as { branding?: TenantBranding } | null;
+  const tenant: Tenant = {
+    id: res.data.id,
+    slug,
+    displayName: res.data.display_name,
+    branding: config?.branding ?? {},
+  };
   return {
-    tenant: res.data,
+    tenant,
     etag: (res.headers['etag'] as string | undefined) ?? null,
     notModified: false,
   };
@@ -66,7 +83,7 @@ export async function listPublicProducts(opts: { limit?: number } = {}): Promise
 
 export async function customerSelfDelete(): Promise<void> {
   try {
-    await api.delete('/api/v1/customer/me');
+    await api.delete('/api/v1/crm/customer/me');
   } catch (e) {
     const axiosErr = axios.isAxiosError<{ code?: string }>(e) ? e : null;
     const code = axiosErr?.response?.data?.code ?? 'unknown';

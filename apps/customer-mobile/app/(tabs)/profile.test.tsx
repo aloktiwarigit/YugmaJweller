@@ -29,7 +29,7 @@ describe('Profile', () => {
   });
 
   it('DPDPA delete button shows the 501 not-yet-available message', async () => {
-    mock.onDelete('/api/v1/customer/me').reply(501, {
+    mock.onDelete('/api/v1/crm/customer/me').reply(501, {
       code: 'deletion.customer_app_not_yet_available',
     });
     const { getByTestId, findByTestId } = render(<Profile />);

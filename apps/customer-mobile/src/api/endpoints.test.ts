@@ -15,14 +15,33 @@ describe('endpoints', () => {
     mock = new MockAdapter(api);
   });
 
-  it('getTenantBoot returns 200 payload', async () => {
-    mock.onGet('/api/v1/tenant/boot').reply(200, {
-      id: 'tid', slug: 'anchor-dev', displayName: 'Test Shop', branding: {},
-    }, { etag: '"v1"' });
+  it('getTenantBoot maps snake_case API response to mobile Tenant shape', async () => {
+    mock.onGet('/api/v1/tenant/boot').reply(
+      200,
+      {
+        id: 'tid',
+        display_name: 'Test Shop',
+        config: { branding: { primaryColor: '#8C2A1E', appName: 'Test Shop' } },
+      },
+      { etag: '"v1"' },
+    );
     const r = await getTenantBoot('anchor-dev');
+    expect(r.tenant.id).toBe('tid');
     expect(r.tenant.slug).toBe('anchor-dev');
+    expect(r.tenant.displayName).toBe('Test Shop');
+    expect(r.tenant.branding.primaryColor).toBe('#8C2A1E');
     expect(r.etag).toBe('"v1"');
     expect(r.notModified).toBe(false);
+  });
+
+  it('getTenantBoot defaults branding to empty when config has none', async () => {
+    mock.onGet('/api/v1/tenant/boot').reply(
+      200,
+      { id: 'tid', display_name: 'Bare Shop', config: null },
+      { etag: '"v2"' },
+    );
+    const r = await getTenantBoot('anchor-dev');
+    expect(r.tenant.branding).toEqual({});
   });
 
   it('getTenantBoot handles 304', async () => {
@@ -52,7 +71,7 @@ describe('endpoints', () => {
   });
 
   it('customerSelfDelete maps 501 NotImplemented to typed error', async () => {
-    mock.onDelete('/api/v1/customer/me').reply(501, { code: 'deletion.customer_app_not_yet_available' });
+    mock.onDelete('/api/v1/crm/customer/me').reply(501, { code: 'deletion.customer_app_not_yet_available' });
     await expect(customerSelfDelete()).rejects.toMatchObject({
       code: 'deletion.customer_app_not_yet_available',
     });

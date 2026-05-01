@@ -17,13 +17,20 @@ describe('TenantProvider', () => {
 
   it('boots tenant from /tenant/boot and stores it', async () => {
     const t = makeTenant();
-    mock.onGet('/api/v1/tenant/boot').reply(200, t, { etag: '"v1"' });
+    // API returns snake_case `{ id, display_name, config }`; getTenantBoot
+    // adapts it to the mobile `Tenant` shape before storing.
+    mock.onGet('/api/v1/tenant/boot').reply(
+      200,
+      { id: t.id, display_name: t.displayName, config: { branding: t.branding } },
+      { etag: '"v1"' },
+    );
 
     render(<TenantProvider><span>x</span></TenantProvider>);
 
     await waitFor(() => {
       expect(useTenantStore.getState().tenant?.id).toBe(t.id);
     });
+    expect(useTenantStore.getState().tenant?.displayName).toBe(t.displayName);
     expect(useTenantStore.getState().etag).toBe('"v1"');
     expect(useTenantStore.getState().loading).toBe(false);
   });
