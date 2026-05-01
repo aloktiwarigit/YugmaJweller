@@ -8,6 +8,7 @@ import { TenantBrandHeader } from '../../src/components/TenantBrandHeader';
 import { useCustomerSessionStore } from '../../src/stores/customerSessionStore';
 import { useTenantStore } from '../../src/stores/tenantStore';
 import { saveSecureSession } from '../../src/lib/secure-storage';
+import { buildDevMockBearer, buildDevMockCustomer } from '../../src/lib/dev-mock-session';
 
 export default function Welcome(): React.ReactElement {
   const devAuth = Boolean(Constants.expoConfig?.extra?.['devAuth']);
@@ -16,13 +17,8 @@ export default function Welcome(): React.ReactElement {
 
   const onDevContinue = async (): Promise<void> => {
     if (!tenant) return;
-    const bearer = `DEV-MOCK-${Date.now()}`;
-    const customer = {
-      id: '00000000-0000-4000-8000-000000000999',
-      shopId: tenant.id,
-      name: 'देव-मोड ग्राहक',
-      phoneE164: '+919999999999',
-    };
+    const bearer = buildDevMockBearer();
+    const customer = buildDevMockCustomer(tenant);
     await saveSecureSession({ bearer, customerId: customer.id, shopId: customer.shopId });
     setSession(customer, bearer);
     router.replace('/(tabs)');

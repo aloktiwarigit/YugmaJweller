@@ -3,9 +3,12 @@ import Constants from 'expo-constants';
 import { useCustomerSessionStore } from '../stores/customerSessionStore';
 import { useTenantStore } from '../stores/tenantStore';
 import { saveSecureSession, loadSecureSession } from '../lib/secure-storage';
-
-const DEV_MOCK_BEARER_PREFIX = 'DEV-MOCK-';
-const DEV_MOCK_CUSTOMER_ID = '00000000-0000-4000-8000-000000000999';
+import {
+  DEV_MOCK_CUSTOMER_NAME,
+  DEV_MOCK_CUSTOMER_PHONE,
+  buildDevMockBearer,
+  buildDevMockCustomer,
+} from '../lib/dev-mock-session';
 
 export function CustomerAuthProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const setSession = useCustomerSessionStore((s) => s.setSession);
@@ -21,7 +24,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
       if (cancelled) return;
       if (persisted && tenant && persisted.shopId === tenant.id) {
         setSession(
-          { id: persisted.customerId, shopId: persisted.shopId, name: 'देव-मोड ग्राहक', phoneE164: '+919999999999' },
+          { id: persisted.customerId, shopId: persisted.shopId, name: DEV_MOCK_CUSTOMER_NAME, phoneE164: DEV_MOCK_CUSTOMER_PHONE },
           persisted.bearer,
         );
         return;
@@ -29,13 +32,8 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
 
       // 2. Dev-mode mock — only fires when EXPO_PUBLIC_DEV_AUTH=1 AND tenant is resolved.
       if (devAuth && tenant) {
-        const bearer = `${DEV_MOCK_BEARER_PREFIX}${Date.now()}`;
-        const customer = {
-          id: DEV_MOCK_CUSTOMER_ID,
-          shopId: tenant.id,
-          name: 'देव-मोड ग्राहक',
-          phoneE164: '+919999999999',
-        };
+        const bearer = buildDevMockBearer();
+        const customer = buildDevMockCustomer(tenant);
         await saveSecureSession({ bearer, customerId: customer.id, shopId: customer.shopId });
         if (cancelled) return;
         setSession(customer, bearer);
