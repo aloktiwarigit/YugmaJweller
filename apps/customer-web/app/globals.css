@@ -4,9 +4,17 @@
 
 :root {
   --primary-color: #B58A3C;
+  --font-heading: 'Yatra One', Georgia, serif;
+  --font-body: 'Noto Sans Devanagari', system-ui, sans-serif;
 }
 
 body {
   background-color: #F5EDDD;
   color: #1E2440;
+  font-family: var(--font-body);
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
 }
