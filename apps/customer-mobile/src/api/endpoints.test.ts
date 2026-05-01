@@ -15,13 +15,18 @@ describe('endpoints', () => {
     mock = new MockAdapter(api);
   });
 
-  it('getTenantBoot maps snake_case API response to mobile Tenant shape', async () => {
+  it('getTenantBoot maps snake_case API response (flat config keys) to mobile Tenant shape', async () => {
     mock.onGet('/api/v1/tenant/boot').reply(
       200,
       {
         id: 'tid',
         display_name: 'Test Shop',
-        config: { branding: { primaryColor: '#8C2A1E', appName: 'Test Shop' } },
+        config: {
+          app_name: 'Test Shop App',
+          default_language: 'hi-IN',
+          primary_color: '#8C2A1E',
+          logo_url: 'https://cdn.example/logo.png',
+        },
       },
       { etag: '"v1"' },
     );
@@ -29,19 +34,43 @@ describe('endpoints', () => {
     expect(r.tenant.id).toBe('tid');
     expect(r.tenant.slug).toBe('anchor-dev');
     expect(r.tenant.displayName).toBe('Test Shop');
+    expect(r.tenant.branding.appName).toBe('Test Shop App');
+    expect(r.tenant.branding.defaultLanguage).toBe('hi-IN');
     expect(r.tenant.branding.primaryColor).toBe('#8C2A1E');
+    expect(r.tenant.branding.logoUrl).toBe('https://cdn.example/logo.png');
     expect(r.etag).toBe('"v1"');
     expect(r.notModified).toBe(false);
   });
 
-  it('getTenantBoot defaults branding to empty when config has none', async () => {
+  it('getTenantBoot ignores invalid types and unknown keys in config', async () => {
     mock.onGet('/api/v1/tenant/boot').reply(
       200,
-      { id: 'tid', display_name: 'Bare Shop', config: null },
+      {
+        id: 'tid',
+        display_name: 'Bare Shop',
+        config: { primary_color: 42, default_language: 'fr-FR', extra_unknown: 'ignored' },
+      },
       { etag: '"v2"' },
     );
     const r = await getTenantBoot('anchor-dev');
-    expect(r.tenant.branding).toEqual({});
+    expect(r.tenant.branding.primaryColor).toBeUndefined();
+    expect(r.tenant.branding.defaultLanguage).toBeUndefined();
+  });
+
+  it('getTenantBoot defaults branding to empty when config is null', async () => {
+    mock.onGet('/api/v1/tenant/boot').reply(
+      200,
+      { id: 'tid', display_name: 'Bare Shop', config: null },
+      { etag: '"v3"' },
+    );
+    const r = await getTenantBoot('anchor-dev');
+    expect(r.tenant.branding).toEqual({
+      primaryColor: undefined,
+      secondaryColor: undefined,
+      logoUrl: undefined,
+      appName: undefined,
+      defaultLanguage: undefined,
+    });
   });
 
   it('getTenantBoot handles 304', async () => {

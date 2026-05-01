@@ -51,21 +51,34 @@ export async function getTenantBoot(
   if (res.status === 304) {
     return { tenant: null as unknown as Tenant, etag: etag ?? null, notModified: true };
   }
-  // The API returns snake_case `{ id, display_name, config }`. The mobile
-  // Tenant shape is `{ id, slug, displayName, branding }`. Map here:
-  // slug is supplied by the caller (it is the lookup key, not in the response);
-  // branding comes from `config.branding` if present, else defaults to {}.
-  const config = (res.data.config ?? null) as { branding?: TenantBranding } | null;
+  // The API returns snake_case `{ id, display_name, config }` from
+  // `tenant_boot_lookup`. `shops.config` is a flat JSONB of snake_case keys
+  // (e.g. `app_name`, `default_language`, `primary_color`), NOT a nested
+  // `branding` object — see apps/api/test/tenant-boot.integration.test.ts
+  // for the production seed shape. Map each known key into the mobile
+  // `TenantBranding` interface; unknown keys are ignored.
   const tenant: Tenant = {
     id: res.data.id,
     slug,
     displayName: res.data.display_name,
-    branding: config?.branding ?? {},
+    branding: brandingFromConfig(res.data.config),
   };
   return {
     tenant,
     etag: (res.headers['etag'] as string | undefined) ?? null,
     notModified: false,
+  };
+}
+
+function brandingFromConfig(config: Record<string, unknown> | null): TenantBranding {
+  if (config === null || typeof config !== 'object') return {};
+  const lang = config['default_language'];
+  return {
+    primaryColor: typeof config['primary_color'] === 'string' ? (config['primary_color'] as string) : undefined,
+    secondaryColor: typeof config['secondary_color'] === 'string' ? (config['secondary_color'] as string) : undefined,
+    logoUrl: typeof config['logo_url'] === 'string' ? (config['logo_url'] as string) : undefined,
+    appName: typeof config['app_name'] === 'string' ? (config['app_name'] as string) : undefined,
+    defaultLanguage: lang === 'hi-IN' || lang === 'en-IN' ? lang : undefined,
   };
 }
 
