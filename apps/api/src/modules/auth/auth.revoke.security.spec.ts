@@ -78,7 +78,8 @@ describe('FirebaseJwtStrategy — revoked token rejection', () => {
     // FirebaseJwtStrategy constructor: (provider: AdminLike, pool?: Pool)
     const strategy = new FirebaseJwtStrategy(mockProvider as never, undefined);
 
-    const error = await strategy.validate('revoked-id-token').catch((e) => e);
+    const fakeReq = { headers: {} } as never;
+    const error = await strategy.validate(fakeReq, 'revoked-id-token').catch((e) => e);
 
     expect(error).toBeInstanceOf(UnauthorizedException);
   });

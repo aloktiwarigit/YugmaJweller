@@ -34,6 +34,7 @@ import { TryAtHomeBookingsModule } from './modules/try-at-home-bookings/try-at-h
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { WishlistModule } from './modules/wishlist/wishlist.module';
 import { CustomerModule } from './modules/customer/customer.module';
+import { PlatformAdminModule } from './modules/platform-admin/platform-admin.module';
 import { DrizzleTenantLookup } from './drizzle-tenant-lookup';
 import { TenantAuditReporter } from './modules/tenant-boot/tenant-audit-reporter';
 import { ImpersonationSessionAdapter } from './modules/platform-admin/impersonation-session.adapter';
@@ -90,11 +91,11 @@ class ConditionalTenantInterceptor implements NestInterceptor {
     ReviewsModule,
     WishlistModule,
     CustomerModule,
+    PlatformAdminModule,
   ],
   controllers: [HealthController],
   providers: [
     HttpTenantResolver,
-    ImpersonationSessionAdapter,
     {
       provide: TenantInterceptor,
       useFactory: (
