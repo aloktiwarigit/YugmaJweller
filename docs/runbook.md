@@ -552,4 +552,64 @@ SELECT rolname, rolbypassrls FROM pg_roles WHERE rolname = 'platform_admin';
 
 ---
 
+## 15. Provisioning a platform_admin user
+
+Platform admins are NEVER created via the shopkeeper invite flow. They have no row in
+`shop_users` and no `shop_id`. Provisioning is manual and audited.
+
+1. **Create a Firebase Auth user** for the platform admin (email/password or Google).
+2. **Set the role custom claim** via the Firebase Admin SDK. Suggested helper script
+   `scripts/set-platform-admin.mjs <firebase-uid>`:
+
+   ```js
+   import admin from 'firebase-admin';
+   admin.initializeApp(); // uses GOOGLE_APPLICATION_CREDENTIALS
+   const uid = process.argv[2];
+   await admin.auth().setCustomUserClaims(uid, { role: 'platform_admin' });
+   console.log(`platform_admin claim set on ${uid}`);
+   ```
+
+3. The user must sign out and refresh the ID token for the claim to apply.
+4. **Verify** by hitting `GET /platform/admin/metrics` with the user's ID token — it should
+   return 200. A non-platform-admin token returns 403.
+5. **Audit**: keep a record of who has `platform_admin`. Quarterly review — revoke claims
+   for any admin who no longer needs access.
+
+`platform_admin` users do NOT have a `shop_id` claim. Tenant-scoped routes are unreachable
+to them unless they start an impersonation session (see §16).
+
+## 16. IMPERSONATION_JWT_SECRET rotation
+
+The impersonation JWT (`X-Impersonation-Token` header) is signed with HS256 using
+`IMPERSONATION_JWT_SECRET`. Rotation invalidates all in-flight impersonation tokens.
+DB session rows are unaffected; running sessions must be re-started after rotation.
+
+### When to rotate
+
+- Quarterly (cron-suggested cadence).
+- Within 24 hours of any known leak or suspected compromise.
+- After offboarding a platform admin who held an active token.
+
+### Procedure
+
+1. Generate a new secret (≥ 32 bytes):
+
+   ```bash
+   openssl rand -base64 48
+   ```
+
+2. Update Azure Key Vault entry `impersonation-jwt-secret`.
+3. Roll API instances (`az containerapp revision restart` or equivalent). All running
+   impersonation tokens become invalid as instances pick up the new secret.
+4. Verify rotation by attempting to use a pre-rotation impersonation token — it must fail
+   with `auth.impersonation_token_invalid`.
+
+### What does NOT need to be rotated
+
+- Firebase ID tokens for platform admins — issued by Firebase, not us.
+- Tenant-side `audit_events` rows referencing impersonation sessions — the session row's
+  `id` is stable across secret rotations.
+
+---
+
 _Runbook entries must stay actionable. If a section becomes prose rather than steps, split it or move it to architecture.md._
