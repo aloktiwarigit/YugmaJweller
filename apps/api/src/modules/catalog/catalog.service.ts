@@ -1,6 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { PricingService } from '../pricing/pricing.service';
+import type { CurrentRatesResult } from '../pricing/pricing.service';
 import { computeProductPrice } from '@goldsmith/money';
 import type { PriceBreakdown } from '@goldsmith/money';
 import { MAKING_CHARGE_DEFAULTS } from '@goldsmith/shared';
@@ -213,10 +214,10 @@ export class CatalogService {
 
   private computeCatalogProduct(
     row: ProductCatalogRow,
-    rates: Record<string, { perGramPaise: bigint }>,
+    rates: CurrentRatesResult,
     mcMap: Map<string, string>,
   ): CatalogProduct {
-    const rateEntry = rates[row.purity as keyof typeof rates] as { perGramPaise: bigint } | undefined;
+    const rateEntry = (rates as unknown as Record<string, { perGramPaise: bigint } | undefined>)[row.purity];
 
     let priceAvailable = false;
     let estimatedPrice: EstimatedPrice | undefined;
