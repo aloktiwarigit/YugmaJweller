@@ -1,14 +1,14 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
+import { PG_POOL_ADMIN } from '../platform-admin.module';
 
-async function withPlatformAdmin<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T> {
+// Pool here is PG_POOL_ADMIN, which connects directly as platform_admin.
+// BEGIN/COMMIT remains for atomicity — the export queries + audit insert read consistent
+// state and audit only commits when the export succeeded.
+async function inTx<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T> {
   const c = await pool.connect();
   try {
-    // SET LOCAL ROLE is transaction-scoped; wrap in BEGIN/COMMIT so the role persists
-    // across all queries inside fn(). Atomic-by-default is also a correctness win for
-    // helpers that pair a write with an audit insert.
     await c.query('BEGIN');
-    await c.query('SET LOCAL ROLE platform_admin');
     try {
       const result = await fn(c);
       await c.query('COMMIT');
@@ -34,10 +34,10 @@ export interface TenantExport {
 
 @Injectable()
 export class DataExportService {
-  constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
+  constructor(@Inject(PG_POOL_ADMIN) private readonly pool: Pool) {}
 
   async exportTenant(shopId: string, platformUserId: string): Promise<TenantExport> {
-    return withPlatformAdmin(this.pool, async (c) => {
+    return inTx(this.pool, async (c) => {
       // PLATFORM_ADMIN_BYPASS: scoped export — every query is filtered to the requested
       // shop_id. Returning customer PII is the explicit purpose (DPDPA portability).
       const shop = await c.query(`SELECT * FROM shops WHERE id = $1`, [shopId]);

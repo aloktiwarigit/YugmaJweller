@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
 import { DrizzleTenantLookup } from '../../../drizzle-tenant-lookup';
+import { PG_POOL_ADMIN } from '../platform-admin.module';
 
 export interface CreateShopArgs {
   slug: string;
@@ -37,14 +38,12 @@ export interface ListShopsResult {
   total: number;
 }
 
-async function withPlatformAdmin<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T> {
+// Pool here is PG_POOL_ADMIN, which connects directly as platform_admin role.
+// BEGIN/COMMIT remains for atomicity — write + audit inserts must succeed or fail together.
+async function inTx<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T> {
   const c = await pool.connect();
   try {
-    // SET LOCAL ROLE is transaction-scoped; wrap in BEGIN/COMMIT so the role persists
-    // across all queries inside fn(). Atomic-by-default is also a correctness win for
-    // helpers that pair a write with an audit insert.
     await c.query('BEGIN');
-    await c.query('SET LOCAL ROLE platform_admin');
     try {
       const result = await fn(c);
       await c.query('COMMIT');
@@ -61,12 +60,12 @@ async function withPlatformAdmin<T>(pool: Pool, fn: (c: PoolClient) => Promise<T
 @Injectable()
 export class TenantManagementService {
   constructor(
-    @Inject('PG_POOL') private readonly pool: Pool,
+    @Inject(PG_POOL_ADMIN) private readonly pool: Pool,
     @Inject(DrizzleTenantLookup) private readonly cache: DrizzleTenantLookup,
   ) {}
 
   async createShop(a: CreateShopArgs): Promise<{ id: string }> {
-    return withPlatformAdmin(this.pool, async (c) => {
+    return inTx(this.pool, async (c) => {
       const r = await c.query<{ id: string }>(
         `INSERT INTO shops (slug, display_name, status) VALUES ($1, $2, 'PROVISIONING') RETURNING id`,
         [a.slug, a.displayName],
@@ -91,7 +90,7 @@ export class TenantManagementService {
     if (fields.length === 0) return;
     fields.push(`updated_at = now()`);
     params.push(a.shopId);
-    await withPlatformAdmin(this.pool, async (c) => {
+    await inTx(this.pool, async (c) => {
       const r = await c.query(`UPDATE shops SET ${fields.join(', ')} WHERE id = $${i}`, params);
       if (r.rowCount === 0) throw new NotFoundException({ code: 'tenant.not_found' });
       await c.query(
@@ -104,7 +103,7 @@ export class TenantManagementService {
   }
 
   async suspendShop(shopId: string, reason: string, platformUserId: string): Promise<void> {
-    await withPlatformAdmin(this.pool, async (c) => {
+    await inTx(this.pool, async (c) => {
       const r = await c.query(
         `UPDATE shops SET status = 'SUSPENDED', updated_at = now() WHERE id = $1 AND status <> 'TERMINATED'`,
         [shopId],
@@ -120,7 +119,7 @@ export class TenantManagementService {
   }
 
   async unsuspendShop(shopId: string, platformUserId: string): Promise<void> {
-    await withPlatformAdmin(this.pool, async (c) => {
+    await inTx(this.pool, async (c) => {
       const r = await c.query(
         `UPDATE shops SET status = 'ACTIVE', updated_at = now() WHERE id = $1 AND status = 'SUSPENDED'`,
         [shopId],
@@ -137,7 +136,7 @@ export class TenantManagementService {
 
   async listShops(a: ListShopsArgs): Promise<ListShopsResult> {
     const offset = Math.max(0, (a.page - 1) * a.pageSize);
-    return withPlatformAdmin(this.pool, async (c) => {
+    return inTx(this.pool, async (c) => {
       const items = await c.query<ShopRow>(
         a.search
           ? `SELECT id, slug, display_name, status, created_at FROM shops

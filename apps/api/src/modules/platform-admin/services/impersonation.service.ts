@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
 import { signImpersonationToken } from '../impersonation-token';
+import { PG_POOL_ADMIN } from '../platform-admin.module';
 
 const TTL_SECONDS = 30 * 60;
 
@@ -18,14 +19,12 @@ export interface StartImpersonationResult {
   expiresAt: string;
 }
 
-async function withPlatformAdmin<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T> {
+// Pool here is PG_POOL_ADMIN, which connects directly as platform_admin.
+// BEGIN/COMMIT remains for atomicity — session row + audit event must succeed or fail together.
+async function inTx<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T> {
   const c = await pool.connect();
   try {
-    // SET LOCAL ROLE is transaction-scoped; wrap in BEGIN/COMMIT so the role persists
-    // across all queries inside fn(). Atomic-by-default is also a correctness win for
-    // helpers that pair a write with an audit insert.
     await c.query('BEGIN');
-    await c.query('SET LOCAL ROLE platform_admin');
     try {
       const result = await fn(c);
       await c.query('COMMIT');
@@ -41,7 +40,7 @@ async function withPlatformAdmin<T>(pool: Pool, fn: (c: PoolClient) => Promise<T
 
 @Injectable()
 export class ImpersonationService {
-  constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
+  constructor(@Inject(PG_POOL_ADMIN) private readonly pool: Pool) {}
 
   async startImpersonation(a: StartImpersonationArgs): Promise<StartImpersonationResult> {
     const secret = process.env['IMPERSONATION_JWT_SECRET'];
@@ -52,7 +51,7 @@ export class ImpersonationService {
       throw new UnauthorizedException({ code: 'impersonation.secret_invalid' });
     }
 
-    return withPlatformAdmin(this.pool, async (c) => {
+    return inTx(this.pool, async (c) => {
       const expiresAt = new Date(Date.now() + TTL_SECONDS * 1000);
       const r = await c.query<{ id: string }>(
         `INSERT INTO impersonation_sessions
@@ -87,20 +86,24 @@ export class ImpersonationService {
   }
 
   async endImpersonation(sessionId: string, platformUserId: string): Promise<void> {
-    await withPlatformAdmin(this.pool, async (c) => {
-      const upd = await c.query(
+    await inTx(this.pool, async (c) => {
+      const upd = await c.query<{ target_shop_id: string }>(
         `UPDATE impersonation_sessions
             SET ended_at = now()
-          WHERE id = $1 AND platform_user_id = $2 AND ended_at IS NULL`,
+          WHERE id = $1 AND platform_user_id = $2 AND ended_at IS NULL
+          RETURNING target_shop_id`,
         [sessionId, platformUserId],
       );
       if (upd.rowCount === 0) {
         throw new NotFoundException({ code: 'impersonation_session.not_found' });
       }
+      // Include target_shop_id so tenant-scoped audit queries pair this `impersonation.ended`
+      // event with the matching `impersonation.started` row.
+      const targetShopId = upd.rows[0]!.target_shop_id;
       await c.query(
-        `INSERT INTO platform_audit_events (action, platform_user_id, metadata)
-         VALUES ($1, $2, $3::jsonb)`,
-        ['impersonation.ended', platformUserId, JSON.stringify({ sessionId })],
+        `INSERT INTO platform_audit_events (action, platform_user_id, target_shop_id, metadata)
+         VALUES ($1, $2, $3, $4::jsonb)`,
+        ['impersonation.ended', platformUserId, targetShopId, JSON.stringify({ sessionId })],
       );
     });
   }

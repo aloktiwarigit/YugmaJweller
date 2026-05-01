@@ -15,10 +15,12 @@ describe('SubscriptionService', () => {
     pool = { connect: vi.fn().mockResolvedValue(client) };
   });
 
+  // After PG_POOL_ADMIN refactor: BEGIN/COMMIT remains, SET LOCAL ROLE gone.
+  // Sequence: BEGIN, upsert, audit, COMMIT (indexes 0/1/2/3).
+
   it('upsertSubscription upserts row, audits subscription.upserted', async () => {
     client.query
       .mockResolvedValueOnce(undefined)                       // BEGIN
-      .mockResolvedValueOnce(undefined)                       // SET LOCAL ROLE
       .mockResolvedValueOnce({ rows: [{ id: 'sub-1' }] })     // UPSERT
       .mockResolvedValueOnce(undefined)                       // INSERT audit
       .mockResolvedValueOnce(undefined);                      // COMMIT
@@ -32,15 +34,17 @@ describe('SubscriptionService', () => {
     });
 
     expect(out.id).toBe('sub-1');
-    expect(client.query.mock.calls[2]![0]).toMatch(/ON CONFLICT \(shop_id\) DO UPDATE/);
-    expect(client.query.mock.calls[3]![1]).toContain('subscription.upserted');
-    expect(client.query.mock.calls[3]![1]).toContain('shop-1');
+    expect(client.query.mock.calls[1]![0]).toMatch(/ON CONFLICT \(shop_id\) DO UPDATE/);
+    // Update path preserves status / billing_cycle_start when caller omits them.
+    expect(client.query.mock.calls[1]![0]).toMatch(/status = COALESCE\(\$3, platform_subscriptions\.status\)/);
+    expect(client.query.mock.calls[1]![0]).toMatch(/billing_cycle_start = COALESCE\(\$5, platform_subscriptions\.billing_cycle_start\)/);
+    expect(client.query.mock.calls[2]![1]).toContain('subscription.upserted');
+    expect(client.query.mock.calls[2]![1]).toContain('shop-1');
   });
 
   it('listSubscriptions returns rows joined with shops, mrrPaise as number', async () => {
     client.query
       .mockResolvedValueOnce(undefined)                       // BEGIN
-      .mockResolvedValueOnce(undefined)                       // SET LOCAL ROLE
       .mockResolvedValueOnce({
         rows: [{
           id: 'sub-1',

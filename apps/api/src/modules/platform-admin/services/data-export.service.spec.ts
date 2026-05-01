@@ -15,10 +15,13 @@ describe('DataExportService', () => {
     pool = { connect: vi.fn().mockResolvedValue(client) };
   });
 
+  // After the PG_POOL_ADMIN refactor: BEGIN/COMMIT remains for atomicity (audit + reads
+  // commit together) but SET LOCAL ROLE is gone — the pool is already platform_admin.
+  // Call sequence is now: BEGIN, shop, customers, invoices, payments, audit, COMMIT.
+
   it('exports a single tenant scope with shop_id filter on every query', async () => {
     client.query
       .mockResolvedValueOnce(undefined)                                                                    // BEGIN
-      .mockResolvedValueOnce(undefined)                                                                    // SET LOCAL ROLE
       .mockResolvedValueOnce({ rows: [{ id: 's1', slug: 'demo', display_name: 'Demo', status: 'ACTIVE' }] }) // shop
       .mockResolvedValueOnce({ rows: [{ id: 'c1' }], rowCount: 1 })                                          // customers
       .mockResolvedValueOnce({ rows: [{ id: 'inv1' }], rowCount: 1 })                                        // invoices
@@ -35,19 +38,19 @@ describe('DataExportService', () => {
     expect(out.payments).toHaveLength(1);
     expect(out.excluded).toContain('audit_events');
 
-    // Every data query filtered by shop_id (indexes shifted by 2 for BEGIN + SET LOCAL ROLE)
+    // Every data query filtered by shop_id (indexes shifted by 1 for BEGIN only)
+    expect(client.query.mock.calls[1]![1]).toEqual(['s1']);
     expect(client.query.mock.calls[2]![1]).toEqual(['s1']);
     expect(client.query.mock.calls[3]![1]).toEqual(['s1']);
     expect(client.query.mock.calls[4]![1]).toEqual(['s1']);
-    expect(client.query.mock.calls[5]![1]).toEqual(['s1']);
     // Audit row written
-    expect(client.query.mock.calls[6]![1]).toContain('tenant.exported');
+    expect(client.query.mock.calls[5]![1]).toContain('tenant.exported');
+    expect(client.query.mock.calls[6]![0]).toBe('COMMIT');
   });
 
   it('throws NotFoundException when shop not found', async () => {
     client.query
       .mockResolvedValueOnce(undefined)             // BEGIN
-      .mockResolvedValueOnce(undefined)             // SET LOCAL ROLE
       .mockResolvedValueOnce({ rows: [] })          // shop SELECT empty → throws
       .mockResolvedValueOnce(undefined);            // ROLLBACK in catch
 

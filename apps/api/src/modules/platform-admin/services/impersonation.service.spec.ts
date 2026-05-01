@@ -19,10 +19,13 @@ describe('ImpersonationService', () => {
     pool = { connect: vi.fn().mockResolvedValue(client) };
   });
 
+  // After PG_POOL_ADMIN refactor: BEGIN/COMMIT remains for atomicity, SET LOCAL ROLE gone.
+  // Call sequence is now: BEGIN, INSERT session, INSERT audit, COMMIT (start)
+  // and BEGIN, UPDATE session, INSERT audit, COMMIT (end).
+
   it('start: inserts session, audits, returns short-lived JWT with jti = session id', async () => {
     client.query
       .mockResolvedValueOnce(undefined)                                    // BEGIN
-      .mockResolvedValueOnce(undefined)                                    // SET LOCAL ROLE
       .mockResolvedValueOnce({ rows: [{ id: SESSION_ID }] })               // INSERT impersonation_sessions
       .mockResolvedValueOnce(undefined)                                    // INSERT platform_audit_events
       .mockResolvedValueOnce(undefined);                                   // COMMIT
@@ -43,37 +46,43 @@ describe('ImpersonationService', () => {
     expect(decoded.exp - decoded.iat).toBe(1800);
     expect(decoded.jti).toBe(SESSION_ID);
 
-    // Indexes shifted by 2 for BEGIN + SET LOCAL ROLE
-    const insertCall = client.query.mock.calls[2]!;
+    // Indexes shifted by 1 for BEGIN only
+    const insertCall = client.query.mock.calls[1]!;
     expect(insertCall[0]).toMatch(/INSERT INTO impersonation_sessions/);
-    const auditCall = client.query.mock.calls[3]!;
+    const auditCall = client.query.mock.calls[2]!;
     expect(auditCall[0]).toMatch(/INSERT INTO platform_audit_events/);
     expect(auditCall[1]).toContain('impersonation.started');
     expect(auditCall[1]).toContain(SHOP_ID);
   });
 
-  it('end: marks session ended_at and audits impersonation.ended', async () => {
+  it('end: marks session ended_at and audits impersonation.ended with target_shop_id', async () => {
     client.query
       .mockResolvedValueOnce(undefined)                                    // BEGIN
-      .mockResolvedValueOnce(undefined)                                    // SET LOCAL ROLE
-      .mockResolvedValueOnce({ rowCount: 1 })                              // UPDATE
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ target_shop_id: SHOP_ID }] }) // UPDATE RETURNING
       .mockResolvedValueOnce(undefined)                                    // INSERT audit
       .mockResolvedValueOnce(undefined);                                   // COMMIT
 
     const svc = new ImpersonationService(pool as never);
     await svc.endImpersonation(SESSION_ID, 'p-uid');
 
-    const updateCall = client.query.mock.calls[2]!;
+    const updateCall = client.query.mock.calls[1]!;
     expect(updateCall[0]).toMatch(/UPDATE impersonation_sessions/);
     expect(updateCall[0]).toMatch(/ended_at = now\(\)/);
+    expect(updateCall[0]).toMatch(/RETURNING target_shop_id/);
     expect(updateCall[1]).toEqual([SESSION_ID, 'p-uid']);
+
+    // Audit row carries target_shop_id so tenant-scoped queries pair start ↔ end
+    const auditCall = client.query.mock.calls[2]!;
+    expect(auditCall[0]).toMatch(/INSERT INTO platform_audit_events/);
+    expect(auditCall[0]).toMatch(/target_shop_id/);
+    expect(auditCall[1]).toContain('impersonation.ended');
+    expect(auditCall[1]).toContain(SHOP_ID);
   });
 
   it('end: 404 when session does not belong to caller (or already ended)', async () => {
     client.query
       .mockResolvedValueOnce(undefined)                                    // BEGIN
-      .mockResolvedValueOnce(undefined)                                    // SET LOCAL ROLE
-      .mockResolvedValueOnce({ rowCount: 0 })                              // UPDATE returns 0 → throws
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })                    // UPDATE returns 0 → throws
       .mockResolvedValueOnce(undefined);                                   // ROLLBACK
 
     const svc = new ImpersonationService(pool as never);

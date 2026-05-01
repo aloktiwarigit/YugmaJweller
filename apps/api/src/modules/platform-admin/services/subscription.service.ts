@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
+import { PG_POOL_ADMIN } from '../platform-admin.module';
 
 export type SubscriptionPlan = 'trial' | 'starter' | 'growth' | 'enterprise';
 export type SubscriptionStatus = 'active' | 'suspended' | 'cancelled';
@@ -24,14 +25,12 @@ export interface SubscriptionRow {
 
 const PLANS = new Set<SubscriptionPlan>(['trial', 'starter', 'growth', 'enterprise']);
 
-async function withPlatformAdmin<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T> {
+// Pool here is PG_POOL_ADMIN, which connects directly as platform_admin.
+// BEGIN/COMMIT remains for atomicity — upsert + audit insert must succeed or fail together.
+async function inTx<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T> {
   const c = await pool.connect();
   try {
-    // SET LOCAL ROLE is transaction-scoped; wrap in BEGIN/COMMIT so the role persists
-    // across all queries inside fn(). Atomic-by-default is also a correctness win for
-    // helpers that pair a write with an audit insert.
     await c.query('BEGIN');
-    await c.query('SET LOCAL ROLE platform_admin');
     try {
       const result = await fn(c);
       await c.query('COMMIT');
@@ -47,22 +46,26 @@ async function withPlatformAdmin<T>(pool: Pool, fn: (c: PoolClient) => Promise<T
 
 @Injectable()
 export class SubscriptionService {
-  constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
+  constructor(@Inject(PG_POOL_ADMIN) private readonly pool: Pool) {}
 
   async upsertSubscription(a: UpsertSubscriptionArgs): Promise<{ id: string }> {
     if (!PLANS.has(a.plan)) throw new BadRequestException({ code: 'subscription.invalid_plan' });
     if (!Number.isInteger(a.mrrPaise) || a.mrrPaise < 0) {
       throw new BadRequestException({ code: 'subscription.invalid_mrr' });
     }
-    return withPlatformAdmin(this.pool, async (c) => {
+    return inTx(this.pool, async (c) => {
+      // On UPDATE: refer to the parameters ($3 / $5) directly so we can preserve the existing
+      // row's status / billing_cycle_start when the caller omits them. Using EXCLUDED.* here
+      // is a footgun because EXCLUDED.status is COALESCE($3, 'active') — omitting the field
+      // on update would silently reactivate a suspended sub and clear its billing cycle.
       const r = await c.query<{ id: string }>(
         `INSERT INTO platform_subscriptions (shop_id, plan, status, mrr_paise, billing_cycle_start)
          VALUES ($1, $2, COALESCE($3, 'active'), $4, $5)
          ON CONFLICT (shop_id) DO UPDATE
            SET plan = EXCLUDED.plan,
-               status = EXCLUDED.status,
+               status = COALESCE($3, platform_subscriptions.status),
                mrr_paise = EXCLUDED.mrr_paise,
-               billing_cycle_start = EXCLUDED.billing_cycle_start,
+               billing_cycle_start = COALESCE($5, platform_subscriptions.billing_cycle_start),
                updated_at = now()
          RETURNING id`,
         [a.shopId, a.plan, a.status ?? null, a.mrrPaise, a.billingCycleStart ?? null],
@@ -75,7 +78,7 @@ export class SubscriptionService {
           'subscription.upserted',
           a.platformUserId,
           a.shopId,
-          JSON.stringify({ plan: a.plan, status: a.status ?? 'active', mrrPaise: a.mrrPaise }),
+          JSON.stringify({ plan: a.plan, status: a.status ?? null, mrrPaise: a.mrrPaise }),
         ],
       );
       return { id };
@@ -83,7 +86,7 @@ export class SubscriptionService {
   }
 
   async listSubscriptions(): Promise<SubscriptionRow[]> {
-    return withPlatformAdmin(this.pool, async (c) => {
+    return inTx(this.pool, async (c) => {
       const r = await c.query<{
         id: string;
         shop_id: string;

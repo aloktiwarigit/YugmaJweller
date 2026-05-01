@@ -1,28 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MetricsService } from './metrics.service';
 
-interface MockClient {
-  query: ReturnType<typeof vi.fn>;
-  release: ReturnType<typeof vi.fn>;
-}
-
 describe('MetricsService', () => {
-  let pool: { connect: ReturnType<typeof vi.fn> };
-  let client: MockClient;
+  // After the PG_POOL_ADMIN refactor MetricsService just calls pool.query directly
+  // (no transaction, no role switch) — the pool itself connects as platform_admin.
+  let pool: { query: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
-    client = { query: vi.fn(), release: vi.fn() };
-    pool = { connect: vi.fn().mockResolvedValue(client) };
+    pool = { query: vi.fn() };
   });
 
   it('returns total/active shops + invoice count for last 30 days', async () => {
-    client.query
-      .mockResolvedValueOnce(undefined) // BEGIN
-      .mockResolvedValueOnce(undefined) // SET LOCAL ROLE
-      .mockResolvedValueOnce({
-        rows: [{ total_shops: '7', active_shops: '5', invoices_30d: '142' }],
-      })
-      .mockResolvedValueOnce(undefined); // COMMIT
+    pool.query.mockResolvedValueOnce({
+      rows: [{ total_shops: '7', active_shops: '5', invoices_30d: '142' }],
+    });
 
     const svc = new MetricsService(pool as never);
     const m = await svc.getMetrics();
@@ -30,33 +21,24 @@ describe('MetricsService', () => {
     expect(m).toEqual({ totalShops: 7, activeShops: 5, invoicesLast30Days: 142 });
   });
 
-  it('escalates to platform_admin role inside a transaction', async () => {
-    client.query
-      .mockResolvedValueOnce(undefined) // BEGIN
-      .mockResolvedValueOnce(undefined) // SET LOCAL ROLE
-      .mockResolvedValueOnce({ rows: [{ total_shops: '0', active_shops: '0', invoices_30d: '0' }] })
-      .mockResolvedValueOnce(undefined); // COMMIT
+  it('issues a single aggregate SELECT against the admin pool', async () => {
+    pool.query.mockResolvedValueOnce({
+      rows: [{ total_shops: '0', active_shops: '0', invoices_30d: '0' }],
+    });
 
     const svc = new MetricsService(pool as never);
     await svc.getMetrics();
 
-    expect(client.query.mock.calls[0]![0]).toBe('BEGIN');
-    expect(client.query.mock.calls[1]![0]).toBe('SET LOCAL ROLE platform_admin');
-    expect(client.query.mock.calls[3]![0]).toBe('COMMIT');
-    expect(client.release).toHaveBeenCalled();
+    expect(pool.query).toHaveBeenCalledTimes(1);
+    const sql = pool.query.mock.calls[0]![0] as string;
+    expect(sql).toMatch(/total_shops/);
+    expect(sql).toMatch(/active_shops/);
+    expect(sql).toMatch(/invoices_30d/);
   });
 
-  it('rolls back the transaction when the inner query throws', async () => {
-    client.query
-      .mockResolvedValueOnce(undefined) // BEGIN
-      .mockResolvedValueOnce(undefined) // SET LOCAL ROLE
-      .mockRejectedValueOnce(new Error('boom')) // SELECT throws
-      .mockResolvedValueOnce(undefined); // ROLLBACK
-
+  it('propagates pool errors', async () => {
+    pool.query.mockRejectedValueOnce(new Error('boom'));
     const svc = new MetricsService(pool as never);
     await expect(svc.getMetrics()).rejects.toThrow('boom');
-
-    expect(client.query.mock.calls[3]![0]).toBe('ROLLBACK');
-    expect(client.release).toHaveBeenCalled();
   });
 });
