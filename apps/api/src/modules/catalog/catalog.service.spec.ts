@@ -175,6 +175,21 @@ describe('CatalogService.getProducts()', () => {
     expect(result.items).toHaveLength(0);
     expect(result.total).toBe(0);
   });
+
+  it('appends metal filter to SQL when metal param provided', async () => {
+    const pool = makePool([
+      { rows: [] },
+      { rows: [baseProduct] },
+    ]);
+    const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
+    const svc = new CatalogService(pool as never, ps as never);
+
+    await svc.getProducts({ shopId: 'shop-1', metal: 'gold', page: 1, limit: 12 });
+
+    const sqlCall = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1];
+    expect(sqlCall[0]).toContain('p.metal = $');
+    expect(sqlCall[1]).toContain('GOLD');
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -87,6 +87,7 @@ export class CatalogController {
     @Headers('x-tenant-id') shopId: string,
     @Query('categoryId') categoryId?: string,
     @Query('search') search?: string,
+    @Query('metal') metal?: string,
     @Query('page') page = '1',
     @Query('limit') limit = '12',
   ): Promise<CatalogProductsResponse> {
@@ -95,6 +96,7 @@ export class CatalogController {
       shopId,
       categoryId,
       search,
+      metal,
       page:  Math.max(1, parseInt(page, 10) || 1),
       limit: Math.min(50, Math.max(1, parseInt(limit, 10) || 12)),
     });

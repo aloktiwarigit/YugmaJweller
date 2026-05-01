@@ -57,6 +57,7 @@ export interface GetProductsParams {
   shopId:      string;
   categoryId?: string;
   search?:     string;
+  metal?:      string;
   page:        number;
   limit:       number;
 }
@@ -153,7 +154,7 @@ export class CatalogService {
   }
 
   async getProducts(params: GetProductsParams): Promise<CatalogProductsResponse> {
-    const { shopId, categoryId, search, page, limit } = params;
+    const { shopId, categoryId, search, metal, page, limit } = params;
     const safePage  = Math.max(1, page);
     const safeLimit = Math.min(50, Math.max(1, limit));
     const offset    = (safePage - 1) * safeLimit;
@@ -164,6 +165,10 @@ export class CatalogService {
     if (categoryId) {
       queryParams.push(categoryId);
       whereExtra += ` AND p.category_id = $${queryParams.length}`;
+    }
+    if (metal && metal.trim().length > 0) {
+      queryParams.push(metal.trim().toUpperCase());
+      whereExtra += ` AND p.metal = $${queryParams.length}`;
     }
     if (search && search.trim().length > 0) {
       const term = `%${search.trim()}%`;
