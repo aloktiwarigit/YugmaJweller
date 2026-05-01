@@ -42,7 +42,7 @@ function fakeReq(overrides: object = {}): Parameters<CustomerController['getLoya
 
 function makeCtrl() {
   mockPool.query.mockResolvedValue({
-    rows: [{ slug: 'test-shop', display_name: 'Test Shop' }],
+    rows: [{ slug: 'test-shop', display_name: 'Test Shop', status: 'ACTIVE' }],
   });
   return new CustomerController(
     mockPool as never,

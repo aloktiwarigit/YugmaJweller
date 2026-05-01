@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, Pressable, TextInput,
   ActivityIndicator, Linking,
 } from 'react-native';
+import Constants from 'expo-constants';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 import { TenantBrandHeader } from '../../src/components/TenantBrandHeader';
@@ -10,6 +11,8 @@ import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import { getPublicRates, createCustomerRateLockBooking } from '../../src/api/endpoints';
 import type { RateLockBookingResult } from '../../src/api/endpoints';
 
+const API_BASE =
+  (Constants.expoConfig?.extra?.['apiBaseUrl'] as string | undefined) ?? 'http://localhost:3000';
 
 function ConfirmationCard({ booking }: { booking: RateLockBookingResult }): React.ReactElement {
   const lockedRate = Math.round(Number(booking.lockedRate24kPaisePerGram) / 100);
@@ -18,9 +21,10 @@ function ConfirmationCard({ booking }: { booking: RateLockBookingResult }): Reac
   });
 
   const openPayment = (): void => {
-    // Razorpay Standard Checkout URL — browser handles the payment flow.
+    // Opens the server-hosted Razorpay Standard Checkout page in the system browser.
+    // The page loads checkout.js and opens the payment modal for the Razorpay order.
     // Webhook on server activates the booking once payment is captured.
-    const url = `https://rzp.io/i/${booking.razorpayOrderId}`;
+    const url = `${API_BASE}/api/v1/customer/rate-lock/bookings/${booking.bookingId}/payment-page`;
     void Linking.openURL(url);
   };
 

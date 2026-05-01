@@ -2,14 +2,20 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   Inject,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
   Post,
   Req,
+  ServiceUnavailableException,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
+import { Res } from '@nestjs/common';
 import { z } from 'zod';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext, Tenant } from '@goldsmith/tenant-context';
@@ -95,14 +101,65 @@ export class CustomerController {
     );
   }
 
+  // ── Rate-Lock Checkout Page ───────────────────────────────────────────────────
+  // Serves a self-contained HTML page that loads Razorpay checkout.js and opens
+  // the payment modal. Mobile app opens this URL via Linking.openURL; the webhook
+  // activates the booking server-side on payment capture.
+
+  @Get('rate-lock/bookings/:id/payment-page')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  @Header('Cache-Control', 'no-store')
+  async getRateLockPaymentPage(
+    @Req() req: Request,
+    @Param('id', ParseUUIDPipe) bookingId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { customerId, shopId } = getCustomerCtx(req);
+
+    // Verify booking belongs to this customer+shop
+    const row = await this.pool.query<{
+      razorpay_order_id: string | null;
+      deposit_amount_paise: string;
+      status: string;
+    }>(
+      `SELECT razorpay_order_id, deposit_amount_paise::text, status
+       FROM rate_lock_bookings
+       WHERE id = $1 AND customer_id = $2 AND shop_id = $3`,
+      [bookingId, customerId, shopId],
+    );
+    if (!row.rows[0]) throw new NotFoundException({ code: 'rate_lock.not_found' });
+    if (row.rows[0].status !== 'PENDING_PAYMENT') {
+      throw new NotFoundException({ code: 'rate_lock.not_pending_payment' });
+    }
+    const orderId     = row.rows[0].razorpay_order_id;
+    const amountPaise = row.rows[0].deposit_amount_paise;
+    if (!orderId) throw new NotFoundException({ code: 'rate_lock.order_not_created' });
+
+    const shopRow = await this.pool.query<{ display_name: string }>(
+      `SELECT display_name FROM shops WHERE id = $1 LIMIT 1`,
+      [shopId],
+    );
+    const shopName = shopRow.rows[0]?.display_name ?? 'Goldsmith';
+    const keyId    = process.env['RAZORPAY_KEY_ID'] ?? '';
+
+    const html = buildRazorpayCheckoutHtml({ orderId, amountPaise, shopName, keyId });
+    res.send(html);
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
   private async buildSyntheticCtx(shopId: string, customerId: string): Promise<AuthenticatedTenantContext> {
-    const row = await this.pool.query<{ slug: string; display_name: string }>(
-      `SELECT slug, display_name FROM shops WHERE id = $1 LIMIT 1`,
+    const row = await this.pool.query<{ slug: string; display_name: string; status: string }>(
+      `SELECT slug, display_name, status FROM shops WHERE id = $1 LIMIT 1`,
       [shopId],
     );
     if (!row.rows[0]) throw new UnauthorizedException({ code: 'customer.shop_not_found' });
+
+    // Guard: only serve ACTIVE shops. SUSPENDED/TERMINATED/PROVISIONING shops must be
+    // rejected here because @SkipTenant bypasses the TenantInterceptor status check.
+    if (row.rows[0].status !== 'ACTIVE') {
+      throw new ServiceUnavailableException({ code: 'tenant.inactive' });
+    }
 
     const tenant: Tenant = {
       id:           shopId,
@@ -119,4 +176,64 @@ export class CustomerController {
       tenant,
     };
   }
+}
+
+function buildRazorpayCheckoutHtml(params: {
+  orderId:     string;
+  amountPaise: string;
+  shopName:    string;
+  keyId:       string;
+}): string {
+  // Escape values to prevent XSS — these come from server-controlled strings but
+  // we still HTML-encode to be safe.
+  const esc = (s: string): string =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  return `<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>भुगतान — ${esc(params.shopName)}</title>
+  <style>
+    body { font-family: sans-serif; display:flex; align-items:center; justify-content:center;
+           min-height:100vh; margin:0; background:#FFFBF5; }
+    .card { text-align:center; padding:2rem; max-width:360px; }
+    h1 { font-size:1.4rem; color:#1C1917; margin-bottom:0.5rem; }
+    p  { color:#6B7280; font-size:0.9rem; margin-bottom:1.5rem; }
+    button { background:#B8860B; color:#fff; border:none; border-radius:8px;
+             padding:14px 32px; font-size:1rem; cursor:pointer; min-width:200px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>${esc(params.shopName)}</h1>
+    <p>दर-लॉक जमा राशि — ₹${Math.round(Number(params.amountPaise) / 100).toLocaleString('en-IN')}</p>
+    <button id="payBtn">Razorpay से भुगतान करें</button>
+  </div>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script>
+    document.getElementById('payBtn').addEventListener('click', function() {
+      var rzp = new Razorpay({
+        key: "${esc(params.keyId)}",
+        order_id: "${esc(params.orderId)}",
+        amount: "${esc(params.amountPaise)}",
+        currency: "INR",
+        name: "${esc(params.shopName)}",
+        description: "दर-लॉक जमा राशि",
+        handler: function(response) {
+          document.querySelector('.card').innerHTML =
+            '<h1>भुगतान सफल!</h1><p>ऐप पर वापस जाएं। बुकिंग जल्द सक्रिय होगी।</p>';
+        },
+        modal: { ondismiss: function() {} }
+      });
+      rzp.open();
+    });
+    // Auto-open on load for smoother UX
+    window.addEventListener('load', function() {
+      document.getElementById('payBtn').click();
+    });
+  </script>
+</body>
+</html>`;
 }
