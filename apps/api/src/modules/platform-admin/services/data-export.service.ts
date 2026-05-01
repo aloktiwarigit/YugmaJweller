@@ -40,12 +40,45 @@ export class DataExportService {
     return inTx(this.pool, async (c) => {
       // PLATFORM_ADMIN_BYPASS: scoped export — every query is filtered to the requested
       // shop_id. Returning customer PII is the explicit purpose (DPDPA portability).
-      const shop = await c.query(`SELECT * FROM shops WHERE id = $1`, [shopId]);
+      //
+      // Explicit column projection per table — never SELECT *. Encrypted columns
+      // (customers.pan_ciphertext, customers.pan_key_id, invoices.pan_ciphertext,
+      // invoices.pan_key_id) are useless to the export consumer (raw bytes without keys)
+      // and infrastructure metadata (shops.kek_key_arn = Azure Key Vault KEK ARN) MUST NOT
+      // appear in any browser-deliverable response. Surface only a boolean `pan_on_file`
+      // so the consumer knows PAN exists without leaking the ciphertext.
+      const shop = await c.query(
+        `SELECT id, slug, display_name, status, config, created_at, updated_at
+           FROM shops WHERE id = $1`,
+        [shopId],
+      );
       if (shop.rows.length === 0) throw new NotFoundException({ code: 'tenant.not_found' });
 
-      const customers = await c.query(`SELECT * FROM customers WHERE shop_id = $1`, [shopId]);
-      const invoices = await c.query(`SELECT * FROM invoices WHERE shop_id = $1`, [shopId]);
-      const payments = await c.query(`SELECT * FROM payments WHERE shop_id = $1`, [shopId]);
+      const customers = await c.query(
+        `SELECT id, shop_id, phone, name, email,
+                address_line1, address_line2, city, state, pincode,
+                dob_year, viewing_consent,
+                (pan_ciphertext IS NOT NULL) AS pan_on_file,
+                created_at, updated_at
+           FROM customers WHERE shop_id = $1`,
+        [shopId],
+      );
+      const invoices = await c.query(
+        `SELECT id, shop_id, invoice_number, invoice_type,
+                customer_id, customer_name, customer_phone,
+                status, subtotal_paise, gst_metal_paise, gst_making_paise, total_paise,
+                idempotency_key, issued_at, created_by_user_id,
+                (pan_ciphertext IS NOT NULL) AS pan_on_file,
+                created_at, updated_at
+           FROM invoices WHERE shop_id = $1`,
+        [shopId],
+      );
+      const payments = await c.query(
+        `SELECT id, shop_id, invoice_id, method, amount_paise, status,
+                recorded_at, created_by_user_id
+           FROM payments WHERE shop_id = $1`,
+        [shopId],
+      );
 
       await c.query(
         `INSERT INTO platform_audit_events (action, platform_user_id, target_shop_id, metadata)
@@ -70,7 +103,14 @@ export class DataExportService {
         invoices: invoices.rows,
         payments: payments.rows,
         exported_at: new Date().toISOString(),
-        excluded: ['audit_events', 'loyalty_ledger', 'product_views', 'try_at_home_bookings'],
+        excluded: [
+          'audit_events',
+          'loyalty_ledger',
+          'product_views',
+          'try_at_home_bookings',
+          'pan_ciphertext / pan_key_id (encrypted, replaced by pan_on_file boolean)',
+          'shops.kek_key_arn (infrastructure metadata)',
+        ],
       };
     });
   }

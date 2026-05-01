@@ -48,6 +48,48 @@ describe('DataExportService', () => {
     expect(client.query.mock.calls[6]![0]).toBe('COMMIT');
   });
 
+  it('explicitly projects safe columns — never SELECT * — and redacts encrypted/infra fields', async () => {
+    client.query
+      .mockResolvedValueOnce(undefined)                                                                    // BEGIN
+      .mockResolvedValueOnce({ rows: [{ id: 's1' }] })                                                     // shop
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })                                                    // customers
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })                                                    // invoices
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })                                                    // payments
+      .mockResolvedValueOnce(undefined)                                                                    // audit
+      .mockResolvedValueOnce(undefined);                                                                   // COMMIT
+
+    const svc = new DataExportService(pool as never);
+    const out = await svc.exportTenant('s1', 'platform-uid');
+
+    // Each data SELECT must explicitly list columns (no `SELECT *`).
+    const shopSql = client.query.mock.calls[1]![0] as string;
+    const custSql = client.query.mock.calls[2]![0] as string;
+    const invSql  = client.query.mock.calls[3]![0] as string;
+    const paySql  = client.query.mock.calls[4]![0] as string;
+    for (const sql of [shopSql, custSql, invSql, paySql]) {
+      expect(sql).not.toMatch(/SELECT\s+\*/i);
+    }
+    // Encrypted bytes / infra metadata must never be returned as projected columns.
+    // (The expression `(pan_ciphertext IS NOT NULL)` is acceptable — it reads the column
+    // server-side to derive a boolean — but no row sent to the consumer should carry the
+    // raw ciphertext or the KEK ARN.)
+    expect(shopSql).not.toContain('kek_key_arn');
+    // Customer + invoice queries surface a pan_on_file boolean instead of the ciphertext.
+    expect(custSql).toContain('pan_on_file');
+    expect(invSql).toContain('pan_on_file');
+    // No SELECT projects pan_ciphertext or pan_key_id directly (must be computed-only usage).
+    for (const sql of [custSql, invSql]) {
+      // A bare reference like ", pan_ciphertext," or ", pan_ciphertext\n" would mean
+      // it's projected as a returned column.
+      expect(sql).not.toMatch(/[,\s]pan_ciphertext\s*[,\n]/);
+      expect(sql).not.toMatch(/[,\s]pan_key_id\s*[,\n]/);
+    }
+
+    // The excluded list must call out the redactions for export-consumer transparency.
+    expect(out.excluded.some((e) => /pan_ciphertext/.test(e))).toBe(true);
+    expect(out.excluded.some((e) => /kek_key_arn/.test(e))).toBe(true);
+  });
+
   it('throws NotFoundException when shop not found', async () => {
     client.query
       .mockResolvedValueOnce(undefined)             // BEGIN
