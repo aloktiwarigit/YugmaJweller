@@ -25,5 +25,22 @@ export class DrizzleTenantLookup implements TenantLookup {
     } finally { c.release(); }
   }
 
+  async bySlug(slug: string): Promise<Tenant | undefined> {
+    const cacheKey = `slug:${slug}`;
+    const hit = this.cache.get(cacheKey);
+    if (hit && hit.exp > Date.now()) return hit.t;
+    const c = await this.pool.connect();
+    try {
+      const r = await c.query(
+        `SELECT id, slug, display_name, status, config FROM shops WHERE slug = $1 AND status = 'ACTIVE'`,
+        [slug],
+      );
+      if (r.rows.length === 0) return undefined;
+      const t = r.rows[0] as Tenant;
+      this.cache.set(cacheKey, { t, exp: Date.now() + TTL_MS });
+      return t;
+    } finally { c.release(); }
+  }
+
   invalidate(id: string): void { this.cache.delete(id); }
 }

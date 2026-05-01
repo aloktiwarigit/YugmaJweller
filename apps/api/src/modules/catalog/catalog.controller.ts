@@ -1,12 +1,20 @@
-import { Body, Controller, Get, Header, Headers, HttpCode, HttpException, HttpStatus, Inject, Ip, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import {
+  BadRequestException, Body, Controller, Get, Header,
+  Headers, HttpCode, HttpException, HttpStatus,
+  Inject, Ip, Param, ParseUUIDPipe, Post, Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { SkipAuth } from '../../common/decorators/skip-auth.decorator';
 import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
 import { PricingService } from '../pricing/pricing.service';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { CatalogService } from './catalog.service';
+import type { TenantConfigResponse, CatalogProductsResponse, CatalogProduct } from './catalog.service';
 import { RatesUnavailableError } from '@goldsmith/rates';
 
 // ---------------------------------------------------------------------------
-// Public rates response shape (Story 4.4)
+// Public rates response shape (Story 4.4 — unchanged)
 // ---------------------------------------------------------------------------
 
 export interface PublicRateEntry {
@@ -38,31 +46,80 @@ function toPublicEntry(paise: bigint, fetchedAt: Date): PublicRateEntry {
 }
 
 // ---------------------------------------------------------------------------
-// Controller
+// Controller — throttled at class level for public catalog endpoints
 // ---------------------------------------------------------------------------
 
 @Controller('/api/v1/catalog')
+@UseGuards(ThrottlerGuard)
 export class CatalogController {
   private readonly viewRateCache = new Map<string, true>();
 
   constructor(
     @Inject(PricingService) private readonly pricingService: PricingService,
     @Inject(AnalyticsService) private readonly analyticsService: AnalyticsService,
+    @Inject(CatalogService) private readonly catalogService: CatalogService,
   ) {}
 
-  // TODO Epic 7: implement full catalog with search + filters
+  // -------------------------------------------------------------------------
+  // GET /catalog/tenant-config
+  // -------------------------------------------------------------------------
+
+  @Get('tenant-config')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'public, max-age=3600')
+  async getTenantConfig(
+    @Headers('x-shop-slug') slug: string,
+  ): Promise<TenantConfigResponse> {
+    if (!slug) throw new BadRequestException({ code: 'catalog.slug_required' });
+    return this.catalogService.getTenantConfig(slug);
+  }
+
+  // -------------------------------------------------------------------------
+  // GET /catalog/products
+  // -------------------------------------------------------------------------
+
   @Get('products')
   @SkipAuth()
   @SkipTenant()
-  listPublished(@Headers('x-tenant-id') tenantId: string): { items: unknown[]; total: number; tenantId: string } {
-    return { items: [], total: 0, tenantId };
+  @Header('Cache-Control', 'public, max-age=30, stale-while-revalidate=60')
+  async listPublished(
+    @Headers('x-tenant-id') shopId: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('search') search?: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '12',
+  ): Promise<CatalogProductsResponse> {
+    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    return this.catalogService.getProducts({
+      shopId,
+      categoryId,
+      search,
+      page:  Math.max(1, parseInt(page, 10) || 1),
+      limit: Math.min(50, Math.max(1, parseInt(limit, 10) || 12)),
+    });
   }
 
-  /**
-   * GET /api/v1/catalog/rates
-   * Public — no auth. Tenant-agnostic (IBJA rates are platform-global).
-   * Serves market rates only; per-tenant overrides are never applied here.
-   */
+  // -------------------------------------------------------------------------
+  // GET /catalog/products/:id
+  // -------------------------------------------------------------------------
+
+  @Get('products/:id')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'public, max-age=30, stale-while-revalidate=60')
+  async getProduct(
+    @Param('id', new ParseUUIDPipe()) productId: string,
+    @Headers('x-tenant-id') shopId: string,
+  ): Promise<CatalogProduct> {
+    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    return this.catalogService.getProduct(productId, shopId);
+  }
+
+  // -------------------------------------------------------------------------
+  // GET /catalog/rates — Story 4.4 (unchanged)
+  // -------------------------------------------------------------------------
+
   @Get('rates')
   @SkipAuth()
   @SkipTenant()
@@ -71,11 +128,11 @@ export class CatalogController {
     try {
       const rates = await this.pricingService.getCurrentRates();
       return {
-        GOLD_24K: toPublicEntry(rates.GOLD_24K.perGramPaise, rates.GOLD_24K.fetchedAt),
-        GOLD_22K: toPublicEntry(rates.GOLD_22K.perGramPaise, rates.GOLD_22K.fetchedAt),
-        SILVER_999: toPublicEntry(rates.SILVER_999.perGramPaise, rates.SILVER_999.fetchedAt),
-        stale: rates.stale,
-        source: rates.source,
+        GOLD_24K:    toPublicEntry(rates.GOLD_24K.perGramPaise, rates.GOLD_24K.fetchedAt),
+        GOLD_22K:    toPublicEntry(rates.GOLD_22K.perGramPaise, rates.GOLD_22K.fetchedAt),
+        SILVER_999:  toPublicEntry(rates.SILVER_999.perGramPaise, rates.SILVER_999.fetchedAt),
+        stale:       rates.stale,
+        source:      rates.source,
         refreshedAt: rates.GOLD_24K.fetchedAt.toISOString(),
       };
     } catch (err) {
@@ -89,12 +146,10 @@ export class CatalogController {
     }
   }
 
-  /**
-   * POST /api/v1/catalog/products/:id/view
-   * Public — no auth or tenant context required.
-   * Rate-limited per IP+product: max 1 event per 60s (in-memory Map).
-   * Consent gate and 30s session dedup enforced in AnalyticsService.
-   */
+  // -------------------------------------------------------------------------
+  // POST /catalog/products/:id/view — Story 3B analytics (unchanged)
+  // -------------------------------------------------------------------------
+
   @Post('products/:id/view')
   @HttpCode(204)
   @SkipAuth()

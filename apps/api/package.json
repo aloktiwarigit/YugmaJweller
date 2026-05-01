@@ -41,6 +41,7 @@
     "@nestjs/event-emitter": "^2.1.1",
     "@nestjs/passport": "^10.0.0",
     "@nestjs/platform-express": "^10.3.0",
+    "@nestjs/throttler": "^5",
     "bullmq": "^5.7.0",
     "csv-parse": "^5.5.0",
     "decimal.js": "^10.4.3",
