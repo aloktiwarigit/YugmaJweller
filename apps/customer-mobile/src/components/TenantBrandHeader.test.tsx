@@ -16,10 +16,26 @@ describe('TenantBrandHeader', () => {
     expect(container.querySelector('[data-testid="tenant-brand-header"]')).toBeNull();
   });
 
-  it('renders tenant displayName once loaded', () => {
-    useTenantStore.setState({ tenant: makeTenant({ displayName: 'टेस्ट दुकान' }) });
+  it('renders tenant displayName once loaded (when branding.appName is unset)', () => {
+    useTenantStore.setState({
+      tenant: makeTenant({
+        displayName: 'टेस्ट दुकान',
+        branding: { primaryColor: '#000', logoUrl: undefined, appName: undefined, defaultLanguage: 'hi-IN' },
+      }),
+    });
     const { getByTestId } = render(<TenantBrandHeader />);
     expect(getByTestId('tenant-brand-name').textContent).toBe('टेस्ट दुकान');
+  });
+
+  it('prefers branding.appName over displayName when set (white-label override)', () => {
+    useTenantStore.setState({
+      tenant: makeTenant({
+        displayName: 'Back-Office Shop Name',
+        branding: { primaryColor: '#000', logoUrl: undefined, appName: 'दुकानदार ऐप', defaultLanguage: 'hi-IN' },
+      }),
+    });
+    const { getByTestId } = render(<TenantBrandHeader />);
+    expect(getByTestId('tenant-brand-name').textContent).toBe('दुकानदार ऐप');
   });
 
   it('does NOT contain the string "Goldsmith" (white-label invariant)', () => {

@@ -9,6 +9,11 @@ export function TenantBrandHeader(): React.ReactElement | null {
 
   if (loading || !tenant) return null;
 
+  // White-label: customer-facing surfaces show the tenant's configured
+  // app name when set (config.app_name → branding.appName). Fall back to
+  // displayName, which is the back-office shop name and may differ.
+  const customerFacingName = tenant.branding.appName ?? tenant.displayName;
+
   // React Native Image needs an absolute URI on native. The seeded
   // shops.config.logo_url shape can be a relative path (e.g.
   // `/assets/brand/placeholder-logo.svg`) which would render broken on
@@ -34,7 +39,7 @@ export function TenantBrandHeader(): React.ReactElement | null {
         <Image
           source={{ uri: logoUrl }}
           style={{ width: 40, height: 40, borderRadius: 8, marginRight: spacing.sm }}
-          accessibilityLabel={tenant.displayName}
+          accessibilityLabel={customerFacingName}
         />
       ) : (
         <View
@@ -57,7 +62,7 @@ export function TenantBrandHeader(): React.ReactElement | null {
           color: colors.ink,
         }}
       >
-        {tenant.displayName}
+        {customerFacingName}
       </Text>
     </View>
   );

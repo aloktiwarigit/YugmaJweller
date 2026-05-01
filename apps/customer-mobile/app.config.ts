@@ -23,12 +23,18 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-secure-store',
   ],
+  // White-label: package / bundleIdentifier MUST differ per tenant build
+  // — app stores and devices identify apps by these values, so two tenant
+  // builds with the same identifier would conflict. Driven from build-time
+  // env so a tenant-specific build pipeline can set them per artifact.
+  // The dev fallback (`com.goldsmith.customer.dev`) is used only by the
+  // anchor dev build invoked from a developer's machine.
   android: {
-    package: 'com.goldsmith.customer.dev',
+    package: process.env['EXPO_PUBLIC_ANDROID_PACKAGE'] ?? 'com.goldsmith.customer.dev',
     googleServicesFile: process.env['GOOGLE_SERVICES_FILE'] ?? './google-services.json',
   },
   ios: {
-    bundleIdentifier: 'com.goldsmith.customer.dev',
+    bundleIdentifier: process.env['EXPO_PUBLIC_IOS_BUNDLE_ID'] ?? 'com.goldsmith.customer.dev',
     googleServicesFile: process.env['GOOGLE_SERVICES_INFO_PLIST'] ?? './GoogleService-Info.plist',
     supportsTablet: false,
   },
