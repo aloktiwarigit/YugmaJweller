@@ -33,6 +33,7 @@ import { CustomOrdersModule } from './modules/custom-orders/custom-orders.module
 import { TryAtHomeBookingsModule } from './modules/try-at-home-bookings/try-at-home-bookings.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { WishlistModule } from './modules/wishlist/wishlist.module';
+import { CustomerModule } from './modules/customer/customer.module';
 import { DrizzleTenantLookup } from './drizzle-tenant-lookup';
 import { TenantAuditReporter } from './modules/tenant-boot/tenant-audit-reporter';
 
@@ -87,6 +88,7 @@ class ConditionalTenantInterceptor implements NestInterceptor {
     TryAtHomeBookingsModule,
     ReviewsModule,
     WishlistModule,
+    CustomerModule,
   ],
   controllers: [HealthController],
   providers: [

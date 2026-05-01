@@ -1,1 +1,1 @@
-{"timestamp":"2026-05-01T08:38:47-04:00","commit":"a851ed9ca185065e202c4606cb246aefff2b76af","reviewer":"codex","findings_resolved":["P1-lockfile","P2-huid-boundary","P2-metal-filter","P2-contact-page","P2-cta-onpress"]}
+{"timestamp":"2026-05-01T08:52:05-04:00","commit":"a3dc29f888ba0c25252a2c440d07c1d0938811a7","reviewer":"codex","p1_fixes":["tenant-status-gate","razorpay-checkout-page"]}
