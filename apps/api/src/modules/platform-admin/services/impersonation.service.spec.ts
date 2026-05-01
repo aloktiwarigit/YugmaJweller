@@ -21,10 +21,11 @@ describe('ImpersonationService', () => {
 
   it('start: inserts session, audits, returns short-lived JWT with jti = session id', async () => {
     client.query
+      .mockResolvedValueOnce(undefined)                                    // BEGIN
       .mockResolvedValueOnce(undefined)                                    // SET LOCAL ROLE
       .mockResolvedValueOnce({ rows: [{ id: SESSION_ID }] })               // INSERT impersonation_sessions
       .mockResolvedValueOnce(undefined)                                    // INSERT platform_audit_events
-      .mockResolvedValueOnce(undefined);                                   // RESET ROLE
+      .mockResolvedValueOnce(undefined);                                   // COMMIT
 
     const svc = new ImpersonationService(pool as never);
     const out = await svc.startImpersonation({
@@ -42,9 +43,10 @@ describe('ImpersonationService', () => {
     expect(decoded.exp - decoded.iat).toBe(1800);
     expect(decoded.jti).toBe(SESSION_ID);
 
-    const insertCall = client.query.mock.calls[1]!;
+    // Indexes shifted by 2 for BEGIN + SET LOCAL ROLE
+    const insertCall = client.query.mock.calls[2]!;
     expect(insertCall[0]).toMatch(/INSERT INTO impersonation_sessions/);
-    const auditCall = client.query.mock.calls[2]!;
+    const auditCall = client.query.mock.calls[3]!;
     expect(auditCall[0]).toMatch(/INSERT INTO platform_audit_events/);
     expect(auditCall[1]).toContain('impersonation.started');
     expect(auditCall[1]).toContain(SHOP_ID);
@@ -52,15 +54,16 @@ describe('ImpersonationService', () => {
 
   it('end: marks session ended_at and audits impersonation.ended', async () => {
     client.query
+      .mockResolvedValueOnce(undefined)                                    // BEGIN
       .mockResolvedValueOnce(undefined)                                    // SET LOCAL ROLE
       .mockResolvedValueOnce({ rowCount: 1 })                              // UPDATE
       .mockResolvedValueOnce(undefined)                                    // INSERT audit
-      .mockResolvedValueOnce(undefined);                                   // RESET ROLE
+      .mockResolvedValueOnce(undefined);                                   // COMMIT
 
     const svc = new ImpersonationService(pool as never);
     await svc.endImpersonation(SESSION_ID, 'p-uid');
 
-    const updateCall = client.query.mock.calls[1]!;
+    const updateCall = client.query.mock.calls[2]!;
     expect(updateCall[0]).toMatch(/UPDATE impersonation_sessions/);
     expect(updateCall[0]).toMatch(/ended_at = now\(\)/);
     expect(updateCall[1]).toEqual([SESSION_ID, 'p-uid']);
@@ -68,9 +71,10 @@ describe('ImpersonationService', () => {
 
   it('end: 404 when session does not belong to caller (or already ended)', async () => {
     client.query
+      .mockResolvedValueOnce(undefined)                                    // BEGIN
       .mockResolvedValueOnce(undefined)                                    // SET LOCAL ROLE
-      .mockResolvedValueOnce({ rowCount: 0 })                              // UPDATE returns 0
-      .mockResolvedValueOnce(undefined);                                   // RESET ROLE
+      .mockResolvedValueOnce({ rowCount: 0 })                              // UPDATE returns 0 → throws
+      .mockResolvedValueOnce(undefined);                                   // ROLLBACK
 
     const svc = new ImpersonationService(pool as never);
     await expect(svc.endImpersonation(SESSION_ID, 'wrong-uid')).rejects.toMatchObject({

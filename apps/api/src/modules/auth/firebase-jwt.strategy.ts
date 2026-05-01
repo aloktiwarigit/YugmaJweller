@@ -93,11 +93,19 @@ export class FirebaseJwtStrategy extends PassportStrategy(BearerStrategy, 'fireb
 
     // The DB-side liveness check (ended_at IS NULL AND expires_at > now()) is performed by the
     // tenant interceptor on every request. Defense in depth: JWT exp and DB row both verified.
+    //
+    // goldsmith_uid is set to the impersonation session UUID (impClaims.jti), NOT the platform
+    // admin's Firebase UID. The Firebase UID is a string like "abc123XYZ" which would fail
+    // the UUID type check on tenant write columns (invoices.created_by_user_id, audit_events.
+    // actor_user_id, etc). The session UUID is the most accurate semantic actor: "this
+    // impersonation session performed the write", and it joins back to impersonation_sessions
+    // for full attribution. impersonatorPlatformUserId carries the Firebase UID separately
+    // for platform-side audit cross-reference.
     return {
       ...baseClaims,
       shop_id: impClaims.target_shop_id,
       role: 'shop_admin',
-      goldsmith_uid: impClaims.sub,
+      goldsmith_uid: impClaims.jti,
       impersonationSessionId: impClaims.jti,
       impersonatorPlatformUserId: impClaims.sub,
     };

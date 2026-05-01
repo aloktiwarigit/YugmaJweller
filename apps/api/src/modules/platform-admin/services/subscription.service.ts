@@ -27,10 +27,20 @@ const PLANS = new Set<SubscriptionPlan>(['trial', 'starter', 'growth', 'enterpri
 async function withPlatformAdmin<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T> {
   const c = await pool.connect();
   try {
+    // SET LOCAL ROLE is transaction-scoped; wrap in BEGIN/COMMIT so the role persists
+    // across all queries inside fn(). Atomic-by-default is also a correctness win for
+    // helpers that pair a write with an audit insert.
+    await c.query('BEGIN');
     await c.query('SET LOCAL ROLE platform_admin');
-    return await fn(c);
+    try {
+      const result = await fn(c);
+      await c.query('COMMIT');
+      return result;
+    } catch (e) {
+      await c.query('ROLLBACK').catch(() => undefined);
+      throw e;
+    }
   } finally {
-    await c.query('RESET ROLE').catch(() => undefined);
     c.release();
   }
 }

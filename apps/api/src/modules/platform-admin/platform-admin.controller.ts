@@ -11,7 +11,6 @@ import {
   Query,
   Req,
   UnauthorizedException,
-  UsePipes,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -56,8 +55,10 @@ export class PlatformAdminController {
   }
 
   @Post('tenants')
-  @UsePipes(new ZodValidationPipe(CreateTenantDto))
-  async createTenant(@Body() dto: CreateTenantDtoT, @Req() req: Request): Promise<{ id: string }> {
+  async createTenant(
+    @Body(new ZodValidationPipe(CreateTenantDto)) dto: CreateTenantDtoT,
+    @Req() req: Request,
+  ): Promise<{ id: string }> {
     return this.tenants.createShop({
       slug: dto.slug,
       displayName: dto.displayName,
@@ -82,10 +83,9 @@ export class PlatformAdminController {
 
   @Post('tenants/:id')
   @HttpCode(204)
-  @UsePipes(new ZodValidationPipe(UpdateTenantDto))
   async updateTenant(
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() dto: UpdateTenantDtoT,
+    @Body(new ZodValidationPipe(UpdateTenantDto)) dto: UpdateTenantDtoT,
     @Req() req: Request,
   ): Promise<void> {
     await this.tenants.updateShop({
@@ -97,10 +97,9 @@ export class PlatformAdminController {
 
   @Post('tenants/:id/suspend')
   @HttpCode(204)
-  @UsePipes(new ZodValidationPipe(SuspendTenantDto))
   async suspend(
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() dto: SuspendTenantDtoT,
+    @Body(new ZodValidationPipe(SuspendTenantDto)) dto: SuspendTenantDtoT,
     @Req() req: Request,
   ): Promise<void> {
     await this.tenants.suspendShop(id, dto.reason, this.platformUid(req));
@@ -124,9 +123,8 @@ export class PlatformAdminController {
   }
 
   @Post('subscriptions')
-  @UsePipes(new ZodValidationPipe(UpsertSubscriptionDto))
   async upsertSub(
-    @Body() dto: UpsertSubscriptionDtoT,
+    @Body(new ZodValidationPipe(UpsertSubscriptionDto)) dto: UpsertSubscriptionDtoT,
     @Req() req: Request,
   ): Promise<{ id: string }> {
     return this.subs.upsertSubscription({
@@ -146,9 +144,8 @@ export class PlatformAdminController {
   }
 
   @Post('impersonate')
-  @UsePipes(new ZodValidationPipe(ImpersonateDto))
   async startImpersonation(
-    @Body() dto: ImpersonateDtoT,
+    @Body(new ZodValidationPipe(ImpersonateDto)) dto: ImpersonateDtoT,
     @Req() req: Request,
   ): Promise<unknown> {
     const ipHeader = req.headers['x-forwarded-for'];

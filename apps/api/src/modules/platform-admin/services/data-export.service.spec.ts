@@ -17,13 +17,14 @@ describe('DataExportService', () => {
 
   it('exports a single tenant scope with shop_id filter on every query', async () => {
     client.query
+      .mockResolvedValueOnce(undefined)                                                                    // BEGIN
       .mockResolvedValueOnce(undefined)                                                                    // SET LOCAL ROLE
       .mockResolvedValueOnce({ rows: [{ id: 's1', slug: 'demo', display_name: 'Demo', status: 'ACTIVE' }] }) // shop
       .mockResolvedValueOnce({ rows: [{ id: 'c1' }], rowCount: 1 })                                          // customers
       .mockResolvedValueOnce({ rows: [{ id: 'inv1' }], rowCount: 1 })                                        // invoices
       .mockResolvedValueOnce({ rows: [{ id: 'p1' }], rowCount: 1 })                                          // payments
       .mockResolvedValueOnce(undefined)                                                                    // INSERT audit
-      .mockResolvedValueOnce(undefined);                                                                   // RESET ROLE
+      .mockResolvedValueOnce(undefined);                                                                   // COMMIT
 
     const svc = new DataExportService(pool as never);
     const out = await svc.exportTenant('s1', 'platform-uid');
@@ -34,20 +35,21 @@ describe('DataExportService', () => {
     expect(out.payments).toHaveLength(1);
     expect(out.excluded).toContain('audit_events');
 
-    // Every data query filtered by shop_id
-    expect(client.query.mock.calls[1]![1]).toEqual(['s1']);
+    // Every data query filtered by shop_id (indexes shifted by 2 for BEGIN + SET LOCAL ROLE)
     expect(client.query.mock.calls[2]![1]).toEqual(['s1']);
     expect(client.query.mock.calls[3]![1]).toEqual(['s1']);
     expect(client.query.mock.calls[4]![1]).toEqual(['s1']);
+    expect(client.query.mock.calls[5]![1]).toEqual(['s1']);
     // Audit row written
-    expect(client.query.mock.calls[5]![1]).toContain('tenant.exported');
+    expect(client.query.mock.calls[6]![1]).toContain('tenant.exported');
   });
 
   it('throws NotFoundException when shop not found', async () => {
     client.query
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce(undefined)             // BEGIN
+      .mockResolvedValueOnce(undefined)             // SET LOCAL ROLE
+      .mockResolvedValueOnce({ rows: [] })          // shop SELECT empty → throws
+      .mockResolvedValueOnce(undefined);            // ROLLBACK in catch
 
     const svc = new DataExportService(pool as never);
     await expect(svc.exportTenant('missing', 'p')).rejects.toMatchObject({

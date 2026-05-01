@@ -64,6 +64,9 @@ describe('FirebaseJwtStrategy — impersonation', () => {
     expect(claims.role).toBe('shop_admin');
     expect(claims.impersonationSessionId).toBe('11111111-1111-1111-1111-111111111111');
     expect(claims.impersonatorPlatformUserId).toBe('p-id');
+    // goldsmith_uid MUST be the session UUID (not the Firebase UID), so tenant write paths
+    // can insert it into UUID columns without type errors.
+    expect(claims.goldsmith_uid).toBe('11111111-1111-1111-1111-111111111111');
   });
 
   it('ignores impersonation header for non-platform-admin tokens', async () => {

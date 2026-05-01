@@ -18,25 +18,32 @@ export class MetricsService {
       // requires platform_admin role (enforced by RolesGuard on the controller) and returns
       // only aggregate counts, no PII. invoices is RLS-enabled, so we run as platform_admin
       // (BYPASSRLS) for the duration of this transaction only.
-      await c.query('SET LOCAL ROLE platform_admin');
-      const r = await c.query<{
-        total_shops: string;
-        active_shops: string;
-        invoices_30d: string;
-      }>(
-        `SELECT
-           (SELECT COUNT(*)::text FROM shops)                                            AS total_shops,
-           (SELECT COUNT(*)::text FROM shops WHERE status = 'ACTIVE')                    AS active_shops,
-           (SELECT COUNT(*)::text FROM invoices WHERE created_at > now() - interval '30 days') AS invoices_30d`,
-      );
-      const row = r.rows[0]!;
-      return {
-        totalShops: Number(row.total_shops),
-        activeShops: Number(row.active_shops),
-        invoicesLast30Days: Number(row.invoices_30d),
-      };
+      // SET LOCAL ROLE is transaction-scoped; BEGIN/COMMIT keeps the role active for the SELECT.
+      await c.query('BEGIN');
+      try {
+        await c.query('SET LOCAL ROLE platform_admin');
+        const r = await c.query<{
+          total_shops: string;
+          active_shops: string;
+          invoices_30d: string;
+        }>(
+          `SELECT
+             (SELECT COUNT(*)::text FROM shops)                                            AS total_shops,
+             (SELECT COUNT(*)::text FROM shops WHERE status = 'ACTIVE')                    AS active_shops,
+             (SELECT COUNT(*)::text FROM invoices WHERE created_at > now() - interval '30 days') AS invoices_30d`,
+        );
+        await c.query('COMMIT');
+        const row = r.rows[0]!;
+        return {
+          totalShops: Number(row.total_shops),
+          activeShops: Number(row.active_shops),
+          invoicesLast30Days: Number(row.invoices_30d),
+        };
+      } catch (e) {
+        await c.query('ROLLBACK').catch(() => undefined);
+        throw e;
+      }
     } finally {
-      await c.query('RESET ROLE').catch(() => undefined);
       c.release();
     }
   }
