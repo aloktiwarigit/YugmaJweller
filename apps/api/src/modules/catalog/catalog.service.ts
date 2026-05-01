@@ -181,6 +181,7 @@ export class CatalogService {
     return { items, total, page: safePage };
   }
 
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint; shopId from slug lookup, not TenantContext
   async getProduct(id: string, shopId: string): Promise<CatalogProduct> {
     const [ratesResult, mcResult, productResult] = await Promise.all([
       this.pricingService.getCurrentRates(),
