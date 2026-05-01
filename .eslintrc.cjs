@@ -55,6 +55,9 @@ module.exports = {
         // Search service: indexProduct/removeFromIndex are called from BullMQ worker (no TenantContext).
         // postgresSearch is a private helper receiving shopId extracted from ctx at the call site.
         'apps/api/src/modules/inventory/inventory.search.service.ts',
+        // Platform admin module operates cross-tenant by design — shopId is the target tenant
+        // being managed by a platform_admin, not coming from a per-tenant TenantContext.
+        'apps/api/src/modules/platform-admin/**/*.ts',
       ],
       rules: { 'goldsmith/no-raw-shop-id-param': 'off' },
     },
