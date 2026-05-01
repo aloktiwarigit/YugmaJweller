@@ -1,10 +1,11 @@
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
-import { fetchTenantConfig, fetchProduct } from '@/lib/api';
+import { fetchTenantConfig, fetchProduct, fetchProductReviews } from '@/lib/api';
 import { HuidBadge } from '@/components/HuidBadge';
 import { EstimatedPriceBadge } from '@/components/EstimatedPriceBadge';
 import { WishlistButton } from '@/components/WishlistButton';
 import { GoldTexturePlaceholder } from '@/components/GoldTexturePlaceholder';
+import { ReviewSection } from '@/components/ReviewSection';
 import { purityLabel } from '@/lib/theme';
 
 function resolveSlug(): string | null {
@@ -23,7 +24,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
   const config = await fetchTenantConfig(slug);
   if (!config) notFound();
 
-  const product = await fetchProduct(params.id, config.shopId);
+  const [product, reviewsData] = await Promise.all([
+    fetchProduct(params.id, config.shopId),
+    fetchProductReviews(params.id, config.shopId),
+  ]);
   if (!product) notFound();
 
   const isUnavailable  = product.quantity === 0;
@@ -75,6 +79,19 @@ export default async function ProductDetailPage({ params }: PageProps) {
             )}
           </div>
 
+          {/* Average rating summary */}
+          {reviewsData.total > 0 && reviewsData.averageRating !== null && (
+            <div className="flex items-center gap-2">
+              <span className="text-yellow-500 text-lg" aria-hidden="true">
+                {'★'.repeat(Math.round(reviewsData.averageRating))}
+                {'☆'.repeat(5 - Math.round(reviewsData.averageRating))}
+              </span>
+              <span className="font-body text-sm text-inkMute">
+                {reviewsData.averageRating} ({reviewsData.total} समीक्षाएं)
+              </span>
+            </div>
+          )}
+
           {/* Weight */}
           <dl className="grid grid-cols-2 gap-2 font-body text-sm">
             <div>
@@ -95,9 +112,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
             />
           </div>
 
-          {/* Wishlist stub — only when available */}
+          {/* Wishlist toggle — only when available */}
           {!isUnavailable && (
-            <WishlistButton productName={displayPurity} />
+            <WishlistButton productId={product.id} productName={displayPurity} />
           )}
 
           {/* Price disclaimer */}
@@ -109,6 +126,15 @@ export default async function ProductDetailPage({ params }: PageProps) {
           )}
         </div>
       </div>
+
+      {/* Reviews */}
+      <ReviewSection
+        productId={product.id}
+        shopId={config.shopId}
+        reviews={reviewsData.reviews}
+        averageRating={reviewsData.averageRating}
+        total={reviewsData.total}
+      />
     </div>
   );
 }

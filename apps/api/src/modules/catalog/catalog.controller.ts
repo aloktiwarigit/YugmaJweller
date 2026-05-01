@@ -175,4 +175,15 @@ export class CatalogController {
       durationSeconds: body.durationSeconds,
     }).catch(() => undefined);
   }
+
+  // -------------------------------------------------------------------------
+  // GET /catalog/return-policy — public; reads shop_settings per tenant
+  // -------------------------------------------------------------------------
+
+  @Get('return-policy')
+  @SkipAuth()
+  @Header('Cache-Control', 'public, max-age=300')
+  getReturnPolicy(): Promise<{ returnPolicyText: string | null }> {
+    return this.catalogService.getReturnPolicy();
+  }
 }

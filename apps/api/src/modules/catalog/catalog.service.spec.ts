@@ -18,6 +18,7 @@ const fakeRates = {
 };
 
 const mockPricingService = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
+const mockSettingsRepo = { getReturnPolicy: vi.fn().mockResolvedValue(null) };
 
 function makePool(responses: Array<{ rows: object[] }>) {
   let callIdx = 0;
@@ -29,7 +30,7 @@ describe('CatalogService.getTenantConfig()', () => {
     const pool = makePool([
       { rows: [{ id: 'shop-1', slug: 'test-shop', display_name: 'Test Jewellers', logo_url: null, config: null }] },
     ]);
-    const svc = new CatalogService(pool as never, mockPricingService as never);
+    const svc = new CatalogService(pool as never, mockPricingService as never, mockSettingsRepo as never);
 
     const result = await svc.getTenantConfig('test-shop');
 
@@ -46,7 +47,7 @@ describe('CatalogService.getTenantConfig()', () => {
     const pool = makePool([
       { rows: [{ id: 'shop-1', slug: 'gold-shop', display_name: 'Gold Shop', logo_url: 'https://cdn.example.com/logo.png', config: { primaryColor: '#FF0000', defaultLanguage: 'en' } }] },
     ]);
-    const svc = new CatalogService(pool as never, mockPricingService as never);
+    const svc = new CatalogService(pool as never, mockPricingService as never, mockSettingsRepo as never);
 
     const result = await svc.getTenantConfig('gold-shop');
 
@@ -58,7 +59,7 @@ describe('CatalogService.getTenantConfig()', () => {
 
   it('throws NotFoundException when shop slug not found', async () => {
     const pool = makePool([{ rows: [] }]);
-    const svc = new CatalogService(pool as never, mockPricingService as never);
+    const svc = new CatalogService(pool as never, mockPricingService as never, mockSettingsRepo as never);
 
     await expect(svc.getTenantConfig('nonexistent')).rejects.toThrow(NotFoundException);
   });
@@ -88,7 +89,7 @@ describe('CatalogService.getProducts()', () => {
       { rows: [baseProduct] },   // products query
     ]);
     const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
-    const svc = new CatalogService(pool as never, ps as never);
+    const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never);
 
     const result = await svc.getProducts({ shopId: 'shop-1', page: 1, limit: 12 });
 
@@ -105,7 +106,7 @@ describe('CatalogService.getProducts()', () => {
       { rows: [{ ...baseProduct, purity: 'PLATINUM_950', total_count: '1' }] },
     ]);
     const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
-    const svc = new CatalogService(pool as never, ps as never);
+    const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never);
 
     const result = await svc.getProducts({ shopId: 'shop-1', page: 1, limit: 12 });
 
@@ -119,7 +120,7 @@ describe('CatalogService.getProducts()', () => {
       { rows: [{ ...baseProduct, net_weight_g: '0.0000', total_count: '1' }] },
     ]);
     const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
-    const svc = new CatalogService(pool as never, ps as never);
+    const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never);
 
     const result = await svc.getProducts({ shopId: 'shop-1', page: 1, limit: 12 });
 
@@ -133,7 +134,7 @@ describe('CatalogService.getProducts()', () => {
       { rows: [baseProduct] },
     ]);
     const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
-    const svc = new CatalogService(pool as never, ps as never);
+    const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never);
 
     const result = await svc.getProducts({ shopId: 'shop-1', page: 1, limit: 12 });
 
@@ -150,7 +151,7 @@ describe('CatalogService.getProducts()', () => {
       { rows: [{ ...baseProduct, category_name: 'UNKNOWN_CATEGORY', total_count: '1' }] },
     ]);
     const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
-    const svc = new CatalogService(pool as never, ps as never);
+    const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never);
 
     const result = await svc.getProducts({ shopId: 'shop-1', page: 1, limit: 12 });
 
@@ -168,7 +169,7 @@ describe('CatalogService.getProducts()', () => {
       { rows: [] },
     ]);
     const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
-    const svc = new CatalogService(pool as never, ps as never);
+    const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never);
 
     const result = await svc.getProducts({ shopId: 'shop-1', page: 1, limit: 12 });
 
@@ -188,7 +189,7 @@ describe('CatalogService.getProduct()', () => {
       { rows: [baseProduct] }, // product
     ]);
     const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
-    const svc = new CatalogService(pool as never, ps as never);
+    const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never);
 
     const result = await svc.getProduct('prod-1', 'shop-1');
 
@@ -204,8 +205,37 @@ describe('CatalogService.getProduct()', () => {
       { rows: [] }, // product not found
     ]);
     const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
-    const svc = new CatalogService(pool as never, ps as never);
+    const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never);
 
     await expect(svc.getProduct('nonexistent', 'shop-1')).rejects.toThrow(NotFoundException);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getReturnPolicy — returns shop-specific text from settings
+// ---------------------------------------------------------------------------
+
+describe('CatalogService.getReturnPolicy()', () => {
+  it('returns shop-specific return policy text', async () => {
+    const pool = makePool([]);
+    const ps   = { getCurrentRates: vi.fn() };
+    const settingsRepo = { getReturnPolicy: vi.fn().mockResolvedValue('30-day exchange policy') };
+    const svc  = new CatalogService(pool as never, ps as never, settingsRepo as never);
+
+    const result = await svc.getReturnPolicy();
+
+    expect(result).toEqual({ returnPolicyText: '30-day exchange policy' });
+    expect(settingsRepo.getReturnPolicy).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null when no policy configured', async () => {
+    const pool = makePool([]);
+    const ps   = { getCurrentRates: vi.fn() };
+    const settingsRepo = { getReturnPolicy: vi.fn().mockResolvedValue(null) };
+    const svc  = new CatalogService(pool as never, ps as never, settingsRepo as never);
+
+    const result = await svc.getReturnPolicy();
+
+    expect(result).toEqual({ returnPolicyText: null });
   });
 });

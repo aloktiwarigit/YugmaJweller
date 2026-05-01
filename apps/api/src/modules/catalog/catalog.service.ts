@@ -6,6 +6,7 @@ import { computeProductPrice } from '@goldsmith/money';
 import type { PriceBreakdown } from '@goldsmith/money';
 import { MAKING_CHARGE_DEFAULTS } from '@goldsmith/shared';
 import type { MakingChargeConfig } from '@goldsmith/shared';
+import { SettingsRepository } from '../settings/settings.repository';
 
 // ---------------------------------------------------------------------------
 // Response shapes
@@ -98,6 +99,7 @@ export class CatalogService {
   constructor(
     @Inject('PG_POOL') private readonly pool: Pool,
     @Inject(PricingService) private readonly pricingService: PricingService,
+    @Inject(SettingsRepository) private readonly settingsRepo: SettingsRepository,
   ) {}
 
   async getTenantConfig(slug: string): Promise<TenantConfigResponse> {
@@ -270,5 +272,10 @@ export class CatalogService {
       estimatedPrice,
       publishedAt:           row.published_at.toISOString(),
     };
+  }
+
+  async getReturnPolicy(): Promise<{ returnPolicyText: string | null }> {
+    const text = await this.settingsRepo.getReturnPolicy();
+    return { returnPolicyText: text };
   }
 }

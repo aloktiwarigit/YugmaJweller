@@ -1,0 +1,17 @@
+{
+  "category": "bangles",
+  "titleHi": "चूड़ी का साइज़ गाइड",
+  "titleEn": "Bangle Size Guide",
+  "unitHi": "व्यास (mm में)",
+  "introHi": "चूड़ी का साइज़ आंतरिक व्यास (diameter) पर निर्भर करता है। अपनी हथेली की सबसे चौड़ी जगह नापें।",
+  "measureHi": "कैसे नापें: अपनी उंगलियों को सटाकर हथेली की सबसे चौड़ी जगह mm में नापें।",
+  "sizes": [
+    { "labelHi": "बहुत छोटा (XS)", "diameterMm": 54, "circumferenceMm": 170 },
+    { "labelHi": "छोटा (S)",        "diameterMm": 56, "circumferenceMm": 176 },
+    { "labelHi": "मध्यम (M)",        "diameterMm": 58, "circumferenceMm": 182 },
+    { "labelHi": "बड़ा (L)",          "diameterMm": 60, "circumferenceMm": 188 },
+    { "labelHi": "बहुत बड़ा (XL)",    "diameterMm": 62, "circumferenceMm": 195 },
+    { "labelHi": "XXL",               "diameterMm": 64, "circumferenceMm": 201 },
+    { "labelHi": "XXXL",              "diameterMm": 66, "circumferenceMm": 207 }
+  ]
+}

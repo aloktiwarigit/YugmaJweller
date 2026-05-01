@@ -105,3 +105,55 @@ export async function customerSelfDelete(): Promise<void> {
     throw err;
   }
 }
+
+export interface WishlistItem {
+  productId:    string;
+  sku:          string;
+  purity:       string;
+  metal:        string;
+  grossWeightG: string;
+  netWeightG:   string;
+  huid:         string | null;
+  addedAt:      string;
+}
+
+export interface ReviewItem {
+  id:                string;
+  rating:            number;
+  reviewText:        string | null;
+  customerFirstName: string | null;
+  createdAt:         string;
+}
+
+export interface ReviewsResponse {
+  reviews:       ReviewItem[];
+  averageRating: number | null;
+  total:         number;
+}
+
+export async function getProductReviews(productId: string): Promise<ReviewsResponse> {
+  const res = await api.get<ReviewsResponse>(`/api/v1/reviews/products/${productId}`);
+  return res.data;
+}
+
+export async function getWishlist(customerId: string): Promise<WishlistItem[]> {
+  const res = await api.get<WishlistItem[]>('/api/v1/wishlist', {
+    params: { customerId },
+  });
+  return res.data;
+}
+
+export async function addToWishlist(customerId: string, productId: string): Promise<void> {
+  await api.post('/api/v1/wishlist', { customerId, productId });
+}
+
+export async function removeFromWishlist(customerId: string, productId: string): Promise<void> {
+  await api.delete(`/api/v1/wishlist/${productId}`, {
+    params: { customerId },
+  });
+}
+
+export async function getReturnPolicy(): Promise<string | null> {
+  const res = await api.get<{ returnPolicyText: string | null }>('/api/v1/catalog/return-policy');
+  return res.data.returnPolicyText;
+}

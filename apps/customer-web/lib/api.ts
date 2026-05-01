@@ -122,3 +122,47 @@ export async function fetchProduct(
     return null;
   }
 }
+
+export interface ReviewItem {
+  id:                string;
+  rating:            number;
+  reviewText:        string | null;
+  customerFirstName: string | null;
+  createdAt:         string;
+}
+
+export interface ReviewsResponse {
+  reviews:       ReviewItem[];
+  averageRating: number | null;
+  total:         number;
+}
+
+export async function fetchProductReviews(
+  productId: string,
+  shopId: string,
+): Promise<ReviewsResponse> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/reviews/products/${productId}`, {
+      headers: { 'X-Tenant-Id': shopId },
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return { reviews: [], averageRating: null, total: 0 };
+    return res.json() as Promise<ReviewsResponse>;
+  } catch {
+    return { reviews: [], averageRating: null, total: 0 };
+  }
+}
+
+export async function fetchReturnPolicy(shopId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/catalog/return-policy`, {
+      headers: { 'X-Tenant-Id': shopId },
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { returnPolicyText: string | null };
+    return data.returnPolicyText;
+  } catch {
+    return null;
+  }
+}
