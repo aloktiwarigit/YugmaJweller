@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { api } from './client';
 import type { Tenant } from '../stores/tenantStore';
 
@@ -67,8 +68,9 @@ export async function customerSelfDelete(): Promise<void> {
   try {
     await api.delete('/api/v1/customer/me');
   } catch (e) {
-    const code = (e as { response?: { data?: { code?: string } } }).response?.data?.code ?? 'unknown';
-    const status = (e as { response?: { status?: number } }).response?.status;
+    const axiosErr = axios.isAxiosError<{ code?: string }>(e) ? e : null;
+    const code = axiosErr?.response?.data?.code ?? 'unknown';
+    const status = axiosErr?.response?.status;
     const err: TypedApiError = Object.assign(new Error(code), { code, status });
     throw err;
   }

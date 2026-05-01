@@ -14,11 +14,21 @@ export function TenantProvider({ children }: { children: React.ReactNode }): Rea
     setSlug(slug);
     setLoading(true);
 
+    // TODO(EPIC7-S0): No AsyncStorage cache yet — boot is network-only. When ETag
+    // persistence is added, the 304 path below must read from cache instead of
+    // dropping the response. Tracked for follow-up before offline-capable release.
     let cancelled = false;
     (async (): Promise<void> => {
       try {
         const r = await getTenantBoot(slug);
         if (cancelled) return;
+        if (r.notModified) {
+          // Defensive: we never send If-None-Match yet, so this branch is
+          // structurally unreachable today. Guard prevents a future ETag-cache
+          // wiring from accidentally calling setTenant(null as Tenant, ...).
+          setLoading(false);
+          return;
+        }
         setTenant(r.tenant, r.etag);
       } catch (e) {
         if (cancelled) return;

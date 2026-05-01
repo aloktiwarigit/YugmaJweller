@@ -35,3 +35,24 @@ vi.mock('@react-native-firebase/auth', () => ({
     onAuthStateChanged: vi.fn(() => () => undefined),
   }),
 }));
+
+// Mock @react-native-async-storage/async-storage with an in-memory map.
+// Defensive — no first-party code in this app uses AsyncStorage (we use SecureStore
+// per the auth-token invariant), but transitive deps may require it at module load.
+vi.mock('@react-native-async-storage/async-storage', () => {
+  const store = new Map<string, string>();
+  return {
+    default: {
+      getItem: vi.fn(async (k: string) => store.get(k) ?? null),
+      setItem: vi.fn(async (k: string, v: string) => {
+        store.set(k, v);
+      }),
+      removeItem: vi.fn(async (k: string) => {
+        store.delete(k);
+      }),
+      clear: vi.fn(async () => {
+        store.clear();
+      }),
+    },
+  };
+});

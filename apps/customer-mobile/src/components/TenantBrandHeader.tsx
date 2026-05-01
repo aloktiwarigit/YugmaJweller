@@ -30,6 +30,8 @@ export function TenantBrandHeader(): React.ReactElement | null {
         />
       ) : (
         <View
+          accessible={false}
+          importantForAccessibility="no"
           style={{
             width: 40,
             height: 40,
