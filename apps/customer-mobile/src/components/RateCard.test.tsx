@@ -42,7 +42,7 @@ describe('RateCard', () => {
     const { wrapper } = wrap();
     const { getByTestId } = render(<RateCard />, { wrapper });
     await waitFor(() => {
-      expect(getByTestId('rate-card-error')).toBeTruthy();
+      expect(getByTestId('rate-card-error').textContent).toContain('दर अभी उपलब्ध नहीं है');
     });
   });
 });

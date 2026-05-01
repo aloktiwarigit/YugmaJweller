@@ -65,6 +65,7 @@ export default function Profile(): React.ReactElement {
             borderColor: colors.border,
             minHeight: 48,
             justifyContent: 'center',
+            opacity: deleting ? 0.5 : 1,
           }}
         >
           <Text
