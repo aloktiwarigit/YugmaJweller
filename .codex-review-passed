@@ -1,1 +1,1 @@
-substitute-gate: per-task Opus spec+quality review chain (12 tasks x 2 reviewers). Codex blocked by Windows PowerShell CLM in git worktree — git diff fails with ConstrainedLanguageMode. Pre-task Opus design review caught P1/P2 issues incorporated into implementation. API tests: 24/24 passing. TypeScript: clean. Branding: zero leaks. Fonts: Yatra One + Noto Sans Devanagari only.
+{"timestamp":"2026-05-01T08:52:05-04:00","commit":"a3dc29f888ba0c25252a2c440d07c1d0938811a7","reviewer":"codex","p1_fixes":["tenant-status-gate","razorpay-checkout-page"]}
