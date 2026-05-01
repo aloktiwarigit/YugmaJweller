@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { saveSecureSession, loadSecureSession, clearSecureSession, SECURE_KEY } from './secure-storage';
 
 describe('secure-storage', () => {
@@ -28,5 +29,31 @@ describe('secure-storage', () => {
     await saveSecureSession({ bearer: 'tok', customerId: 'cid', shopId: 'sid' });
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(SECURE_KEY, expect.any(String));
     expect(SECURE_KEY).toBe('customer_session_v1');
+  });
+
+  describe('on web (SecureStore unavailable)', () => {
+    const originalOS = Platform.OS;
+    beforeEach(() => {
+      Platform.OS = 'web';
+    });
+    afterEach(() => {
+      Platform.OS = originalOS;
+    });
+
+    it('save no-ops without calling SecureStore (does not crash on web export)', async () => {
+      await saveSecureSession({ bearer: 'tok', customerId: 'cid', shopId: 'sid' });
+      expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+    });
+
+    it('load returns null without calling SecureStore', async () => {
+      const loaded = await loadSecureSession();
+      expect(loaded).toBeNull();
+      expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
+    });
+
+    it('clear no-ops without calling SecureStore', async () => {
+      await clearSecureSession();
+      expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    });
   });
 });

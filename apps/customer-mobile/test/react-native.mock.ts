@@ -63,6 +63,15 @@ const ImageMock = React.forwardRef<unknown, AnyProps>(
   },
 );
 
+// Default to 'ios' so first-party code that branches on Platform.OS (e.g.
+// secure-storage's web/native gate) exercises the native path under unit
+// test. Tests that need the web path can mutate Platform.OS in beforeEach.
+export const Platform: { OS: 'ios' | 'android' | 'web'; select: <T>(opts: { ios?: T; android?: T; web?: T; default?: T }) => T | undefined } = {
+  OS: 'ios',
+  select: <T>(opts: { ios?: T; android?: T; web?: T; default?: T }): T | undefined =>
+    opts.ios ?? opts.default,
+};
+
 export const View = passthrough('view');
 export const Text = passthrough('text');
 export const Pressable = PressableMock;
