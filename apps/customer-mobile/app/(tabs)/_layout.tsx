@@ -4,10 +4,13 @@ import { Tabs, Redirect } from 'expo-router';
 import { colors } from '@goldsmith/ui-tokens';
 import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import { useCustomerAuthBootstrap } from '../../src/providers/CustomerAuthProvider';
+import { useTenantStore } from '../../src/stores/tenantStore';
 
 export default function TabsLayout(): React.ReactElement {
   const { isAuthenticated } = useCustomerSession();
   const { ready } = useCustomerAuthBootstrap();
+  const tenantError = useTenantStore((s) => s.error);
+  const tenant = useTenantStore((s) => s.tenant);
 
   // Wait for CustomerAuthProvider to finish rehydrating SecureStore before
   // deciding whether to redirect — otherwise a deep-link / cold-start onto a
@@ -23,6 +26,11 @@ export default function TabsLayout(): React.ReactElement {
       </View>
     );
   }
+  // Tenant boot failed but the user deep-linked / cold-started onto a tab
+  // route. Bounce through the root index so the tenant-boot-error UI gets a
+  // chance to render — falling through to /(auth)/welcome would strand the
+  // user on a screen whose dev-continue handler no-ops without a tenant.
+  if (tenantError !== null || tenant === null) return <Redirect href="/" />;
   if (!isAuthenticated) return <Redirect href="/(auth)/welcome" />;
 
   return (
