@@ -184,17 +184,21 @@ function buildRazorpayCheckoutHtml(params: {
   shopName:    string;
   keyId:       string;
 }): string {
-  // Escape values to prevent XSS — these come from server-controlled strings but
-  // we still HTML-encode to be safe.
-  const esc = (s: string): string =>
+  // HTML-escape for HTML text/attribute context (title, h1, p).
+  const escHtml = (s: string): string =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  // JSON.stringify for values embedded inside <script> — HTML entity encoding is
+  // NOT decoded by JS parsers inside script blocks, so esc() is wrong there.
+  // JSON.stringify properly escapes backslashes, quotes, and all control chars.
+  const jsStr = (s: string): string => JSON.stringify(s);
 
   return `<!DOCTYPE html>
 <html lang="hi">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>भुगतान — ${esc(params.shopName)}</title>
+  <title>भुगतान — ${escHtml(params.shopName)}</title>
   <style>
     body { font-family: sans-serif; display:flex; align-items:center; justify-content:center;
            min-height:100vh; margin:0; background:#FFFBF5; }
@@ -207,7 +211,7 @@ function buildRazorpayCheckoutHtml(params: {
 </head>
 <body>
   <div class="card">
-    <h1>${esc(params.shopName)}</h1>
+    <h1>${escHtml(params.shopName)}</h1>
     <p>दर-लॉक जमा राशि — ₹${Math.round(Number(params.amountPaise) / 100).toLocaleString('en-IN')}</p>
     <button id="payBtn">Razorpay से भुगतान करें</button>
   </div>
@@ -215,11 +219,11 @@ function buildRazorpayCheckoutHtml(params: {
   <script>
     document.getElementById('payBtn').addEventListener('click', function() {
       var rzp = new Razorpay({
-        key: "${esc(params.keyId)}",
-        order_id: "${esc(params.orderId)}",
-        amount: "${esc(params.amountPaise)}",
+        key:      ${jsStr(params.keyId)},
+        order_id: ${jsStr(params.orderId)},
+        amount:   ${jsStr(params.amountPaise)},
         currency: "INR",
-        name: "${esc(params.shopName)}",
+        name:     ${jsStr(params.shopName)},
         description: "दर-लॉक जमा राशि",
         handler: function(response) {
           document.querySelector('.card').innerHTML =

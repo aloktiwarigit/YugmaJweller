@@ -39,10 +39,15 @@ export class CustomerAuthGuard implements CanActivate {
     const bearer = raw.replace(/^Bearer\s+/i, '');
     if (!shopId) throw new UnauthorizedException({ code: 'customer.tenant_id_missing' });
 
-    // Development mock — only accepted when bearer has the well-known prefix
+    // Development mock — only accepted when bearer has the well-known prefix AND
+    // the runtime is explicitly a development/test environment. Allowlist (not
+    // blocklist) so that staging, unset NODE_ENV, or any typo (e.g. "Production")
+    // fails closed rather than open.
     if (bearer.startsWith(DEV_MOCK_BEARER_PREFIX)) {
-      if (process.env['NODE_ENV'] === 'production') {
-        throw new UnauthorizedException({ code: 'customer.dev_mock_not_allowed_in_production' });
+      const nodeEnv = process.env['NODE_ENV'];
+      const isDevOrTest = nodeEnv === 'development' || nodeEnv === 'test';
+      if (!isDevOrTest) {
+        throw new UnauthorizedException({ code: 'customer.dev_mock_not_allowed' });
       }
       req.customerCtx = { customerId: DEV_MOCK_CUSTOMER_ID, shopId };
       return true;

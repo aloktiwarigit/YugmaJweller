@@ -214,8 +214,12 @@ export class RateLockBookingsService {
     try {
       await client.query('BEGIN');
       await client.query('SET LOCAL ROLE app_user');
-      // nosemgrep: goldsmith.no-raw-shop-id-param
-      await client.query(`SET LOCAL app.current_shop_id = '${shopIdHint}'`);
+      // Use parameterized set_config() instead of raw interpolation. Even though
+      // the upstream UUID_RE regex blocks all SQL metacharacters today, this is
+      // defense-in-depth: the regex could be relaxed, or the source of shopIdHint
+      // could change. set_config(name, value, is_local=true) is equivalent to
+      // SET LOCAL with safe parameter binding.
+      await client.query('SELECT set_config($1, $2, true)', ['app.current_shop_id', shopIdHint]);
 
       const res = await client.query<{ id: string; shop_id: string; status: string }>(
         `SELECT id, shop_id, status FROM rate_lock_bookings WHERE id = $1 AND shop_id = $2 FOR UPDATE`,
