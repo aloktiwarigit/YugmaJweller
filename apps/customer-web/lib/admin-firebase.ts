@@ -7,12 +7,14 @@ import { initWebFirebase, type WebFirebaseConfig } from '@goldsmith/auth-client/
 import type { Auth } from 'firebase/auth';
 
 function readConfigFromEnv(): WebFirebaseConfig {
-  // NEXT_PUBLIC_* are exposed to the browser by Next.js. Configure these in
-  // apps/customer-web/.env.local — values come from Firebase console → Project settings → Web app.
-  const apiKey     = process.env['NEXT_PUBLIC_FIREBASE_API_KEY'];
-  const authDomain = process.env['NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN'];
-  const projectId  = process.env['NEXT_PUBLIC_FIREBASE_PROJECT_ID'];
-  const appId      = process.env['NEXT_PUBLIC_FIREBASE_APP_ID'];
+  // NEXT_PUBLIC_* are exposed to the browser by Next.js — but ONLY via static dot-property
+  // access (process.env.NEXT_PUBLIC_FOO). Bracket access (process.env['NEXT_PUBLIC_FOO']) is
+  // left as runtime in the client bundle and reads as undefined in the browser, so deployed
+  // /admin would silently fail Firebase init even with the env vars set.
+  const apiKey     = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+  const projectId  = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const appId      = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
 
   if (!apiKey || !authDomain || !projectId) {
     throw new Error(

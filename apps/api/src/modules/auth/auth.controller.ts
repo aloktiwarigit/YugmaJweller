@@ -96,6 +96,12 @@ export class AuthController {
     const ctx = tenantContext.requireCurrent();
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     const auth = ctx as AuthenticatedTenantContext;
+    // Impersonators must not perform shop_users governance: invited_by_user_id is FK to
+    // shop_users(id) and ctx.userId during impersonation is the session UUID, which would
+    // fail the FK constraint. Force the actual shop owner to perform invites.
+    if (auth.isImpersonating) {
+      throw new ForbiddenException({ code: 'auth.impersonation_not_allowed_for_route' });
+    }
     return this.svc.invite(auth.shopId, dto, auth.userId);
   }
 
@@ -196,6 +202,13 @@ export class AuthController {
     const ctx = tenantContext.requireCurrent();
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     const auth = ctx as AuthenticatedTenantContext;
+    // Impersonators must not revoke staff: revoked_by_user_id is FK to shop_users(id) and
+    // ctx.userId during impersonation is the session UUID. Beyond the FK failure, revoke
+    // also clears Firebase claims first — letting it half-succeed leaves the session
+    // tokens revoked but the DB row intact, an inconsistent state hard to undo.
+    if (auth.isImpersonating) {
+      throw new ForbiddenException({ code: 'auth.impersonation_not_allowed_for_route' });
+    }
     await this.svc.revokeStaff(auth.shopId, userId, auth.userId);
   }
 }

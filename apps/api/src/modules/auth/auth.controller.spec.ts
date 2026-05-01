@@ -116,6 +116,19 @@ describe('AuthController', () => {
         withAdminCtx(() => controller.invite(inviteDto)),
       ).rejects.toBeInstanceOf(ConflictException);
     });
+
+    it('rejects when caller is impersonating (FK to shop_users would fail)', async () => {
+      const impersonatedCtx: AuthenticatedTenantContext = {
+        ...adminCtx,
+        userId: '11111111-1111-1111-1111-111111111111',
+        isImpersonating: true,
+        impersonationAuditId: '11111111-1111-1111-1111-111111111111',
+      };
+      await expect(
+        tenantContext.runWith(impersonatedCtx, () => controller.invite(inviteDto)),
+      ).rejects.toMatchObject({ response: { code: 'auth.impersonation_not_allowed_for_route' } });
+      expect(mockAuthService.invite).not.toHaveBeenCalled();
+    });
   });
 
   // ─── GET /users ──────────────────────────────────────────────────────────
@@ -336,6 +349,19 @@ describe('AuthController', () => {
       await expect(
         withAdminCtx(() => controller.revokeStaff('nonexistent-id')),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('rejects when caller is impersonating (FK + Firebase-claim-clear race)', async () => {
+      const impersonatedCtx: AuthenticatedTenantContext = {
+        ...adminCtx,
+        userId: '11111111-1111-1111-1111-111111111111',
+        isImpersonating: true,
+        impersonationAuditId: '11111111-1111-1111-1111-111111111111',
+      };
+      await expect(
+        tenantContext.runWith(impersonatedCtx, () => controller.revokeStaff('staff-uuid-1')),
+      ).rejects.toMatchObject({ response: { code: 'auth.impersonation_not_allowed_for_route' } });
+      expect(mockAuthService.revokeStaff).not.toHaveBeenCalled();
     });
   });
 });

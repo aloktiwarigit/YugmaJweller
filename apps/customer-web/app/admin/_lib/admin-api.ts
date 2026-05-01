@@ -11,7 +11,9 @@ export interface TenantList { items: Tenant[]; total: number }
 export interface PlatformMetrics { totalShops: number; activeShops: number; invoicesLast30Days: number }
 export interface ImpersonationSession { sessionId: string; token: string; expiresAt: string }
 
-const BASE = process.env['NEXT_PUBLIC_API_BASE'] ?? 'http://localhost:3001';
+// Next only statically replaces NEXT_PUBLIC_* via dot-property access in the client bundle;
+// bracket access stays as runtime `process.env[...]` and reads undefined in the browser.
+const BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3001';
 
 async function call<T>(token: string, path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(`${BASE}${path}`, {
