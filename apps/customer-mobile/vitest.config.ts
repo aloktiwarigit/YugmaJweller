@@ -19,7 +19,12 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./test/setup.ts'],
     globals: true,
-    include: ['test/**/*.test.ts', 'test/**/*.test.tsx', 'src/**/*.test.ts', 'src/**/*.test.tsx', 'app/**/*.test.ts', 'app/**/*.test.tsx'],
+    // Tests live under test/ and src/ only. We deliberately do NOT include
+    // app/**/*.test.* — Expo Router treats every app/**/*.tsx as a route,
+    // so colocating tests there leaks vitest/test-only deps into the bundle
+    // and exposes a phantom route. A test for an app/ screen lives in
+    // test/ and imports the screen relatively (see test/profile.test.tsx).
+    include: ['test/**/*.test.ts', 'test/**/*.test.tsx', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
   },
   resolve: {
     alias: {

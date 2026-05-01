@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import MockAdapter from 'axios-mock-adapter';
 import { render, fireEvent } from '@testing-library/react';
 import React from 'react';
-import { api } from '../../src/api/client';
-import { useCustomerSessionStore } from '../../src/stores/customerSessionStore';
-import { useTenantStore } from '../../src/stores/tenantStore';
-import { makeCustomer, makeTenant } from '../../test/factories';
-import Profile from './profile';
+import { api } from '../src/api/client';
+import { useCustomerSessionStore } from '../src/stores/customerSessionStore';
+import { useTenantStore } from '../src/stores/tenantStore';
+import { makeCustomer, makeTenant } from './factories';
+import Profile from '../app/(tabs)/profile';
 
 describe('Profile', () => {
   let mock: MockAdapter;

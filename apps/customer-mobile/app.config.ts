@@ -15,9 +15,15 @@ const config: ExpoConfig = {
   // gate) bundles successfully. Native iOS/Android remain the primary
   // distribution targets.
   platforms: ['ios', 'android', 'web'],
+  // Firebase plugins (@react-native-firebase/app + auth) and the
+  // googleServicesFile entries are deferred to follow-up story EPIC7-S1
+  // (Customer Phone OTP). This branch only ships the dev-mode mock auth
+  // path, which has no Firebase dependency. Adding the plugins now would
+  // require checking google-services.json / GoogleService-Info.plist into
+  // the repo (or making EAS env vars mandatory), which a clean checkout
+  // would fail without — and the artifacts aren't usable until OTP ships
+  // anyway.
   plugins: [
-    '@react-native-firebase/app',
-    '@react-native-firebase/auth',
     'expo-dev-client',
     'expo-font',
     'expo-router',
@@ -31,11 +37,9 @@ const config: ExpoConfig = {
   // anchor dev build invoked from a developer's machine.
   android: {
     package: process.env['EXPO_PUBLIC_ANDROID_PACKAGE'] ?? 'com.goldsmith.customer.dev',
-    googleServicesFile: process.env['GOOGLE_SERVICES_FILE'] ?? './google-services.json',
   },
   ios: {
     bundleIdentifier: process.env['EXPO_PUBLIC_IOS_BUNDLE_ID'] ?? 'com.goldsmith.customer.dev',
-    googleServicesFile: process.env['GOOGLE_SERVICES_INFO_PLIST'] ?? './GoogleService-Info.plist',
     supportsTablet: false,
   },
   extra: {
