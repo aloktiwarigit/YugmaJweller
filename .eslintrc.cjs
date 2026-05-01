@@ -131,5 +131,15 @@ module.exports = {
         { group: ['bullmq', 'bullmq/*'], message: 'Import bullmq only from packages/queue.' },
       ] }] },
     },
+    // Next.js App Router pages/components — server components return JSX.Element | Promise<JSX.Element>
+    // which TypeScript infers correctly; explicit return type annotation is unergonomic here.
+    {
+      files: ['apps/customer-web/**/*.tsx', 'apps/customer-web/**/*.ts'],
+      rules: {
+        '@typescript-eslint/explicit-function-return-type': 'off',
+        'goldsmith/no-raw-shop-id-param': 'off',
+        'no-restricted-imports': 'off',
+      },
+    },
   ],
 };
