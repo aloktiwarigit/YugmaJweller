@@ -35,6 +35,18 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const headersList = headers();
+  const pathname = headersList.get('x-pathname') ?? '';
+
+  // Platform admin pages have their own layout and do not need tenant config.
+  if (pathname.startsWith('/admin')) {
+    return (
+      <html lang="en" className={`${yatraOne.variable} ${notoSansDevanagari.variable}`}>
+        <body>{children}</body>
+      </html>
+    );
+  }
+
   const slug = resolveSlug();
 
   const unavailablePage = (
