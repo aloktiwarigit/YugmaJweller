@@ -1,18 +1,43 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  signOutOfFirebase,
+  subscribeToIdToken,
+} from '@goldsmith/auth-client/web';
+import { getAdminAuth } from '../../lib/admin-firebase';
 import { adminApi, type Tenant, type PlatformMetrics } from './_lib/admin-api';
 import { TenantTable } from './_components/TenantTable';
 
 export default function AdminHome() {
-  const [token, setToken] = useState('');
-  const [armed, setArmed] = useState(false);
+  const router = useRouter();
+  const [token, setToken] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [metrics, setMetrics] = useState<PlatformMetrics | null>(null);
   const [search, setSearch] = useState('');
 
+  // Subscribe to Firebase ID-token rotation so admin-api always carries a fresh token.
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    try {
+      const auth = getAdminAuth();
+      unsubscribe = subscribeToIdToken(auth, (t) => {
+        setToken(t);
+        setAuthReady(true);
+        if (!t) router.replace('/admin/login');
+      });
+    } catch (e) {
+      // Misconfigured Firebase — surface the env-var error instead of a blank screen.
+      setError((e as Error).message);
+      setAuthReady(true);
+    }
+    return () => unsubscribe?.();
+  }, [router]);
+
   async function refresh() {
-    if (!armed || !token) return;
+    if (!token) return;
     setError(null);
     try {
       const tList = await adminApi.listTenants(token, search ? { search } : undefined);
@@ -23,28 +48,23 @@ export default function AdminHome() {
     }
   }
 
-  useEffect(() => { void refresh(); }, [armed, token]);
+  useEffect(() => { void refresh(); }, [token]);
 
-  if (!armed) {
+  async function handleSignOut() {
+    try {
+      await signOutOfFirebase(getAdminAuth());
+    } finally {
+      router.replace('/admin/login');
+    }
+  }
+
+  if (!authReady) {
+    return <p className="text-sm text-slate-600">Loading…</p>;
+  }
+  if (!token) {
     return (
-      <div className="space-y-4 max-w-xl">
-        <p className="text-sm text-slate-700">
-          Paste your Firebase ID token (with <code>role=platform_admin</code> custom claim).
-          Token is held in memory only.
-        </p>
-        <textarea
-          className="w-full border border-slate-300 rounded p-2 font-mono text-xs h-28"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          placeholder="eyJhbGciOi..."
-        />
-        <button
-          onClick={() => setArmed(Boolean(token))}
-          disabled={!token}
-          className="px-4 py-2 bg-slate-900 text-white rounded disabled:opacity-50"
-        >
-          Use token
-        </button>
+      <div className="space-y-3">
+        <p className="text-sm text-slate-600">Redirecting to sign-in…</p>
         {error && <p className="text-red-600 text-sm">{error}</p>}
       </div>
     );
@@ -68,7 +88,7 @@ export default function AdminHome() {
           className="flex-1 border border-slate-300 rounded px-3 py-2 text-sm"
         />
         <button onClick={refresh} className="px-4 py-2 bg-slate-700 text-white rounded">Refresh</button>
-        <button onClick={() => { setArmed(false); setToken(''); }} className="px-4 py-2 bg-slate-300 text-slate-900 rounded">
+        <button onClick={handleSignOut} className="px-4 py-2 bg-slate-300 text-slate-900 rounded">
           Sign out
         </button>
       </div>
