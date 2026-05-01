@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import React from 'react';
 import { useCustomerSession } from './useCustomerSession';
 import { useCustomerSessionStore } from '../stores/customerSessionStore';
 import { makeCustomer } from '../../test/factories';

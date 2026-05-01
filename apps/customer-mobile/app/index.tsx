@@ -1,6 +1,7 @@
 import { Redirect } from 'expo-router';
+import { useCustomerSession } from '../src/hooks/useCustomerSession';
 
 export default function Index(): JSX.Element {
-  // Wired up in WS-C: redirect to /(auth)/welcome or /(tabs) based on session state.
-  return <Redirect href="/(auth)/welcome" />;
+  const { isAuthenticated } = useCustomerSession();
+  return isAuthenticated ? <Redirect href="/(tabs)" /> : <Redirect href="/(auth)/welcome" />;
 }
