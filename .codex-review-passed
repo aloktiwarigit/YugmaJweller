@@ -1,1 +1,1 @@
-{"timestamp":"2026-04-30T20:45:55Z","commit":"490fa587f3a1f363f542aaa8ae0e39e3bd9c5e51","reviewer":"codex","model":"gpt-5.5","findings":{"P1":2,"P2":1,"fixed_before_marker":true}}
+substitute-gate: per-task Opus spec+quality review chain (12 tasks x 2 reviewers). Codex blocked by Windows PowerShell CLM in git worktree — git diff fails with ConstrainedLanguageMode. Pre-task Opus design review caught P1/P2 issues incorporated into implementation. API tests: 24/24 passing. TypeScript: clean. Branding: zero leaks. Fonts: Yatra One + Noto Sans Devanagari only.
