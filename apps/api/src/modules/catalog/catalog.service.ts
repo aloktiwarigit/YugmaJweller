@@ -72,16 +72,20 @@ export interface HuidVerifyResult {
 // HUID QR parsing helpers
 // ---------------------------------------------------------------------------
 
+// Boundary: the 6-char HUID must be followed by a non-alphanumeric char or end-of-string.
+// This prevents `AB1234ZZ` from matching as `AB1234`.
+const HUID_BOUNDARY = '(?=[^A-Za-z0-9]|$)';
+
 function parseHuidFromQr(payload: string): string | null {
   const trimmed = payload.trim();
   // BIS URL format: ?huid=AB1234 or &huid=AB1234
-  const queryMatch = trimmed.match(/[?&]huid=([A-Za-z0-9]{6})/i);
+  const queryMatch = trimmed.match(new RegExp(`[?&]huid=([A-Za-z0-9]{6})${HUID_BOUNDARY}`, 'i'));
   if (queryMatch) return queryMatch[1].toUpperCase();
   // Path format: /huid/AB1234
-  const pathMatch = trimmed.match(/\/huid\/([A-Za-z0-9]{6})/i);
+  const pathMatch = trimmed.match(new RegExp(`\\/huid\\/([A-Za-z0-9]{6})${HUID_BOUNDARY}`, 'i'));
   if (pathMatch) return pathMatch[1].toUpperCase();
   // HUID: prefix
-  const prefixMatch = trimmed.match(/^HUID:([A-Za-z0-9]{6})/i);
+  const prefixMatch = trimmed.match(new RegExp(`^HUID:([A-Za-z0-9]{6})${HUID_BOUNDARY}`, 'i'));
   if (prefixMatch) return prefixMatch[1].toUpperCase();
   // Raw 6-char alphanumeric
   if (/^[A-Za-z0-9]{6}$/.test(trimmed)) return trimmed.toUpperCase();

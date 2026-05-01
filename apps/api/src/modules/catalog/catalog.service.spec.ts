@@ -301,6 +301,15 @@ describe('CatalogService.verifyHuid()', () => {
     await expect(svc.verifyHuid(PRODUCT_ID, SHOP_ID, 'not-a-valid-huid-string!!!')).rejects.toThrow(BadRequestException);
   });
 
+  it('rejects partial HUID token — ?huid=AB1234ZZ does not match AB1234', async () => {
+    // Without a boundary check, AB1234ZZ could erroneously extract AB1234
+    const pool = makePool([]);
+    const svc = new CatalogService(pool as never, mockPricingService as never);
+
+    const { BadRequestException } = await import('@nestjs/common');
+    await expect(svc.verifyHuid(PRODUCT_ID, SHOP_ID, 'https://x?huid=AB1234ZZ')).rejects.toThrow(BadRequestException);
+  });
+
   it('throws NotFoundException when product not found', async () => {
     const pool = makePool([{ rows: [] }]);
     const svc = new CatalogService(pool as never, mockPricingService as never);
