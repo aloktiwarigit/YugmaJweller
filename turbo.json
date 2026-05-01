@@ -8,6 +8,7 @@
     "test:unit":            { "dependsOn": [], "outputs": [] },
     "test:integration":     { "dependsOn": ["^build"], "outputs": [] },
     "test:tenant-isolation": { "dependsOn": ["^build"], "outputs": [] },
-    "build":                { "dependsOn": ["^build"], "outputs": ["dist/**"] }
+    "build":                { "dependsOn": ["^build"], "outputs": ["dist/**"] },
+    "dev":                  { "cache": false, "persistent": true }
   }
 }
