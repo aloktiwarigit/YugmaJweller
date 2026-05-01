@@ -312,6 +312,21 @@ describe('AuthController', () => {
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
 
+    it('rejects when caller is impersonating (would revoke admin sessions, not tenant user)', async () => {
+      const PLATFORM_FIREBASE_UID = 'platform-firebase-uid';
+      const impersonatedCtx: AuthenticatedTenantContext = {
+        ...adminCtx,
+        userId: '11111111-1111-1111-1111-111111111111',
+        isImpersonating: true,
+        impersonationAuditId: '11111111-1111-1111-1111-111111111111',
+      };
+      const fakeReq = { user: { uid: PLATFORM_FIREBASE_UID } } as never;
+      await expect(
+        tenantContext.runWith(impersonatedCtx, () => controller.logoutAll(fakeReq)),
+      ).rejects.toMatchObject({ response: { code: 'auth.impersonation_not_allowed_for_route' } });
+      expect(mockAuthService.logoutAll).not.toHaveBeenCalled();
+    });
+
     it('throws UnauthorizedException when context is not authenticated', async () => {
       const FIREBASE_UID = 'firebase-uid-abc';
       const fakeReq = { user: { uid: FIREBASE_UID } } as never;

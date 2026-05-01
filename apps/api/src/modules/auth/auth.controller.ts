@@ -192,6 +192,13 @@ export class AuthController {
     const ctx = tenantContext.requireCurrent();
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     const auth = ctx as AuthenticatedTenantContext;
+    // Impersonators must not invoke logoutAll: req.user.uid is the platform admin's Firebase
+    // UID (not the impersonated shop user), so revokeRefreshTokens(uid) would terminate the
+    // platform admin's own sessions across every device. Auth-governance routes have no
+    // safe semantic during impersonation.
+    if (auth.isImpersonating) {
+      throw new ForbiddenException({ code: 'auth.impersonation_not_allowed_for_route' });
+    }
     await this.svc.logoutAll(auth.userId, user.uid);
   }
 

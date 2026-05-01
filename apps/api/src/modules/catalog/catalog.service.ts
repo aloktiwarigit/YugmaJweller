@@ -187,6 +187,9 @@ export class CatalogService {
     const limitIdx  = queryParams.length - 1;
     const offsetIdx = queryParams.length;
 
+    // EXISTS guard: suspended/terminated tenants must not surface products via the public
+    // catalog. Without this, anyone holding a (cached) shop_id can keep fetching after
+    // platform admin suspends the tenant.
     const sql = `
       SELECT p.id, p.sku, p.metal, p.purity, p.category_id,
              pc.name AS category_name,
@@ -197,6 +200,7 @@ export class CatalogService {
         FROM products p
         LEFT JOIN product_categories pc ON pc.id = p.category_id
        WHERE p.shop_id = $1
+         AND EXISTS (SELECT 1 FROM shops WHERE id = $1 AND status = 'ACTIVE')
          AND p.status = 'PUBLISHED'
          ${whereExtra}
        ORDER BY p.published_at DESC
@@ -233,6 +237,7 @@ export class CatalogService {
         [shopId],
       ),
       this.pool.query<ProductCatalogRow>(
+        // EXISTS guard: suspended/terminated tenants must 404 from public catalog detail too.
         `SELECT p.id, p.sku, p.metal, p.purity, p.category_id,
                 pc.name AS category_name,
                 p.gross_weight_g, p.net_weight_g,
@@ -241,7 +246,9 @@ export class CatalogService {
                 '1' AS total_count
            FROM products p
            LEFT JOIN product_categories pc ON pc.id = p.category_id
-          WHERE p.id = $1 AND p.shop_id = $2 AND p.status = 'PUBLISHED'`,
+          WHERE p.id = $1 AND p.shop_id = $2
+            AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
+            AND p.status = 'PUBLISHED'`,
         [id, shopId],
       ),
     ]);
