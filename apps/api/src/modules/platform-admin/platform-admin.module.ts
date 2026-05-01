@@ -14,8 +14,15 @@ import { ImpersonationSessionAdapter } from './impersonation-session.adapter';
 // Dedicated platform_admin connection pool. The default `app_user` role (used by `PG_POOL`)
 // has no membership in `platform_admin`, so `SET ROLE platform_admin` from an app_user
 // session is denied by Postgres. Connect directly as platform_admin instead.
+//
+// Why this works against RLS-protected tables: migration 0000 creates platform_admin as
+// NOBYPASSRLS, but migration 0003 then `ALTER ROLE platform_admin BYPASSRLS` (in a DO block).
+// Pre-deploy DBA action documented in runbook §14 (the migrator role normally lacks SUPERUSER
+// to make the ALTER itself, so the DBA pre-grants BYPASSRLS once before migration 0003 runs).
+// The grant is verified at startup by migration 0003's RAISE EXCEPTION.
+//
 // Falls back to DATABASE_URL for dev convenience when DATABASE_URL_ADMIN isn't set
-// (acceptable: dev Postgres typically has no role separation).
+// (acceptable: dev Postgres typically uses a single superuser role with no RLS separation).
 export const PG_POOL_ADMIN = 'PG_POOL_ADMIN';
 
 @Module({

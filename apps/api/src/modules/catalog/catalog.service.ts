@@ -272,7 +272,12 @@ export class CatalogService {
     const certifyingBody = certifyingBodyFromQr(qrPayload);
 
     const r = await this.pool.query<{ huid: string | null }>(
-      `SELECT huid FROM products WHERE id = $1 AND shop_id = $2 AND status = 'PUBLISHED'`,
+      // EXISTS guard: HUID verification must also respect tenant suspension. Without it, a
+      // caller with a cached shop+product ID could keep verifying HUID after suspend.
+      `SELECT huid FROM products
+        WHERE id = $1 AND shop_id = $2
+          AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
+          AND status = 'PUBLISHED'`,
       [productId, shopId],
     );
     if (r.rows.length === 0) {
