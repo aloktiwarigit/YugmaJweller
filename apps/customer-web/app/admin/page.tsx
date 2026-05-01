@@ -23,7 +23,7 @@ export default function AdminHome() {
     }
   }
 
-  useEffect(() => { void refresh(); }, [armed, token]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void refresh(); }, [armed, token]);
 
   if (!armed) {
     return (
