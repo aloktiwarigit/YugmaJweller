@@ -10,7 +10,7 @@ import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
 import { PricingService } from '../pricing/pricing.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { CatalogService } from './catalog.service';
-import type { TenantConfigResponse, CatalogProductsResponse, CatalogProduct } from './catalog.service';
+import type { TenantConfigResponse, CatalogProductsResponse, CatalogProduct, HuidVerifyResult } from './catalog.service';
 import { RatesUnavailableError } from '@goldsmith/rates';
 
 // ---------------------------------------------------------------------------
@@ -114,6 +114,24 @@ export class CatalogController {
   ): Promise<CatalogProduct> {
     if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
     return this.catalogService.getProduct(productId, shopId);
+  }
+
+  // -------------------------------------------------------------------------
+  // GET /catalog/products/:id/verify-huid — Story 5C HUID QR verification
+  // -------------------------------------------------------------------------
+
+  @Get('products/:id/verify-huid')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'no-store')
+  async verifyHuid(
+    @Param('id', new ParseUUIDPipe()) productId: string,
+    @Headers('x-tenant-id') shopId: string,
+    @Query('payload') payload: string,
+  ): Promise<HuidVerifyResult> {
+    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    if (!payload) throw new BadRequestException({ code: 'catalog.huid_payload_required' });
+    return this.catalogService.verifyHuid(productId, shopId, payload);
   }
 
   // -------------------------------------------------------------------------

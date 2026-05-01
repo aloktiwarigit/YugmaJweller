@@ -209,3 +209,87 @@ describe('CatalogService.getProduct()', () => {
     await expect(svc.getProduct('nonexistent', 'shop-1')).rejects.toThrow(NotFoundException);
   });
 });
+
+// ---------------------------------------------------------------------------
+// verifyHuid
+// ---------------------------------------------------------------------------
+
+describe('CatalogService.verifyHuid()', () => {
+  const PRODUCT_ID = 'prod-uuid-1';
+  const SHOP_ID    = 'shop-1';
+
+  it('returns verified=true when QR HUID matches product HUID (raw 6-char)', async () => {
+    const pool = makePool([{ rows: [{ huid: 'AB1234' }] }]);
+    const svc = new CatalogService(pool as never, mockPricingService as never);
+
+    const result = await svc.verifyHuid(PRODUCT_ID, SHOP_ID, 'AB1234');
+
+    expect(result.verified).toBe(true);
+    expect(result.huid).toBe('AB1234');
+    expect(result.certifyingBody).toBe('BIS');
+  });
+
+  it('returns verified=true for BIS URL format QR', async () => {
+    const pool = makePool([{ rows: [{ huid: 'AB1234' }] }]);
+    const svc = new CatalogService(pool as never, mockPricingService as never);
+
+    const result = await svc.verifyHuid(PRODUCT_ID, SHOP_ID, 'https://jewel.bis.gov.in/?huid=AB1234');
+
+    expect(result.verified).toBe(true);
+    expect(result.huid).toBe('AB1234');
+    expect(result.certifyingBody).toBe('BIS');
+  });
+
+  it('returns verified=true for path-style QR', async () => {
+    const pool = makePool([{ rows: [{ huid: 'ZZ9999' }] }]);
+    const svc = new CatalogService(pool as never, mockPricingService as never);
+
+    const result = await svc.verifyHuid(PRODUCT_ID, SHOP_ID, 'https://bis.gov.in/huid/ZZ9999');
+
+    expect(result.verified).toBe(true);
+    expect(result.huid).toBe('ZZ9999');
+  });
+
+  it('returns verified=false when QR HUID does not match product HUID', async () => {
+    const pool = makePool([{ rows: [{ huid: 'AB1234' }] }]);
+    const svc = new CatalogService(pool as never, mockPricingService as never);
+
+    const result = await svc.verifyHuid(PRODUCT_ID, SHOP_ID, 'ZZ9999');
+
+    expect(result.verified).toBe(false);
+    expect(result.huid).toBe('ZZ9999');
+  });
+
+  it('returns verified=false when product has no HUID', async () => {
+    const pool = makePool([{ rows: [{ huid: null }] }]);
+    const svc = new CatalogService(pool as never, mockPricingService as never);
+
+    const result = await svc.verifyHuid(PRODUCT_ID, SHOP_ID, 'AB1234');
+
+    expect(result.verified).toBe(false);
+  });
+
+  it('is case-insensitive for HUID comparison', async () => {
+    const pool = makePool([{ rows: [{ huid: 'ab1234' }] }]);
+    const svc = new CatalogService(pool as never, mockPricingService as never);
+
+    const result = await svc.verifyHuid(PRODUCT_ID, SHOP_ID, 'AB1234');
+
+    expect(result.verified).toBe(true);
+  });
+
+  it('throws BadRequestException for unparseable QR payload', async () => {
+    const pool = makePool([]);
+    const svc = new CatalogService(pool as never, mockPricingService as never);
+
+    const { BadRequestException } = await import('@nestjs/common');
+    await expect(svc.verifyHuid(PRODUCT_ID, SHOP_ID, 'not-a-valid-huid-string!!!')).rejects.toThrow(BadRequestException);
+  });
+
+  it('throws NotFoundException when product not found', async () => {
+    const pool = makePool([{ rows: [] }]);
+    const svc = new CatalogService(pool as never, mockPricingService as never);
+
+    await expect(svc.verifyHuid(PRODUCT_ID, SHOP_ID, 'AB1234')).rejects.toThrow(NotFoundException);
+  });
+});

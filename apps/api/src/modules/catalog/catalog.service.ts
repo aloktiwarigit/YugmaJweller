@@ -1,4 +1,4 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { PricingService } from '../pricing/pricing.service';
 import type { CurrentRatesResult } from '../pricing/pricing.service';
@@ -59,6 +59,38 @@ export interface GetProductsParams {
   search?:     string;
   page:        number;
   limit:       number;
+}
+
+export interface HuidVerifyResult {
+  verified:       boolean;
+  huid:           string;
+  certifyingBody: string;
+}
+
+// ---------------------------------------------------------------------------
+// HUID QR parsing helpers
+// ---------------------------------------------------------------------------
+
+function parseHuidFromQr(payload: string): string | null {
+  const trimmed = payload.trim();
+  // BIS URL format: ?huid=AB1234 or &huid=AB1234
+  const queryMatch = trimmed.match(/[?&]huid=([A-Za-z0-9]{6})/i);
+  if (queryMatch) return queryMatch[1].toUpperCase();
+  // Path format: /huid/AB1234
+  const pathMatch = trimmed.match(/\/huid\/([A-Za-z0-9]{6})/i);
+  if (pathMatch) return pathMatch[1].toUpperCase();
+  // HUID: prefix
+  const prefixMatch = trimmed.match(/^HUID:([A-Za-z0-9]{6})/i);
+  if (prefixMatch) return prefixMatch[1].toUpperCase();
+  // Raw 6-char alphanumeric
+  if (/^[A-Za-z0-9]{6}$/.test(trimmed)) return trimmed.toUpperCase();
+  return null;
+}
+
+function certifyingBodyFromQr(payload: string): string {
+  if (/bis\.gov\.in/i.test(payload)) return 'BIS';
+  if (/jewel\.bis/i.test(payload)) return 'BIS';
+  return 'BIS';
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +243,27 @@ export class CatalogService {
     const mcMap = new Map<string, string>(configs.map((c) => [c.category, c.value]));
 
     return this.computeCatalogProduct(productResult.rows[0], ratesResult, mcMap);
+  }
+
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint; shopId from slug lookup, not TenantContext
+  async verifyHuid(productId: string, shopId: string, qrPayload: string): Promise<HuidVerifyResult> {
+    const extractedHuid = parseHuidFromQr(qrPayload);
+    if (!extractedHuid) {
+      throw new BadRequestException({ code: 'catalog.huid_qr_invalid' });
+    }
+    const certifyingBody = certifyingBodyFromQr(qrPayload);
+
+    const r = await this.pool.query<{ huid: string | null }>(
+      `SELECT huid FROM products WHERE id = $1 AND shop_id = $2 AND status = 'PUBLISHED'`,
+      [productId, shopId],
+    );
+    if (r.rows.length === 0) {
+      throw new NotFoundException({ code: 'catalog.product_not_found' });
+    }
+
+    const productHuid = r.rows[0].huid;
+    const verified = productHuid !== null && productHuid.toUpperCase() === extractedHuid;
+    return { verified, huid: extractedHuid, certifyingBody };
   }
 
   private computeCatalogProduct(
