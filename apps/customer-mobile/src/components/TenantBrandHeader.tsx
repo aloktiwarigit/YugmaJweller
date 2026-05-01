@@ -9,7 +9,15 @@ export function TenantBrandHeader(): React.ReactElement | null {
 
   if (loading || !tenant) return null;
 
+  // React Native Image needs an absolute URI on native. The seeded
+  // shops.config.logo_url shape can be a relative path (e.g.
+  // `/assets/brand/placeholder-logo.svg`) which would render broken on
+  // iOS/Android with no fallback. Only render Image when the URL is
+  // absolute; otherwise fall through to the neutral placeholder. A
+  // follow-up CDN-rewrite story should resolve relative paths against
+  // the tenant's CDN origin server-side.
   const logoUrl = tenant.branding.logoUrl;
+  const hasAbsoluteLogo = typeof logoUrl === 'string' && /^(?:https?:|data:)/.test(logoUrl);
 
   return (
     <View
@@ -22,7 +30,7 @@ export function TenantBrandHeader(): React.ReactElement | null {
         backgroundColor: colors.bg,
       }}
     >
-      {logoUrl ? (
+      {hasAbsoluteLogo ? (
         <Image
           source={{ uri: logoUrl }}
           style={{ width: 40, height: 40, borderRadius: 8, marginRight: spacing.sm }}

@@ -11,7 +11,10 @@ const config: ExpoConfig = {
   version: '0.0.0',
   orientation: 'portrait',
   userInterfaceStyle: 'light',
-  platforms: ['ios', 'android'],
+  // 'web' is included so `expo export --platform web` (the WS-E smoke
+  // gate) bundles successfully. Native iOS/Android remain the primary
+  // distribution targets.
+  platforms: ['ios', 'android', 'web'],
   plugins: [
     '@react-native-firebase/app',
     '@react-native-firebase/auth',
