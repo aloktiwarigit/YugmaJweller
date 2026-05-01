@@ -183,7 +183,7 @@ describe('CatalogService.getProducts()', () => {
       { rows: [baseProduct] },
     ]);
     const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
-    const svc = new CatalogService(pool as never, ps as never);
+    const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never);
 
     await svc.getProducts({ shopId: 'shop-1', metal: 'gold', page: 1, limit: 12 });
 

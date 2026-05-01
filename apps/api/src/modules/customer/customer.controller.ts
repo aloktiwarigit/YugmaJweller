@@ -148,6 +148,7 @@ export class CustomerController {
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal helper; shopId from authenticated customer JWT
   private async buildSyntheticCtx(shopId: string, customerId: string): Promise<AuthenticatedTenantContext> {
     const row = await this.pool.query<{ slug: string; display_name: string; status: string }>(
       `SELECT slug, display_name, status FROM shops WHERE id = $1 LIMIT 1`,
