@@ -278,6 +278,9 @@ importers:
       expo-haptics:
         specifier: ~13.0.1
         version: 13.0.1(expo@51.0.39(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0)))
+      expo-image:
+        specifier: ^55.0.9
+        version: 55.0.9(expo@51.0.39(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0)))(react-native-web@0.19.13(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react-native@0.74.0(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0))(@types/react@18.2.79)(react@18.2.0))(react@18.2.0)
       expo-router:
         specifier: ~3.5.0
         version: 3.5.24(3uvatxgwuo3u64yzrd3pvxnccy)
