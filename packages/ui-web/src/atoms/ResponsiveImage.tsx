@@ -1,6 +1,6 @@
 'use client';
 
-import * as React from 'react';
+import type { ReactElement } from 'react';
 
 type Props = {
   src: string;
@@ -22,9 +22,8 @@ export function ResponsiveImage({
   height,
   loading = 'lazy',
   className,
-}: Props) {
+}: Props): ReactElement {
   return (
-    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
       srcSet={srcset}
