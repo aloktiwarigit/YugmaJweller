@@ -46,6 +46,13 @@ const setAltTextSchema = z.object({
   alt_text: z.string().max(200).nullable(),
 });
 
+// Idempotency-Key header (RFC draft-ietf-httpapi-idempotency-key-header):
+// bound to a conservative URL-safe token, max 64 chars. Rejects whitespace,
+// CRLF, control characters, and oversized inputs that could pollute logs or
+// the partial UNIQUE index. Empty / missing header is allowed (idempotency
+// is opt-in per the spec).
+const IDEMPOTENCY_KEY_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
 // ---------------------------------------------------------------------------
 // Controller
 // ---------------------------------------------------------------------------
@@ -92,6 +99,13 @@ export class ProductImagesController {
     const bodyParse = uploadBodySchema.safeParse(rawBody);
     if (!bodyParse.success) {
       throw new BadRequestException({ code: 'INVALID_BODY', detail: bodyParse.error.flatten() });
+    }
+
+    // Validate Idempotency-Key shape if present (max 64 chars, URL-safe charset)
+    // before passing through to the service. Reject malformed keys early so they
+    // can't pollute the partial UNIQUE index or audit logs.
+    if (idempotencyKey !== undefined && !IDEMPOTENCY_KEY_RE.test(idempotencyKey)) {
+      throw new BadRequestException({ code: 'INVALID_IDEMPOTENCY_KEY' });
     }
 
     return this.svc.upload({

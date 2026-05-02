@@ -25,6 +25,7 @@ import type { Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
 import { withTenantTx } from '@goldsmith/db';
 import { tenantContext } from '@goldsmith/tenant-context';
+import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { AuditAction, auditLog } from '@goldsmith/audit';
 import {
   STORAGE_PORT,
@@ -310,6 +311,9 @@ export class ProductImagesService {
   }
 
   async setAltText(productId: string, imageId: string, altText: string | null): Promise<ImageRow> {
+    const ctx = tenantContext.requireCurrent();
+    const userId = ctx.authenticated ? (ctx as AuthenticatedTenantContext).userId : undefined;
+
     if (altText !== null && altText.length > MAX_ALT_TEXT_LENGTH) {
       throw new BadRequestException({ code: 'ALT_TEXT_TOO_LONG' });
     }
@@ -317,6 +321,23 @@ export class ProductImagesService {
     if (!row) {
       throw new NotFoundException({ code: 'IMAGE_NOT_FOUND' });
     }
+
+    // Alt-text changes are user-visible (a11y + SEO surface) and a potential
+    // vector for staff-side spam if a malicious user mutates a shared product.
+    // Emit audit so the change is traceable. Detached fire-and-forget to match
+    // the convention of other PRODUCT_IMAGE_* events in this service.
+    auditLog(this.pool, {
+      action: AuditAction.PRODUCT_IMAGE_ALT_TEXT_CHANGED,
+      subjectType: 'product_image',
+      subjectId: imageId,
+      actorUserId: userId,
+      metadata: {
+        imageId,
+        productId,
+        altTextLength: altText?.length ?? 0,
+      },
+    }).catch(() => undefined);
+
     return this.withThumbnail(row);
   }
 }
