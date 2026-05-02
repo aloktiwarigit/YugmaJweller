@@ -153,6 +153,33 @@ export async function fetchProductReviews(
   }
 }
 
+export interface PublicImageItem {
+  id:              string;
+  alt_text:        string | null;
+  width:           number;
+  height:          number;
+  srcset:          string;
+  default_url:     string;
+  placeholder_url: string;
+}
+
+export async function fetchProductImages(
+  productId: string,
+  shopId: string,
+): Promise<PublicImageItem[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/catalog/products/${productId}/images`, {
+      headers: { 'X-Tenant-Id': shopId },
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as { images: PublicImageItem[] };
+    return data.images ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchReturnPolicy(shopId: string): Promise<string | null> {
   try {
     const res = await fetch(`${API_URL}/api/v1/catalog/return-policy`, {
