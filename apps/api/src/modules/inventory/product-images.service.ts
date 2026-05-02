@@ -235,7 +235,8 @@ export class ProductImagesService {
   }
 
   async delete(productId: string, imageId: string): Promise<void> {
-    const { userId } = tenantContext.requireCurrent();
+    const _ctx = tenantContext.requireCurrent();
+    const userId = _ctx.authenticated ? _ctx.userId : undefined;
     const result = await this.repo.deleteImage(productId, imageId);
     if (!result) {
       throw new NotFoundException({ code: 'IMAGE_NOT_FOUND' });
@@ -266,7 +267,8 @@ export class ProductImagesService {
       throw new BadRequestException({ code: 'ORDER_LIST_DUPLICATES' });
     }
 
-    const { userId } = tenantContext.requireCurrent();
+    const _reorderCtx = tenantContext.requireCurrent();
+    const userId = _reorderCtx.authenticated ? _reorderCtx.userId : undefined;
     const rows = await this.repo.setSortOrders(productId, orderedIds);
     if (rows.length === 0) {
       throw new BadRequestException({ code: 'ORDER_LIST_MISMATCH' });

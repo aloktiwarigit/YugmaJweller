@@ -10,6 +10,9 @@ import { AuthModule } from '../auth/auth.module';
 import { TenantLookupModule } from '../tenant-lookup/tenant-lookup.module';
 import { DrizzleTenantLookup } from '../../drizzle-tenant-lookup';
 import { InventoryController } from './inventory.controller';
+import { ProductImagesController } from './product-images.controller';
+import { ProductImagesService } from './product-images.service';
+import { ProductImagesRepository } from './product-images.repository';
 import { InventoryService } from './inventory.service';
 import { InventoryRepository } from './inventory.repository';
 import { InventoryBulkImportProcessor } from './inventory.bulk-import.processor';
@@ -37,9 +40,11 @@ const QUEUE_NAME = 'inventory-bulk-import';
     BullModule.registerQueue({ name: 'search-indexer' }),
     PricingModule,
   ],
-  controllers: [InventoryController],
-  exports: [InventoryService],
+  controllers: [InventoryController, ProductImagesController],
+  exports: [InventoryService, ProductImagesRepository],
   providers: [
+    ProductImagesService,
+    ProductImagesRepository,
     InventoryService,
     InventoryRepository,
     BarcodeService,
