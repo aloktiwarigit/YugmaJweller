@@ -227,7 +227,7 @@ export class CatalogService {
         LEFT JOIN product_categories pc ON pc.id = p.category_id
        WHERE p.shop_id = $1
          AND EXISTS (SELECT 1 FROM shops WHERE id = $1 AND status = 'ACTIVE')
-         AND p.status = 'PUBLISHED'
+         AND p.published_at IS NOT NULL
          ${whereExtra}
        ORDER BY p.published_at DESC
        LIMIT $${limitIdx} OFFSET $${offsetIdx}
@@ -279,10 +279,10 @@ export class CatalogService {
                     p.huid, p.huid_exemption_category, p.quantity, p.published_at,
                     '1' AS total_count
                FROM products p
-               LEFT JOIN product_categories pc ON pc.id = p.category_id
-              WHERE p.id = $1 AND p.shop_id = $2
-                AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
-                AND p.status = 'PUBLISHED'`,
+              LEFT JOIN product_categories pc ON pc.id = p.category_id
+             WHERE p.id = $1 AND p.shop_id = $2
+               AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
+               AND p.published_at IS NOT NULL`,
             [id, shopId],
           ),
         ]);
@@ -316,7 +316,7 @@ export class CatalogService {
         `SELECT huid FROM products
           WHERE id = $1 AND shop_id = $2
             AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
-            AND status = 'PUBLISHED'`,
+            AND published_at IS NOT NULL`,
         [productId, shopId],
       ),
     );
@@ -396,7 +396,10 @@ export class CatalogService {
   // ---------------------------------------------------------------------------
   // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint; shopId from slug lookup, not TenantContext
   async listPublicImages(productId: string, shopId: string): Promise<PublicImageRow[]> {
-    // Only show images for PUBLISHED products of ACTIVE shops (security guard).
+    // Only show images for published products of ACTIVE shops (security guard).
+    // "Published" = products.published_at IS NOT NULL (set by publishProduct() in
+    // inventory.service). The products.status column is independent of publish state
+    // and must not be used as the publish gate.
     const r = await withShopTx(this.pool, shopId, async (tx) =>
       tx.query<{
         id: string; alt_text: string | null; width: number; height: number; storage_key: string;
@@ -406,7 +409,7 @@ export class CatalogService {
            JOIN products p ON p.id = pi.product_id
           WHERE pi.product_id = $1
             AND pi.shop_id = $2
-            AND p.status = 'PUBLISHED'
+            AND p.published_at IS NOT NULL
             AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
           ORDER BY pi.sort_order ASC, pi.created_at ASC`,
         [productId, shopId],
