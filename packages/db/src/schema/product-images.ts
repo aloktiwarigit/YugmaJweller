@@ -16,6 +16,9 @@ export const productImages = tenantScopedTable('product_images', {
   uploaded_by_user_id:  uuid('uploaded_by_user_id').notNull().references(() => shopUsers.id),
   scan_status:          text('scan_status').notNull().default('clean'),
   sort_order:           integer('sort_order').notNull().default(0),
+  // Per migration 0058: nullable; partial UNIQUE(product_id, idempotency_key)
+  // when NOT NULL — supports F7 idempotent upload retries.
+  idempotency_key:      text('idempotency_key'),
   created_at:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updated_at:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
