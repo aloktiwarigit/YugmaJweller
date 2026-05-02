@@ -1010,6 +1010,8 @@ The following are **out of MVP** and should be rejected if they appear in implem
 
 **This is the binding capability contract.** UX, Architecture, and Epic breakdown in subsequent BMAD workflows must trace every design decision back to these FRs. Any capability not listed here will NOT exist in the product unless explicitly added.
 
+> **Addendum (2026-05-01):** Customer-storefront capabilities FR127–FR140 + completion notes for FR86/88/90/93/96/104/105 + NFR-SE-1/SE-2/IMG-1 are recorded in [`docs/prd-addendum-customer-storefront.md`](../../docs/prd-addendum-customer-storefront.md). The original 126-FR / 70-NFR list below is the historical MVP capability contract; the addendum is the post-feature-complete extension. Implementing epics: [`epics-E17-E18.md`](epics-E17-E18.md).
+
 ### FR Capability Areas Overview
 
 1. **Tenant & Multi-Tenancy Management** (FR1-FR7)

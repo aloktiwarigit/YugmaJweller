@@ -1,4 +1,9 @@
-export { initWebFirebase, type WebFirebaseConfig } from './firebase-app';
+export {
+  initWebFirebase,
+  getPendingPersistence,
+  type WebFirebaseConfig,
+  type InitOptions,
+} from './firebase-app';
 export {
   signInWithGoogle,
   signOutOfFirebase,

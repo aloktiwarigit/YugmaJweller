@@ -27,6 +27,10 @@ function readConfigFromEnv(): WebFirebaseConfig {
 let cachedAuth: Auth | null = null;
 
 export function getAdminAuth(): Auth {
-  if (!cachedAuth) cachedAuth = initWebFirebase(readConfigFromEnv());
+  // inMemoryOnly: platform admin is a privileged surface. Refusing default LOCAL
+  // (IndexedDB) persistence ensures the refresh token does not survive tab close on
+  // shared/compromised browsers. Trade-off: page reload re-popups the Google sign-in
+  // — acceptable UX cost for a platform-admin audience.
+  if (!cachedAuth) cachedAuth = initWebFirebase(readConfigFromEnv(), { inMemoryOnly: true });
   return cachedAuth;
 }
