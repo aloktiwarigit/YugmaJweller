@@ -52,6 +52,21 @@ export class ImpersonationService {
     }
 
     return inTx(this.pool, async (c) => {
+      // Pre-flight: target shop must exist AND be ACTIVE. TenantInterceptor enforces the
+      // same status check on every impersonated request, so without this guard we'd happily
+      // mint a JWT that the very next API call would reject as `tenant.inactive`. Worse,
+      // the audit row is written before the impersonator discovers the session is unusable.
+      const status = await c.query<{ status: string }>(
+        `SELECT status FROM shops WHERE id = $1`,
+        [a.targetShopId],
+      );
+      if (status.rows.length === 0) {
+        throw new NotFoundException({ code: 'impersonation.target_shop_not_found' });
+      }
+      if (status.rows[0]!.status !== 'ACTIVE') {
+        throw new NotFoundException({ code: 'impersonation.target_shop_not_active' });
+      }
+
       const expiresAt = new Date(Date.now() + TTL_SECONDS * 1000);
       const r = await c.query<{ id: string }>(
         `INSERT INTO impersonation_sessions

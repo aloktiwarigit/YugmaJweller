@@ -26,6 +26,7 @@ describe('ImpersonationService', () => {
   it('start: inserts session, audits, returns short-lived JWT with jti = session id', async () => {
     client.query
       .mockResolvedValueOnce(undefined)                                    // BEGIN
+      .mockResolvedValueOnce({ rows: [{ status: 'ACTIVE' }] })             // pre-flight target status
       .mockResolvedValueOnce({ rows: [{ id: SESSION_ID }] })               // INSERT impersonation_sessions
       .mockResolvedValueOnce(undefined)                                    // INSERT platform_audit_events
       .mockResolvedValueOnce(undefined);                                   // COMMIT
@@ -46,13 +47,41 @@ describe('ImpersonationService', () => {
     expect(decoded.exp - decoded.iat).toBe(1800);
     expect(decoded.jti).toBe(SESSION_ID);
 
-    // Indexes shifted by 1 for BEGIN only
-    const insertCall = client.query.mock.calls[1]!;
+    // Indexes shifted by 2 for BEGIN + pre-flight status check
+    const insertCall = client.query.mock.calls[2]!;
     expect(insertCall[0]).toMatch(/INSERT INTO impersonation_sessions/);
-    const auditCall = client.query.mock.calls[2]!;
+    const auditCall = client.query.mock.calls[3]!;
     expect(auditCall[0]).toMatch(/INSERT INTO platform_audit_events/);
     expect(auditCall[1]).toContain('impersonation.started');
     expect(auditCall[1]).toContain(SHOP_ID);
+  });
+
+  it('start: 404 when target shop does not exist', async () => {
+    client.query
+      .mockResolvedValueOnce(undefined)                                    // BEGIN
+      .mockResolvedValueOnce({ rows: [] })                                 // pre-flight: not found
+      .mockResolvedValueOnce(undefined);                                   // ROLLBACK
+
+    const svc = new ImpersonationService(pool as never);
+    await expect(svc.startImpersonation({
+      platformUserId: 'p-uid',
+      targetShopId: SHOP_ID,
+      reason: 'r',
+    })).rejects.toMatchObject({ response: { code: 'impersonation.target_shop_not_found' } });
+  });
+
+  it('start: 404 when target shop is not ACTIVE (suspended/provisioning)', async () => {
+    client.query
+      .mockResolvedValueOnce(undefined)                                    // BEGIN
+      .mockResolvedValueOnce({ rows: [{ status: 'SUSPENDED' }] })          // pre-flight: not ACTIVE
+      .mockResolvedValueOnce(undefined);                                   // ROLLBACK
+
+    const svc = new ImpersonationService(pool as never);
+    await expect(svc.startImpersonation({
+      platformUserId: 'p-uid',
+      targetShopId: SHOP_ID,
+      reason: 'r',
+    })).rejects.toMatchObject({ response: { code: 'impersonation.target_shop_not_active' } });
   });
 
   it('end: marks session ended_at and audits impersonation.ended with target_shop_id', async () => {

@@ -54,15 +54,18 @@ describe('TenantManagementService', () => {
     expect(cache.invalidate).toHaveBeenCalledWith(SHOP_ID);
   });
 
-  it('suspendShop 404s when shop missing or already terminated', async () => {
+  it('suspendShop 404s when shop missing, not ACTIVE, or already terminated', async () => {
     client.query
       .mockResolvedValueOnce(undefined)                       // BEGIN
       .mockResolvedValueOnce({ rowCount: 0 })                 // UPDATE returns 0 → throws
       .mockResolvedValueOnce(undefined);                      // ROLLBACK
 
     const svc = new TenantManagementService(pool as never, cache as never);
+    // The WHERE clause is `status = 'ACTIVE'` so this catches PROVISIONING / SUSPENDED /
+    // TERMINATED targets (not just missing rows). Locking suspension to ACTIVE prevents
+    // the suspend → unsuspend round-trip from promoting a never-provisioned shop to ACTIVE.
     await expect(svc.suspendShop('00000000-0000-0000-0000-000000000000', 'r', ADMIN_UID))
-      .rejects.toMatchObject({ response: { code: 'tenant.not_found' } });
+      .rejects.toMatchObject({ response: { code: 'tenant.not_found_or_not_active' } });
   });
 
   it('unsuspendShop sets status ACTIVE and audits', async () => {

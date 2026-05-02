@@ -107,11 +107,14 @@ export class TenantManagementService {
 
   async suspendShop(shopId: string, reason: string, platformUserId: string): Promise<void> {
     await inTx(this.pool, async (c) => {
+      // Only ACTIVE shops can be suspended. Allowing PROVISIONING → SUSPENDED would let
+      // a subsequent unsuspendShop promote the row to ACTIVE without ever completing
+      // provisioning. A truly-stuck PROVISIONING shop should be terminated, not suspended.
       const r = await c.query(
-        `UPDATE shops SET status = 'SUSPENDED', updated_at = now() WHERE id = $1 AND status <> 'TERMINATED'`,
+        `UPDATE shops SET status = 'SUSPENDED', updated_at = now() WHERE id = $1 AND status = 'ACTIVE'`,
         [shopId],
       );
-      if (r.rowCount === 0) throw new NotFoundException({ code: 'tenant.not_found' });
+      if (r.rowCount === 0) throw new NotFoundException({ code: 'tenant.not_found_or_not_active' });
       await c.query(
         `INSERT INTO platform_audit_events (action, platform_user_id, target_shop_id, metadata)
          VALUES ($1, $2, $3, $4::jsonb)`,
