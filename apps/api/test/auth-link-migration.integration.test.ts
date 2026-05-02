@@ -59,7 +59,10 @@ describe('0003_auth_link migration', () => {
     } finally { c.release(); }
   });
 
-  it('platform_audit_events table is append-only for app_user (INSERT+SELECT, no UPDATE/DELETE)', async () => {
+  it('platform_audit_events table is INSERT-only for app_user (no SELECT/UPDATE/DELETE)', async () => {
+    // Migration 0056 revoked SELECT from app_user — Wave 6 added impersonation audit rows
+    // (platform admin UID, target shop, IP/UA, free-form reason) which app_user has no
+    // business reading. INSERT remains so the auth-flow audit logger can write.
     const c = await pool.connect();
     try {
       const g = await c.query(`
@@ -68,7 +71,7 @@ describe('0003_auth_link migration', () => {
         ORDER BY privilege_type
       `);
       const privs = g.rows.map((r: { privilege_type: string }) => r.privilege_type);
-      expect(privs).toEqual(['INSERT', 'SELECT']);
+      expect(privs).toEqual(['INSERT']);
     } finally { c.release(); }
   });
 
