@@ -234,11 +234,63 @@ export class ProductImagesService {
     }
   }
 
-  // Stubs for Task 5 — delete, list, reorder, setAltText.
-  async delete(_productId: string, _imageId: string): Promise<void> { throw new Error('TODO Task 5'); }
-  async listForProduct(_productId: string): Promise<ImageRow[]> { throw new Error('TODO Task 5'); }
-  async reorder(_productId: string, _orderedIds: string[]): Promise<ImageRow[]> { throw new Error('TODO Task 5'); }
-  async setAltText(_productId: string, _imageId: string, _alt: string | null): Promise<ImageRow> { throw new Error('TODO Task 5'); }
+  async delete(productId: string, imageId: string): Promise<void> {
+    const { userId } = tenantContext.requireCurrent();
+    const result = await this.repo.deleteImage(productId, imageId);
+    if (!result) {
+      throw new NotFoundException({ code: 'IMAGE_NOT_FOUND' });
+    }
+    // Best-effort blob cleanup; orphan blobs are recoverable, row-without-blob
+    // would be worse — DB row is already gone before we try the blob.
+    this.storage.deleteBlob(result.storageKey).catch(() => undefined);
+    void auditLog(this.pool, {
+      action: AuditAction.PRODUCT_IMAGE_DELETED,
+      subjectType: 'product_image',
+      subjectId: imageId,
+      actorUserId: userId,
+      metadata: { imageId, productId, storageKey: result.storageKey },
+    }).catch(() => undefined);
+  }
+
+  async listForProduct(productId: string): Promise<ImageRow[]> {
+    return this.repo.listForProduct(productId);
+  }
+
+  async reorder(productId: string, orderedIds: string[]): Promise<ImageRow[]> {
+    // F4 (Codex P2, service half): reject duplicate IDs BEFORE the repo call.
+    // The repo's set-equality check (size + membership) admits ['img-1','img-1']
+    // for a single-image product, which would then UPDATE the same row twice
+    // with conflicting sort_order values. Guard with Set comparison up front.
+    const unique = new Set(orderedIds);
+    if (unique.size !== orderedIds.length) {
+      throw new BadRequestException({ code: 'ORDER_LIST_DUPLICATES' });
+    }
+
+    const { userId } = tenantContext.requireCurrent();
+    const rows = await this.repo.setSortOrders(productId, orderedIds);
+    if (rows.length === 0) {
+      throw new BadRequestException({ code: 'ORDER_LIST_MISMATCH' });
+    }
+    void auditLog(this.pool, {
+      action: AuditAction.PRODUCT_IMAGE_REORDERED,
+      subjectType: 'product_image',
+      subjectId: productId,
+      actorUserId: userId,
+      metadata: { productId, orderedIds },
+    }).catch(() => undefined);
+    return rows;
+  }
+
+  async setAltText(productId: string, imageId: string, altText: string | null): Promise<ImageRow> {
+    if (altText !== null && altText.length > MAX_ALT_TEXT_LENGTH) {
+      throw new BadRequestException({ code: 'ALT_TEXT_TOO_LONG' });
+    }
+    const row = await this.repo.setAltText(productId, imageId, altText);
+    if (!row) {
+      throw new NotFoundException({ code: 'IMAGE_NOT_FOUND' });
+    }
+    return row;
+  }
 }
 
 function extFromMime(mime: string): string {

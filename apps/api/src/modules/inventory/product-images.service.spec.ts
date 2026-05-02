@@ -389,3 +389,163 @@ describe('ProductImagesService.upload', () => {
     expect(repoMock.findByIdempotencyKeyInTx).toHaveBeenCalledTimes(2);
   });
 });
+
+// Task 5: delete / listForProduct / reorder / setAltText.
+//
+// NB: signatures in this codebase do NOT take shopId — the repo + service
+// pull tenant via `tenantContext.requireCurrent()` and `withTenantTx` (RLS).
+// Audit is emitted via `auditLog(this.pool, {...}).catch(() => undefined)`,
+// fire-and-forget, NOT a DI'd `audit.emit(tx, ...)` call. See
+// `feedback_audit_pattern_pool_not_tx.md`.
+
+describe('ProductImagesService.delete', () => {
+  let svc: ProductImagesService;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    svc = newSvc();
+  });
+
+  it('deletes the row and the blob, emits audit', async () => {
+    repoMock.deleteImage.mockResolvedValueOnce({ storageKey: 'tenant/A/products/X/k.jpg' });
+    await svc.delete('prod-X', 'img-1');
+    expect(repoMock.deleteImage).toHaveBeenCalledWith('prod-X', 'img-1');
+    expect(storageMock.deleteBlob).toHaveBeenCalledWith('tenant/A/products/X/k.jpg');
+    expect(auditLogMock).toHaveBeenCalledWith(
+      poolMock,
+      expect.objectContaining({
+        action: 'PRODUCT_IMAGE_DELETED',
+        subjectId: 'img-1',
+        metadata: expect.objectContaining({
+          imageId: 'img-1',
+          productId: 'prod-X',
+          storageKey: 'tenant/A/products/X/k.jpg',
+        }),
+      }),
+    );
+  });
+
+  it('throws 404 when image not found in tenant', async () => {
+    repoMock.deleteImage.mockResolvedValueOnce(null);
+    await expect(svc.delete('prod-X', 'img-missing')).rejects.toThrow(NotFoundException);
+    expect(storageMock.deleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('does NOT throw if blob delete fails (best-effort)', async () => {
+    repoMock.deleteImage.mockResolvedValueOnce({ storageKey: 'k.jpg' });
+    storageMock.deleteBlob.mockRejectedValueOnce(new Error('blob gone'));
+    await expect(svc.delete('prod-X', 'img-1')).resolves.toBeUndefined();
+  });
+});
+
+describe('ProductImagesService.listForProduct', () => {
+  let svc: ProductImagesService;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    svc = newSvc();
+  });
+
+  it('delegates to repo', async () => {
+    const rows = [{ id: 'img-1' }] as never;
+    repoMock.listForProduct.mockResolvedValueOnce(rows);
+    const r = await svc.listForProduct('prod-X');
+    expect(repoMock.listForProduct).toHaveBeenCalledWith('prod-X');
+    expect(r).toBe(rows);
+  });
+});
+
+describe('ProductImagesService.reorder', () => {
+  let svc: ProductImagesService;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    svc = newSvc();
+  });
+
+  it('persists the new order, emits audit', async () => {
+    const reordered = [
+      { id: 'img-2', sort_order: 0 },
+      { id: 'img-1', sort_order: 1 },
+    ] as never;
+    repoMock.setSortOrders.mockResolvedValueOnce(reordered);
+    const result = await svc.reorder('prod-X', ['img-2', 'img-1']);
+    expect(result).toBe(reordered);
+    expect(repoMock.setSortOrders).toHaveBeenCalledWith('prod-X', ['img-2', 'img-1']);
+    expect(auditLogMock).toHaveBeenCalledWith(
+      poolMock,
+      expect.objectContaining({
+        action: 'PRODUCT_IMAGE_REORDERED',
+        metadata: expect.objectContaining({
+          productId: 'prod-X',
+          orderedIds: ['img-2', 'img-1'],
+        }),
+      }),
+    );
+  });
+
+  it('throws 400 ORDER_LIST_MISMATCH when set inequality (empty result from repo)', async () => {
+    repoMock.setSortOrders.mockResolvedValueOnce([]);
+    await expect(svc.reorder('prod-X', ['ghost-id'])).rejects.toMatchObject({
+      response: { code: 'ORDER_LIST_MISMATCH' },
+    });
+  });
+
+  // F4 (P2): reorder rejects duplicate IDs BEFORE calling repo, since repo
+  // length-equality alone admits ['img-1','img-1'] for a 1-image product, then
+  // UPDATEs the same row twice with conflicting sort_order values. Guard with
+  // a Set comparison up front.
+  it('rejects duplicate IDs in single-image case (F4)', async () => {
+    await expect(svc.reorder('prod-X', ['img-1', 'img-1'])).rejects.toMatchObject({
+      response: { code: 'ORDER_LIST_DUPLICATES' },
+    });
+    expect(repoMock.setSortOrders).not.toHaveBeenCalled();
+  });
+
+  it('rejects duplicate IDs in multi-image case (F4)', async () => {
+    await expect(
+      svc.reorder('prod-X', ['img-1', 'img-2', 'img-1']),
+    ).rejects.toMatchObject({ response: { code: 'ORDER_LIST_DUPLICATES' } });
+    expect(repoMock.setSortOrders).not.toHaveBeenCalled();
+  });
+
+  it('accepts unique IDs across the cap (10 entries) (F4)', async () => {
+    const ids = Array.from({ length: 10 }, (_, i) => `img-${i}`);
+    const reordered = ids.map((id, i) => ({ id, sort_order: i })) as never;
+    repoMock.setSortOrders.mockResolvedValueOnce(reordered);
+    const result = await svc.reorder('prod-X', ids);
+    expect(result).toBe(reordered);
+    expect(repoMock.setSortOrders).toHaveBeenCalledWith('prod-X', ids);
+  });
+});
+
+describe('ProductImagesService.setAltText', () => {
+  let svc: ProductImagesService;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    svc = newSvc();
+  });
+
+  it('updates and returns the row', async () => {
+    repoMock.setAltText.mockResolvedValueOnce({ id: 'img-1', alt_text: 'सोने की अंगूठी' });
+    const r = await svc.setAltText('prod-X', 'img-1', 'सोने की अंगूठी');
+    expect(repoMock.setAltText).toHaveBeenCalledWith('prod-X', 'img-1', 'सोने की अंगूठी');
+    expect(r.alt_text).toBe('सोने की अंगूठी');
+  });
+
+  it('returns 404 when image not in tenant', async () => {
+    repoMock.setAltText.mockResolvedValueOnce(null);
+    await expect(
+      svc.setAltText('prod-X', 'img-missing', null),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('rejects alt text > 200 chars', async () => {
+    const long = 'क'.repeat(201);
+    await expect(svc.setAltText('prod-X', 'img-1', long)).rejects.toMatchObject({
+      response: { code: 'ALT_TEXT_TOO_LONG' },
+    });
+    expect(repoMock.setAltText).not.toHaveBeenCalled();
+  });
+});
