@@ -44,20 +44,20 @@ notes:
 
 **Class:** A — touches Azure Blob + ImageKit signing, malware scan hook, RLS on new `product_images` table, encrypted signed-URL TTL.
 **Wave:** 7A · **Worktree:** `C:/gs17a-img/` · **Depends on:** none (foundation story)
-**Blocks:** every other story in 17/18 that renders product imagery (17.2 footer, 17.10 home rails, 18.1 collections, 18.5 recommendations, 18.6 zoom)
+**Blocks:** every other story in 17/18 that renders product imagery (17.10 home rails, 18.1 collections, 18.5 recommendations, 18.6 zoom, 18.10 PDP polish). 17.2 footer does not render product images and is independent.
 
 **As an anchor jeweller's customer**,
 I want to see real photographs of each piece on the product page with a swipeable/clickable gallery,
 So that I can evaluate the jewellery before walking into the shop or booking try-at-home.
 
 **FRs implemented:** FR90 (multiple images — completion); foundation for FR127 (footer asset previews), FR135 (collection cover images)
-**NFRs verified:** NFR-IMG-1 (CDN + responsive srcset + 250 KB cap), NFR-S2 (encrypted at rest), NFR-S3 (tenant-scoped image isolation), NFR-A4 (alt text mandatory), NFR-P9 (image p95 < 500 ms thumbnails)
+**NFRs verified:** NFR-IMG-1 (CDN + responsive srcset + 250 KB cap), NFR-S2 (encrypted at rest — Azure Storage SSE per ADR-0015 supersedes PRD-body NFR-S2's pre-Azure "AWS RDS encryption" wording), NFR-S3 (tenant-scoped image isolation), NFR-C7 (data residency — Azure Central India / South India per ADR-0015 supersedes PRD-body NFR-C7's pre-Azure "AWS Mumbai ap-south-1" wording; both are India-residency-compliant), NFR-A4 (alt text mandatory), NFR-P9 (image p95 < 500 ms thumbnails)
 **Modules + packages touched:**
 - `packages/integrations-storage/src/azure-blob.adapter.ts` (extend — signed-URL issuance per tenant)
 - `packages/integrations-storage/src/imagekit.adapter.ts` (new — transcoding pipeline + variant generation)
 - `apps/api/src/modules/inventory/product-images.controller.ts` (new — POST/DELETE/list endpoints)
 - `apps/api/src/modules/inventory/product-images.service.ts` (new — MIME validation, EXIF strip, malware-scan hook)
-- migration `0056_product_images.sql` (new table with FK to products + RLS policy + cascade delete)
+- migration `0057_product_images.sql` (new table with FK to products + RLS policy + cascade delete)
 - `apps/shopkeeper/src/screens/inventory/ProductImagesScreen.tsx` (new — upload, reorder, delete UI)
 - `apps/customer-web/src/components/products/ProductGallery.tsx` (new — replace `GoldTexturePlaceholder`)
 - `apps/customer-mobile/src/components/products/ProductGallery.tsx` (new)
@@ -70,12 +70,17 @@ So that I can evaluate the jewellery before walking into the shop or booking try
 **Acceptance Criteria:**
 
 **Given** shopkeeper Rajesh-ji is on the product edit screen for SKU-1234
-**When** he taps "तस्वीर जोड़ें" and selects a 6 MP JPEG from his phone gallery
+**When** he taps "तस्वीर जोड़ें" and selects a 6 MP JPEG (under 5 MB on disk) from his phone gallery
 **Then** the image uploads with a progress indicator
-**And** ImageKit returns 4 variants (320w/640w/1024w/1920w) all under 250 KB each
-**And** the smallest variant fails to fit under 250 KB → upload is rejected with Hindi error message
+**And** ImageKit transcodes the source into 4 variants (320w/640w/1024w/1920w) all under 250 KB each
 **And** EXIF metadata (GPS, device) is stripped before storage
 **And** the image carries `shop_id = Rajesh's shop_id` enforced by RLS
+
+**Given** Rajesh-ji selects an extreme source image where even the 320w variant cannot be brought under 250 KB after maximum compression (e.g. a 100 MP photo with intricate detail and no recompressible flat regions)
+**When** he attempts the upload
+**Then** the upload is rejected with HTTP 400 + Hindi error "इस तस्वीर की गुणवत्ता बहुत बड़ी है — कृपया कम रिज़ॉल्यूशन की कोशिश करें"
+**And** no row is inserted into `product_images`
+**And** the rejection event is audit-logged with reason code `IMAGE_TOO_LARGE_AFTER_COMPRESSION`
 
 **Given** a customer of Rajesh's shop opens product SKU-1234 detail
 **When** the page loads on a 4G connection
@@ -116,9 +121,10 @@ So that I can find contact details, follow the shop, and download the mobile app
 **NFRs verified:** NFR-A1 (WCAG AA), NFR-A4 (semantic HTML), NFR-A6 (Devanagari rendering)
 **Modules + packages touched:**
 - `apps/customer-web/src/components/layout/Footer.tsx` (new)
-- `apps/customer-web/src/app/layout.tsx` (mount footer)
-- `apps/customer-mobile/src/components/layout/FooterSheet.tsx` (new — bottom-sheet variant on mobile profile screen)
-- migration `0057_shop_settings_footer_columns.sql` (add `whatsapp_number`, `instagram_url`, `facebook_url`, `youtube_url`, `app_play_store_url`, `app_app_store_url` to `shop_settings`)
+- `apps/customer-web/src/app/layout.tsx` (mount footer in root layout — renders on every route)
+- `apps/customer-mobile/src/components/layout/MobileFooter.tsx` (new — compact horizontal-scroll footer; rendered globally inside the root navigator wrapper so it appears on every customer-mobile screen including home, browse, wishlist, profile, PDP)
+- `apps/customer-mobile/app/_layout.tsx` (mount MobileFooter as a sibling of `<Stack />` so it persists across navigation)
+- migration `0058_shop_settings_footer_columns.sql` (add `whatsapp_number`, `instagram_url`, `facebook_url`, `youtube_url`, `app_play_store_url`, `app_app_store_url` to `shop_settings`)
 - `apps/api/src/modules/settings/footer.dto.ts` (Zod schema)
 - `apps/shopkeeper/src/screens/settings/FooterSettingsScreen.tsx` (new — shopkeeper UI to edit columns)
 
@@ -128,11 +134,16 @@ So that I can find contact details, follow the shop, and download the mobile app
 **Acceptance Criteria:**
 
 **Given** Rajesh-ji has set Instagram and WhatsApp in footer settings
-**When** any customer opens any web page of his shop
-**Then** the footer shows: Online Shopping links column · Customer Service column · About column · Contact (address + phone + WhatsApp) · Social row · App download badges · Bottom bar (FAQ · Privacy · Terms · Sitemap)
+**When** any customer opens any web page of his shop (home, /products, PDP, /wishlist, /loyalty, /try-at-home, /rate-lock, /size-guide, /faq, /buying-guide/[metal], /shipping-policy, /cancellation-policy, /return-policy, /contact)
+**Then** the footer renders identically on every route with: Online Shopping links column · Customer Service column · About column · Contact (address + phone + WhatsApp) · Social row · App download badges · Bottom bar (FAQ · Privacy · Terms · Sitemap)
 **And** the Goldsmith platform brand is nowhere on the footer
 **And** all icons are reachable by keyboard (Tab order matches visual order)
 **And** all links have descriptive accessible names ("WhatsApp Rajesh Jewellers" not "wa")
+
+**Given** the customer is on the customer-mobile app
+**When** they navigate to any tab (Home, Browse, Wishlist, Profile) or any sub-screen (PDP, loyalty, rate-lock, try-at-home, FAQ, size-guide, policies)
+**Then** a compact horizontal-scrollable mobile footer renders globally with at least: contact phone CTA, WhatsApp CTA, social row, app-download badges
+**And** the footer is excluded only from auth screens (`/welcome`, OTP entry) where it would obstruct keyboard input
 
 **Given** Rajesh has not configured Instagram URL
 **When** the customer opens any page
@@ -212,7 +223,8 @@ So that I can quickly narrow to what fits my budget without scrolling thousands 
 **Given** a customer opens `/products`
 **When** they tap "₹10–20K"
 **Then** the URL gains `?priceMin=1000000&priceMax=2000000` (paise)
-**And** the API returns only products whose computed live price `(net_weight × current_rate + making + 3% GST + 5% making_GST)` falls in [10K, 20K]
+**And** the API returns only products whose computed live price using the **FR40 formula** `(net_weight × current_rate) + making_charges + stone_charges + GST(3% metal + 5% making) + hallmarking_fee` falls in [₹10K, ₹20K]
+**And** the same FR40 formula is used for filtering AND for the displayed `EstimatedPriceBadge` — no divergence (a property test in CI verifies parity)
 **And** API p95 latency stays < 200 ms (NFR-P5)
 **And** chip selection persists across pagination
 
@@ -222,11 +234,21 @@ So that I can quickly narrow to what fits my budget without scrolling thousands 
 **Given** the gold rate ticks during the customer's session
 **Then** the filter still uses the rate that was current when the page loaded (snapshot consistency)
 
+**Given** the customer adds purity filter
+**When** they select "22K"
+**Then** the URL gains `&purity=22K` and API returns only 22K-purity products
+**And** purity chips support multi-select (e.g. 22K + 18K together)
+
+**Given** the customer toggles "केवल उपलब्ध" (in-stock only)
+**Then** the URL gains `&inStock=true`
+**And** API returns only products with `inventory.status = IN_STOCK` AND `published = true`
+**And** the toggle defaults to off (so the user discovers all published products including reserved/with-karigar by default)
+
 **Tests required:** Unit (price computation), Integration (controller + service + DB), Tenant-isolation, Performance (p95 budget)
 
 **Definition of Done:** All AC + Codex review + API contract test + browser smoke.
 
-**Out of scope:** Saved-filter persistence per customer (Phase 3+).
+**Out of scope:** Saved-filter persistence per customer (Phase 3+); **occasion filter** (FR88's fifth dimension) deferred to Phase 3+ pending shopkeeper-controlled occasion taxonomy decision per addendum §5 Q4. FR88 closure under this story is therefore conditional — full FR88 closure requires the deferred occasion filter to ship before the FR can be marked complete in the traceability matrix.
 
 ---
 
@@ -256,7 +278,7 @@ So that I can reach a curated product list in one click instead of multiple filt
 **Then** the mega-menu opens with three columns: Category (8 rows) · Metal (3 rows) · Price-band (6 rows)
 **And** keyboard: Tab enters the menu, Arrow keys move between items, Enter selects, Escape closes
 **And** ARIA: `role="menu"`, `aria-haspopup="true"` on trigger, `aria-expanded` toggles correctly
-**And** clicking any combination produces a filtered `/products?category=<>&metal=<>&priceMin=<>` URL
+**And** clicking any combination produces a filtered URL — for an unbounded band ("₹75K+") the link emits `priceMin=7500000` only; for a bounded band (e.g. "₹10–20K") the link emits BOTH `priceMin=1000000&priceMax=2000000` per T1.4's full bounds contract
 
 **Given** the customer is on mobile (≤ 768 px width)
 **Then** the trigger opens a bottom drawer with the same three sections collapsible
@@ -285,7 +307,7 @@ So that I can read each shop's specific terms before completing a try-at-home or
 - `apps/customer-web/src/app/cancellation-policy/page.tsx` (new)
 - `apps/customer-mobile/src/screens/info/ShippingPolicyScreen.tsx` (new)
 - `apps/customer-mobile/src/screens/info/CancellationPolicyScreen.tsx` (new)
-- migration `0058_shop_settings_shipping_cancellation.sql` (add `shipping_policy_text` and `cancellation_policy_text` TEXT columns)
+- migration `0059_shop_settings_shipping_cancellation.sql` (add `shipping_policy_text` and `cancellation_policy_text` TEXT columns)
 - `apps/shopkeeper/src/screens/settings/PoliciesScreen.tsx` (extend with two new editable fields)
 
 **Complexity:** XS
@@ -363,7 +385,7 @@ So that I get answers without having to call the shop.
 **Modules + packages touched:**
 - `apps/customer-web/src/app/faq/page.tsx` (new)
 - `apps/customer-mobile/src/screens/info/FAQScreen.tsx` (new)
-- migration `0059_shop_settings_faq.sql` (add `faq_blocks JSONB` — array of `{question, answer_md}`)
+- migration `0060_shop_settings_faq.sql` (add `faq_blocks JSONB` — array of `{question, answer_md}`)
 - `apps/shopkeeper/src/screens/settings/FAQEditorScreen.tsx` (new)
 
 **Complexity:** XS
@@ -484,6 +506,12 @@ So that customers find my shop via search.
 **Then** `GET /sitemap.xml` for Rajesh's tenant domain includes the new product URL
 **And** `Content-Type: application/xml; charset=utf-8`
 
+**Given** the sitemap is requested
+**Then** it includes — at minimum — every published product URL, every published collection landing page (`/collections/[slug]`), every gift-persona page (`/personas/[slug]`), the homepage, and every static page (`/return-policy`, `/shipping-policy`, `/cancellation-policy`, `/faq`, `/size-guide`, `/buying-guide/gold`, `/buying-guide/diamond`, `/buying-guide/silver`, `/contact`)
+**And** unknown collection or persona slugs do NOT appear (404 routes excluded)
+**And** unpublished products are absent
+**And** the sitemap validates against the Sitemap 0.9 XSD in CI
+
 **Given** a customer opens any PDP
 **Then** the rendered HTML contains a JSON-LD `<script type="application/ld+json">` block with Schema.org `Product` type containing `name`, `image`, `offers.price`, `brand`, `material`
 **And** Google Rich Results Test validates the markup with no errors (CI uses Schema.org validator)
@@ -562,7 +590,7 @@ So that customers can browse curated themes that match their occasion.
 
 **FRs implemented:** FR135 + FR86 (featured collections — completion)
 **Modules + packages touched:**
-- migration `0060_collections.sql` (new `collections` table — platform-defined enum slug + tenant FK + cover_image_id; new `product_collections` join table with RLS)
+- migration `0061_collections.sql` (new `collections` table — platform-defined enum slug + tenant FK + cover_image_id; new `product_collections` join table with RLS)
 - `apps/api/src/modules/catalog/collections.controller.ts` (new — list collections, list products in collection)
 - `apps/api/src/modules/catalog/collections.service.ts` (new)
 - `apps/shopkeeper/src/screens/inventory/CollectionAssignScreen.tsx` (new — multi-select collections per product)
@@ -606,8 +634,10 @@ So that I can quickly find appropriate gifts for specific recipients without bro
 
 **FRs implemented:** FR136
 **Modules + packages touched:**
-- migration `0061_gift_personas.sql` (extend `product_collections` to support `persona` slug — or add `product_personas` table)
-- `apps/api/src/modules/catalog/personas.controller.ts` (new)
+- migration `0062_gift_personas.sql` (new `product_personas` join table with `persona` slug ∈ platform-defined enum; RLS on `shop_id`; shopkeeper assigns products to personas via UI)
+- `apps/api/src/modules/catalog/personas.controller.ts` (new — public GET endpoints for customer browse + shopkeeper PATCH/DELETE for persona assignments)
+- `apps/api/src/modules/catalog/personas.service.ts` (new)
+- `apps/shopkeeper/src/screens/inventory/PersonaAssignScreen.tsx` (new — shopkeeper multi-select persona tags per product, parallel to CollectionAssignScreen)
 - `apps/customer-web/src/app/personas/[slug]/page.tsx` (new)
 - `apps/customer-mobile/src/screens/browse/PersonaScreen.tsx` (new)
 - `apps/customer-web/src/components/home/GiftPersonasSection.tsx` (new — homepage tile section)
@@ -616,11 +646,18 @@ So that I can quickly find appropriate gifts for specific recipients without bro
 
 **Acceptance Criteria:**
 
+**Given** Rajesh-ji opens a product edit screen
+**When** he opens the persona-tag picker and selects "पत्नी" + "बहन"
+**Then** two rows are inserted into `product_personas` with his shop_id
+**And** RLS prevents him from tagging another tenant's product
+**And** persona slug values are restricted to the platform enum (server validates)
+
 **Given** a customer opens the homepage
 **Then** a "किसके लिए?" persona section shows 6 persona tiles with labels in Hindi
 **And** tapping पत्नी navigates to `/personas/wife`
-**And** the persona page shows products tagged for that persona across all categories
-**And** persona slugs are platform-defined enum (no shopkeeper-custom personas)
+**And** the persona page shows ONLY products that Rajesh-ji has tagged with the `wife` persona for his shop (not all products)
+**And** persona slugs are platform-defined enum (no shopkeeper-custom personas — shopkeeper controls assignments, not the enum)
+**And** if Rajesh has not tagged any products with a persona, the persona page shows a Hindi empty-state message
 
 **Tests required:** Unit, Integration, Tenant-isolation
 
@@ -641,7 +678,7 @@ So that I can recall my activity with this shop in one place.
 **NFRs verified:** NFR-S3 (PII isolation), NFR-A1
 **Modules + packages touched:**
 - `apps/api/src/modules/customer/customer-timeline.controller.ts` (new — `/api/v1/customer/me/timeline`)
-- `apps/api/src/modules/customer/customer-timeline.service.ts` (new — UNION query across invoices, try_at_home_bookings, rate_locks, reviews ORDER BY ts DESC)
+- `apps/api/src/modules/customer/customer-timeline.service.ts` (new — UNION query across invoices, try_at_home_bookings, rate_locks, **custom_orders**, reviews ORDER BY ts DESC)
 - `apps/customer-web/src/app/profile/timeline/page.tsx` (new)
 - `apps/customer-mobile/src/screens/profile/TimelineScreen.tsx` (new)
 
@@ -650,9 +687,10 @@ So that I can recall my activity with this shop in one place.
 
 **Acceptance Criteria:**
 
-**Given** a logged-in customer Priya has 3 invoices, 2 try-at-home bookings, 1 rate-lock, and 2 reviews on Rajesh's shop
+**Given** a logged-in customer Priya has 3 invoices, 2 try-at-home bookings, 1 rate-lock, **1 in-flight custom order** (FR73-FR79), and 2 reviews on Rajesh's shop
 **When** she opens her profile timeline
-**Then** all 8 events render in reverse-chronological order with type-specific icons + Hindi labels
+**Then** all 9 events render in reverse-chronological order with type-specific icons + Hindi labels (invoice 🧾 / try-at-home 🏠 / rate-lock 🔒 / custom-order 🎨 / review ⭐)
+**And** custom-order entries link to the customer-side custom-order detail screen (existing) showing current stage, photo updates, and ETA
 **And** invoice events are gated by `linked_via_invoice = true` per FR100
 **And** other tenants' data never appears (tenant-scoped query)
 **And** API p95 latency < 200 ms (NFR-P5)
@@ -680,7 +718,7 @@ So that I can use them quickly for try-at-home delivery or invoice billing witho
 **FRs implemented:** FR139
 **NFRs verified:** NFR-S3 (PII encrypted at rest), NFR-C6 (DPDPA — deletion via FR63 honoured)
 **Modules + packages touched:**
-- migration `0062_customer_addresses.sql` (new table with FK to customers, RLS, soft-delete column)
+- migration `0063_customer_addresses.sql` (new table with FK to customers, RLS, soft-delete column, `is_default_delivery BOOLEAN`, `is_default_visit BOOLEAN`)
 - `apps/api/src/modules/customer/addresses.controller.ts` (new)
 - `apps/api/src/modules/customer/addresses.service.ts` (new — enforce 5-address cap)
 - `apps/customer-web/src/app/profile/addresses/page.tsx` (new)
@@ -690,6 +728,10 @@ So that I can use them quickly for try-at-home delivery or invoice billing witho
 
 **Acceptance Criteria:**
 
+**Given** an unauthenticated visitor calls any address-book endpoint (`GET /customer/me/addresses`, `POST`, `PATCH`, `DELETE`)
+**Then** the API returns 401 — address book is gated by Firebase phone OTP per FR8/FR9 + FR139
+**And** an authenticated customer can only see/edit addresses where `customer_id = me` (RLS enforced)
+
 **Given** Priya has 4 saved addresses
 **When** she adds a 5th
 **Then** it succeeds
@@ -697,7 +739,12 @@ So that I can use them quickly for try-at-home delivery or invoice billing witho
 **Then** the API returns 409 Conflict with Hindi error "पते की सीमा 5 है"
 
 **Given** Priya marks an address as "default delivery"
-**Then** all other addresses' `is_default_delivery = false` (atomic update)
+**Then** all other addresses' `is_default_delivery = false` (atomic update in same transaction)
+
+**Given** Priya marks a different address as "default visit"
+**Then** all other addresses' `is_default_visit = false` (atomic; independent of default-delivery — one address can be both default-delivery and default-visit, or addresses can have separate defaults)
+**And** the customer-mobile try-at-home booking flow pre-fills "default visit" address by default
+**And** the invoice billing-address dropdown pre-fills "default delivery" by default
 
 **Given** Priya invokes DPDPA delete on her account (FR63)
 **Then** all her addresses are removed within 30 days alongside the customer record
@@ -760,7 +807,7 @@ So that I can evaluate the piece visually before booking try-at-home.
 **Modules + packages touched:**
 - `apps/customer-web/src/components/products/ZoomableImage.tsx` (new — pointer/touch zoom)
 - `apps/customer-mobile/src/components/products/ZoomableImage.tsx` (new — pinch zoom + double-tap zoom)
-- migration `0063_product_images_360.sql` (extend `product_images` with `is_360_frame BOOLEAN DEFAULT false` + `frame_index INT NULL` — data shape for future 360° capture; not yet rendered)
+- migration `0064_product_images_360.sql` (extend `product_images` with `is_360_frame BOOLEAN DEFAULT false` + `frame_index INT NULL` — data shape for future 360° capture; not yet rendered)
 
 **Complexity:** S
 
@@ -874,7 +921,7 @@ So that I grow my customer base via word-of-mouth.
 
 **FRs implemented:** FR140
 **Modules + packages touched:**
-- migration `0064_referral_codes.sql` (add `referral_code TEXT UNIQUE per shop_id` + `referred_by_customer_id UUID` to `customers`)
+- migration `0065_referral_codes.sql` (add `referral_code TEXT UNIQUE per shop_id` + `referred_by_customer_id UUID` to `customers`)
 - `apps/api/src/modules/customer/referral.service.ts` (new — generate, validate, attribute)
 - `apps/api/src/modules/billing/billing.service.ts` (extend — emit `customer.firstInvoice` event for loyalty bonus)
 - `apps/api/src/modules/loyalty/loyalty.service.ts` (extend — award referral bonus to both referrer and new customer)
@@ -917,14 +964,16 @@ So that I grow my customer base via word-of-mouth.
 I want a polished PDP with breadcrumbs at the top, sticky try-at-home / wishlist CTAs as I scroll, and a share button,
 So that I can navigate back, take action without scrolling, and share the product with my partner.
 
-**FRs implemented:** FR93 (share — completion), FR90 polish
+**FRs implemented:** FR93 (share completion — WhatsApp + SMS + copy link), FR90 (size-options completion)
 **NFRs verified:** NFR-A1, NFR-A7
 **Modules + packages touched:**
 - `apps/customer-web/src/components/products/PdpStickyCtas.tsx` (new)
 - `apps/customer-web/src/components/products/Breadcrumbs.tsx` (new)
-- `apps/customer-web/src/components/products/ShareButton.tsx` (new — Web Share API + WhatsApp deep link + copy fallback)
+- `apps/customer-web/src/components/products/ShareButton.tsx` (new — Web Share API on mobile web; explicit WhatsApp + SMS + Copy popover on desktop)
+- `apps/customer-web/src/components/products/SizeSelector.tsx` (new — ring + bangle size picker; pulls `availableSizes` from product detail; links to `/size-guide`)
 - `apps/customer-mobile/src/components/products/PdpStickyCtas.tsx` (new)
-- `apps/customer-mobile/src/components/products/ShareButton.tsx` (new — React Native Share API + WhatsApp deep link)
+- `apps/customer-mobile/src/components/products/ShareButton.tsx` (new — React Native Share API surfaces native SMS/WhatsApp picker)
+- `apps/customer-mobile/src/components/products/SizeSelector.tsx` (new — same contract as web)
 
 **Complexity:** XS
 
@@ -934,9 +983,24 @@ So that I can navigate back, take action without scrolling, and share the produc
 **Then** breadcrumbs render at the top: Home › Category › Product
 **And** as the user scrolls past the price breakdown, the try-at-home + wishlist CTAs become sticky at the bottom of the viewport
 
-**Given** the customer taps "Share"
-**Then** on mobile the OS Share sheet opens (Web Share API)
-**And** on desktop a small popover offers WhatsApp + Copy Link
+**Given** the customer taps "Share" on mobile web or customer-mobile
+**Then** the OS Share sheet opens via Web Share API (mobile web) / React Native Share API (mobile app), surfacing the device's installed apps including WhatsApp, SMS, Telegram, etc.
+
+**Given** the customer taps "Share" on desktop web
+**Then** a small popover offers three explicit channels:
+  1. **WhatsApp** — opens `https://wa.me/?text=<URL-encoded greeting + product URL>`
+  2. **SMS** — opens `sms:?body=<URL-encoded greeting + product URL>` (which triggers the OS SMS app on iOS Safari + Android Chrome; on desktop browsers without an SMS handler, the link copies the SMS URL to clipboard with a Hindi toast "SMS लिंक कॉपी हो गया")
+  3. **Copy Link** — copies the canonical product URL to clipboard with a Hindi toast "लिंक कॉपी हो गया"
+
+**Given** the customer is viewing a ring product (`category = ring`) on the PDP
+**Then** a **Size Selector** UI appears below the price breakdown showing Indian ring sizes 1–28 with the shop's available sizes highlighted
+**And** the selector includes a "मेरा साइज़ मालूम नहीं" link that navigates to `/size-guide` (FR104, FR105)
+
+**Given** the customer is viewing a bangle product
+**Then** the Size Selector shows bangle diameter options with the shop's available diameters highlighted
+
+**Given** the customer is viewing a non-sized product (e.g. pendant, earring)
+**Then** the Size Selector is hidden (no empty-state UI)
 
 **Given** the customer is on a 360-px-wide screen
 **Then** the sticky CTAs do not occlude content (≥ 16 px padding above bottom)
@@ -961,7 +1025,7 @@ So that I can navigate back, take action without scrolling, and share the produc
 
 **Concurrency:** Max 2 parallel tracks · Max 5 holding branches · Codex queue ≤ 5 · One Class A story at a time (only 17.1 is Class A).
 
-**Migration sequence reservation:** 0056 (product_images) · 0057 (footer columns) · 0058 (shipping/cancellation) · 0059 (FAQ) · 0060 (collections) · 0061 (gift_personas) · 0062 (customer_addresses) · 0063 (product_images_360) · 0064 (referral_codes). Numbers are pre-assigned to avoid the 0037 collision pattern observed in the prior merge train (`memory/project_merge_train_2026_04_29.md`). If a wave merges in unexpected order, the merging session must rebase-and-renumber per the merge-train runbook.
+**Migration sequence reservation:** 0057 (product_images) · 0058 (footer columns) · 0059 (shipping/cancellation) · 0060 (FAQ) · 0061 (collections) · 0062 (gift_personas) · 0063 (customer_addresses) · 0064 (product_images_360) · 0065 (referral_codes). Numbers are pre-assigned past current main HEAD's `0056_platform_audit_events_revoke_app_user_select.sql` to avoid the 0037 collision pattern observed in the prior merge train (`memory/project_merge_train_2026_04_29.md`). If a wave merges in unexpected order, the merging session must rebase-and-renumber per the merge-train runbook.
 
 ---
 
@@ -970,7 +1034,7 @@ So that I can navigate back, take action without scrolling, and share the produc
 - [x] All 22 stories drafted with Class, Wave, Worktree, Dependencies
 - [x] BDD acceptance criteria written for each story
 - [x] FRs + NFRs traced per story
-- [x] Migrations pre-assigned 0056–0064
+- [x] Migrations pre-assigned 0057–0065 (past current main 0056)
 - [x] Wave + concurrency summary written
 - [ ] Codex cross-model review on this file + addendum (substitute gate per `feedback_codex_worktree_clm.md` if Worktree CLM blocks)
 - [ ] Committed to main alongside addendum + PRD §1009 cross-link
