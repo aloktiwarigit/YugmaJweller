@@ -23,7 +23,6 @@ import { createPool, runMigrations } from '@goldsmith/db';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { Tenant, AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { SyncLogger } from '@goldsmith/sync';
-import { StubStorageAdapter } from '@goldsmith/integrations-storage';
 import {
   FallbackChain,
   IbjaAdapter,
@@ -91,7 +90,7 @@ beforeAll(async () => {
   estSvc = new EstimateService(pool as never);
 
   const invRepo  = new InventoryRepository(pool as never, new SyncLogger());
-  const invSvc   = new InventoryService(invRepo, new StubStorageAdapter(), pool as never);
+  const invSvc   = new InventoryService(invRepo, pool as never);
   const lkg      = new LastKnownGoodCache(redis as never);
   const chain    = new FallbackChain(
     new CircuitBreaker(new IbjaAdapter(), redis as never),

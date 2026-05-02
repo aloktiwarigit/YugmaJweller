@@ -28,6 +28,13 @@ describe('publish/unpublish — smoke test against real Postgres', () => {
       `INSERT INTO shops (id, slug, display_name, status) VALUES ($1, $2, $3, 'ACTIVE')`,
       [SHOP_ID, tenant.slug, tenant.display_name],
     );
+    // Story 17.1 — product_images now has a NOT NULL FK to shop_users(id),
+    // so we seed the user before inserting the image row.
+    await pool.query(
+      `INSERT INTO shop_users (id, shop_id, phone, display_name, role, status)
+       VALUES ($1, $2, '+910000000000', 'Smoke User', 'shop_admin', 'ACTIVE')`,
+      [USER_ID, SHOP_ID],
+    );
 
     // Create a product
     const row = await tenantContext.runWith(ctx, () =>
@@ -44,9 +51,16 @@ describe('publish/unpublish — smoke test against real Postgres', () => {
     );
     productId = row.id;
 
-    // Simulate upload URL being issued (inserts product_images row)
-    await tenantContext.runWith(ctx, () =>
-      repo.insertImageRecord(SHOP_ID, productId, `tenants/${SHOP_ID}/products/${productId}/img1.jpg`),
+    // Seed a product_images row directly — the legacy insertImageRecord
+    // helper has been retired (Story 17.1 retires the upload-url path).
+    // Direct DML is acceptable in test setup; production writes go through
+    // ProductImagesService.upload.
+    await pool.query(
+      `INSERT INTO product_images (
+         shop_id, product_id, storage_key, mime_type, byte_size,
+         width, height, exif_stripped_at, uploaded_by_user_id
+       ) VALUES ($1, $2, $3, 'image/jpeg', 12345, 800, 600, now(), $4)`,
+      [SHOP_ID, productId, `tenant/${SHOP_ID}/products/${productId}/img1.jpg`, USER_ID],
     );
   }, 120_000);
 
@@ -81,7 +95,7 @@ describe('publish/unpublish — smoke test against real Postgres', () => {
     expect(row!.published_by_user_id).toBeNull();
   });
 
-  it('countImages returns > 0 after insertImageRecord', async () => {
+  it('countImages returns > 0 when a product_images row exists', async () => {
     const count = await tenantContext.runWith(ctx, () =>
       repo.countImages(productId),
     );

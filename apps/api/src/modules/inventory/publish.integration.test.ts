@@ -45,11 +45,10 @@ const repoMock = {
   updateProduct: vi.fn(),
 };
 
-const storageMock = { getPresignedUploadUrl: vi.fn(), getPublicUrl: vi.fn() };
 const poolMock = { connect: vi.fn() } as unknown as import('pg').Pool;
 
 function makeService(): InventoryService {
-  return new InventoryService(repoMock as never, storageMock as never, poolMock);
+  return new InventoryService(repoMock as never, poolMock);
 }
 
 beforeEach(() => {
