@@ -223,7 +223,16 @@ export class ProductImagesService {
               idempotencyKey,
             );
             // thumbnail_url added OUTSIDE the tx block in the outer withThumbnail call
-            if (winner) return winner;
+            if (winner) {
+              // Race-loser orphan-blob cleanup: this upload's storageKey is now
+              // stale (the winner's row references its own distinct key). Best-
+              // effort delete; the outer try/catch only fires on thrown errors,
+              // so without this the loser's blob would leak. Detached promise on
+              // purpose — failures are non-blocking and a reconcile sweep can
+              // mop up persistent orphans.
+              this.storage.deleteBlob(storageKey).catch(() => undefined);
+              return winner;
+            }
           }
           throw err;
         }

@@ -392,6 +392,16 @@ describe('ProductImagesService.upload', () => {
     });
     expect(r.id).toBe('img-winner');
     expect(repoMock.findByIdempotencyKeyInTx).toHaveBeenCalledTimes(2);
+    // Race-loser must clean up its own (now-orphaned) blob — see opus review P2-1.
+    // The deleteBlob call is detached (.catch attached, no await), so we need a
+    // tick for the microtask to settle before asserting.
+    await Promise.resolve();
+    expect(storageMock.deleteBlob).toHaveBeenCalledTimes(1);
+    // The loser's storageKey is whatever uploadBuffer was called with (the
+    // distinct UUID this attempt generated). The exact key value is non-
+    // deterministic (randomUUID), so assert by call shape.
+    const loserKey = (storageMock.uploadBuffer.mock.calls[0]?.[0]) as string;
+    expect(storageMock.deleteBlob).toHaveBeenCalledWith(loserKey);
   });
 });
 

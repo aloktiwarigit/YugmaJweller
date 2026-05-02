@@ -13,11 +13,10 @@
  *   4. srcset contains 'mb-0.25' and '1920w' (NFR-IMG-1: byte-cap + responsive widths).
  *   5. PublicImageRow does NOT have storage_key (security guard).
  *
- * Note: CatalogService.listPublicImages uses `p.status = 'PUBLISHED'` which is currently
- * not a valid enum value in the products_status_check constraint (pre-existing schema gap).
- * The public catalog DTO shape tests therefore use a mocked pool so we can assert the
- * toPublicImageRow() mapping without needing a PUBLISHED product row. The mapping itself
- * is the exclusive responsibility of CatalogService — fully tested here and in
+ * Note: CatalogService.listPublicImages filters by `p.published_at IS NOT NULL`
+ * (set by inventory.publishProduct). The public catalog DTO shape tests use a
+ * mocked pool to assert the toPublicImageRow() mapping in isolation; full DB-
+ * coupled coverage of listPublicImages lives in
  * product-images.public-catalog.spec.ts (Task 7 unit tests).
  */
 
@@ -142,9 +141,9 @@ beforeAll(async () => {
   );
 
   // CatalogService with mocked pool for public catalog DTO tests.
-  // listPublicImages filters p.status = 'PUBLISHED' (pre-existing schema gap: products
-  // check constraint does not include PUBLISHED). Mocking the pool lets us test the
-  // toPublicImageRow() mapping without seeding a row that would violate the constraint.
+  // listPublicImages filters by p.published_at IS NOT NULL. Mocking the pool
+  // here keeps the test focused on the toPublicImageRow() mapping shape without
+  // needing to seed a real published product + image row.
   const mockPool = {
     query: vi.fn().mockResolvedValue({
       rows: [{
