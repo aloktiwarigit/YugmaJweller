@@ -141,19 +141,26 @@ beforeAll(async () => {
   );
 
   // CatalogService with mocked pool for public catalog DTO tests.
-  // listPublicImages filters by p.published_at IS NOT NULL. Mocking the pool
-  // here keeps the test focused on the toPublicImageRow() mapping shape without
-  // needing to seed a real published product + image row.
+  // listPublicImages filters by p.published_at IS NOT NULL and runs under
+  // withShopScope (BEGIN / SET LOCAL ROLE / SET LOCAL app.current_shop_id /
+  // user query / COMMIT / SET app.current_shop_id POISON). The mock treats
+  // BEGIN/COMMIT/SET as framing no-ops and only returns the user row for the
+  // actual SELECT.
+  const userRow = {
+    id: 'img-catalog-001',
+    alt_text: 'Gold ring',
+    width: 800,
+    height: 600,
+    storage_key: STORAGE_KEY_FOR_CATALOG,
+  };
+  const isFraming = (sql: string): boolean =>
+    /^\s*(BEGIN|COMMIT|ROLLBACK|SET\b)/i.test(sql);
+  const mockQueryImpl = vi.fn().mockImplementation((sql: string) =>
+    Promise.resolve(isFraming(sql) ? { rows: [] } : { rows: [userRow] }),
+  );
   const mockPool = {
-    query: vi.fn().mockResolvedValue({
-      rows: [{
-        id: 'img-catalog-001',
-        alt_text: 'Gold ring',
-        width: 800,
-        height: 600,
-        storage_key: STORAGE_KEY_FOR_CATALOG,
-      }],
-    }),
+    query: mockQueryImpl,
+    connect: vi.fn().mockResolvedValue({ query: mockQueryImpl, release: vi.fn() }),
   };
 
   const settingsRepo = new SettingsRepository(pool as never);
