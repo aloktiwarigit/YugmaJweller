@@ -22,6 +22,9 @@ export type ImageRow = {
   idempotency_key: string | null;
   created_at: string;
   updated_at: string;
+  /** F6-server (Codex P2): server-built thumbnail URL via ImageKit builder.
+   *  Mobile consumes this directly — no client-side URL construction. */
+  thumbnail_url: string;
 };
 
 export type InsertImageInput = {

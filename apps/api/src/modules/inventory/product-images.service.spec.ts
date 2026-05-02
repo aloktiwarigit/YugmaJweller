@@ -82,12 +82,17 @@ async function makeJpeg(
   return pipeline.toBuffer();
 }
 
+// Stub URL builder (F6-server) — returns a deterministic URL so tests can assert
+// on thumbnail_url presence without depending on ImageKitTransformUrlBuilder internals.
+const urlBuilderStub = { url: (key: string, _opts: unknown) => `https://ik.imagekit.io/goldsmith/${key}?tr=w-200,mb-0.25` };
+
 function newSvc(): ProductImagesService {
   return new ProductImagesService(
     repoMock as never,
     storageMock as never,
     malwareMock as never,
     poolMock,
+    urlBuilderStub as never,
   );
 }
 
@@ -451,7 +456,8 @@ describe('ProductImagesService.listForProduct', () => {
     repoMock.listForProduct.mockResolvedValueOnce(rows);
     const r = await svc.listForProduct('prod-X');
     expect(repoMock.listForProduct).toHaveBeenCalledWith('prod-X');
-    expect(r).toBe(rows);
+    // F6-server: service adds thumbnail_url via withThumbnails; use toMatchObject.
+    expect(r).toMatchObject([{ id: 'img-1' }]);
   });
 });
 
@@ -470,7 +476,8 @@ describe('ProductImagesService.reorder', () => {
     ] as never;
     repoMock.setSortOrders.mockResolvedValueOnce(reordered);
     const result = await svc.reorder('prod-X', ['img-2', 'img-1']);
-    expect(result).toBe(reordered);
+    // F6-server: service adds thumbnail_url via withThumbnails; use toMatchObject.
+    expect(result).toMatchObject([{ id: 'img-2', sort_order: 0 }, { id: 'img-1', sort_order: 1 }]);
     expect(repoMock.setSortOrders).toHaveBeenCalledWith('prod-X', ['img-2', 'img-1']);
     expect(auditLogMock).toHaveBeenCalledWith(
       poolMock,
@@ -514,7 +521,8 @@ describe('ProductImagesService.reorder', () => {
     const reordered = ids.map((id, i) => ({ id, sort_order: i })) as never;
     repoMock.setSortOrders.mockResolvedValueOnce(reordered);
     const result = await svc.reorder('prod-X', ids);
-    expect(result).toBe(reordered);
+    // F6-server: service adds thumbnail_url via withThumbnails; use toMatchObject.
+    expect(result).toMatchObject(ids.map((id, i) => ({ id, sort_order: i })));
     expect(repoMock.setSortOrders).toHaveBeenCalledWith('prod-X', ids);
   });
 });

@@ -10,7 +10,7 @@ import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
 import { PricingService } from '../pricing/pricing.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { CatalogService } from './catalog.service';
-import type { TenantConfigResponse, CatalogProductsResponse, CatalogProduct, HuidVerifyResult } from './catalog.service';
+import type { TenantConfigResponse, CatalogProductsResponse, CatalogProduct, HuidVerifyResult, PublicImageRow } from './catalog.service';
 import { RatesUnavailableError } from '@goldsmith/rates';
 
 // ---------------------------------------------------------------------------
@@ -134,6 +134,25 @@ export class CatalogController {
     if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
     if (!payload) throw new BadRequestException({ code: 'catalog.huid_payload_required' });
     return this.catalogService.verifyHuid(productId, shopId, payload);
+  }
+
+  // -------------------------------------------------------------------------
+  // GET /catalog/products/:id/images — Story 17.1 Task 7
+  // Public endpoint; tenant scoped by x-tenant-id header (same as getProduct).
+  // Returns PublicImageRow[] — no storage_key, server-built srcset + URLs.
+  // -------------------------------------------------------------------------
+
+  @Get('products/:id/images')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'public, max-age=30, stale-while-revalidate=60')
+  async listProductImages(
+    @Param('id', new ParseUUIDPipe()) productId: string,
+    @Headers('x-tenant-id') shopId: string,
+  ): Promise<{ images: PublicImageRow[] }> {
+    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    const images = await this.catalogService.listPublicImages(productId, shopId);
+    return { images };
   }
 
   // -------------------------------------------------------------------------

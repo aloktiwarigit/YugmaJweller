@@ -29,8 +29,10 @@ import { AuditAction, auditLog } from '@goldsmith/audit';
 import {
   STORAGE_PORT,
   MALWARE_SCAN_PORT,
+  IMAGEKIT_URL_BUILDER,
   type StoragePort,
   type MalwareScanPort,
+  ImageKitTransformUrlBuilder,
 } from '@goldsmith/integrations-storage';
 import { ProductImagesRepository, type ImageRow } from './product-images.repository';
 
@@ -60,7 +62,20 @@ export class ProductImagesService {
     @Inject(STORAGE_PORT) private readonly storage: StoragePort,
     @Inject(MALWARE_SCAN_PORT) private readonly malwareScan: MalwareScanPort,
     @Inject('PG_POOL') private readonly pool: Pool,
+    @Inject(IMAGEKIT_URL_BUILDER) private readonly urlBuilder: ImageKitTransformUrlBuilder,
   ) {}
+
+  /** Decorates a DB row with the server-built thumbnail URL (F6-server). */
+  private withThumbnail(row: Omit<ImageRow, 'thumbnail_url'>): ImageRow {
+    return {
+      ...row,
+      thumbnail_url: this.urlBuilder.url(row.storage_key, { width: 200 }),
+    };
+  }
+
+  private withThumbnails(rows: Omit<ImageRow, 'thumbnail_url'>[]): ImageRow[] {
+    return rows.map((r) => this.withThumbnail(r));
+  }
 
   async upload(input: UploadInput): Promise<ImageRow> {
     const { productId, file, altText, idempotencyKey } = input;
@@ -88,7 +103,7 @@ export class ProductImagesService {
       const existing = await withTenantTx(this.pool, (tx) =>
         this.repo.findByIdempotencyKeyInTx(tx, productId, idempotencyKey),
       );
-      if (existing) return existing;
+      if (existing) return this.withThumbnail(existing);
     }
 
     // 2. MIME sniff via magic bytes; reject SVG outright (XML/JS injection risk).
@@ -207,6 +222,7 @@ export class ProductImagesService {
               productId,
               idempotencyKey,
             );
+            // thumbnail_url added OUTSIDE the tx block in the outer withThumbnail call
             if (winner) return winner;
           }
           throw err;
@@ -225,7 +241,7 @@ export class ProductImagesService {
           mimeType: sniffed.mime,
         },
       });
-      return inserted;
+      return this.withThumbnail(inserted);
     } catch (err) {
       // Best-effort orphan cleanup. If the tx never committed, the storage blob
       // we uploaded above has no DB row — delete it.
@@ -254,7 +270,8 @@ export class ProductImagesService {
   }
 
   async listForProduct(productId: string): Promise<ImageRow[]> {
-    return this.repo.listForProduct(productId);
+    const rows = await this.repo.listForProduct(productId);
+    return this.withThumbnails(rows);
   }
 
   async reorder(productId: string, orderedIds: string[]): Promise<ImageRow[]> {
@@ -280,7 +297,7 @@ export class ProductImagesService {
       actorUserId: userId,
       metadata: { productId, orderedIds },
     }).catch(() => undefined);
-    return rows;
+    return this.withThumbnails(rows);
   }
 
   async setAltText(productId: string, imageId: string, altText: string | null): Promise<ImageRow> {
@@ -291,7 +308,7 @@ export class ProductImagesService {
     if (!row) {
       throw new NotFoundException({ code: 'IMAGE_NOT_FOUND' });
     }
-    return row;
+    return this.withThumbnail(row);
   }
 }
 

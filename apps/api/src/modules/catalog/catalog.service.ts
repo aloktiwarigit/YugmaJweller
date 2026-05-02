@@ -8,6 +8,10 @@ import type { PriceBreakdown } from '@goldsmith/money';
 import { MAKING_CHARGE_DEFAULTS } from '@goldsmith/shared';
 import type { MakingChargeConfig } from '@goldsmith/shared';
 import { SettingsRepository } from '../settings/settings.repository';
+import {
+  IMAGEKIT_URL_BUILDER,
+  ImageKitTransformUrlBuilder,
+} from '@goldsmith/integrations-storage';
 
 // ---------------------------------------------------------------------------
 // Response shapes
@@ -68,6 +72,26 @@ export interface HuidVerifyResult {
   verified:       boolean;
   huid:           string;
   certifyingBody: string;
+}
+
+// ---------------------------------------------------------------------------
+// Story 17.1 — Task 7: Public image DTO (F6-server)
+// MUST NOT contain storage_key — leaking internal blob paths is a security issue.
+// All URLs are built server-side via ImageKitTransformUrlBuilder so mobile/web
+// never construct ImageKit URLs client-side (NFR-IMG-1 enforcement).
+// ---------------------------------------------------------------------------
+
+export interface PublicImageRow {
+  id:              string;
+  alt_text:        string | null;
+  width:           number;
+  height:          number;
+  /** 4-candidate srcset: 320w, 640w, 1024w, 1920w */
+  srcset:          string;
+  /** w=1024 default for <img src> fallback */
+  default_url:     string;
+  /** w=200, blur=30 for LQIP/progressive reveal */
+  placeholder_url: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -138,6 +162,7 @@ export class CatalogService {
     @Inject('PG_POOL') private readonly pool: Pool,
     @Inject(PricingService) private readonly pricingService: PricingService,
     @Inject(SettingsRepository) private readonly settingsRepo: SettingsRepository,
+    @Inject(IMAGEKIT_URL_BUILDER) private readonly urlBuilder: ImageKitTransformUrlBuilder,
   ) {}
 
   async getTenantConfig(slug: string): Promise<TenantConfigResponse> {
@@ -360,6 +385,45 @@ export class CatalogService {
       priceAvailable,
       estimatedPrice,
       publishedAt:           row.published_at.toISOString(),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Story 17.1 Task 7 — public images for a product
+  // Public catalog routes don't run under TenantContext (no auth middleware).
+  // Shop scope comes from the x-tenant-id header (same pattern as getProduct).
+  // Use explicit shop-scoped transaction helper so RLS is active under app_user.
+  // ---------------------------------------------------------------------------
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint; shopId from slug lookup, not TenantContext
+  async listPublicImages(productId: string, shopId: string): Promise<PublicImageRow[]> {
+    // Only show images for PUBLISHED products of ACTIVE shops (security guard).
+    const r = await withShopTx(this.pool, shopId, async (tx) =>
+      tx.query<{
+        id: string; alt_text: string | null; width: number; height: number; storage_key: string;
+      }>(
+        `SELECT pi.id, pi.alt_text, pi.width, pi.height, pi.storage_key
+           FROM product_images pi
+           JOIN products p ON p.id = pi.product_id
+          WHERE pi.product_id = $1
+            AND pi.shop_id = $2
+            AND p.status = 'PUBLISHED'
+            AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
+          ORDER BY pi.sort_order ASC, pi.created_at ASC`,
+        [productId, shopId],
+      ),
+    );
+    return r.rows.map((row) => this.toPublicImageRow(row));
+  }
+
+  private toPublicImageRow(row: { id: string; alt_text: string | null; width: number; height: number; storage_key: string }): PublicImageRow {
+    return {
+      id:              row.id,
+      alt_text:        row.alt_text,
+      width:           row.width,
+      height:          row.height,
+      srcset:          this.urlBuilder.srcset(row.storage_key),
+      default_url:     this.urlBuilder.url(row.storage_key, { width: 1024 }),
+      placeholder_url: this.urlBuilder.url(row.storage_key, { width: 200, blur: 30 }),
     };
   }
 
