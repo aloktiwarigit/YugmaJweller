@@ -72,6 +72,13 @@ mvpScope: >
 
 ## 2. Deployment
 
+> 2026-05-03 sweep note: this section describes the intended production
+> deployment flow. The repository currently has no checked-in deploy script,
+> production deploy workflow, Terraform deploy directory, or provider config
+> proving that the latest code is live. Before using this runbook operationally,
+> verify the actual hosting provider, deployed commit SHA, migration level,
+> secrets, CDN/storage provider, and mobile build channel.
+
 ### 2.1 Pre-deploy checklist
 
 Before running `./scripts/deploy.sh prod` (or GitHub Actions `Deploy to Production`):

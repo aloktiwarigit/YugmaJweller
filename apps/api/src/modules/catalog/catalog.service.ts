@@ -1,5 +1,6 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
 import type { Pool } from 'pg';
+import { withShopTx } from '@goldsmith/db';
 import { PricingService } from '../pricing/pricing.service';
 import type { CurrentRatesResult } from '../pricing/pricing.service';
 import { computeProductPrice } from '@goldsmith/money';
@@ -207,14 +208,20 @@ export class CatalogService {
        LIMIT $${limitIdx} OFFSET $${offsetIdx}
     `;
 
-    const [ratesResult, mcResult, productsResult] = await Promise.all([
+    const [ratesResult, scopedResult] = await Promise.all([
       this.pricingService.getCurrentRates(),
-      this.pool.query<{ making_charges_json: MakingChargeConfig[] | null }>(
-        `SELECT making_charges_json FROM shop_settings WHERE shop_id = $1`,
-        [shopId],
-      ),
-      this.pool.query<ProductCatalogRow>(sql, queryParams),
+      withShopTx(this.pool, shopId, async (tx) => {
+        const [mcResult, productsResult] = await Promise.all([
+          tx.query<{ making_charges_json: MakingChargeConfig[] | null }>(
+            `SELECT making_charges_json FROM shop_settings WHERE shop_id = $1`,
+            [shopId],
+          ),
+          tx.query<ProductCatalogRow>(sql, queryParams),
+        ]);
+        return { mcResult, productsResult };
+      }),
     ]);
+    const { mcResult, productsResult } = scopedResult;
 
     const configs: MakingChargeConfig[] = mcResult.rows[0]?.making_charges_json ?? MAKING_CHARGE_DEFAULTS;
     const mcMap = new Map<string, string>(configs.map((c) => [c.category, c.value]));
@@ -230,28 +237,34 @@ export class CatalogService {
 
   // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint; shopId from slug lookup, not TenantContext
   async getProduct(id: string, shopId: string): Promise<CatalogProduct> {
-    const [ratesResult, mcResult, productResult] = await Promise.all([
+    const [ratesResult, scopedResult] = await Promise.all([
       this.pricingService.getCurrentRates(),
-      this.pool.query<{ making_charges_json: MakingChargeConfig[] | null }>(
-        `SELECT making_charges_json FROM shop_settings WHERE shop_id = $1`,
-        [shopId],
-      ),
-      this.pool.query<ProductCatalogRow>(
-        // EXISTS guard: suspended/terminated tenants must 404 from public catalog detail too.
-        `SELECT p.id, p.sku, p.metal, p.purity, p.category_id,
-                pc.name AS category_name,
-                p.gross_weight_g, p.net_weight_g,
-                p.making_charge_override_pct,
-                p.huid, p.huid_exemption_category, p.quantity, p.published_at,
-                '1' AS total_count
-           FROM products p
-           LEFT JOIN product_categories pc ON pc.id = p.category_id
-          WHERE p.id = $1 AND p.shop_id = $2
-            AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
-            AND p.status = 'PUBLISHED'`,
-        [id, shopId],
-      ),
+      withShopTx(this.pool, shopId, async (tx) => {
+        const [mcResult, productResult] = await Promise.all([
+          tx.query<{ making_charges_json: MakingChargeConfig[] | null }>(
+            `SELECT making_charges_json FROM shop_settings WHERE shop_id = $1`,
+            [shopId],
+          ),
+          tx.query<ProductCatalogRow>(
+            // EXISTS guard: suspended/terminated tenants must 404 from public catalog detail too.
+            `SELECT p.id, p.sku, p.metal, p.purity, p.category_id,
+                    pc.name AS category_name,
+                    p.gross_weight_g, p.net_weight_g,
+                    p.making_charge_override_pct,
+                    p.huid, p.huid_exemption_category, p.quantity, p.published_at,
+                    '1' AS total_count
+               FROM products p
+               LEFT JOIN product_categories pc ON pc.id = p.category_id
+              WHERE p.id = $1 AND p.shop_id = $2
+                AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
+                AND p.status = 'PUBLISHED'`,
+            [id, shopId],
+          ),
+        ]);
+        return { mcResult, productResult };
+      }),
     ]);
+    const { mcResult, productResult } = scopedResult;
 
     if (productResult.rows.length === 0) {
       throw new NotFoundException({ code: 'catalog.product_not_found' });
@@ -271,14 +284,16 @@ export class CatalogService {
     }
     const certifyingBody = certifyingBodyFromQr(qrPayload);
 
-    const r = await this.pool.query<{ huid: string | null }>(
-      // EXISTS guard: HUID verification must also respect tenant suspension. Without it, a
-      // caller with a cached shop+product ID could keep verifying HUID after suspend.
-      `SELECT huid FROM products
-        WHERE id = $1 AND shop_id = $2
-          AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
-          AND status = 'PUBLISHED'`,
-      [productId, shopId],
+    const r = await withShopTx(this.pool, shopId, async (tx) =>
+      tx.query<{ huid: string | null }>(
+        // EXISTS guard: HUID verification must also respect tenant suspension. Without it, a
+        // caller with a cached shop+product ID could keep verifying HUID after suspend.
+        `SELECT huid FROM products
+          WHERE id = $1 AND shop_id = $2
+            AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
+            AND status = 'PUBLISHED'`,
+        [productId, shopId],
+      ),
     );
     if (r.rows.length === 0) {
       throw new NotFoundException({ code: 'catalog.product_not_found' });

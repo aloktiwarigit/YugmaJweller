@@ -68,6 +68,14 @@ function makeService(searchPort = makeSearchPortMock(), pool = makePoolMock()) {
   };
 }
 
+function findCustomerSearchQuery(pool: ReturnType<typeof makePoolMock>): [string, unknown[]] {
+  const call = (pool._client.query as ReturnType<typeof vi.fn>).mock.calls.find(
+    (args: unknown[]) => typeof args[0] === 'string' && (args[0] as string).includes('FROM customers c'),
+  );
+  if (!call) throw new Error('customer search SQL was not executed');
+  return call as [string, unknown[]];
+}
+
 // ---------------------------------------------------------------------------
 
 beforeEach(() => { vi.clearAllMocks(); });
@@ -143,7 +151,7 @@ describe('CrmSearchService.searchCustomers()', () => {
 
     await svc.searchCustomers(makeAuthCtx(SHOP_A), sampleQuery);
 
-    const [sql, params] = (pool._client.query as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown[]];
+    const [sql, params] = findCustomerSearchQuery(pool);
     expect(params[0]).toBe(SHOP_A);
     expect(sql).toContain('c.shop_id = $1');
   });
@@ -178,7 +186,7 @@ describe('CrmSearchService.searchCustomers()', () => {
 
     await svc.searchCustomers(makeAuthCtx(), { q: '3210', limit: 10, offset: 0 });
 
-    const [sql, params] = (pool._client.query as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown[]];
+    const [sql, params] = findCustomerSearchQuery(pool);
     expect(sql).toContain('RIGHT(c.phone, 4)');
     expect(params).toContain('3210');
   });
@@ -191,7 +199,7 @@ describe('CrmSearchService.searchCustomers()', () => {
 
     await svc.searchCustomers(makeAuthCtx(), { q: 'Ramesh', limit: 10, offset: 0 });
 
-    const [sql] = (pool._client.query as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    const [sql] = findCustomerSearchQuery(pool);
     // SELECT always has RIGHT(c.phone, 4) AS phone_last4; the WHERE clause must NOT add = condition
     expect(sql).not.toContain('RIGHT(c.phone, 4) =');
   });
@@ -288,7 +296,7 @@ describe('tenant isolation', () => {
 
     await svc.searchCustomers(makeAuthCtx(SHOP_A), sampleQuery);
 
-    const params = (pool._client.query as ReturnType<typeof vi.fn>).mock.calls[0][1] as unknown[];
+    const [, params] = findCustomerSearchQuery(pool);
     expect(params[0]).toBe(SHOP_A);
     expect(params[0]).not.toBe(SHOP_B);
   });

@@ -1,27 +1,11 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
+import { platformGlobalTx } from '../../../platform-global-execute';
 import { PG_POOL_ADMIN } from '../platform-admin.tokens';
 
 // Pool here is PG_POOL_ADMIN, which connects directly as platform_admin.
 // BEGIN/COMMIT remains for atomicity — the export queries + audit insert read consistent
 // state and audit only commits when the export succeeded.
-async function inTx<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T> {
-  const c = await pool.connect();
-  try {
-    await c.query('BEGIN');
-    try {
-      const result = await fn(c);
-      await c.query('COMMIT');
-      return result;
-    } catch (e) {
-      await c.query('ROLLBACK').catch(() => undefined);
-      throw e;
-    }
-  } finally {
-    c.release();
-  }
-}
-
 export interface TenantExport {
   shop: Record<string, unknown>;
   customers: Array<Record<string, unknown>>;
@@ -37,7 +21,7 @@ export class DataExportService {
   constructor(@Inject(PG_POOL_ADMIN) private readonly pool: Pool) {}
 
   async exportTenant(shopId: string, platformUserId: string): Promise<TenantExport> {
-    return inTx(this.pool, async (c) => {
+    return platformGlobalTx(this.pool, 'platform-admin tenant data export with audit', async (c) => {
       // PLATFORM_ADMIN_BYPASS: scoped export — every query is filtered to the requested
       // shop_id. Returning customer PII is the explicit purpose (DPDPA portability).
       //

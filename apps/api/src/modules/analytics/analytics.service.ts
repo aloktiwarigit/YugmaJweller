@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
-import type { Pool, PoolClient } from 'pg';
-import { POISON_UUID } from '@goldsmith/db';
+import type { Pool } from 'pg';
+import { withShopTx } from '@goldsmith/db';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -31,7 +31,7 @@ export class AnalyticsService {
       return;
     }
 
-    await this.withShopTx(params.shopId, async (tx) => {
+    await withShopTx(this.pool, params.shopId, async (tx) => {
       // P2 fix: verify the product belongs to this shop before recording any view.
       // Prevents cross-tenant pollution where caller supplies their shop_id but a
       // different tenant's product_id.
@@ -85,7 +85,7 @@ export class AnalyticsService {
     if (!UUID_RE.test(params.shopId) || !UUID_RE.test(params.productId)) {
       throw new Error('analytics.invalid_params');
     }
-    return this.withShopTx(params.shopId, async (tx) => {
+    return withShopTx(this.pool, params.shopId, async (tx) => {
       const r = await tx.query<{
         total_views: string;
         unique_viewers: string;
@@ -110,24 +110,5 @@ export class AnalyticsService {
           : null,
       };
     });
-  }
-
-  // eslint-disable-next-line goldsmith/no-raw-shop-id-param
-  private async withShopTx<T>(shopId: string, fn: (tx: PoolClient) => Promise<T>): Promise<T> {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query('SET LOCAL ROLE app_user');
-      await client.query(`SET LOCAL app.current_shop_id = '${shopId}'`);
-      const result = await fn(client);
-      await client.query('COMMIT');
-      return result;
-    } catch (err) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw err;
-    } finally {
-      await client.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
-      client.release();
-    }
   }
 }

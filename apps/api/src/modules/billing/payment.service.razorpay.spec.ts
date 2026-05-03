@@ -8,11 +8,12 @@ import type { Redis } from '@goldsmith/cache';
 // ── Mocks MUST be at top (hoisted by vitest) ─────────────────────────────────
 
 const mockWithTenantTx = vi.fn();
+const mockWithShopTx = vi.fn();
 const mockTenantContext = vi.fn().mockReturnValue({
   authenticated: true, userId: 'u1', shopId: 's1', role: 'shop_admin',
 });
 
-vi.mock('@goldsmith/db', () => ({ withTenantTx: mockWithTenantTx }));
+vi.mock('@goldsmith/db', () => ({ withTenantTx: mockWithTenantTx, withShopTx: mockWithShopTx }));
 vi.mock('@goldsmith/tenant-context', () => ({
   tenantContext: { requireCurrent: mockTenantContext },
 }));
@@ -66,6 +67,9 @@ type Ctx = Parameters<InstanceType<typeof import('./payment.service').PaymentSer
 // ── Set up withTenantTx mock default before each test ─────────────────────────
 
 beforeEach(() => {
+  mockWithShopTx.mockImplementation(async (pool: ReturnType<typeof makePool>, _shopId: string, fn: (tx: { query: ReturnType<typeof vi.fn> }) => Promise<unknown>) => {
+    return fn(pool._client);
+  });
   mockWithTenantTx.mockImplementation(async (_pool: Pool, fn: (tx: { query: ReturnType<typeof vi.fn> }) => Promise<void>) => {
     const tx = {
       query: vi.fn().mockImplementation((sql: string) => {

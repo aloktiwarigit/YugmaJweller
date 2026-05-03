@@ -7,12 +7,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
-import { withTenantTx } from '@goldsmith/db';
+import { withShopTx, withTenantTx } from '@goldsmith/db';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import type { PaymentsPort } from '@goldsmith/integrations-payments';
 import type { PurityKey } from '@goldsmith/shared';
+import { platformGlobalExecute } from '../../platform-global-execute';
 import { PricingService } from '../pricing/pricing.service';
 import type { TenantRatesResult } from '../pricing/pricing.service';
 
@@ -73,52 +74,52 @@ export class RateLockBookingsService {
       throw new BadRequestException({ code: 'rate_lock.deposit_amount_required' });
     }
 
-    // One active/pending lock per customer+shop (blocks duplicate PENDING_PAYMENT at app layer;
-    // the DB unique index uq_rate_lock_bookings_one_active remains the definitive ACTIVE guard)
-    const conflict = await this.pool.query<{ id: string }>(
-      `SELECT id FROM rate_lock_bookings
-       WHERE customer_id = $1 AND shop_id = $2
-         AND status IN ('ACTIVE', 'PENDING_PAYMENT')
-         AND expires_at > NOW()
-       LIMIT 1`,
-      [dto.customerId, ctx.shopId],
-    );
-    if (conflict.rows.length > 0) {
-      throw new ConflictException({ code: 'rate_lock.already_active' });
-    }
-
     // Lock the current 24K rate
     const rates     = await this.pricing.getCurrentRatesForTenant(ctx);
     const locked24k = (rates as unknown as Record<string, { perGramPaise: bigint }>)['GOLD_24K'].perGramPaise;
 
-    // Expiry duration from shop settings (default 1 day)
-    const daysRow = await this.pool.query<{ rate_lock_days: number | null }>(
-      `SELECT rate_lock_days FROM shop_settings WHERE shop_id = $1`,
-      [ctx.shopId],
-    );
-    const rateLockDays = daysRow.rows[0]?.rate_lock_days ?? 1;
+    const booking = await withShopTx(this.pool, ctx.shopId, async (tx) => {
+      // One active/pending lock per customer+shop (blocks duplicate PENDING_PAYMENT at app layer;
+      // the DB unique index uq_rate_lock_bookings_one_active remains the definitive ACTIVE guard)
+      const conflict = await tx.query<{ id: string }>(
+        `SELECT id FROM rate_lock_bookings
+         WHERE customer_id = $1 AND shop_id = $2
+           AND status IN ('ACTIVE', 'PENDING_PAYMENT')
+           AND expires_at > NOW()
+         LIMIT 1`,
+        [dto.customerId, ctx.shopId],
+      );
+      if (conflict.rows.length > 0) {
+        throw new ConflictException({ code: 'rate_lock.already_active' });
+      }
 
-    // Validate the customer belongs to this tenant before creating the booking.
-    // The FK on customer_id only proves the customer exists, not that it belongs to ctx.shopId.
-    if (dto.customerId) {
-      const ownerCheck = await this.pool.query<{ exists: boolean }>(
+      // Expiry duration from shop settings (default 1 day)
+      const daysRow = await tx.query<{ rate_lock_days: number | null }>(
+        `SELECT rate_lock_days FROM shop_settings WHERE shop_id = $1`,
+        [ctx.shopId],
+      );
+      const rateLockDays = daysRow.rows[0]?.rate_lock_days ?? 1;
+
+      // Validate the customer belongs to this tenant before creating the booking.
+      // The FK on customer_id only proves the customer exists, not that it belongs to ctx.shopId.
+      const ownerCheck = await tx.query<{ exists: boolean }>(
         `SELECT EXISTS(SELECT 1 FROM customers WHERE id = $1 AND shop_id = $2) AS exists`,
         [dto.customerId, ctx.shopId],
       );
       if (!ownerCheck.rows[0]?.exists) {
         throw new BadRequestException({ code: 'customer.not_found_in_shop' });
       }
-    }
 
-    // Insert booking row
-    const insertRes = await this.pool.query<{ id: string; expires_at: Date }>(
-      `INSERT INTO rate_lock_bookings
-         (shop_id, customer_id, locked_rate_24k_paise_per_gram, expires_at, deposit_amount_paise, status)
-       VALUES ($1, $2, $3, NOW() + ($4 * INTERVAL '1 day'), $5, 'PENDING_PAYMENT')
-       RETURNING id, expires_at`,
-      [ctx.shopId, dto.customerId, locked24k, rateLockDays, dto.depositAmountPaise],
-    );
-    const booking = insertRes.rows[0]!;
+      // Insert booking row
+      const insertRes = await tx.query<{ id: string; expires_at: Date }>(
+        `INSERT INTO rate_lock_bookings
+           (shop_id, customer_id, locked_rate_24k_paise_per_gram, expires_at, deposit_amount_paise, status)
+         VALUES ($1, $2, $3, NOW() + ($4 * INTERVAL '1 day'), $5, 'PENDING_PAYMENT')
+         RETURNING id, expires_at`,
+        [ctx.shopId, dto.customerId, locked24k, rateLockDays, dto.depositAmountPaise],
+      );
+      return insertRes.rows[0]!;
+    });
 
     // Create Razorpay order; clean up the booking row if this fails so we don't leave
     // a dangling PENDING_PAYMENT row with no order ID.
@@ -137,17 +138,21 @@ export class RateLockBookingsService {
       });
     } catch (err) {
       // Best-effort cleanup — ignore secondary failure so original error propagates
-      await this.pool.query(
-        `DELETE FROM rate_lock_bookings WHERE id = $1`,
-        [booking.id],
-      ).catch(() => undefined);
+      await withShopTx(this.pool, ctx.shopId, async (tx) => {
+        await tx.query(
+          `DELETE FROM rate_lock_bookings WHERE id = $1`,
+          [booking.id],
+        );
+      }).catch(() => undefined);
       throw err;
     }
 
-    await this.pool.query(
-      `UPDATE rate_lock_bookings SET razorpay_order_id = $1 WHERE id = $2`,
-      [order.orderId, booking.id],
-    );
+    await withShopTx(this.pool, ctx.shopId, async (tx) => {
+      await tx.query(
+        `UPDATE rate_lock_bookings SET razorpay_order_id = $1 WHERE id = $2`,
+        [order.orderId, booking.id],
+      );
+    });
 
     void auditLog(this.pool, {
       action:      AuditAction.RATE_LOCK_BOOKING_CREATED,
@@ -175,15 +180,17 @@ export class RateLockBookingsService {
   // Called before withTenantTx in billing.service.ts; no PoolClient available yet.
   // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal; shopId from billing TenantContext caller
   async peekActiveLock(customerId: string, shopId: string): Promise<ActiveLockPeek | null> {
-    const res = await this.pool.query<{ id: string; locked_rate_24k_paise_per_gram: bigint }>(
-      `SELECT id, locked_rate_24k_paise_per_gram
-       FROM rate_lock_bookings
-       WHERE customer_id = $1
-         AND shop_id = $2
-         AND status = 'ACTIVE'
-         AND expires_at > NOW()
-       LIMIT 1`,
-      [customerId, shopId],
+    const res = await withShopTx(this.pool, shopId, async (tx) =>
+      tx.query<{ id: string; locked_rate_24k_paise_per_gram: bigint }>(
+        `SELECT id, locked_rate_24k_paise_per_gram
+         FROM rate_lock_bookings
+         WHERE customer_id = $1
+           AND shop_id = $2
+           AND status = 'ACTIVE'
+           AND expires_at > NOW()
+         LIMIT 1`,
+        [customerId, shopId],
+      ),
     );
     const row = res.rows[0];
     if (!row) return null;
@@ -210,29 +217,18 @@ export class RateLockBookingsService {
       return;
     }
 
-    const client = await this.pool.connect(); // nosemgrep: goldsmith.require-tenant-transaction
-    try {
-      await client.query('BEGIN');
-      await client.query('SET LOCAL ROLE app_user');
-      // Use parameterized set_config() instead of raw interpolation. Even though
-      // the upstream UUID_RE regex blocks all SQL metacharacters today, this is
-      // defense-in-depth: the regex could be relaxed, or the source of shopIdHint
-      // could change. set_config(name, value, is_local=true) is equivalent to
-      // SET LOCAL with safe parameter binding.
-      await client.query('SELECT set_config($1, $2, true)', ['app.current_shop_id', shopIdHint]);
-
+    let activated = false;
+    await withShopTx(this.pool, shopIdHint, async (client) => {
       const res = await client.query<{ id: string; shop_id: string; status: string }>(
         `SELECT id, shop_id, status FROM rate_lock_bookings WHERE id = $1 AND shop_id = $2 FOR UPDATE`,
         [bookingId, shopIdHint],
       );
       const row = res.rows[0];
       if (!row) {
-        await client.query('ROLLBACK');
         this.logger.warn({ bookingId, shopIdHint }, 'Rate-lock webhook: booking not found or shop mismatch');
         return;
       }
       if (row.status !== 'PENDING_PAYMENT') {
-        await client.query('ROLLBACK');
         this.logger.warn({ bookingId, status: row.status }, 'Rate-lock webhook: unexpected status — ignoring');
         return;
       }
@@ -246,23 +242,19 @@ export class RateLockBookingsService {
            AND shop_id = $4`,
         [bookingId, razorpayPaymentId, payment.amountPaise, shopIdHint],
       );
-      await client.query('COMMIT');
+      activated = true;
+    });
+    if (!activated) return;
 
-      void auditLog(this.pool, {
-        action:      AuditAction.RATE_LOCK_ACTIVATED,
-        subjectType: 'rate_lock_booking',
-        subjectId:   bookingId,
-        actorUserId: 'system',
-        after:       { razorpayPaymentId, depositPaidPaise: payment.amountPaise.toString() },
-      }).catch(() => undefined);
+    void auditLog(this.pool, {
+      action:      AuditAction.RATE_LOCK_ACTIVATED,
+      subjectType: 'rate_lock_booking',
+      subjectId:   bookingId,
+      actorUserId: 'system',
+      after:       { razorpayPaymentId, depositPaidPaise: payment.amountPaise.toString() },
+    }).catch(() => undefined);
 
-      this.logger.log({ bookingId, razorpayPaymentId }, 'Rate-lock booking activated');
-    } catch (err) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw err;
-    } finally {
-      client.release();
-    }
+    this.logger.log({ bookingId, razorpayPaymentId }, 'Rate-lock booking activated');
   }
 
   async confirmAndMarkUsed(bookingId: string, tx: PoolClient): Promise<boolean> {
@@ -289,14 +281,17 @@ export class RateLockBookingsService {
   }
 
   async expireStaleBookings(): Promise<number> {
-    const res = await this.pool.query<{ count: string }>(
-      `WITH expired AS (
-         UPDATE rate_lock_bookings
-         SET status = 'EXPIRED'
-         WHERE status = 'ACTIVE' AND expires_at < NOW()
-         RETURNING id
-       )
-       SELECT COUNT(*)::text AS count FROM expired`,
+    const res = await platformGlobalExecute(
+      'background rate-lock expiry sweep across tenants',
+      async () => this.pool.query<{ count: string }>(
+        `WITH expired AS (
+           UPDATE rate_lock_bookings
+           SET status = 'EXPIRED'
+           WHERE status = 'ACTIVE' AND expires_at < NOW()
+           RETURNING id
+         )
+         SELECT COUNT(*)::text AS count FROM expired`,
+      ),
     );
     const count = parseInt(res.rows[0]?.count ?? '0', 10);
     if (count > 0) {

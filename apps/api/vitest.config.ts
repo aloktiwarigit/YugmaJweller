@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    setupFiles: ['./test/vitest.setup.ts'],
     // endpoint-walker.e2e.test.ts requires a fresh Firebase Auth emulator and must
     // run in isolation (pnpm test:e2e). When run as part of the full suite, prior
     // auth test files leave the emulator in a shared state that causes token

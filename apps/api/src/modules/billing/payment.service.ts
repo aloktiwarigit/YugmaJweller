@@ -2,7 +2,7 @@ import { ConflictException, Inject, Injectable, NotFoundException, Unprocessable
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from '@goldsmith/queue';
 import type { Pool } from 'pg';
-import { withTenantTx } from '@goldsmith/db';
+import { withShopTx, withTenantTx } from '@goldsmith/db';
 import {
   enforce269ST,
   buildCashCapOverride,
@@ -493,71 +493,52 @@ export class PaymentService {
     const acquired = await this.redis.set(redisKey, '1', 'EX', WEBHOOK_IDEM_TTL_SEC, 'NX');
     if (!acquired) return;
 
-    const client = await this.pool.connect();
-    let paymentId: string;
-    let invoiceId: string;
-    let dbShopId: string;
     try {
-      await client.query('BEGIN');
-      // Use the notes-supplied shopId to arm RLS for the initial lookup.
-      // This is safe because: (1) the webhook HMAC is verified before we reach
-      // here, (2) shopIdFromNotes was set by OUR server at order-creation time.
-      // We then validate the found row's shop_id equals shopIdFromNotes.
-      // nosemgrep: goldsmith.no-raw-shop-id-param
-      await client.query(`SET LOCAL app.current_shop_id = '${shopIdFromNotes}'`);
-      const res = await client.query<{ id: string; invoice_id: string; shop_id: string }>(
-        `SELECT id, invoice_id, shop_id
-         FROM payments
-         WHERE razorpay_order_id = $1
-           AND status            = 'PENDING'
-         LIMIT 1`,
-        [razorpayOrderId],
-      );
-      if (!res.rows[0] || res.rows[0].shop_id !== shopIdFromNotes) {
-        await client.query('ROLLBACK');
-        client.release();
-        await this.redis.del(redisKey);
-        return;
-      }
-      ({ id: paymentId, invoice_id: invoiceId, shop_id: dbShopId } = res.rows[0]);
-    } catch (lookupErr) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      client.release();
-      await this.redis.del(redisKey);
-      throw lookupErr;
-    }
+      const processed = await withShopTx(this.pool, shopIdFromNotes, async (client) => {
+        // Use the notes-supplied shopId to arm RLS for the initial lookup.
+        // This is safe because: (1) the webhook HMAC is verified before we reach
+        // here, (2) shopIdFromNotes was set by OUR server at order-creation time.
+        // We then validate the found row's shop_id equals shopIdFromNotes.
+        const res = await client.query<{ id: string; invoice_id: string; shop_id: string }>(
+          `SELECT id, invoice_id, shop_id
+           FROM payments
+           WHERE razorpay_order_id = $1
+             AND status            = 'PENDING'
+           LIMIT 1`,
+          [razorpayOrderId],
+        );
+        const row = res.rows[0];
+        if (!row || row.shop_id !== shopIdFromNotes) return false;
 
-    try {
-      // GUC already set to dbShopId from the BEGIN block; RLS is active.
-      await client.query(`SET LOCAL app.current_shop_id = '${dbShopId}'`);
-      await client.query(
-        `UPDATE payments
-         SET status              = 'CONFIRMED',
-             webhook_status      = 'CAPTURED',
-             razorpay_payment_id = $1,
-             webhook_received_at = now()
-         WHERE id = $2`,
-        [razorpayPaymentId, paymentId],
-      );
-      await client.query(
-        `INSERT INTO audit_events
-           (shop_id, actor_user_id, action, subject_type, subject_id, metadata)
-         VALUES (current_setting('app.current_shop_id', true)::uuid, NULL, $1, $2, $3, $4)`,
-        [
-          AuditAction.PAYMENT_RECORDED,
-          'invoice',
-          invoiceId,
-          JSON.stringify({ source: 'razorpay_webhook', razorpayPaymentId, razorpayOrderId }),
-        ],
-      );
-      await client.query('COMMIT');
+        await client.query(
+          `UPDATE payments
+           SET status              = 'CONFIRMED',
+               webhook_status      = 'CAPTURED',
+               razorpay_payment_id = $1,
+               webhook_received_at = now()
+           WHERE id = $2`,
+          [razorpayPaymentId, row.id],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (shop_id, actor_user_id, action, subject_type, subject_id, metadata)
+           VALUES (current_setting('app.current_shop_id', true)::uuid, NULL, $1, $2, $3, $4)`,
+          [
+            AuditAction.PAYMENT_RECORDED,
+            'invoice',
+            row.invoice_id,
+            JSON.stringify({ source: 'razorpay_webhook', razorpayPaymentId, razorpayOrderId }),
+          ],
+        );
+        return true;
+      });
+      if (!processed) {
+        await this.redis.del(redisKey);
+      }
     } catch (err) {
-      await client.query('ROLLBACK');
       // Release the lock so the worker can retry.
       await this.redis.del(redisKey);
       throw err;
-    } finally {
-      client.release();
     }
   }
 

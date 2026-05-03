@@ -6,6 +6,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import type { Pool } from 'pg';
+import { withShopTx } from '@goldsmith/db';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
@@ -120,13 +121,7 @@ export class TryAtHomeBookingsService {
 
   async dispatchBooking(bookingId: string): Promise<BookingResponse> {
     const ctx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
-    const client = await this.pool.connect();
-
-    try {
-      await client.query('BEGIN');
-      // nosemgrep: goldsmith.no-raw-shop-id-param
-      await client.query(`SET LOCAL app.current_shop_id = '${ctx.shopId}'`);
-
+    const { booking, updated } = await withShopTx(this.pool, ctx.shopId, async (client) => {
       const booking = await this.repo.lockForUpdate(client, bookingId);
       if (!booking) throw new NotFoundException({ code: 'try_at_home.booking_not_found' });
       if (booking.status !== 'REQUESTED') {
@@ -138,7 +133,8 @@ export class TryAtHomeBookingsService {
         throw new UnprocessableEntityException({ code: 'try_at_home.booking_dispatch_conflict' });
       }
 
-      await client.query('COMMIT');
+      return { booking, updated };
+    });
 
       // Transition products to IN_TRY_AT_HOME via state machine (outside tx — each has its own audit)
       for (const productId of booking.product_ids) {
@@ -154,12 +150,6 @@ export class TryAtHomeBookingsService {
       }).catch(() => undefined);
 
       return rowToResponse(updated);
-    } catch (err) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw err;
-    } finally {
-      client.release();
-    }
   }
 
   async recordReturn(bookingId: string, dto: RecordReturnDto): Promise<BookingResponse & { invoiceId?: string }> {
@@ -170,12 +160,7 @@ export class TryAtHomeBookingsService {
       throw new BadRequestException({ code: 'try_at_home.no_products_specified' });
     }
 
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-      // nosemgrep: goldsmith.no-raw-shop-id-param
-      await client.query(`SET LOCAL app.current_shop_id = '${ctx.shopId}'`);
-
+    const { booking, updated, newStatus } = await withShopTx(this.pool, ctx.shopId, async (client) => {
       const booking = await this.repo.lockForUpdate(client, bookingId);
       if (!booking) throw new NotFoundException({ code: 'try_at_home.booking_not_found' });
       if (booking.status !== 'DISPATCHED') {
@@ -200,7 +185,8 @@ export class TryAtHomeBookingsService {
         newStatus,
       );
 
-      await client.query('COMMIT');
+      return { booking, updated, newStatus };
+    });
 
       // Revert returned products to IN_STOCK via state machine
       for (const productId of dto.returnedProductIds) {
@@ -250,12 +236,6 @@ export class TryAtHomeBookingsService {
       }).catch(() => undefined);
 
       return { ...rowToResponse(updated), invoiceId };
-    } catch (err) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw err;
-    } finally {
-      client.release();
-    }
   }
 
   async list(params: { limit: number; offset: number }): Promise<{ bookings: BookingResponse[]; total: number }> {

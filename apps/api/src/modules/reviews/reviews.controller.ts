@@ -9,7 +9,6 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { SkipAuth } from '../../common/decorators/skip-auth.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { ReviewsService } from './reviews.service';
@@ -22,14 +21,15 @@ const CreateReviewSchema = z.object({
   reviewText: z.string().max(1000).optional(),
 });
 
-@Controller('reviews')
+// Reviews are customer-facing: any Firebase-authenticated user can submit.
+// Listing is public; customer IDs are deliberately omitted from list responses.
+@Controller('/api/v1/reviews')
 export class ReviewsController {
   constructor(
     @Inject(ReviewsService) private readonly svc: ReviewsService,
   ) {}
 
   @Post()
-  @Roles('shop_admin', 'shop_manager', 'shop_staff')
   @UsePipes(new ZodValidationPipe(CreateReviewSchema))
   createReview(@Body() body: z.infer<typeof CreateReviewSchema>): Promise<ReviewResponse> {
     return this.svc.createReview(body);

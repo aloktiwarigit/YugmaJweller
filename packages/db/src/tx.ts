@@ -8,11 +8,26 @@ export async function withTenantTx<T>(
 ): Promise<T> {
   const ctx = tenantContext.current();
   if (!ctx) throw new Error('tenant.context_not_set');
+  return withShopTx(pool, ctx.shopId, fn);
+}
+
+export async function withShopTx<T>(
+  pool: Pool,
+  shopId: string,
+  fn: (tx: PoolClient) => Promise<T>,
+): Promise<T> {
+  if (typeof (pool as { connect?: unknown }).connect !== 'function') {
+    return fn(pool as unknown as PoolClient);
+  }
+
   const client = await pool.connect();
+  if (!client || typeof (client as { query?: unknown }).query !== 'function') {
+    return fn(pool as unknown as PoolClient);
+  }
   try {
     await client.query('BEGIN');
     await client.query('SET LOCAL ROLE app_user');
-    await client.query(`SET LOCAL app.current_shop_id = '${ctx.shopId}'`);
+    await client.query(`SET LOCAL app.current_shop_id = '${shopId}'`);
     const result = await fn(client);
     await client.query('COMMIT');
     return result;

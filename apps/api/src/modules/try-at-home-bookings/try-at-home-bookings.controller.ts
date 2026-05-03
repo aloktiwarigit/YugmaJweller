@@ -30,7 +30,7 @@ const RecordReturnSchema = z.object({
   keptCustomerPhone:  z.string().regex(/^[6-9]\d{9}$/).optional(),
 });
 
-@Controller('try-at-home/bookings')
+@Controller('/api/v1/try-at-home/bookings')
 export class TryAtHomeBookingsController {
   constructor(
     @Inject(TryAtHomeBookingsService) private readonly svc: TryAtHomeBookingsService,

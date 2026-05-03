@@ -104,6 +104,7 @@ describe('ReviewsService', () => {
       expect(result.total).toBe(2);
       expect(result.reviews).toHaveLength(2);
       expect(result.reviews[0]!.customerFirstName).toBe('Priya');
+      expect((result.reviews[0] as unknown as Record<string, unknown>)['customerId']).toBeUndefined();
     });
 
     it('returns null averageRating when no reviews', async () => {

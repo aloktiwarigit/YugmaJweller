@@ -1,5 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
+import { withShopTx, withTenantTx } from '@goldsmith/db';
 
 export interface TryAtHomeBookingRow {
   id:           string;
@@ -23,31 +24,37 @@ export class TryAtHomeBookingsRepository {
     productIds: string[];
     notes?:     string;
   }): Promise<TryAtHomeBookingRow> {
-    const { rows } = await this.pool.query<TryAtHomeBookingRow>(
-      `INSERT INTO try_at_home_bookings (shop_id, customer_id, product_ids, notes)
-       VALUES ($1, $2, $3::uuid[], $4)
-       RETURNING *`,
-      [params.shopId, params.customerId, params.productIds, params.notes ?? null],
+    const { rows } = await withShopTx(this.pool, params.shopId, async (tx) =>
+      tx.query<TryAtHomeBookingRow>(
+        `INSERT INTO try_at_home_bookings (shop_id, customer_id, product_ids, notes)
+         VALUES ($1, $2, $3::uuid[], $4)
+         RETURNING *`,
+        [params.shopId, params.customerId, params.productIds, params.notes ?? null],
+      ),
     );
     return rows[0]!;
   }
 
   async findById(id: string): Promise<TryAtHomeBookingRow | null> {
-    const { rows } = await this.pool.query<TryAtHomeBookingRow>(
-      `SELECT * FROM try_at_home_bookings WHERE id = $1`,
-      [id],
+    const { rows } = await withTenantTx(this.pool, async (tx) =>
+      tx.query<TryAtHomeBookingRow>(
+        `SELECT * FROM try_at_home_bookings WHERE id = $1`,
+        [id],
+      ),
     );
     return rows[0] ?? null;
   }
 
   async list(params: { limit: number; offset: number }): Promise<{ rows: TryAtHomeBookingRow[]; total: number }> {
-    const [data, count] = await Promise.all([
-      this.pool.query<TryAtHomeBookingRow>(
-        `SELECT * FROM try_at_home_bookings ORDER BY requested_at DESC LIMIT $1 OFFSET $2`,
-        [params.limit, params.offset],
-      ),
-      this.pool.query<{ count: string }>(`SELECT COUNT(*) FROM try_at_home_bookings`),
-    ]);
+    const [data, count] = await withTenantTx(this.pool, async (tx) =>
+      Promise.all([
+        tx.query<TryAtHomeBookingRow>(
+          `SELECT * FROM try_at_home_bookings ORDER BY requested_at DESC LIMIT $1 OFFSET $2`,
+          [params.limit, params.offset],
+        ),
+        tx.query<{ count: string }>(`SELECT COUNT(*) FROM try_at_home_bookings`),
+      ]),
+    );
     return { rows: data.rows, total: Number(count.rows[0]!.count) };
   }
 

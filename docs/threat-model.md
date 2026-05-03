@@ -113,6 +113,22 @@ This document applies the STRIDE framework (Spoofing / Tampering / Repudiation /
 | 14 | White-label brand config (logo, colors) | Brand-medium | Tenant impersonation for phishing |
 | 15 | Shopkeeper staff permissions | Authorization-medium | Unauthorized supervisor-override on 269ST |
 
+### 4.1 Product Images And Public Media
+
+Story 17.1 introduces tenant product image uploads and public image delivery.
+Current MVP controls are:
+
+- API-side MIME/type validation and image metadata validation before storing.
+- Tenant ownership checks before image mutation.
+- Public CDN/ImageKit-style delivery is expected for published product media;
+  never store private customer or staff PII in product image metadata.
+- Stub/local storage is development-only and must not be treated as a production
+  media backend.
+
+Residual risk: full antivirus scanning is deferred. Before production rollout,
+wire ClamAV, Microsoft Defender for Storage, or equivalent malware scanning and
+define the quarantine/delete workflow for suspicious uploads.
+
 ## 5. STRIDE Analysis by Trust Boundary
 
 ### 5.1 TB-1 · Client ↔ API Gateway

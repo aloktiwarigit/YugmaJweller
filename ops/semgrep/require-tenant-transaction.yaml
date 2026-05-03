@@ -20,6 +20,7 @@ rules:
         - "apps/api/src/workers/rates-refresh.processor.ts" # platform-global: platform_audit_events write in fallback handler
         - "apps/api/src/modules/inventory/inventory.search.service.ts" # explicit shop_id=$1 WHERE clause on all queries; no RLS reliance
         - "apps/api/src/modules/inventory/inventory.dead-stock.service.ts" # explicit shop_id=$1 WHERE clause on all queries; no RLS reliance
+        - "apps/api/src/platform-global-execute.ts" # reviewed helper implementing platform-global DB boundaries
         - "packages/sync/**"                       # sync package: cursor/push/sync-logger use withTenantTx internally, false-positive on tx.query inside the callback
         - "apps/shopkeeper/**"                     # client-side (React Native): WatermelonDB queries, no server-side tenant transaction context
         - "ops/semgrep/tests/**"
@@ -27,9 +28,17 @@ rules:
     patterns:
       - pattern-either:
           - pattern: $DB.execute($...X)
-          - pattern: $DB.query($...X)
-          - pattern: $POOL.connect()
+          - pattern: this.pool.query($...X)
+          - pattern: this.pool.connect()
+          - pattern: pool.query($...X)
+          - pattern: pool.connect()
       - pattern-not-inside: |
           withTenantTx(...) { ... }
       - pattern-not-inside: |
           withTenantTx($POOL, async ($TX) => { ... })
+      - pattern-not-inside: |
+          withShopTx($POOL, $SHOP_ID, async ($TX) => { ... })
+      - pattern-not-inside: |
+          platformGlobalExecute($REASON, async () => { ... })
+      - pattern-not-inside: |
+          platformGlobalTx($POOL, $REASON, async ($TX) => { ... })

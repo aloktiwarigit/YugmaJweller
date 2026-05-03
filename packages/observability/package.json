@@ -20,11 +20,14 @@
   },
   "dependencies": {
     "@opentelemetry/api": "^1.8.0",
-    "@opentelemetry/sdk-node": "^0.51.0",
     "@opentelemetry/auto-instrumentations-node": "^0.43.0",
+    "@opentelemetry/sdk-node": "^0.51.0",
     "@sentry/node": "^7.109.0",
-    "pino": "^8.19.0",
+    "pino": "^8.21.0",
     "posthog-node": "^4.0.0"
   },
-  "devDependencies": { "vitest": "^1.4.0", "typescript": "^5.4.0" }
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  }
 }

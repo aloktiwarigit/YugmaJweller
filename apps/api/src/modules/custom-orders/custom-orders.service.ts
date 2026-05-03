@@ -7,6 +7,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import type { Pool } from 'pg';
+import { withShopTx } from '@goldsmith/db';
 import { enforce269ss, ComplianceHardBlockError } from '@goldsmith/compliance';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
@@ -220,12 +221,7 @@ export class CustomOrdersService {
   ): Promise<void> {
     const payment = await this.paymentsAdapter.fetchPayment(razorpayPaymentId);
 
-    const client = await this.pool.connect(); // nosemgrep: goldsmith.require-tenant-transaction
-    try {
-      await client.query('BEGIN');
-      // nosemgrep: goldsmith.no-raw-shop-id-param
-      await client.query(`SET LOCAL app.current_shop_id = '${shopIdHint}'`);
-
+    await withShopTx(this.pool, shopIdHint, async (client) => {
       // Lock and verify shop ownership before any DML
       const res = await client.query<{ id: string; shop_id: string; deposit_paid_paise: bigint; deposit_amount_paise: bigint; status: string }>(
         `SELECT id, shop_id, deposit_paid_paise, deposit_amount_paise, status
@@ -237,7 +233,6 @@ export class CustomOrdersService {
       );
       const order = res.rows[0];
       if (!order) {
-        await client.query('ROLLBACK');
         this.logger.warn({ orderId, shopIdHint }, 'Custom order webhook: order not found or shop mismatch');
         return;
       }
@@ -250,16 +245,10 @@ export class CustomOrdersService {
          SET deposit_paid_paise  = $2,
              razorpay_payment_id = $3,
              status              = $4
-         WHERE id = $1`,
+       WHERE id = $1`,
         [orderId, newPaid, razorpayPaymentId, newStatus],
       );
-      await client.query('COMMIT');
-    } catch (err) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw err;
-    } finally {
-      client.release();
-    }
+    });
 
     this.logger.log({ orderId, razorpayPaymentId }, 'Custom order deposit webhook processed');
   }

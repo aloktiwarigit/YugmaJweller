@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Pool } from 'pg';
+import { platformGlobalExecute } from '../../../platform-global-execute';
 import { PG_POOL_ADMIN } from '../platform-admin.tokens';
 
 export interface PlatformMetrics {
@@ -17,15 +18,17 @@ export class MetricsService {
   constructor(@Inject(PG_POOL_ADMIN) private readonly pool: Pool) {}
 
   async getMetrics(): Promise<PlatformMetrics> {
-    const r = await this.pool.query<{
-      total_shops: string;
-      active_shops: string;
-      invoices_30d: string;
-    }>(
-      `SELECT
-         (SELECT COUNT(*)::text FROM shops)                                            AS total_shops,
-         (SELECT COUNT(*)::text FROM shops WHERE status = 'ACTIVE')                    AS active_shops,
-         (SELECT COUNT(*)::text FROM invoices WHERE created_at > now() - interval '30 days') AS invoices_30d`,
+    const r = await platformGlobalExecute('platform-admin aggregate metrics cross-tenant read', async () =>
+      this.pool.query<{
+        total_shops: string;
+        active_shops: string;
+        invoices_30d: string;
+      }>(
+        `SELECT
+           (SELECT COUNT(*)::text FROM shops)                                            AS total_shops,
+           (SELECT COUNT(*)::text FROM shops WHERE status = 'ACTIVE')                    AS active_shops,
+           (SELECT COUNT(*)::text FROM invoices WHERE created_at > now() - interval '30 days') AS invoices_30d`,
+      ),
     );
     const row = r.rows[0]!;
     return {

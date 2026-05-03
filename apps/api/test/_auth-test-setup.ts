@@ -33,10 +33,10 @@ export async function setupAuthTestHarness(): Promise<AuthTestHarness> {
   return { container, pool, app, testingModule, projectId, emulatorPort };
 }
 
-export async function teardownAuthTestHarness(h: AuthTestHarness): Promise<void> {
-  await h.app?.close();
-  await h.pool?.end();
-  await h.container?.stop();
+export async function teardownAuthTestHarness(h?: AuthTestHarness): Promise<void> {
+  await h?.app?.close();
+  await h?.pool?.end();
+  await h?.container?.stop();
   await stopFirebaseAuthEmulator();
 }
 

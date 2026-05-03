@@ -9,6 +9,7 @@ import type {
 } from '@goldsmith/integrations-search';
 import { MeilisearchUnavailableError } from '@goldsmith/integrations-search';
 import type { Pool } from 'pg';
+import { withShopTx } from '@goldsmith/db';
 import type { TenantContext } from '@goldsmith/tenant-context';
 
 @Injectable()
@@ -86,8 +87,7 @@ export class CrmSearchService {
     `;
     params.push(limit, offset);
 
-    const client = await this.pool.connect(); // nosemgrep: goldsmith.require-tenant-transaction -- RLS context already set by interceptor; read-only customer search
-    try {
+    return withShopTx(this.pool, shopId, async (client) => {
       const rows = await client.query(sql, params);
       const total = rows.rows.length > 0 ? Number(rows.rows[0]?.['total_count'] ?? 0) : 0;
       return {
@@ -101,9 +101,7 @@ export class CrmSearchService {
         total,
         source: 'postgres',
       };
-    } finally {
-      client.release();
-    }
+    });
   }
 
   // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal indexing; shopId from auth context

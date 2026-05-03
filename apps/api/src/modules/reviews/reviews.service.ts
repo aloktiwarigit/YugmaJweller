@@ -1,6 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { tenantContext } from '@goldsmith/tenant-context';
+import { withShopTx } from '@goldsmith/db';
 import { ReviewsRepository } from './reviews.repository';
 
 export interface CreateReviewDto {
@@ -20,8 +21,16 @@ export interface ReviewResponse {
   createdAt:         string;
 }
 
+export interface PublicReviewItem {
+  id:                string;
+  rating:            number;
+  reviewText:        string | null;
+  customerFirstName: string | null;
+  createdAt:         string;
+}
+
 export interface ListReviewsResponse {
-  reviews:       ReviewResponse[];
+  reviews:       PublicReviewItem[];
   averageRating: number | null;
   total:         number;
 }
@@ -36,10 +45,12 @@ export class ReviewsService {
   async createReview(dto: CreateReviewDto): Promise<ReviewResponse> {
     const { shopId } = tenantContext.requireCurrent();
 
-    // Verify product belongs to this shop
-    const { rows } = await this.pool.query<{ id: string }>(
-      `SELECT id FROM products WHERE id = $1 AND shop_id = $2`,
-      [dto.productId, shopId],
+    // Verify product belongs to this shop before allowing a customer review.
+    const { rows } = await withShopTx(this.pool, shopId, async (tx) =>
+      tx.query<{ id: string }>(
+        `SELECT id FROM products WHERE id = $1 AND shop_id = $2`,
+        [dto.productId, shopId],
+      ),
     );
     if (rows.length === 0) throw new NotFoundException({ code: 'product.not_found' });
 
@@ -73,8 +84,6 @@ export class ReviewsService {
     return {
       reviews: reviews.map((r) => ({
         id:                r.id,
-        productId:         r.product_id,
-        customerId:        r.customer_id,
         rating:            r.rating,
         reviewText:        r.review_text,
         customerFirstName: r.customer_first_name,

@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
 import { signImpersonationToken } from '../impersonation-token';
+import { platformGlobalTx } from '../../../platform-global-execute';
 import { PG_POOL_ADMIN } from '../platform-admin.tokens';
 
 const TTL_SECONDS = 30 * 60;
@@ -21,23 +22,6 @@ export interface StartImpersonationResult {
 
 // Pool here is PG_POOL_ADMIN, which connects directly as platform_admin.
 // BEGIN/COMMIT remains for atomicity — session row + audit event must succeed or fail together.
-async function inTx<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T> {
-  const c = await pool.connect();
-  try {
-    await c.query('BEGIN');
-    try {
-      const result = await fn(c);
-      await c.query('COMMIT');
-      return result;
-    } catch (e) {
-      await c.query('ROLLBACK').catch(() => undefined);
-      throw e;
-    }
-  } finally {
-    c.release();
-  }
-}
-
 @Injectable()
 export class ImpersonationService {
   constructor(@Inject(PG_POOL_ADMIN) private readonly pool: Pool) {}
@@ -51,7 +35,7 @@ export class ImpersonationService {
       throw new UnauthorizedException({ code: 'impersonation.secret_invalid' });
     }
 
-    return inTx(this.pool, async (c) => {
+    return platformGlobalTx(this.pool, 'platform-admin impersonation start with audit', async (c) => {
       // Pre-flight: target shop must exist AND be ACTIVE. TenantInterceptor enforces the
       // same status check on every impersonated request, so without this guard we'd happily
       // mint a JWT that the very next API call would reject as `tenant.inactive`. Worse,
@@ -101,7 +85,7 @@ export class ImpersonationService {
   }
 
   async endImpersonation(sessionId: string, platformUserId: string): Promise<void> {
-    await inTx(this.pool, async (c) => {
+    await platformGlobalTx(this.pool, 'platform-admin impersonation end with audit', async (c) => {
       const upd = await c.query<{ target_shop_id: string }>(
         `UPDATE impersonation_sessions
             SET ended_at = now()

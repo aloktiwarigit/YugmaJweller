@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
 import { DrizzleTenantLookup } from '../../../drizzle-tenant-lookup';
+import { platformGlobalTx } from '../../../platform-global-execute';
 import { PG_POOL_ADMIN } from '../platform-admin.tokens';
 
 export interface CreateShopArgs {
@@ -40,23 +41,6 @@ export interface ListShopsResult {
 
 // Pool here is PG_POOL_ADMIN, which connects directly as platform_admin role.
 // BEGIN/COMMIT remains for atomicity — write + audit inserts must succeed or fail together.
-async function inTx<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T> {
-  const c = await pool.connect();
-  try {
-    await c.query('BEGIN');
-    try {
-      const result = await fn(c);
-      await c.query('COMMIT');
-      return result;
-    } catch (e) {
-      await c.query('ROLLBACK').catch(() => undefined);
-      throw e;
-    }
-  } finally {
-    c.release();
-  }
-}
-
 @Injectable()
 export class TenantManagementService {
   constructor(
@@ -65,7 +49,7 @@ export class TenantManagementService {
   ) {}
 
   async createShop(a: CreateShopArgs): Promise<{ id: string }> {
-    return inTx(this.pool, async (c) => {
+    return platformGlobalTx(this.pool, 'platform-admin tenant creation with audit', async (c) => {
       const r = await c.query<{ id: string }>(
         `INSERT INTO shops (slug, display_name, status) VALUES ($1, $2, 'PROVISIONING') RETURNING id`,
         [a.slug, a.displayName],
@@ -93,7 +77,7 @@ export class TenantManagementService {
     // Cache invalidation must happen AFTER COMMIT, not inside the tx — otherwise a parallel
     // request can repopulate the cache from the still-old (uncommitted) row and serve stale
     // ACTIVE for up to 60s after suspend.
-    await inTx(this.pool, async (c) => {
+    await platformGlobalTx(this.pool, 'platform-admin tenant profile update with audit', async (c) => {
       const r = await c.query(`UPDATE shops SET ${fields.join(', ')} WHERE id = $${i}`, params);
       if (r.rowCount === 0) throw new NotFoundException({ code: 'tenant.not_found' });
       await c.query(
@@ -106,7 +90,7 @@ export class TenantManagementService {
   }
 
   async suspendShop(shopId: string, reason: string, platformUserId: string): Promise<void> {
-    await inTx(this.pool, async (c) => {
+    await platformGlobalTx(this.pool, 'platform-admin tenant suspension with audit', async (c) => {
       // Only ACTIVE shops can be suspended. Allowing PROVISIONING → SUSPENDED would let
       // a subsequent unsuspendShop promote the row to ACTIVE without ever completing
       // provisioning. A truly-stuck PROVISIONING shop should be terminated, not suspended.
@@ -126,7 +110,7 @@ export class TenantManagementService {
   }
 
   async unsuspendShop(shopId: string, platformUserId: string): Promise<void> {
-    await inTx(this.pool, async (c) => {
+    await platformGlobalTx(this.pool, 'platform-admin tenant unsuspension with audit', async (c) => {
       const r = await c.query(
         `UPDATE shops SET status = 'ACTIVE', updated_at = now() WHERE id = $1 AND status = 'SUSPENDED'`,
         [shopId],
@@ -144,7 +128,7 @@ export class TenantManagementService {
 
   async listShops(a: ListShopsArgs): Promise<ListShopsResult> {
     const offset = Math.max(0, (a.page - 1) * a.pageSize);
-    return inTx(this.pool, async (c) => {
+    return platformGlobalTx(this.pool, 'platform-admin tenant list cross-tenant read', async (c) => {
       const items = await c.query<ShopRow>(
         a.search
           ? `SELECT id, slug, display_name, status, created_at FROM shops

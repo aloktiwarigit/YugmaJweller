@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
+import { withShopTx } from '@goldsmith/db';
 import type { TenantContext } from '@goldsmith/tenant-context';
 import { CrmRepository } from './crm.repository';
 
@@ -28,26 +29,6 @@ interface BalanceRow {
   last_updated_at:   Date;
 }
 
-// Runs fn inside a tenant-scoped transaction without relying on AsyncLocalStorage.
-// Needed for event-handler paths that execute outside of HTTP request context;
-// the TenantContext is passed explicitly rather than recovered from ALS.
-async function withShopTx<T>(pool: Pool, ctx: TenantContext, fn: (tx: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query('SET LOCAL ROLE app_user');
-    await client.query(`SET LOCAL app.current_shop_id = '${ctx.shopId}'`);
-    const result = await fn(client);
-    await client.query('COMMIT');
-    return result;
-  } catch (err) {
-    await client.query('ROLLBACK').catch(() => undefined);
-    throw err;
-  } finally {
-    client.release();
-  }
-}
-
 @Injectable()
 export class BalanceService {
   private readonly logger = new Logger(BalanceService.name);
@@ -64,7 +45,7 @@ export class BalanceService {
     const customer = await this.crmRepo.getCustomerById(customerId);
     if (!customer) throw new NotFoundException({ code: 'crm.customer_not_found' });
 
-    const row = await withShopTx(this.pool, ctx, async (tx) => {
+    const row = await withShopTx(this.pool, ctx.shopId, async (tx) => {
       const r = await tx.query<BalanceRow>(
         `SELECT id, shop_id, customer_id, outstanding_paise, advance_paise, last_updated_at
          FROM customer_balances WHERE customer_id = $1`,
@@ -90,7 +71,7 @@ export class BalanceService {
     ctx: TenantContext,
     customerId: string,
   ): Promise<void> {
-    await withShopTx(this.pool, ctx, async (tx) => {
+    await withShopTx(this.pool, ctx.shopId, async (tx) => {
       // Lock the balance row (if it exists) to serialize concurrent recalculations.
       await tx.query(
         `SELECT id FROM customer_balances WHERE customer_id = $1 FOR UPDATE`,

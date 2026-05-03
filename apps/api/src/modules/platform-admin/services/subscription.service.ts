@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
+import { platformGlobalTx } from '../../../platform-global-execute';
 import { PG_POOL_ADMIN } from '../platform-admin.tokens';
 
 export type SubscriptionPlan = 'trial' | 'starter' | 'growth' | 'enterprise';
@@ -27,23 +28,6 @@ const PLANS = new Set<SubscriptionPlan>(['trial', 'starter', 'growth', 'enterpri
 
 // Pool here is PG_POOL_ADMIN, which connects directly as platform_admin.
 // BEGIN/COMMIT remains for atomicity — upsert + audit insert must succeed or fail together.
-async function inTx<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T> {
-  const c = await pool.connect();
-  try {
-    await c.query('BEGIN');
-    try {
-      const result = await fn(c);
-      await c.query('COMMIT');
-      return result;
-    } catch (e) {
-      await c.query('ROLLBACK').catch(() => undefined);
-      throw e;
-    }
-  } finally {
-    c.release();
-  }
-}
-
 @Injectable()
 export class SubscriptionService {
   constructor(@Inject(PG_POOL_ADMIN) private readonly pool: Pool) {}
@@ -53,7 +37,7 @@ export class SubscriptionService {
     if (!Number.isInteger(a.mrrPaise) || a.mrrPaise < 0) {
       throw new BadRequestException({ code: 'subscription.invalid_mrr' });
     }
-    return inTx(this.pool, async (c) => {
+    return platformGlobalTx(this.pool, 'platform-admin subscription upsert with audit', async (c) => {
       // On UPDATE: refer to the parameters ($3 / $5) directly so we can preserve the existing
       // row's status / billing_cycle_start when the caller omits them. Using EXCLUDED.* here
       // is a footgun because EXCLUDED.status is COALESCE($3, 'active') — omitting the field
@@ -86,7 +70,7 @@ export class SubscriptionService {
   }
 
   async listSubscriptions(): Promise<SubscriptionRow[]> {
-    return inTx(this.pool, async (c) => {
+    return platformGlobalTx(this.pool, 'platform-admin subscription list cross-tenant read', async (c) => {
       const r = await c.query<{
         id: string;
         shop_id: string;

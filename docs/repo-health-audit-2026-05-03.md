@@ -1,156 +1,135 @@
 # Repo Health Audit - 2026-05-03
 
-This audit captures the state observed from the root worktree at
+This audit captures the merge sweep from the root worktree at
 `C:/Alok/Business Projects/Goldsmith` on 2026-05-03.
 
-## Executive status
+## Executive Status
 
 | Area | Status | Evidence |
 | --- | --- | --- |
-| Root worktree | Clean, but not pushed | `main...origin/main [ahead 11]` |
-| Local main | `53f6531` | Story 17.1 docs/spec handoff |
-| Remote main | `3ad39ca` | GitHub `origin/main` |
-| Remote CI | Red | Latest `ship` runs on `origin/main` failed |
-| Deployment | Not proven | No deploy job, no GitHub deployments, no root deploy script |
-| Open PRs | 2 | #41 Story 17.1 image pipeline, #32 valuation dashboard |
-| Project memory | Stale | `.remember` canonical files last updated 2026-04-30 |
-| Documentation images | Clean | No tracked image binaries under `docs/` or `_bmad-output/` |
+| Root branch | `main`, ahead of `origin/main` | `main...origin/main [ahead 12]` before the pending sweep commit |
+| Root HEAD before pending sweep commit | `cf8138e` | `chore(sweep): hook implemented features into UI` |
+| Remote main | `3ad39ca` | `origin/main` |
+| Worktree | Dirty by design | Pending tenant DB, API route, Semgrep, docs, and lockfile fixes |
+| API typecheck | Pass | `pnpm -F @goldsmith/api typecheck` |
+| API targeted tests | Pass | 7 files, 73 tests |
+| API integration slice | Pass | 37 files, 240 tests with Redis/Firebase env and `--no-file-parallelism --maxWorkers=1` |
+| Semgrep ERROR gate | Pass | `semgrep --config ops/semgrep/ --error --severity ERROR --quiet .` |
+| Deployment | Not proven | No checked-in deploy workflow/script/provider config found |
+| Documentation images | Clean | No tracked docs image binaries found |
 
-## Source control
+Local verification was run on Node v24.13.1. The repository requires
+Node `>=20.11.0 <21`, and CI pins Node `20.11.0`, so CI must still be treated
+as authoritative after the sweep is pushed.
 
-Local `main` is ahead of `origin/main` by 11 commits. These are Story 17.1
-documentation, design-spec, plan, and review-trail commits. They are not on
-GitHub, so remote CI has not run against the current local `main`.
+## Integrated In This Sweep
 
-Open GitHub PRs:
+- Added shared tenant transaction helper `withShopTx(pool, shopId, fn)` and
+  kept `withTenantTx` as the request-context wrapper.
+- Moved tenant-scoped raw DB access in catalog, analytics, CRM, billing,
+  custom orders, rate-lock, try-at-home, reviews, and wishlist paths behind
+  tenant transaction helpers.
+- Added explicit platform-global DB helpers for cross-tenant platform-admin
+  operations and updated the Semgrep rule to allow only reviewed platform
+  global paths.
+- Fixed `CatalogModule` dependency wiring by importing `AuthModule`.
+- Restored public/customer API routes:
+  - `/api/v1/reviews`
+  - `/api/v1/wishlist`
+  - `/api/v1/try-at-home/bookings`
+- Preserved public review privacy: public review list items omit `customerId`.
+- Added migration `0059_reviews_wishlist_update_grant.sql` so review upsert
+  has the required `UPDATE` grant without mutating historical migration `0047`.
+- Added API Vitest setup to prefer IPv4 DNS. This fixes Windows/Testcontainers
+  `localhost` connection resets without changing production runtime behavior.
+- Integrated the observability package drift from `C:/gs-cust-web` and updated
+  `pnpm-lock.yaml` so frozen install is not blocked by the `pino` specifier.
 
-| PR | Branch | Status | Risk |
-| --- | --- | --- | --- |
-| #41 | `feat/story-17.1-image-pipeline` | Open, `UNSTABLE` | `integration` and `semgrep` failed; final build skipped |
-| #32 | `feat/story-3.7-valuation-dashboard` | Open, `DIRTY` | Conflicting, no current check rollup |
+## Git And PR Status
 
-Dirty sibling worktrees at audit time:
-
-| Worktree | Branch | Dirty state |
+| Item | Status | Action |
 | --- | --- | --- |
-| `C:/gs-browse` | `feat/epic7-browse-huid-qr` | Untracked `.next/`, `next-env.d.ts`, review doc |
-| `C:/gs-cust-mob` | `feat/epic7-customer-mobile-scaffold` | Untracked `nativewind-env.d.ts` |
-| `C:/gs-cust-web` | `feat/epic7-customer-web-scaffold` | Modified `packages/observability/package.json` |
-| `C:/gs-reviews` | `feat/epic7-reviews-wishlist` | Multiple modified API/web files plus untracked build/review artifacts |
-| `C:/gscf` | `feat/epic7-customer-flows` | Modified `pnpm-lock.yaml` |
+| Root `main` | Pending sweep commit | Commit this doc plus code/test/security fixes, then push |
+| PR #41 `feat/story-17.1-image-pipeline` | Open, previously `UNSTABLE` | Rebase after root sweep commit; push local `0380e33` route-hook commit; rerun CI |
+| PR #32 `feat/story-3.7-valuation-dashboard` | Open, stale/dirty | Close or supersede after confirming no unique functionality remains |
+| `C:/gs17a-img` | Clean, ahead by one local commit | Push/rebase after root is green |
+| `C:/gs-browse` | Generated artifacts only | Do not merge `.next/`, `next-env.d.ts`, or local review doc |
+| `C:/gs-cust-mob` | Generated artifact only | Do not merge `nativewind-env.d.ts` unless the app intentionally tracks it |
+| `C:/gs-reviews` | Useful API fixes recovered | Ignore generated customer-web build output and superseded review docs |
+| `C:/gscf` | Lockfile concern reviewed | Root lockfile now includes the observability specifier fix |
 
-Notes:
+## Verification Matrix
 
-- Several old branch tips appear in `git branch --no-merged main` even when
-  their PRs were merged by GitHub. Treat branch ancestry as noisy because of
-  squash merges.
-- `feat/story-17.1-task8` is local-only and not an upstream-tracked branch.
-- `docs/lean-story-protocol` is ahead of its upstream by 6 commits.
+| Command | Result | Notes |
+| --- | --- | --- |
+| `pnpm -F @goldsmith/db build` | Pass | Rebuilt shared DB package after transaction helper changes |
+| `pnpm -F @goldsmith/api typecheck` | Pass | API compiles after route/helper changes |
+| Targeted API Vitest set | Pass | 7 files, 73 tests |
+| `semgrep --config ops/semgrep/ --error --severity ERROR --quiet .` | Pass | ERROR gate clean after tenant DB policy update |
+| API integration slice | Pass | `REDIS_URL=redis://127.0.0.1:6379`, Firebase emulator on `127.0.0.1:9099`, sequential workers |
+| `pnpm install --lockfile-only` | Pass | Lockfile drift corrected; existing peer warnings remain |
 
-## CI and deployment
+The broad `pnpm -F @goldsmith/api test` run initially failed locally because it
+ran container-backed integration specs in parallel and used `localhost` on
+Windows/Node v24. After adding the IPv4 Vitest setup and running the CI-like
+integration slice with constrained workers, all API integration tests passed.
 
-The only checked-in workflow is `.github/workflows/ship.yml`. It gates install,
-typecheck, lint, unit, integration, tenant isolation, semgrep, Expo config,
-shopkeeper tests, e2e YAML validation, Lighthouse stub, and build.
+## UI Hook Status
 
-Local verification notes:
+Root `main` already includes a checkpoint commit for UI reachability:
 
-- Local shell is Node v24.13.1, while the repo expects Node `>=20.11.0 <21`;
-  local results are useful but not CI-equivalent.
-- `pnpm test:unit` passed in the root audit run.
-- `pnpm --filter @goldsmith/shopkeeper test` passed.
-- `pnpm --filter @goldsmith/customer-mobile test` passed.
-- `pnpm --filter @goldsmith/ui-mobile test` passed.
-- `pnpm --filter @goldsmith/db test:integration` failed locally at initial
-  Testcontainers/Postgres `pool.connect()` with `read ECONNRESET`.
-- `semgrep --config ops/semgrep/ --error --severity ERROR .` failed with 98
-  blocking `ops.semgrep.goldsmith.require-tenant-transaction` findings.
+- Shopkeeper billing tab opens a billing hub.
+- Shopkeeper inventory is in the tab bar.
+- Inventory search rows open product edit.
+- Customer web has header navigation to core customer journeys.
+- Customer web and customer mobile PDP CTAs route to try-at-home and rate-lock.
+
+Remaining UI gaps to schedule separately:
+
+- Shopkeeper customers, rates, custom orders, and try-at-home screens are not
+  consistently reachable from primary navigation.
+- Shopkeeper rate-lock booking components exist but still need app-route
+  mounting.
+- Customer mobile has duplicate product detail route shapes:
+  `browse/[id].tsx` and `browse/[productId].tsx`.
+- Customer mobile policy and size-guide screens exist but need navigation links.
+
+## Deployment Truth
+
+The latest code is not proven deployed from this repository.
 
 No checked-in deployment automation was found:
 
-- No deploy step in `.github/workflows/ship.yml`.
-- No GitHub deployment records.
-- Root `package.json` has no deploy script.
-- `firebase.json` configures only the Auth emulator; `.firebaserc` points to
-  `goldsmith-test`.
+- No deploy job in `.github/workflows/ship.yml`.
+- No root deploy script.
+- No GitHub deployment records observed during the sweep.
 - No checked-in `vercel.json`, `netlify.toml`, `render.yaml`, `railway.json`,
-  `fly.toml`, Dockerfile/compose, EAS, App Hosting, or Cloud Build deploy file.
+  `fly.toml`, Dockerfile/compose deployment, EAS production profile, App
+  Hosting, or Cloud Build deploy file.
 
-Conclusion: the latest code is not proven deployed from this repository. Any
-deployment, if it exists, is outside the checked-in automation and must be
-verified in the hosting provider console.
+Before claiming production is current, verify the actual provider console,
+deployed commit SHA, database migration level, CDN/storage provider config, and
+mobile build channel.
 
-## Feature and UI integration
+## Docs And Assets
 
-Root `main` already contains these app surfaces:
-
-- `apps/api`
-- `apps/shopkeeper`
-- `apps/customer-web`
-- `apps/customer-mobile`
-
-Root `main` does not contain Story 17.1 implementation. That implementation is
-on PR #41 / `C:/gs17a-img`.
-
-Confirmed fix applied during this audit in `C:/gs17a-img`:
-
-- `apps/shopkeeper/app/inventory/_layout.tsx` now registers `[id]/images`.
-- `apps/shopkeeper/app/inventory/[id]/edit.tsx` now exposes a link to
-  `/inventory/:id/images`.
-- Verification: `pnpm -F @goldsmith/shopkeeper typecheck` passed in
-  `C:/gs17a-img` with a Node engine warning because local Node is v24.13.1
-  while the repo expects Node `>=20.11.0 <21`.
-
-Additional UI reachability fixes applied on root `main` during this audit:
-
-- Shopkeeper billing tab now renders a hub linking to invoice, estimate,
-  old-gold purchase, and barcode scan routes.
-- Shopkeeper inventory is reachable from the bottom tabs.
-- Shopkeeper inventory search rows now open the product edit route.
-- Customer-web now has global header navigation to product, wishlist,
-  try-at-home, rate-lock, loyalty, and return policy pages.
-- Customer-web PDP CTAs now link to `/try-at-home` and `/rate-lock` instead of
-  falling back to `/contact`.
-- Customer-mobile PDP CTAs now route to `/try-at-home` and `/rate-lock` instead
-  of showing placeholder alerts.
-
-Remaining UI reachability gaps:
-
-- Shopkeeper customers, rates, custom orders, and try-at-home routes exist but
-  are not consistently reachable from primary navigation.
-- Shopkeeper rate-lock booking feature components exist but are not mounted in
-  an app route.
-- Customer-mobile has duplicate dynamic product-detail route shapes:
-  `browse/[id].tsx` and `browse/[productId].tsx`.
-- Customer-mobile policy and size-guide screens exist but are not linked.
-
-## Documentation and assets
-
-`.remember` was stale relative to code:
-
-- It said customer mobile and customer web were not started, but both app
-  directories now exist.
-- It reported migrations through `0046`; root `main` has 52 migration files,
-  through `0056`.
-- It reported green build/CI status from April 30, but current remote CI is red.
-- It did not mention open PR #41, open PR #32, or the local `main` ahead state.
-
-Image asset audit:
-
-- `git ls-files '*.png' '*.jpg' '*.jpeg' '*.gif' '*.webp' '*.svg'` found only
+- No tracked docs image binaries were found under `docs/`, `.remember`, or
+  `_bmad-output`.
+- The only tracked image-like asset found in the repo scan was
   `apps/shopkeeper/assets/brand/placeholder-logo.svg`.
-- No tracked image binaries exist under `docs/` or `_bmad-output/`.
-- Documentation prototypes reference external Unsplash URLs, not committed
-  stale image files.
+- `_bmad-output` prototypes reference external Unsplash URLs and should remain
+  prototype-only, not product documentation.
+- Older Story 17.1 review rounds are audit trail only; use the latest PR/spec
+  state instead of earlier review notes.
 
-## Priority gaps
+## Merge Plan
 
-| Priority | Gap | Next action |
-| --- | --- | --- |
-| P0 | Remote CI red on `main` and PR #41 | Fix semgrep/integration failures before any merge/deploy claim |
-| P0 | Local `main` 11 commits ahead of `origin/main` | Push or intentionally hold these docs commits after review |
-| P0 | No deploy automation | Decide target runtime and add deploy workflow before claiming latest code is live |
-| P1 | PR #41 open and unstable | Resolve CI, then merge image pipeline |
-| P1 | PR #32 open and conflicting | Rebase/resolve or close if superseded |
-| P1 | Dirty sibling worktrees | Clean build artifacts, commit intentional changes, or archive branches |
-| P1 | `.remember` stale | Use `.remember/current-state-2026-05-03.md` as the current session handoff |
+1. Commit the root sweep fixes on `main`.
+2. Rerun CI-equivalent gates under Node 20.11.0 if available, otherwise rely on
+   GitHub CI after push.
+3. Push `main` and wait for `ship.yml`.
+4. Rebase PR #41 onto the swept `main`, push the local image-route commit, and
+   rerun checks.
+5. Close or explicitly supersede PR #32 after confirming it has no unique
+   production functionality.
+6. Only then verify deployment provider state and update runbook/deploy docs.
