@@ -134,7 +134,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
               {/* Try at Home CTA */}
               <a
-                href={`/contact?interest=try-at-home&product=${product.id}`}
+                href={`/try-at-home?product=${product.id}`}
                 className="w-full rounded-md border border-primary bg-primary/5 px-6 py-3 font-body text-primary text-center hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-primary transition-colors"
                 aria-label={`${displayPurity} — घर पर कोशिश करने की जानकारी`}
               >
@@ -143,7 +143,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
               {/* Rate Lock CTA */}
               <a
-                href={`/contact?interest=rate-lock&product=${product.id}`}
+                href={`/rate-lock?product=${product.id}`}
                 className="w-full rounded-md border border-border bg-white px-6 py-3 font-body text-ink text-center hover:bg-border/30 focus-visible:outline-2 focus-visible:outline-primary transition-colors"
                 aria-label={`${displayPurity} — आज का मूल्य लॉक करें`}
               >

@@ -42,6 +42,15 @@ export default function TabsLayout(): JSX.Element {
         }}
       />
       <Tabs.Screen
+        name="inventory"
+        options={{
+          title: 'इन्वेंटरी',
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
+            <TabIcon name="cube-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="billing"
         options={{
           title: 'बिलिंग',

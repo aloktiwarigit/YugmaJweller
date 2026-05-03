@@ -24,7 +24,10 @@ export default function InventoryListScreen(): React.ReactElement {
 
       {/* Inventory search + results */}
       <View style={styles.searchContainer}>
-        <InventorySearch />
+        <InventorySearch
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onProductPress={(productId) => router.push(`/inventory/${productId}/edit` as any)}
+        />
       </View>
     </View>
   );

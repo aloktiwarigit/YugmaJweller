@@ -36,13 +36,14 @@ interface SearchResultResponse {
 
 export interface InventorySearchProps {
   onResults?: (results: SearchHit[], source: 'meilisearch' | 'postgres') => void;
+  onProductPress?: (id: string) => void;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function InventorySearch({ onResults }: InventorySearchProps): React.ReactElement {
+export function InventorySearch({ onProductPress, onResults }: InventorySearchProps): React.ReactElement {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchHit[]>([]);
   const [source, setSource] = useState<'meilisearch' | 'postgres' | null>(null);
@@ -103,9 +104,10 @@ export function InventorySearch({ onResults }: InventorySearchProps): React.Reac
         status={item.status}
         huid={item.huid}
         published={item.published}
+        onPress={onProductPress}
       />
     ),
-    [],
+    [onProductPress],
   );
 
   const keyExtractor = useCallback((item: SearchHit) => item.id, []);

@@ -25,3 +25,4 @@ This directory holds the authoritative ADRs for the Goldsmith platform. Each ADR
 | 0013 | Per-Tenant KEK + Envelope Encryption for Sensitive Columns | Superseded in part by 0015 | 2026-04-18 |
 | 0014 | PITR Retention vs DPDPA Erasure — Documented Residual | Superseded in part by 0015 | 2026-04-18 |
 | 0015 | Stack correction — Azure + Firebase, startup-lean infra (revenue-first) | Accepted | 2026-04-18 |
+| 0016 | Firebase Auth ID tokens direct | Accepted | 2026-04-18 |

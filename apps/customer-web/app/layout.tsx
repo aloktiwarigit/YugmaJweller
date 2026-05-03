@@ -91,6 +91,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               />
             )}
             <span className="font-heading text-xl text-ink">{config.appName}</span>
+            <nav
+              className="ml-auto hidden items-center gap-4 text-sm font-body text-ink md:flex"
+              aria-label="मुख्य नेविगेशन"
+            >
+              <a className="hover:text-primary focus-visible:outline-2 focus-visible:outline-primary" href="/products">उत्पाद</a>
+              <a className="hover:text-primary focus-visible:outline-2 focus-visible:outline-primary" href="/wishlist">पसंदीदा</a>
+              <a className="hover:text-primary focus-visible:outline-2 focus-visible:outline-primary" href="/try-at-home">घर पर ट्राई</a>
+              <a className="hover:text-primary focus-visible:outline-2 focus-visible:outline-primary" href="/rate-lock">Rate Lock</a>
+              <a className="hover:text-primary focus-visible:outline-2 focus-visible:outline-primary" href="/loyalty">लॉयल्टी</a>
+              <a className="hover:text-primary focus-visible:outline-2 focus-visible:outline-primary" href="/return-policy">Return Policy</a>
+            </nav>
           </div>
         </header>
         <main id="main-content">{children}</main>

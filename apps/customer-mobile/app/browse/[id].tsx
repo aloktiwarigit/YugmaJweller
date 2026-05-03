@@ -516,11 +516,8 @@ export default function ProductDetailScreen(): React.ReactElement {
 
             {/* Try at home */}
             <TouchableOpacity
-              onPress={() => Alert.alert(
-                'कोशिश घर पर',
-                'इस सेवा के लिए दुकानदार से संपर्क करें।\nऑनलाइन बुकिंग जल्द उपलब्ध होगी।',
-                [{ text: 'ठीक है' }],
-              )}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              onPress={() => router.push('/try-at-home' as any)}
               style={{
                 backgroundColor: colors.white,
                 borderRadius: radii.md,
@@ -540,11 +537,8 @@ export default function ProductDetailScreen(): React.ReactElement {
 
             {/* Rate lock */}
             <TouchableOpacity
-              onPress={() => Alert.alert(
-                'दर-लॉक बुकिंग',
-                'आज का सोने का भाव लॉक करने के लिए दुकानदार से संपर्क करें।\nऑनलाइन बुकिंग जल्द उपलब्ध होगी।',
-                [{ text: 'ठीक है' }],
-              )}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              onPress={() => router.push('/rate-lock' as any)}
               style={{
                 backgroundColor: colors.white,
                 borderRadius: radii.md,
