@@ -1,0 +1,498 @@
+{
+  "generated": "2026-05-04T21:30:30.214Z",
+  "summary": {
+    "total": 23,
+    "implemented": 14,
+    "planned": 9,
+    "withTestEvidence": 14,
+    "coveragePct": 61,
+    "implementedCoveragePct": 100
+  },
+  "stories": [
+    {
+      "id": "1.1",
+      "title": "Shop Owner reaches the empty shop dashboard (Firebase Auth + Hindi-first Expo shell)",
+      "class": "B",
+      "status": "complete",
+      "frs": [
+        "FR8 (shopkeeper OTP login)",
+        "FR10 (session persistence across app restarts — via Firebase SDK native Keystore)",
+        "FR5 (tenant-isolation invariant — first authenticated consumer)"
+      ],
+      "specFile": "docs/superpowers/specs/2026-04-18-story-1.1-auth-and-dashboard-design.md",
+      "testFiles": [
+        "apps/api/test/auth-duplicate-phone.integration.test.ts",
+        "apps/api/test/auth-link-migration.integration.test.ts",
+        "apps/api/test/auth-me.integration.test.ts",
+        "apps/api/test/auth-missing-phone.integration.test.ts",
+        "apps/api/test/auth-rate-limit.integration.test.ts",
+        "apps/api/test/auth-repository.integration.test.ts",
+        "apps/api/test/auth-session.integration.test.ts",
+        "apps/api/test/auth-staff.integration.spec.ts",
+        "apps/api/test/auth-uid-mismatch.integration.test.ts",
+        "apps/api/test/auth-uid-race.integration.test.ts",
+        "apps/api/test/_auth-test-setup.ts"
+      ],
+      "ciJobs": [
+        "integration"
+      ],
+      "smokeTest": "manual:shopkeeper-android",
+      "evidenceGaps": []
+    },
+    {
+      "id": "1.2",
+      "title": "Shop Owner invites a staff member by phone and assigns a role",
+      "class": "B",
+      "status": "complete",
+      "frs": [
+        "FR12 (invite staff by phone + role)"
+      ],
+      "specFile": "docs/superpowers/specs/2026-04-19-story-1.2-staff-invite-design.md",
+      "testFiles": [
+        "apps/api/test/auth-duplicate-phone.integration.test.ts",
+        "apps/api/test/auth-link-migration.integration.test.ts",
+        "apps/api/test/auth-me.integration.test.ts",
+        "apps/api/test/auth-missing-phone.integration.test.ts",
+        "apps/api/test/auth-rate-limit.integration.test.ts",
+        "apps/api/test/auth-repository.integration.test.ts",
+        "apps/api/test/auth-session.integration.test.ts",
+        "apps/api/test/auth-staff.integration.spec.ts",
+        "apps/api/test/auth-uid-mismatch.integration.test.ts",
+        "apps/api/test/auth-uid-race.integration.test.ts",
+        "apps/api/test/_auth-test-setup.ts"
+      ],
+      "ciJobs": [
+        "integration"
+      ],
+      "smokeTest": "manual:shopkeeper-android",
+      "evidenceGaps": []
+    },
+    {
+      "id": "1.3",
+      "title": "2026-04-19-story-1.3-design.md",
+      "class": "B",
+      "status": "complete",
+      "frs": [],
+      "specFile": "docs/superpowers/specs/2026-04-19-story-1.3-design.md",
+      "testFiles": [
+        "apps/api/test/auth-duplicate-phone.integration.test.ts",
+        "apps/api/test/auth-link-migration.integration.test.ts",
+        "apps/api/test/auth-me.integration.test.ts",
+        "apps/api/test/auth-missing-phone.integration.test.ts",
+        "apps/api/test/auth-rate-limit.integration.test.ts",
+        "apps/api/test/auth-repository.integration.test.ts",
+        "apps/api/test/auth-session.integration.test.ts",
+        "apps/api/test/auth-staff.integration.spec.ts",
+        "apps/api/test/auth-uid-mismatch.integration.test.ts",
+        "apps/api/test/auth-uid-race.integration.test.ts",
+        "apps/api/test/_auth-test-setup.ts"
+      ],
+      "ciJobs": [
+        "integration"
+      ],
+      "smokeTest": "manual:shopkeeper-android",
+      "evidenceGaps": []
+    },
+    {
+      "id": "1.4",
+      "title": "2026-04-19-story-1.4-design.md",
+      "class": "B",
+      "status": "complete",
+      "frs": [],
+      "specFile": "docs/superpowers/specs/2026-04-19-story-1.4-design.md",
+      "testFiles": [
+        "apps/api/test/auth-duplicate-phone.integration.test.ts",
+        "apps/api/test/auth-link-migration.integration.test.ts",
+        "apps/api/test/auth-me.integration.test.ts",
+        "apps/api/test/auth-missing-phone.integration.test.ts",
+        "apps/api/test/auth-rate-limit.integration.test.ts",
+        "apps/api/test/auth-repository.integration.test.ts",
+        "apps/api/test/auth-session.integration.test.ts",
+        "apps/api/test/auth-staff.integration.spec.ts",
+        "apps/api/test/auth-uid-mismatch.integration.test.ts",
+        "apps/api/test/auth-uid-race.integration.test.ts",
+        "apps/api/test/_auth-test-setup.ts"
+      ],
+      "ciJobs": [
+        "integration"
+      ],
+      "smokeTest": "manual:shopkeeper-android",
+      "evidenceGaps": []
+    },
+    {
+      "id": "2.1",
+      "title": "2026-04-19-story-2.1-design.md",
+      "class": "B",
+      "status": "complete",
+      "frs": [],
+      "specFile": "docs/superpowers/specs/2026-04-19-story-2.1-design.md",
+      "testFiles": [
+        "apps/api/test/settings/settings.integration.test.ts",
+        "apps/api/test/settings/tenant-isolation.test.ts"
+      ],
+      "ciJobs": [
+        "integration"
+      ],
+      "smokeTest": "manual:shopkeeper-android",
+      "evidenceGaps": []
+    },
+    {
+      "id": "2.2",
+      "title": "2026-04-19-story-2.2-design.md",
+      "class": "B",
+      "status": "complete",
+      "frs": [],
+      "specFile": "docs/superpowers/specs/2026-04-19-story-2.2-design.md",
+      "testFiles": [
+        "apps/api/test/settings/settings.integration.test.ts",
+        "apps/api/test/settings/tenant-isolation.test.ts"
+      ],
+      "ciJobs": [
+        "integration"
+      ],
+      "smokeTest": "manual:shopkeeper-android",
+      "evidenceGaps": []
+    },
+    {
+      "id": "2.3",
+      "title": "2026-04-19-story-2.3-design.md",
+      "class": "B",
+      "status": "complete",
+      "frs": [],
+      "specFile": "docs/superpowers/specs/2026-04-19-story-2.3-design.md",
+      "testFiles": [
+        "apps/api/test/settings/settings.integration.test.ts",
+        "apps/api/test/settings/tenant-isolation.test.ts"
+      ],
+      "ciJobs": [
+        "integration"
+      ],
+      "smokeTest": "manual:shopkeeper-android",
+      "evidenceGaps": []
+    },
+    {
+      "id": "1.5",
+      "title": "2026-04-20-story-1.5-staff-revocation-design.md",
+      "class": "B",
+      "status": "complete",
+      "frs": [],
+      "specFile": "docs/superpowers/specs/2026-04-20-story-1.5-staff-revocation-design.md",
+      "testFiles": [
+        "apps/api/test/auth-duplicate-phone.integration.test.ts",
+        "apps/api/test/auth-link-migration.integration.test.ts",
+        "apps/api/test/auth-me.integration.test.ts",
+        "apps/api/test/auth-missing-phone.integration.test.ts",
+        "apps/api/test/auth-rate-limit.integration.test.ts",
+        "apps/api/test/auth-repository.integration.test.ts",
+        "apps/api/test/auth-session.integration.test.ts",
+        "apps/api/test/auth-staff.integration.spec.ts",
+        "apps/api/test/auth-uid-mismatch.integration.test.ts",
+        "apps/api/test/auth-uid-race.integration.test.ts",
+        "apps/api/test/_auth-test-setup.ts"
+      ],
+      "ciJobs": [
+        "integration"
+      ],
+      "smokeTest": "manual:shopkeeper-android",
+      "evidenceGaps": []
+    },
+    {
+      "id": "1.6",
+      "title": "2026-04-20-story-1.6-1.7-audit-trail-logout-all-design.md",
+      "class": "B",
+      "status": "complete",
+      "frs": [],
+      "specFile": "docs/superpowers/specs/2026-04-20-story-1.6-1.7-audit-trail-logout-all-design.md",
+      "testFiles": [
+        "apps/api/test/auth-duplicate-phone.integration.test.ts",
+        "apps/api/test/auth-link-migration.integration.test.ts",
+        "apps/api/test/auth-me.integration.test.ts",
+        "apps/api/test/auth-missing-phone.integration.test.ts",
+        "apps/api/test/auth-rate-limit.integration.test.ts",
+        "apps/api/test/auth-repository.integration.test.ts",
+        "apps/api/test/auth-session.integration.test.ts",
+        "apps/api/test/auth-staff.integration.spec.ts",
+        "apps/api/test/auth-uid-mismatch.integration.test.ts",
+        "apps/api/test/auth-uid-race.integration.test.ts",
+        "apps/api/test/_auth-test-setup.ts"
+      ],
+      "ciJobs": [
+        "integration"
+      ],
+      "smokeTest": "manual:shopkeeper-android",
+      "evidenceGaps": []
+    },
+    {
+      "id": "2.4",
+      "title": "2026-04-20-story-2.4-loyalty-config-design.md",
+      "class": "B",
+      "status": "complete",
+      "frs": [],
+      "specFile": "docs/superpowers/specs/2026-04-20-story-2.4-loyalty-config-design.md",
+      "testFiles": [
+        "apps/api/test/settings/settings.integration.test.ts",
+        "apps/api/test/settings/tenant-isolation.test.ts"
+      ],
+      "ciJobs": [
+        "integration"
+      ],
+      "smokeTest": "manual:shopkeeper-android",
+      "evidenceGaps": []
+    },
+    {
+      "id": "2.5",
+      "title": "2026-04-20-story-2.5-rate-lock-design.md",
+      "class": "B",
+      "status": "complete",
+      "frs": [],
+      "specFile": "docs/superpowers/specs/2026-04-20-story-2.5-rate-lock-design.md",
+      "testFiles": [
+        "apps/api/test/settings/settings.integration.test.ts",
+        "apps/api/test/settings/tenant-isolation.test.ts"
+      ],
+      "ciJobs": [
+        "integration"
+      ],
+      "smokeTest": "manual:shopkeeper-android",
+      "evidenceGaps": []
+    },
+    {
+      "id": "2.6",
+      "title": "2026-04-23-story-2.6-try-at-home-design.md",
+      "class": "B",
+      "status": "complete",
+      "frs": [],
+      "specFile": "docs/superpowers/specs/2026-04-23-story-2.6-try-at-home-design.md",
+      "testFiles": [
+        "apps/api/test/settings/settings.integration.test.ts",
+        "apps/api/test/settings/tenant-isolation.test.ts"
+      ],
+      "ciJobs": [
+        "integration"
+      ],
+      "smokeTest": "manual:shopkeeper-android",
+      "evidenceGaps": []
+    },
+    {
+      "id": "3.7",
+      "title": "2026-04-24-story-3.7-valuation-dashboard-design.md",
+      "class": "B",
+      "status": "complete",
+      "frs": [],
+      "specFile": "docs/superpowers/specs/2026-04-24-story-3.7-valuation-dashboard-design.md",
+      "testFiles": [
+        "apps/api/test/inventory-isolation.integration.test.ts",
+        "apps/api/test/inventory-valuation.integration.test.ts"
+      ],
+      "ciJobs": [
+        "integration"
+      ],
+      "smokeTest": "manual:shopkeeper-android",
+      "evidenceGaps": []
+    },
+    {
+      "id": "17.1",
+      "title": "2026-05-01-story-17.1-image-pipeline-design.md",
+      "class": "B",
+      "status": "complete",
+      "frs": [],
+      "specFile": "docs/superpowers/specs/2026-05-01-story-17.1-image-pipeline-design.md",
+      "testFiles": [
+        "apps/api/test/product-images-tenant-fk.integration.test.ts",
+        "apps/api/test/product-images.concurrency.spec.ts",
+        "apps/api/test/product-images.integration.spec.ts",
+        "apps/api/test/product-images.public-catalog.spec.ts",
+        "apps/api/test/product-images.rls.spec.ts",
+        "apps/api/test/product-images.tenant-isolation.spec.ts"
+      ],
+      "ciJobs": [
+        "integration"
+      ],
+      "smokeTest": "ci:playwright",
+      "evidenceGaps": []
+    },
+    {
+      "id": "WS-3C",
+      "title": "Gap-closure: WS-3C",
+      "class": "B",
+      "status": "planned",
+      "frs": [
+        "FR64",
+        "FR65",
+        "FR66",
+        "FR67",
+        "FR68"
+      ],
+      "specFile": "",
+      "testFiles": [],
+      "ciJobs": [],
+      "smokeTest": "none",
+      "evidenceGaps": [
+        "no-impl",
+        "no-test",
+        "no-spec"
+      ]
+    },
+    {
+      "id": "WS-3D",
+      "title": "Gap-closure: WS-3D",
+      "class": "B",
+      "status": "planned",
+      "frs": [
+        "FR73",
+        "FR74"
+      ],
+      "specFile": "",
+      "testFiles": [],
+      "ciJobs": [],
+      "smokeTest": "none",
+      "evidenceGaps": [
+        "no-impl",
+        "no-test",
+        "no-spec"
+      ]
+    },
+    {
+      "id": "WS-0.2",
+      "title": "Gap-closure: WS-0.2",
+      "class": "B",
+      "status": "planned",
+      "frs": [
+        "FR107",
+        "FR108"
+      ],
+      "specFile": "",
+      "testFiles": [],
+      "ciJobs": [],
+      "smokeTest": "none",
+      "evidenceGaps": [
+        "no-impl",
+        "no-test",
+        "no-spec"
+      ]
+    },
+    {
+      "id": "WS-3B",
+      "title": "Gap-closure: WS-3B",
+      "class": "B",
+      "status": "planned",
+      "frs": [
+        "FR109",
+        "FR110",
+        "FR111",
+        "FR112"
+      ],
+      "specFile": "",
+      "testFiles": [],
+      "ciJobs": [],
+      "smokeTest": "none",
+      "evidenceGaps": [
+        "no-impl",
+        "no-test",
+        "no-spec"
+      ]
+    },
+    {
+      "id": "WS-3A",
+      "title": "Gap-closure: WS-3A",
+      "class": "B",
+      "status": "planned",
+      "frs": [
+        "FR117",
+        "FR119"
+      ],
+      "specFile": "",
+      "testFiles": [],
+      "ciJobs": [],
+      "smokeTest": "none",
+      "evidenceGaps": [
+        "no-impl",
+        "no-test",
+        "no-spec"
+      ]
+    },
+    {
+      "id": "WS-2C",
+      "title": "Gap-closure: WS-2C",
+      "class": "B",
+      "status": "planned",
+      "frs": [
+        "FR126"
+      ],
+      "specFile": "",
+      "testFiles": [],
+      "ciJobs": [],
+      "smokeTest": "none",
+      "evidenceGaps": [
+        "no-impl",
+        "no-test",
+        "no-spec"
+      ]
+    },
+    {
+      "id": "WS-1A",
+      "title": "Gap-closure: WS-1A",
+      "class": "B",
+      "status": "planned",
+      "frs": [
+        "FR127",
+        "FR129",
+        "FR130",
+        "FR131",
+        "FR132",
+        "FR134",
+        "FR135",
+        "FR136",
+        "FR137",
+        "FR138",
+        "FR139",
+        "FR140"
+      ],
+      "specFile": "",
+      "testFiles": [],
+      "ciJobs": [],
+      "smokeTest": "none",
+      "evidenceGaps": [
+        "no-impl",
+        "no-test",
+        "no-spec"
+      ]
+    },
+    {
+      "id": "WS-1B",
+      "title": "Gap-closure: WS-1B",
+      "class": "B",
+      "status": "planned",
+      "frs": [
+        "FR128"
+      ],
+      "specFile": "",
+      "testFiles": [],
+      "ciJobs": [],
+      "smokeTest": "none",
+      "evidenceGaps": [
+        "no-impl",
+        "no-test",
+        "no-spec"
+      ]
+    },
+    {
+      "id": "WS-1C",
+      "title": "Gap-closure: WS-1C",
+      "class": "B",
+      "status": "planned",
+      "frs": [
+        "FR133"
+      ],
+      "specFile": "",
+      "testFiles": [],
+      "ciJobs": [],
+      "smokeTest": "none",
+      "evidenceGaps": [
+        "no-impl",
+        "no-test",
+        "no-spec"
+      ]
+    }
+  ]
+}
