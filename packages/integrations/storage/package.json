@@ -18,11 +18,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@azure/storage-blob": "^12.17.0",
     "@nestjs/common": "^10.3.0",
     "reflect-metadata": "^0.2.0"
   },
   "devDependencies": {
-    "vitest": "^1.4.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
   }
 }

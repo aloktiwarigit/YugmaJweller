@@ -4,3 +4,6 @@ export { AzureBlobAdapter } from './adapters/azure-blob.adapter';
 export { ImageKitAdapter } from './adapters/imagekit.adapter';
 export { StorageModule } from './storage.module';
 export const STORAGE_PORT = 'STORAGE_PORT';
+export * from './malware-scan.port';
+export * from './adapters/imagekit-url-builder';
+export { StubMalwareScanAdapter } from './adapters/stub-malware-scan.adapter';

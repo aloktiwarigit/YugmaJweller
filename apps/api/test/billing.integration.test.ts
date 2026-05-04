@@ -26,7 +26,6 @@ import { createPool, runMigrations, withTenantTx } from '@goldsmith/db';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { Tenant, AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { SyncLogger } from '@goldsmith/sync';
-import { StubStorageAdapter } from '@goldsmith/integrations-storage';
 import {
   FallbackChain,
   IbjaAdapter,
@@ -107,10 +106,9 @@ async function seedProduct(opts: {
 /** Build a BillingService wired to the shared pool + Redis for a given shop context. */
 function buildBillingService(): BillingService {
   const syncLogger = new SyncLogger();
-  const storage    = new StubStorageAdapter();
 
   const invRepo = new InventoryRepository(pool as never, syncLogger);
-  const invSvc  = new InventoryService(invRepo, storage, pool as never);
+  const invSvc  = new InventoryService(invRepo, pool as never);
 
   const redis     = sharedRedis;
   const lkg       = new LastKnownGoodCache(redis as never);

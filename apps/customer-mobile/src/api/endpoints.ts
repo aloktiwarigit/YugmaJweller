@@ -292,3 +292,22 @@ export async function getReturnPolicy(): Promise<string | null> {
   const res = await api.get<{ returnPolicyText: string | null }>('/api/v1/catalog/return-policy');
   return res.data.returnPolicyText;
 }
+
+// ── Product images (public catalog) ───────────────────────────────────────────
+
+export interface ProductImageRow {
+  id:              string;
+  alt_text:        string | null;
+  width:           number;
+  height:          number;
+  srcset:          string;
+  default_url:     string;
+  placeholder_url: string;
+}
+
+export async function getProductImages(productId: string): Promise<ProductImageRow[]> {
+  const res = await api.get<{ images: ProductImageRow[] }>(
+    `/api/v1/catalog/products/${productId}/images`,
+  );
+  return res.data.images;
+}

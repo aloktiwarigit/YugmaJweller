@@ -29,4 +29,9 @@ export class ImageKitAdapter implements StoragePort {
   async getPresignedReadUrl(key: string): Promise<string> {
     return `${this.base}/${key}`;
   }
+
+  async deleteBlob(key: string): Promise<void> {
+    // TODO: implement via ImageKit delete API
+    throw new Error(`imagekit.deleteBlob: not implemented for key ${key}`);
+  }
 }

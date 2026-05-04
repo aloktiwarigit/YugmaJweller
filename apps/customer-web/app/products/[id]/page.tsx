@@ -1,11 +1,11 @@
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
-import { fetchTenantConfig, fetchProduct, fetchProductReviews } from '@/lib/api';
+import { fetchTenantConfig, fetchProduct, fetchProductReviews, fetchProductImages } from '@/lib/api';
 import { HuidBadge } from '@/components/HuidBadge';
 import { WishlistButton } from '@/components/WishlistButton';
-import { GoldTexturePlaceholder } from '@/components/GoldTexturePlaceholder';
 import { ReviewSection } from '@/components/ReviewSection';
 import { PriceBreakdown } from '@/components/PriceBreakdown';
+import { ProductGallery } from '@/components/products/ProductGallery';
 import { purityLabel, metalLabel } from '@/lib/theme';
 
 function resolveSlug(): string | null {
@@ -24,9 +24,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
   const config = await fetchTenantConfig(slug);
   if (!config) notFound();
 
-  const [product, reviewsData] = await Promise.all([
+  const [product, reviewsData, images] = await Promise.all([
     fetchProduct(params.id, config.shopId),
     fetchProductReviews(params.id, config.shopId),
+    fetchProductImages(params.id, config.shopId),
   ]);
   if (!product) notFound();
 
@@ -46,12 +47,22 @@ export default async function ProductDetailPage({ params }: PageProps) {
       </a>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Product image */}
-        <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-bg">
-          <GoldTexturePlaceholder className="w-full h-full" />
+        {/* Product image — responsive preload for LCP hero */}
+        {images.length > 0 && (
+          <link
+            rel="preload"
+            as="image"
+            imageSrcSet={images[0]!.srcset}
+            imageSizes="(max-width: 768px) 100vw, (max-width: 1280px) 60vw, 800px"
+            fetchPriority="high"
+            href={images[0]!.default_url}
+          />
+        )}
+        <div className="relative rounded-lg overflow-hidden border border-border bg-bg">
+          <ProductGallery images={images} productName={displayPurity} />
           {isUnavailable && (
             <div
-              className="absolute inset-0 flex items-center justify-center bg-ink/40"
+              className="absolute inset-0 flex items-center justify-center bg-ink/40 pointer-events-none"
               aria-hidden="true"
             >
               <span className="font-body text-white text-lg font-medium">उपलब्ध नहीं</span>

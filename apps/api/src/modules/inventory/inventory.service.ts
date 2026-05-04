@@ -2,14 +2,11 @@ import { BadRequestException, ConflictException, Inject, Injectable, NotFoundExc
 import { assertValidTransition } from './state-machine';
 import type { ProductStatus } from './state-machine';
 import type { Pool } from 'pg';
-import { randomUUID } from 'node:crypto';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { validateHuidFormat } from '@goldsmith/compliance';
 import type { CreateProductDto, UpdateProductDto, ProductResponse } from '@goldsmith/shared';
-import type { StoragePort } from '@goldsmith/integrations-storage';
-import { STORAGE_PORT } from '@goldsmith/integrations-storage';
 import { trackEvent } from '@goldsmith/observability';
 import { InventoryRepository } from './inventory.repository';
 import type { ProductRow, ListProductsFilter } from './inventory.repository';
@@ -43,7 +40,6 @@ function mapRow(row: ProductRow): ProductResponse {
 export class InventoryService {
   constructor(
     @Inject(InventoryRepository) private readonly repo: InventoryRepository,
-    @Inject(STORAGE_PORT) private readonly storage: StoragePort,
     @Inject('PG_POOL') private readonly pool: Pool,
   ) {}
 
@@ -220,21 +216,5 @@ export class InventoryService {
 
     // TODO Epic 7: emit domain event inventory.product_unpublished
     return mapRow(row);
-  }
-
-  async getImageUploadUrl(productId: string, contentType: string): Promise<string> {
-    const product = await this.repo.getProduct(productId);
-    if (!product) throw new NotFoundException({ code: 'inventory.product_not_found' });
-
-    const ctx = tenantContext.requireCurrent();
-    const ext = contentType.split('/')[1] ?? 'bin';
-    const key = `tenants/${ctx.shopId}/products/${productId}/${randomUUID()}.${ext}`;
-    const uploadUrl = await this.storage.getPresignedUploadUrl(key, contentType);
-
-    // Register the image record now so countImages() returns > 0 after first upload URL is issued.
-    // Optimistic pre-insert: the image row exists regardless of whether the client completes the upload.
-    void this.repo.insertImageRecord(ctx.shopId, productId, key).catch(() => undefined);
-
-    return uploadUrl;
   }
 }

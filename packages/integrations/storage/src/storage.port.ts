@@ -4,4 +4,5 @@ export interface StoragePort {
   downloadBuffer(key: string): Promise<Buffer>;
   uploadBuffer(key: string, data: Buffer, contentType: string): Promise<void>;
   getPresignedReadUrl(key: string): Promise<string>;
+  deleteBlob(key: string): Promise<void>;
 }

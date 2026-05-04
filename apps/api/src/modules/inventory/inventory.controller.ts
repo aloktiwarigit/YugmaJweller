@@ -142,20 +142,6 @@ export class InventoryController {
     return this.svc.updateStatus(id, dto);
   }
 
-  @Post('/products/:id/images/upload-url')
-  @HttpCode(200)
-  @Roles('shop_admin', 'shop_manager')
-  async getImageUploadUrl(
-    @TenantContextDec() ctx: TenantContext,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body('contentType') contentType: string,
-  ): Promise<{ uploadUrl: string }> {
-    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
-    if (!contentType) throw new NotFoundException({ code: 'inventory.content_type_required' });
-    const uploadUrl = await this.svc.getImageUploadUrl(id, contentType);
-    return { uploadUrl };
-  }
-
   @Post('/products/:id/publish')
   @HttpCode(200)
   @Roles('shop_admin', 'shop_manager')

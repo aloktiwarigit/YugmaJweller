@@ -7,6 +7,8 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 import { getCatalogProduct, verifyHuid } from '../../src/api/endpoints';
+import { ProductGallery } from '../../src/components/products/ProductGallery';
+import { useProductImages } from '../../src/hooks/useProductImages';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -259,6 +261,8 @@ export default function ProductDetailScreen(): React.ReactElement {
     retry: false,
   });
 
+  const { data: productImages } = useProductImages(id);
+
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg }}>
@@ -301,27 +305,22 @@ export default function ProductDetailScreen(): React.ReactElement {
           </Text>
         </TouchableOpacity>
 
-        {/* Image placeholder */}
-        <View
-          style={{
-            aspectRatio: 1,
-            backgroundColor: colors.border,
-            borderRadius: radii.lg,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <Text style={{ fontSize: 48 }}>💍</Text>
+        {/* Product gallery — LQIP via expo-image, FlatList paging */}
+        <View style={{ marginHorizontal: -spacing.md, overflow: 'hidden' }}>
+          <ProductGallery
+            images={productImages}
+            productName={product.purity}
+          />
           {isUnavailable && (
             <View
               style={{
                 position: 'absolute',
                 top: 0, bottom: 0, left: 0, right: 0,
                 backgroundColor: 'rgba(0,0,0,0.4)',
-                borderRadius: radii.lg,
                 justifyContent: 'center',
                 alignItems: 'center',
               }}
+              pointerEvents="none"
             >
               <Text style={{ fontFamily: typography.body.family, color: '#fff', fontSize: 18 }}>
                 उपलब्ध नहीं

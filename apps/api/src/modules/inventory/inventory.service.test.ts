@@ -37,18 +37,12 @@ const repoMock = {
   countImages: vi.fn().mockResolvedValue(1),
   publishProduct: vi.fn().mockResolvedValue(publishedRow),
   unpublishProduct: vi.fn().mockResolvedValue(productRow),
-  insertImageRecord: vi.fn().mockResolvedValue(undefined),
-};
-
-const storageMock = {
-  getPresignedUploadUrl: vi.fn().mockResolvedValue('https://stub-storage.local/key?sas=STUB'),
-  getPublicUrl: vi.fn().mockResolvedValue('https://stub-storage.local/key'),
 };
 
 const poolMock = { connect: vi.fn() } as unknown as import('pg').Pool;
 
 function makeService(): InventoryService {
-  return new InventoryService(repoMock as never, storageMock as never, poolMock);
+  return new InventoryService(repoMock as never, poolMock);
 }
 
 beforeEach(() => {
@@ -97,38 +91,6 @@ describe('InventoryService', () => {
       repoMock.getProduct.mockResolvedValueOnce(null);
       const svc = makeService();
       await expect(svc.getProduct('not-exist')).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('getImageUploadUrl', () => {
-    it('returns a URL from storage', async () => {
-      const svc = makeService();
-      const result = await svc.getImageUploadUrl('prod-abc', 'image/jpeg');
-      expect(storageMock.getPresignedUploadUrl).toHaveBeenCalled();
-      expect(result).toContain('stub-storage.local');
-    });
-
-    it('scopes upload key to tenant prefix', async () => {
-      const svc = makeService();
-      await svc.getImageUploadUrl('prod-abc', 'image/jpeg');
-      const [key] = (storageMock.getPresignedUploadUrl as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
-      expect(key.startsWith(`tenants/${SHOP_ID}/`)).toBe(true);
-    });
-
-    it('throws NotFoundException if product does not belong to this tenant', async () => {
-      repoMock.getProduct.mockResolvedValueOnce(null);
-      const svc = makeService();
-      await expect(svc.getImageUploadUrl('other-prod', 'image/jpeg')).rejects.toThrow(NotFoundException);
-    });
-
-    it('inserts image record so countImages returns > 0 after upload URL is issued', async () => {
-      const svc = makeService();
-      await svc.getImageUploadUrl('prod-abc', 'image/jpeg');
-      // Allow the fire-and-forget void to settle
-      await new Promise((r) => setTimeout(r, 0));
-      expect(repoMock.insertImageRecord).toHaveBeenCalledWith(
-        SHOP_ID, 'prod-abc', expect.stringContaining(`tenants/${SHOP_ID}/products/prod-abc/`),
-      );
     });
   });
 

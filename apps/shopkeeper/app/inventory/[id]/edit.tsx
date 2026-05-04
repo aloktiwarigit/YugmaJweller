@@ -148,6 +148,15 @@ export default function EditProductScreen(): React.ReactElement {
       <Pressable
         style={styles.linkRow}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onPress={() => router.push(`/inventory/${id}/images` as any)}
+        accessibilityRole="link"
+        accessibilityLabel={t('inventory.images_title')}>
+        <Text style={styles.linkText}>{t('inventory.images_title')}{' ->'}</Text>
+      </Pressable>
+
+      <Pressable
+        style={styles.linkRow}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onPress={() => router.push(`/inventory/${id}/movements` as any)}
         accessibilityRole="link"
         accessibilityLabel="आंदोलन इतिहास">
