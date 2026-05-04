@@ -103,8 +103,8 @@ const MODULE_HINTS: Record<string, string | null> = {
   '14': 'apps/api/src/modules/reports',
   '15': 'apps/api/src/modules/platform-admin',
   '16': 'apps/api/src/modules/platform-admin',
-  '17': 'apps/api/src/modules/storefront-content',
-  '18': 'apps/api/src/modules/storefront-content',
+  '17': 'apps/api/src/modules/inventory/product-images',
+  '18': 'apps/api/src/modules/catalog',
 };
 
 // Known FR titles for bootstrap accuracy (covers FR1-FR20 and key FRs)
@@ -166,7 +166,9 @@ export async function generate(root: string): Promise<Record<string, unknown>> {
         epic: seedEntry.epic ?? '',
         story: seedEntry.story ?? '',
         status: seedEntry.status,
-        evidence: seedEntry.status === 'missing' || seedEntry.status === 'planned' ? 'missing' : 'spec-only',
+        evidence: (seedEntry.status === 'missing' || seedEntry.status === 'planned')
+          ? 'missing'
+          : inCode ? 'code-verified' : 'spec-only',
         wave: seedEntry.wave ?? null,
         specFile: spec?.specFile ?? null,
         codeModule: spec?.codeModule ?? null,
