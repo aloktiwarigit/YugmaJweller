@@ -21,6 +21,7 @@ function getCurrentMigration(root: string): string {
 function getPackages(root: string): Array<{ name: string; path: string }> {
   const pkgsDir = join(root, 'packages');
   const result: Array<{ name: string; path: string }> = [];
+  if (!existsSync(pkgsDir)) return result;
   for (const dir of readdirSync(pkgsDir)) {
     const full = join(pkgsDir, dir);
     if (!statSync(full).isDirectory()) continue;
@@ -115,7 +116,7 @@ export async function generate(root: string): Promise<Record<string, unknown>> {
 }
 
 // CLI entry point — only runs when this file is the direct entrypoint
-if (process.argv[1] === __filename) {
+if (process.argv[1]?.toLowerCase() === __filename.toLowerCase()) {
   const repoRoot = resolve(__dirname, '../..');
   const outPath = join(repoRoot, 'docs/agent-context/project.context.json');
   generate(repoRoot).then(result => {
