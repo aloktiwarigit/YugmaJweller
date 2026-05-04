@@ -72,17 +72,24 @@ mvpScope: >
 
 ## 2. Deployment
 
-> 2026-05-03 sweep note: this section describes the intended production
-> deployment flow. The repository currently has no checked-in deploy script,
-> production deploy workflow, Terraform deploy directory, or provider config
-> proving that the latest code is live. Before using this runbook operationally,
-> verify the actual hosting provider, deployed commit SHA, migration level,
-> secrets, CDN/storage provider, and mobile build channel.
+> 2026-05-04 sweep note: production deployment is not repo-backed yet. The
+> repository can prove CI/build health for `main`, but it has no checked-in
+> deploy script, production deploy workflow, Terraform/azd directory, hosting
+> provider config, EAS production profile, or release promotion record proving
+> that the latest code is live. Do not claim production is current until the
+> actual provider, deployed commit SHA, migration level, secrets, CDN/storage
+> provider, and mobile build channel are verified.
 
 ### 2.1 Pre-deploy checklist
 
-Before running `./scripts/deploy.sh prod` (or GitHub Actions `Deploy to Production`):
+Before the first production deploy path is created:
 
+- [ ] Hosting provider selected and checked in (`azure.yaml`/`azd`, Terraform under `infra/`, or the chosen provider's equivalent)
+- [ ] GitHub Actions production environment added with required approvals and OIDC/secret access scoped to deploy only
+- [ ] Release artifact/version exposes the deployed Git SHA through `/healthz`
+- [ ] Database migration command and rollback/forward-fix policy are part of the deploy workflow
+- [ ] CDN/storage/ImageKit/Azure Blob production configuration is provisioned and smoke-testable
+- [ ] Mobile production build channel is defined if customer-mobile/shopkeeper native builds are part of the release
 - [ ] CI pipeline green on `main` (type-check · lint · tests ≥ 80% · Semgrep · axe-core · Lighthouse · Codex review)
 - [ ] Migration plan reviewed: any `DROP`, `ALTER COLUMN TYPE`, or column-remove requires 2-phase deploy (deploy code tolerating both shapes → migrate → deploy code assuming new shape)
 - [ ] `threat-model.md` updated if new trust boundary / vendor / admin role introduced
@@ -92,29 +99,19 @@ Before running `./scripts/deploy.sh prod` (or GitHub Actions `Deploy to Producti
 
 ### 2.2 Deploy procedure
 
-```bash
-# 1. Tag release from main
-git checkout main && git pull
-RELEASE_TAG=$(date +%Y.%m.%d)-$(git rev-parse --short HEAD)
-git tag -a "release/$RELEASE_TAG" -m "Release $RELEASE_TAG"
-git push origin "release/$RELEASE_TAG"
+No executable production deploy procedure is checked in yet.
 
-# 2. Confirm CI ran the full ship.yml on the tag
-gh workflow view ship --ref "release/$RELEASE_TAG"
+The deploy story must add the concrete provider files and commands before this
+runbook can be used operationally. Minimum shape:
 
-# 3. Deploy via Terraform (staging first — always)
-cd infra/
-terraform workspace select staging
-terraform apply -var="release_tag=$RELEASE_TAG"
-
-# 4. Smoke test staging — see §2.4
-
-# 5. Promote to prod
-terraform workspace select prod
-terraform apply -var="release_tag=$RELEASE_TAG"
-
-# 6. Post-deploy smoke (§2.4) against prod + tag canary metrics in PostHog
-```
+1. Build and test from a clean `main` checkout.
+2. Create an immutable release artifact or image tagged with the Git SHA.
+3. Run database migrations with the migrator role.
+4. Deploy to staging.
+5. Run the post-deploy smoke tests in this section against staging.
+6. Promote the same artifact to production.
+7. Run the post-deploy smoke tests in this section against production.
+8. Record deployed Git SHA, migration version, artifact ID, and operator in the release log.
 
 ### 2.3 Rollback
 
@@ -126,27 +123,23 @@ terraform apply -var="release_tag=$RELEASE_TAG"
 
 **Rollback procedure:**
 
-```bash
-# 1. Identify last-known-good tag
-PREVIOUS_TAG=$(gh release list --limit 5 | awk '/stable/ {print $1}' | head -1)
+No executable rollback command is checked in yet. The deploy story must define
+rollback for the selected provider and artifact format.
 
-# 2. Re-deploy previous tag via Terraform
-cd infra/ && terraform workspace select prod
-terraform apply -var="release_tag=$PREVIOUS_TAG"
+Required rollback rules:
 
-# 3. CRITICAL: DB migrations do NOT roll back automatically.
-#    If the bad release ran a migration, you have three options:
-#    a) If migration was additive only (new column nullable) — rollback is safe; old code ignores new column
-#    b) If migration was destructive (dropped column) — DO NOT roll back code; forward-fix instead
-#    c) If migration added NOT NULL constraint — forward-fix or restore from PITR backup (see §10)
-
-# 4. Notify anchor POC: "हमने एक deploy को वापस लिया है — आपका काम प्रभावित नहीं होगा।"
-#    (We rolled back a deploy. Your operations are unaffected.)
-```
+1. Identify the last-known-good artifact by Git SHA, not by mutable branch name.
+2. Re-deploy only the previous application artifact; do not automatically roll back DB migrations.
+3. If the bad release ran an additive migration, rollback is normally safe because old code ignores the new shape.
+4. If the bad release ran a destructive migration, do not roll back code; forward-fix instead.
+5. Notify the anchor POC when a production rollback affects customer-visible behavior.
 
 ### 2.4 Post-deploy smoke tests
 
-Run these in order against prod after every deploy. Any failure → rollback.
+Run these in order against staging and prod after every deploy. Replace
+`goldsmith.example` with the actual production host once the deployment story
+selects the provider. Any failure means stop promotion or execute the rollback
+procedure.
 
 1. `curl https://api.goldsmith.example/healthz` returns 200 with `{"ok": true, "version": "$RELEASE_TAG"}`
 2. Shopkeeper app login flow — real OTP through MSG91 (use internal QA number)
