@@ -1,0 +1,213 @@
+{
+  "generated": "2026-05-04T21:12:10.781Z",
+  "repo": "Goldsmith",
+  "description": "Multi-tenant white-label jewellery platform for local Indian jewellers",
+  "stack": {
+    "api": "NestJS (TypeScript) + PostgreSQL 15 + Drizzle + Redis + BullMQ",
+    "mobile": "React Native (Expo SDK 50) + NativeWind",
+    "web": "Next.js 14 (App Router) + Tailwind CSS + shadcn/ui",
+    "auth": "Firebase Auth (phone OTP)",
+    "storage": "Azure Blob Storage + ImageKit CDN",
+    "search": "Meilisearch",
+    "monorepo": "Turborepo + pnpm"
+  },
+  "apps": [
+    {
+      "name": "api",
+      "path": "apps/api"
+    },
+    {
+      "name": "customer-mobile",
+      "path": "apps/customer-mobile"
+    },
+    {
+      "name": "customer-web",
+      "path": "apps/customer-web"
+    },
+    {
+      "name": "shopkeeper",
+      "path": "apps/shopkeeper"
+    }
+  ],
+  "packages": [
+    {
+      "name": "@goldsmith/audit",
+      "path": "packages/audit"
+    },
+    {
+      "name": "@goldsmith/auth-client",
+      "path": "packages/auth-client"
+    },
+    {
+      "name": "@goldsmith/cache",
+      "path": "packages/cache"
+    },
+    {
+      "name": "@goldsmith/compliance",
+      "path": "packages/compliance"
+    },
+    {
+      "name": "@goldsmith/crypto-envelope",
+      "path": "packages/crypto-envelope"
+    },
+    {
+      "name": "@goldsmith/db",
+      "path": "packages/db"
+    },
+    {
+      "name": "@goldsmith/i18n",
+      "path": "packages/i18n"
+    },
+    {
+      "name": "@goldsmith/integrations-payments",
+      "path": "packages/integrations/payments"
+    },
+    {
+      "name": "@goldsmith/rates",
+      "path": "packages/integrations/rates"
+    },
+    {
+      "name": "@goldsmith/integrations-search",
+      "path": "packages/integrations/search"
+    },
+    {
+      "name": "@goldsmith/integrations-storage",
+      "path": "packages/integrations/storage"
+    },
+    {
+      "name": "@goldsmith/money",
+      "path": "packages/money"
+    },
+    {
+      "name": "@goldsmith/observability",
+      "path": "packages/observability"
+    },
+    {
+      "name": "@goldsmith/queue",
+      "path": "packages/queue"
+    },
+    {
+      "name": "@goldsmith/secrets",
+      "path": "packages/secrets"
+    },
+    {
+      "name": "@goldsmith/shared",
+      "path": "packages/shared"
+    },
+    {
+      "name": "@goldsmith/sync",
+      "path": "packages/sync"
+    },
+    {
+      "name": "@goldsmith/tenant-config",
+      "path": "packages/tenant-config"
+    },
+    {
+      "name": "@goldsmith/tenant-context",
+      "path": "packages/tenant-context"
+    },
+    {
+      "name": "@goldsmith/testing-tenant-isolation",
+      "path": "packages/testing/tenant-isolation"
+    },
+    {
+      "name": "@goldsmith/testing-weight-precision",
+      "path": "packages/testing/weight-precision"
+    },
+    {
+      "name": "@goldsmith/ui-mobile",
+      "path": "packages/ui-mobile"
+    },
+    {
+      "name": "@goldsmith/ui-tokens",
+      "path": "packages/ui-tokens"
+    },
+    {
+      "name": "@goldsmith/ui-web",
+      "path": "packages/ui-web"
+    }
+  ],
+  "apiModules": [
+    "analytics",
+    "auth",
+    "billing",
+    "catalog",
+    "crm",
+    "custom-orders",
+    "customer",
+    "inventory",
+    "loyalty",
+    "platform-admin",
+    "pricing",
+    "rate-lock-bookings",
+    "reports",
+    "reviews",
+    "settings",
+    "sync",
+    "tenant-boot",
+    "tenant-lookup",
+    "try-at-home-bookings",
+    "webhooks",
+    "wishlist"
+  ],
+  "commands": {
+    "dev": "pnpm dev",
+    "typecheck": "pnpm typecheck",
+    "lint": "pnpm lint",
+    "test:unit": "pnpm test:unit",
+    "test:integration": "pnpm test:integration",
+    "test:tenant-isolation": "pnpm test:tenant-isolation",
+    "test:ci": "pnpm test:ci",
+    "db:reset": "pnpm db:reset",
+    "docs:context": "pnpm docs:context",
+    "docs:validate": "pnpm docs:validate"
+  },
+  "invariants": [
+    "NEVER use FLOAT or REAL for weight columns. Use `DECIMAL(10,3)` or `DECIMAL(12,4)`. Paise-level precision required across 10,000+ transactions.",
+    "Every tenant-scoped table has `shop_id` FK with PostgreSQL row-level security policy. No exceptions.",
+    "Tenant context injected at API gateway via NestJS interceptor; verified at query layer. Two-layer defense.",
+    "Section 269ST cash cap: Hard-block at Rs 1,99,999 per transaction/day/event. Supervisor override requires role check + audit-logged justification.",
+    "PAN Rule 114B: Hard-block invoice completion at Rs 2 lakh without PAN or Form 60.",
+    "GST rates: 3% metal + 5% making hardcoded. No user override on rates.",
+    "HUID: Required field on every hallmarked product; appears on every hallmarked invoice.",
+    "PMLA: Cumulative monthly cash per customer tracked; warning at Rs 8L, block at Rs 10L with CTR template auto-generated.",
+    "auditLog(pool, {action, subjectType, subjectId, actorUserId}) from @goldsmith/audit — never audit.emit(tx, ...)",
+    "Use import (not import type) for NestJS @Injectable constructor params",
+    "No Goldsmith platform brand on any customer-facing surface",
+    "All new @Injectable constructors need explicit @Inject(Token) — tsx/esbuild drops paramtypes"
+  ],
+  "ceremonyClasses": {
+    "A": [
+      "auth",
+      "money",
+      "RLS",
+      "compliance",
+      "platform-admin",
+      "migrations touching RLS/roles/SECURITY DEFINER",
+      "webhook handlers",
+      "encryption"
+    ],
+    "B": [
+      "products",
+      "customers",
+      "dashboards",
+      "notification prefs",
+      "settings",
+      "search",
+      "reports"
+    ],
+    "C": [
+      "copy tweaks",
+      "colors/spacing",
+      "config-toggles",
+      "doc-only",
+      "refactors <50 LOC",
+      "dep bumps"
+    ]
+  },
+  "migrations": {
+    "current": "0059",
+    "reserved": "0060-0085",
+    "pattern": "packages/db/src/migrations/{seq}_{slug}.sql"
+  }
+}
