@@ -1,0 +1,126 @@
+{
+  "generated": "hand-authored-2026-05-04",
+  "note": "Hand-authored. Validated by docs:validate — all sourceFiles paths must exist. Update when new modules land.",
+  "routes": [
+    {
+      "taskClass": "billing-compliance",
+      "ceremonyClass": "A",
+      "description": "Invoice creation, payment processing, GST/PAN/PMLA/269ST/HUID hard-blocks",
+      "readFirst": ["docs/agent-context/project.context.json", "docs/agent-context/task-routing.json"],
+      "readAlso": ["docs/agent-context/decision-index.json"],
+      "sourceFiles": ["apps/api/src/modules/billing/", "packages/compliance/src/", "packages/money/src/"],
+      "avoidFiles": ["_bmad-output/**", "docs/reviews/**", "docs/superpowers/plans/**"],
+      "runBefore": ["pnpm typecheck", "pnpm test:tenant-isolation", "pnpm test:integration"]
+    },
+    {
+      "taskClass": "auth-rbac",
+      "ceremonyClass": "A",
+      "description": "Firebase Auth, staff invite/revoke, role guards, session management",
+      "readFirst": ["docs/agent-context/project.context.json", "docs/agent-context/task-routing.json"],
+      "readAlso": ["docs/agent-context/decision-index.json"],
+      "sourceFiles": ["apps/api/src/modules/auth/", "packages/auth-client/src/"],
+      "avoidFiles": ["_bmad-output/**", "docs/reviews/**"],
+      "runBefore": ["pnpm typecheck", "pnpm test:tenant-isolation"]
+    },
+    {
+      "taskClass": "tenant-isolation",
+      "ceremonyClass": "A",
+      "description": "RLS policies, withShopScope, tenant context injection, cross-tenant prevention",
+      "readFirst": ["docs/agent-context/project.context.json", "docs/agent-context/task-routing.json"],
+      "readAlso": ["docs/agent-context/decision-index.json"],
+      "sourceFiles": ["packages/db/src/", "packages/tenant-context/src/"],
+      "avoidFiles": ["_bmad-output/**"],
+      "runBefore": ["pnpm test:tenant-isolation"]
+    },
+    {
+      "taskClass": "platform-admin",
+      "ceremonyClass": "A",
+      "description": "Platform admin console, tenant lifecycle, impersonation, subscriptions",
+      "readFirst": ["docs/agent-context/project.context.json", "docs/agent-context/task-routing.json"],
+      "readAlso": ["docs/agent-context/decision-index.json"],
+      "sourceFiles": ["apps/api/src/modules/platform-admin/", "apps/customer-web/app/admin/"],
+      "avoidFiles": ["_bmad-output/**", "docs/reviews/**"],
+      "runBefore": ["pnpm typecheck", "pnpm test:tenant-isolation"]
+    },
+    {
+      "taskClass": "notifications",
+      "ceremonyClass": "A",
+      "description": "NotificationsModule, outbox, BullMQ processors, WhatsApp/Email/SMS/Push adapters",
+      "readFirst": ["docs/agent-context/project.context.json", "docs/agent-context/task-routing.json"],
+      "readAlso": ["docs/agent-context/decision-index.json"],
+      "sourceFiles": ["apps/api/src/modules/notifications/", "packages/integrations/"],
+      "avoidFiles": ["_bmad-output/**", "docs/reviews/**"],
+      "runBefore": ["pnpm typecheck", "pnpm test:integration"]
+    },
+    {
+      "taskClass": "sync-offline",
+      "ceremonyClass": "A",
+      "description": "WatermelonDB, sync push/pull registry, offline-first shopkeeper",
+      "readFirst": ["docs/agent-context/project.context.json", "docs/agent-context/task-routing.json"],
+      "readAlso": [],
+      "sourceFiles": ["packages/sync/src/", "apps/shopkeeper/src/db/"],
+      "avoidFiles": ["_bmad-output/**"],
+      "runBefore": ["pnpm typecheck", "pnpm test:tenant-isolation"]
+    },
+    {
+      "taskClass": "inventory",
+      "ceremonyClass": "B",
+      "description": "Product CRUD, stock movements, barcode, bulk import, valuation, images",
+      "readFirst": ["docs/agent-context/project.context.json", "docs/agent-context/task-routing.json"],
+      "readAlso": [],
+      "sourceFiles": ["apps/api/src/modules/inventory/", "apps/shopkeeper/app/inventory/"],
+      "avoidFiles": ["_bmad-output/**", "docs/reviews/**"],
+      "runBefore": ["pnpm typecheck"]
+    },
+    {
+      "taskClass": "crm-customers",
+      "ceremonyClass": "B",
+      "description": "Customer CRM, family links, purchase history, notes, occasions, DPDPA deletion",
+      "readFirst": ["docs/agent-context/project.context.json", "docs/agent-context/task-routing.json"],
+      "readAlso": [],
+      "sourceFiles": ["apps/api/src/modules/crm/", "apps/shopkeeper/app/customers/"],
+      "avoidFiles": ["_bmad-output/**", "docs/reviews/**"],
+      "runBefore": ["pnpm typecheck", "pnpm test:tenant-isolation"]
+    },
+    {
+      "taskClass": "reports-analytics",
+      "ceremonyClass": "B",
+      "description": "Daily summary, outstanding, GSTR export, stock aging, customer LTV, loyalty summary",
+      "readFirst": ["docs/agent-context/project.context.json", "docs/agent-context/task-routing.json"],
+      "readAlso": [],
+      "sourceFiles": ["apps/api/src/modules/reports/", "apps/shopkeeper/app/reports/"],
+      "avoidFiles": ["_bmad-output/**", "docs/reviews/**"],
+      "runBefore": ["pnpm typecheck"]
+    },
+    {
+      "taskClass": "customer-web",
+      "ceremonyClass": "B",
+      "description": "Next.js customer storefront, catalog, wishlist, SEO, admin console",
+      "readFirst": ["docs/agent-context/project.context.json", "docs/agent-context/task-routing.json"],
+      "readAlso": [],
+      "sourceFiles": ["apps/customer-web/app/", "apps/customer-web/lib/", "packages/ui-web/src/"],
+      "avoidFiles": ["_bmad-output/**", "docs/reviews/**"],
+      "runBefore": ["pnpm --filter @goldsmith/customer-web typecheck"]
+    },
+    {
+      "taskClass": "customer-mobile",
+      "ceremonyClass": "B",
+      "description": "React Native customer app, browse, profile timeline, addresses, referrals",
+      "readFirst": ["docs/agent-context/project.context.json", "docs/agent-context/task-routing.json"],
+      "readAlso": [],
+      "sourceFiles": ["apps/customer-mobile/app/", "apps/customer-mobile/src/"],
+      "avoidFiles": ["_bmad-output/**", "docs/reviews/**"],
+      "runBefore": ["pnpm --filter @goldsmith/customer-mobile typecheck"]
+    },
+    {
+      "taskClass": "shopkeeper-ui",
+      "ceremonyClass": "B",
+      "description": "React Native shopkeeper app, tabs, inventory hub, dashboard, settings, billing screens",
+      "readFirst": ["docs/agent-context/project.context.json", "docs/agent-context/task-routing.json"],
+      "readAlso": [],
+      "sourceFiles": ["apps/shopkeeper/app/", "apps/shopkeeper/src/"],
+      "avoidFiles": ["_bmad-output/**", "docs/reviews/**"],
+      "runBefore": ["pnpm --filter @goldsmith/shopkeeper typecheck"]
+    }
+  ]
+}
