@@ -17,6 +17,8 @@ const ARRAY_KEYS = ['frs', 'adrs', 'docs', 'stories', 'routes'] as const;
 const VOLATILE_KEYS = ['generated', 'generatedAt', 'generated_at'] as const;
 
 function normalize(obj: Record<string, unknown>): Record<string, unknown> {
+  // Strips volatile timestamp keys at top-level only — generators do not
+  // embed generated/generatedAt inside sub-objects. Update this if they do.
   const copy = { ...obj };
   for (const k of VOLATILE_KEYS) delete copy[k];
   return copy;
@@ -26,7 +28,6 @@ function computeDrift(
   committed: Record<string, unknown>,
   generated: Record<string, unknown>,
 ): { drift: number; changed: number; total: number } {
-  // Strip volatile timestamp fields before comparison
   const c = normalize(committed);
   const g = normalize(generated);
 
@@ -34,17 +35,28 @@ function computeDrift(
     if (Array.isArray(c[key]) && Array.isArray(g[key])) {
       const ca = c[key] as unknown[];
       const ga = g[key] as unknown[];
-      if (JSON.stringify(ca) === JSON.stringify(ga)) return { drift: 0, changed: 0, total: ca.length };
+
+      // Also check non-array scalar fields (e.g., summary) for drift
+      const cScalars = Object.fromEntries(Object.entries(c).filter(([, v]) => !Array.isArray(v)));
+      const gScalars = Object.fromEntries(Object.entries(g).filter(([, v]) => !Array.isArray(v)));
+      const scalarsSame = JSON.stringify(cScalars) === JSON.stringify(gScalars);
+
+      if (JSON.stringify(ca) === JSON.stringify(ga) && scalarsSame) {
+        return { drift: 0, changed: 0, total: ca.length };
+      }
+
       const total = Math.max(ca.length, ga.length);
       let changed = Math.abs(ca.length - ga.length);
       const min = Math.min(ca.length, ga.length);
       for (let i = 0; i < min; i++) {
         if (JSON.stringify(ca[i]) !== JSON.stringify(ga[i])) changed++;
       }
+      if (!scalarsSame) changed = Math.max(changed, 1); // register scalar drift
       return { drift: changed / total, changed, total };
     }
   }
-  // Flat object — binary comparison
+
+  // Flat object (no recognised array key) — binary comparison
   const same = JSON.stringify(c) === JSON.stringify(g);
   return { drift: same ? 0 : 1, changed: same ? 0 : 1, total: 1 };
 }
@@ -84,6 +96,7 @@ async function main(root: string): Promise<void> {
 
   let hardFail = false;
   let softWarn = false;
+  let generatedAcceptance: Record<string, unknown> | null = null;
 
   console.log('\n📋 Agent-Context Validation\n');
 
@@ -96,6 +109,9 @@ async function main(root: string): Promise<void> {
     }
     const committed = JSON.parse(readFileSync(filePath, 'utf8')) as Record<string, unknown>;
     const generated = await g.fn(root);
+    if (g.name === 'acceptance-evidence.json') {
+      generatedAcceptance = generated;
+    }
     const { drift, changed, total } = computeDrift(committed, generated);
 
     if (drift === 0) {
@@ -126,11 +142,10 @@ async function main(root: string): Promise<void> {
     }
   }
 
-  // Spec file checks on acceptance-evidence.json
-  const acceptPath = join(outDir, 'acceptance-evidence.json');
-  if (existsSync(acceptPath)) {
-    const acc = JSON.parse(readFileSync(acceptPath, 'utf8')) as Record<string, unknown>;
-    const specErrors = checkSpecFiles(root, acc);
+  // Spec file checks on acceptance-evidence.json — uses in-memory generated result
+  // (avoids re-reading the committed/possibly-stale file from disk)
+  if (generatedAcceptance !== null) {
+    const specErrors = checkSpecFiles(root, generatedAcceptance);
     if (specErrors.length) {
       for (const e of specErrors) console.error(`  ✗ ${e}`);
       hardFail = true;
