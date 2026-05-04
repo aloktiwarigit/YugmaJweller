@@ -18,14 +18,14 @@ These two work streams were explicitly deferred from the 8.1 loyalty accrual mer
 
 ---
 
-## Story 3.7 — Live Stock Valuation Dashboard (UNMERGED)
+## Story 3.7 - Live Stock Valuation Dashboard (MERGED)
 
-**Status:** Implemented on `feat/story-3.7-valuation-dashboard` (37 commits ahead of main). Was NOT included in the 2026-04-29 merge train. Memory incorrectly recorded as "merged to main."
+**Status:** Integrated into `main` by the Codex merge train and present in `origin/main`. PR #32 was closed as stale after the merge-train work superseded the dirty feature branch.
 
-**Stacks on:** Story 3.6 sync infrastructure (already on main as squash `7bfd264`).  
-**Class:** B  
-**Migration:** none (pure service + UI)  
-**Gate needed:** Codex review then merge.
+**Stacks on:** Story 3.6 sync infrastructure.
+**Class:** B
+**Migration:** none (pure service + UI)
+**Gate:** merged, covered by valuation unit/integration tests and current `main` CI.
 
 **What's implemented:**
 - `InventoryValuationService` — purity→rate map, DECIMAL arithmetic, Redis 5-min TTL cache
@@ -33,4 +33,4 @@ These two work streams were explicitly deferred from the 8.1 loyalty accrual mer
 - `DailySummaryCard` — metal-tinted border (gold/silver/platinum)
 - `valuation.tsx` screen — stale banner, skeleton cards, grand total footer
 
-**Action required:** Run `codex review --base main` on this branch and merge when Codex is available.
+**Action required:** none for merge. Future work is ordinary product hardening and route/navigation polish.
