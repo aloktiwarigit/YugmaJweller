@@ -64,7 +64,7 @@ export async function generate(root: string): Promise<Record<string, unknown>> {
   return { generated: new Date().toISOString(), docs };
 }
 
-if (process.argv[1] === __filename) {
+if (process.argv[1]?.toLowerCase() === __filename.toLowerCase()) {
   const repoRoot = resolve(__dirname, '../..');
   const outPath = join(repoRoot, 'docs/agent-context/doc-index.json');
   generate(repoRoot).then(result => {
