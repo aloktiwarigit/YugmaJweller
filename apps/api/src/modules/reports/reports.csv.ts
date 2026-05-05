@@ -12,6 +12,7 @@ function escapeCsv(value: string): string {
   return value;
 }
 
+// Accepts string|number (gstr-export.service.ts accepts string[] only — reconcile on hoist to @goldsmith/shared).
 function csvRow(cells: (string | number)[]): string {
   return cells.map((c) => escapeCsv(String(c))).join(',');
 }
