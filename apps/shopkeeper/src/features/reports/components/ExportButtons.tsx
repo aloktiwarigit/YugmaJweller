@@ -68,28 +68,32 @@ export function ExportButtons(props: ExportButtonsProps): React.ReactElement {
   const isPdfBusy = pdf.status === 'QUEUED' || pdf.status === 'RUNNING';
 
   return (
-    <View style={styles.row}>
-      <Pressable
-        onPress={onCsvPress}
-        disabled={csvBusy}
-        style={[styles.csvBtn, csvBusy && styles.btnBusy]}
-        accessibilityRole="button"
-        accessibilityLabel="CSV डाउनलोड"
-      >
-        {csvBusy && <ActivityIndicator size="small" color={GOLD} style={{ marginRight: 8 }} />}
-        <Text style={styles.csvBtnText}>CSV डाउनलोड</Text>
-      </Pressable>
+    <View style={styles.container}>
+      <View style={styles.buttonRow}>
+        <Pressable
+          onPress={onCsvPress}
+          disabled={csvBusy}
+          style={[styles.csvBtn, csvBusy && styles.btnBusy]}
+          accessibilityRole="button"
+          accessibilityLabel="CSV डाउनलोड"
+          accessibilityState={{ disabled: csvBusy }}
+        >
+          {csvBusy && <ActivityIndicator size="small" color={GOLD} style={{ marginRight: 8 }} />}
+          <Text style={styles.csvBtnText}>CSV डाउनलोड</Text>
+        </Pressable>
 
-      <Pressable
-        onPress={onPdfPress}
-        disabled={isPdfBusy}
-        style={[styles.pdfBtn, isPdfBusy && styles.pdfBtnBusy]}
-        accessibilityRole="button"
-        accessibilityLabel={pdfLabel}
-      >
-        {isPdfBusy && <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />}
-        <Text style={styles.pdfBtnText}>{pdfLabel}</Text>
-      </Pressable>
+        <Pressable
+          onPress={onPdfPress}
+          disabled={isPdfBusy}
+          style={[styles.pdfBtn, isPdfBusy && styles.pdfBtnBusy]}
+          accessibilityRole="button"
+          accessibilityLabel={pdfLabel}
+          accessibilityState={{ disabled: isPdfBusy }}
+        >
+          {isPdfBusy && <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />}
+          <Text style={styles.pdfBtnText}>{pdfLabel}</Text>
+        </Pressable>
+      </View>
 
       {csvError && (
         <Text style={styles.errorText} numberOfLines={2}>{csvError}</Text>
@@ -104,12 +108,13 @@ export function ExportButtons(props: ExportButtonsProps): React.ReactElement {
 }
 
 const styles = StyleSheet.create({
-  row:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 12 },
+  container:     { marginVertical: 12 },
+  buttonRow:     { flexDirection: 'row', gap: 8 },
   csvBtn:        { flexGrow: 1, minHeight: 48, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: GOLD, justifyContent: 'center', alignItems: 'center', flexDirection: 'row' },
   csvBtnText:    { fontFamily: 'NotoSansDevanagari', fontSize: 14, color: GOLD, fontWeight: '600' },
   pdfBtn:        { flexGrow: 1, minHeight: 48, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8, backgroundColor: GOLD, justifyContent: 'center', alignItems: 'center', flexDirection: 'row' },
   pdfBtnBusy:    { backgroundColor: '#A07832' },
   pdfBtnText:    { fontFamily: 'NotoSansDevanagari', fontSize: 14, color: '#fff', fontWeight: '600' },
   btnBusy:       { opacity: 0.7 },
-  errorText:     { width: '100%', fontFamily: 'NotoSansDevanagari', fontSize: 12, color: colors.error, marginTop: 4 },
+  errorText:     { fontFamily: 'NotoSansDevanagari', fontSize: 12, color: colors.error, marginTop: 4 },
 });
