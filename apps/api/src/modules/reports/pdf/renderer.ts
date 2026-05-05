@@ -16,9 +16,12 @@ import { renderStockAging } from './templates/stock-aging';
 
 const FONT_DIR = path.resolve(__dirname, '../../../../assets/fonts');
 
-export type ReportType =
-  | 'daily-summary' | 'outstanding' | 'customer-ltv'
-  | 'loyalty-summary' | 'stock-aging';
+export const REPORT_TYPES = [
+  'daily-summary', 'outstanding', 'customer-ltv',
+  'loyalty-summary', 'stock-aging',
+] as const;
+
+export type ReportType = (typeof REPORT_TYPES)[number];
 
 export type ReportData =
   | DailySummaryResult | OutstandingResult | CustomerLtvItem[]

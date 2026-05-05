@@ -9,11 +9,8 @@ import { tenantContext } from '@goldsmith/tenant-context';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { STORAGE_PORT } from '@goldsmith/integrations-storage';
 import type { StoragePort } from '@goldsmith/integrations-storage';
+import { REPORT_TYPES } from './pdf/renderer';
 import type { ReportType } from './pdf/renderer';
-
-const VALID_REPORT_TYPES: ReportType[] = [
-  'daily-summary', 'outstanding', 'customer-ltv', 'loyalty-summary', 'stock-aging',
-];
 
 const BLOB_RETENTION_DAYS = 7;
 
@@ -51,7 +48,7 @@ export class ReportsExportService {
   ) {}
 
   async enqueue(reportType: ReportType, params: ExportEnqueueParams): Promise<{ id: string; status: 'QUEUED' }> {
-    if (!VALID_REPORT_TYPES.includes(reportType)) {
+    if (!(REPORT_TYPES as readonly string[]).includes(reportType)) {
       throw new BadRequestException({ code: 'reports.export.invalid_report_type' });
     }
     const ctx = tenantContext.requireCurrent();

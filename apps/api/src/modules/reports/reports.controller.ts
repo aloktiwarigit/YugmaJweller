@@ -17,10 +17,10 @@ import {
 } from './reports.csv';
 import { ReportsExportService } from './reports-export.service';
 import type { ExportStatusResult } from './reports-export.service';
-import type { ReportType } from './pdf/renderer';
+import { REPORT_TYPES } from './pdf/renderer';
 
 const ExportRequestSchema = z.object({
-  reportType: z.enum(['daily-summary', 'outstanding', 'customer-ltv', 'loyalty-summary', 'stock-aging']),
+  reportType: z.enum(REPORT_TYPES),
   params: z.record(z.unknown()).optional().default({}),
 });
 type ExportRequestDto = z.infer<typeof ExportRequestSchema>;
@@ -28,7 +28,7 @@ type ExportRequestDto = z.infer<typeof ExportRequestSchema>;
 @Controller('/api/v1/reports')
 export class ReportsController {
   constructor(
-    private readonly svc: ReportsService,
+    @Inject(ReportsService) private readonly svc: ReportsService,
     @Inject(ReportsExportService) private readonly exports: ReportsExportService,
   ) {}
 
@@ -139,7 +139,7 @@ export class ReportsController {
   async createExport(
     @Body(new ZodValidationPipe(ExportRequestSchema)) dto: ExportRequestDto,
   ): Promise<{ id: string; status: 'QUEUED' }> {
-    return this.exports.enqueue(dto.reportType as ReportType, dto.params);
+    return this.exports.enqueue(dto.reportType, dto.params);
   }
 
   @TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-4000-8000-000000000000' } })
