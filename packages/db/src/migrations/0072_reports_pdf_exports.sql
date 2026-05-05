@@ -6,10 +6,15 @@
 --
 -- Spec correction: the plan's task C1 prescribed `REFERENCES users(id)`, but
 -- the codebase has no `users` table — actors are `shop_users`. We use a
--- tenant-scoped composite FK (shop_id, requested_by_user_id) per the
--- 0058_product_images_tenant_fk.sql pattern, which closes the
--- FK-bypasses-RLS cross-tenant insert loophole called out in
+-- tenant-scoped composite FK on (shop_id, requested_by_user_id) →
+-- shop_users(shop_id, id) per the 0058_product_images_tenant_fk.sql pattern,
+-- with explicit ON DELETE RESTRICT (0058 omitted the clause and relied on
+-- the NO ACTION default; explicit RESTRICT is stricter and safer for
+-- deferred-constraint transactions). This closes the FK-bypasses-RLS
+-- cross-tenant insert loophole called out in
 -- feedback_spec_lessons_need_plan_assertions.md.
+
+BEGIN;
 
 CREATE TABLE reports_pdf_exports (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -28,7 +33,9 @@ CREATE TABLE reports_pdf_exports (
   CONSTRAINT reports_pdf_exports_shop_requester_fkey
     FOREIGN KEY (shop_id, requested_by_user_id)
     REFERENCES shop_users(shop_id, id)
-    ON DELETE RESTRICT
+    ON DELETE RESTRICT,
+  CONSTRAINT reports_pdf_exports_terminal_completed_at_chk
+    CHECK (status NOT IN ('READY','FAILED') OR completed_at IS NOT NULL)
 );
 
 CREATE INDEX reports_pdf_exports_shop_created_idx
@@ -43,3 +50,5 @@ CREATE POLICY rls_reports_pdf_exports_tenant_isolation ON reports_pdf_exports
   WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
 
 GRANT SELECT, INSERT, UPDATE ON reports_pdf_exports TO app_user;
+
+COMMIT;
