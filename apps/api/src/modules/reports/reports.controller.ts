@@ -78,9 +78,10 @@ export class ReportsController {
   @Get('/outstanding.csv')
   @Roles('shop_admin', 'shop_manager')
   async getOutstandingCsv(): Promise<{ csv: string; filename: string }> {
-    // CSV exports the FULL list (capped at 1000 — anchor jeweller's outstanding
-    // never exceeds low hundreds; cap protects worker memory in pathological cases).
-    const data = await this.svc.getOutstanding(1, 1000);
+    // CSV exports the first 100 outstanding invoices (service enforces a 100-row cap;
+    // sufficient for a single-shop ledger). Add a dedicated service method if unlimited
+    // export is ever required.
+    const data = await this.svc.getOutstanding(1, 100);
     return { csv: toOutstandingCsv(data), filename: `outstanding-${this.todayIST()}.csv` };
   }
 
