@@ -10,6 +10,7 @@ import type {
 } from '../reports.service';
 import { renderDailySummary } from './templates/daily-summary';
 import { renderOutstanding } from './templates/outstanding';
+import { renderCustomerLtv } from './templates/customer-ltv';
 
 const FONT_DIR = path.resolve(__dirname, '../../../../assets/fonts');
 
@@ -65,8 +66,11 @@ export class PdfRenderer {
       case 'outstanding':
         await renderOutstanding(doc, data as OutstandingResult, branding, this.storage);
         break;
-      // customer-ltv / loyalty-summary / stock-aging added in
-      // Tasks C8–C10. Until then, throw to fail fast.
+      case 'customer-ltv':
+        await renderCustomerLtv(doc, data as CustomerLtvItem[], branding, this.storage);
+        break;
+      // loyalty-summary / stock-aging added in Tasks C9–C10.
+      // Until then, throw to fail fast.
       default:
         throw new Error(`reports.pdf.template_not_implemented:${reportType}`);
     }

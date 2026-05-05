@@ -67,3 +67,16 @@ describe('PdfRenderer.render(outstanding)', () => {
     expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
   });
 });
+
+describe('PdfRenderer.render(customer-ltv)', () => {
+  it('produces a non-empty PDF buffer', async () => {
+    const renderer = new PdfRenderer(mockStorage);
+    const data = [
+      { customer_id: 'c1', name: 'रमेश सिंह', phone: '9900000001', ltv_paise: '2000000' },
+      { customer_id: 'c2', name: 'सुमन देवी', phone: '9900000002', ltv_paise: '1500000' },
+    ];
+    const buf = await renderer.render('customer-ltv', data, branding);
+    expect(buf.length).toBeGreaterThan(1000);
+    expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
+  });
+});
