@@ -97,3 +97,25 @@ describe('PdfRenderer.render(loyalty-summary)', () => {
     expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
   });
 });
+
+describe('PdfRenderer.render(stock-aging)', () => {
+  it('produces a non-empty PDF buffer with bucket summary + items', async () => {
+    const renderer = new PdfRenderer(mockStorage);
+    const data = {
+      buckets: [
+        { label: '<30d',   count: 2, totalWeightMg: '8000', totalCostPaise: '8000000' },
+        { label: '30-60d', count: 1, totalWeightMg: '50000', totalCostPaise: '500000' },
+        { label: '60-90d', count: 1, totalWeightMg: '4000',  totalCostPaise: '0' },
+        { label: '90d+',   count: 1, totalWeightMg: '8000',  totalCostPaise: '8000000' },
+      ],
+      items: [
+        { id: 'p1', sku: 'R-001', metal: 'GOLD', purity: '22K',
+          weightG: '5.000', daysInStock: 10, bucket: '<30d',
+          costPaise: '5000000', firstListedAt: '2026-04-15T00:00:00.000Z' },
+      ],
+    };
+    const buf = await renderer.render('stock-aging', data as never, branding);
+    expect(buf.length).toBeGreaterThan(1000);
+    expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
+  });
+});
