@@ -211,3 +211,79 @@ describe('getLoyaltySummary', () => {
     expect(result.members_by_tier).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// getStockAging
+// ---------------------------------------------------------------------------
+describe('getStockAging', () => {
+  it('aggregates products into 4 age buckets with counts and totals', async () => {
+    fakeTx = {
+      query: vi.fn().mockResolvedValue({
+        rows: [
+          // <30d
+          { id: 'p1', sku: 'R-001', metal: 'GOLD', purity: '22K', weight_g: '5.000',
+            cost_paise: '5000000', created_at: new Date(Date.now() - 10 * 86400_000), days_in_stock: 10, bucket: '<30d' },
+          { id: 'p2', sku: 'R-002', metal: 'GOLD', purity: '22K', weight_g: '3.000',
+            cost_paise: '3000000', created_at: new Date(Date.now() - 20 * 86400_000), days_in_stock: 20, bucket: '<30d' },
+          // 30-60d
+          { id: 'p3', sku: 'C-001', metal: 'SILVER', purity: '92.5', weight_g: '50.000',
+            cost_paise: '500000', created_at: new Date(Date.now() - 45 * 86400_000), days_in_stock: 45, bucket: '30-60d' },
+          // 60-90d
+          { id: 'p4', sku: 'C-002', metal: 'GOLD', purity: '22K', weight_g: '4.000',
+            cost_paise: null, created_at: new Date(Date.now() - 75 * 86400_000), days_in_stock: 75, bucket: '60-90d' },
+          // 90d+
+          { id: 'p5', sku: 'B-001', metal: 'GOLD', purity: '22K', weight_g: '8.000',
+            cost_paise: '8000000', created_at: new Date(Date.now() - 120 * 86400_000), days_in_stock: 120, bucket: '90d+' },
+        ],
+      }),
+    };
+
+    const svc = makeService();
+    const result = await svc.getStockAging();
+
+    expect(result.buckets).toHaveLength(4);
+    const byLabel = Object.fromEntries(result.buckets.map((b) => [b.label, b]));
+    expect(byLabel['<30d']!.count).toBe(2);
+    expect(byLabel['<30d']!.totalWeightMg).toBe('8000');     // (5 + 3) * 1000
+    expect(byLabel['<30d']!.totalCostPaise).toBe('8000000'); // 5000000 + 3000000
+    expect(byLabel['30-60d']!.count).toBe(1);
+    expect(byLabel['60-90d']!.count).toBe(1);
+    expect(byLabel['60-90d']!.totalCostPaise).toBe('0');     // null cost excluded
+    expect(byLabel['90d+']!.count).toBe(1);
+    expect(result.items).toHaveLength(5);
+    expect(result.items[0]!.bucket).toBeDefined();
+  });
+
+  it('returns all 4 buckets even when some are empty', async () => {
+    fakeTx = { query: vi.fn().mockResolvedValue({ rows: [] }) };
+    const svc = makeService();
+    const result = await svc.getStockAging();
+    expect(result.buckets).toHaveLength(4);
+    expect(result.buckets.every((b) => b.count === 0)).toBe(true);
+    expect(result.items).toEqual([]);
+  });
+
+  it('boundary: 29d → <30d, 30d → 30-60d, 89d → 60-90d, 90d → 90d+', async () => {
+    fakeTx = {
+      query: vi.fn().mockResolvedValue({
+        rows: [
+          { id: 'a', sku: 'A', metal: 'GOLD', purity: '22K', weight_g: '1.000',
+            cost_paise: '100000', created_at: new Date(), days_in_stock: 29, bucket: '<30d' },
+          { id: 'b', sku: 'B', metal: 'GOLD', purity: '22K', weight_g: '1.000',
+            cost_paise: '100000', created_at: new Date(), days_in_stock: 30, bucket: '30-60d' },
+          { id: 'c', sku: 'C', metal: 'GOLD', purity: '22K', weight_g: '1.000',
+            cost_paise: '100000', created_at: new Date(), days_in_stock: 89, bucket: '60-90d' },
+          { id: 'd', sku: 'D', metal: 'GOLD', purity: '22K', weight_g: '1.000',
+            cost_paise: '100000', created_at: new Date(), days_in_stock: 90, bucket: '90d+' },
+        ],
+      }),
+    };
+    const svc = makeService();
+    const result = await svc.getStockAging();
+    const byLabel = Object.fromEntries(result.buckets.map((b) => [b.label, b]));
+    expect(byLabel['<30d']!.count).toBe(1);
+    expect(byLabel['30-60d']!.count).toBe(1);
+    expect(byLabel['60-90d']!.count).toBe(1);
+    expect(byLabel['90d+']!.count).toBe(1);
+  });
+});

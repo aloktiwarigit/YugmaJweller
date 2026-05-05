@@ -42,6 +42,34 @@ export interface LoyaltySummaryResult {
   members_by_tier: { tier: string | null; count: number }[];
 }
 
+export type StockAgingBucketLabel = '<30d' | '30-60d' | '60-90d' | '90d+';
+
+export interface StockAgingBucket {
+  label: StockAgingBucketLabel;
+  count: number;
+  totalWeightMg: string;
+  totalCostPaise: string;
+}
+
+export interface StockAgingItem {
+  id: string;
+  sku: string;
+  metal: string;
+  purity: string;
+  weightG: string;
+  daysInStock: number;
+  bucket: StockAgingBucketLabel;
+  costPaise: string | null;
+  firstListedAt: string;
+}
+
+export interface StockAgingResult {
+  buckets: StockAgingBucket[];
+  items: StockAgingItem[];
+}
+
+const BUCKET_ORDER: StockAgingBucketLabel[] = ['<30d', '30-60d', '60-90d', '90d+'];
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 @Injectable()
@@ -230,6 +258,81 @@ export class ReportsService {
           count: parseInt(r.count, 10),
         })),
       };
+    });
+  }
+
+  async getStockAging(): Promise<StockAgingResult> {
+    return withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query<{
+        id: string;
+        sku: string;
+        metal: string;
+        purity: string;
+        weight_g: string;
+        cost_paise: string | null;
+        created_at: Date;
+        days_in_stock: number;
+        bucket: StockAgingBucketLabel;
+      }>(
+        // RLS scopes by app.current_shop_id; do NOT add WHERE shop_id = $1
+        // (would shadow RLS predicate; flagged by goldsmith.require-tenant-transaction).
+        `WITH aged AS (
+           SELECT id, sku, metal, purity,
+                  gross_weight_g::text AS weight_g,
+                  cost_paise::text     AS cost_paise,
+                  created_at,
+                  FLOOR(EXTRACT(EPOCH FROM (now() - created_at)) / 86400)::int AS days_in_stock
+           FROM products
+           WHERE status = 'IN_STOCK'
+         )
+         SELECT *,
+                CASE
+                  WHEN days_in_stock <  30 THEN '<30d'
+                  WHEN days_in_stock <  60 THEN '30-60d'
+                  WHEN days_in_stock <  90 THEN '60-90d'
+                  ELSE                          '90d+'
+                END AS bucket
+         FROM aged
+         ORDER BY days_in_stock DESC`,
+        [],
+      );
+
+      const items: StockAgingItem[] = r.rows.map((row) => ({
+        id:             row.id,
+        sku:            row.sku,
+        metal:          row.metal,
+        purity:         row.purity,
+        weightG:        row.weight_g,
+        daysInStock:    row.days_in_stock,
+        bucket:         row.bucket,
+        costPaise:      row.cost_paise,
+        firstListedAt:  row.created_at.toISOString(),
+      }));
+
+      const agg = new Map<StockAgingBucketLabel, { count: number; weightMg: bigint; costPaise: bigint }>();
+      for (const label of BUCKET_ORDER) {
+        agg.set(label, { count: 0, weightMg: 0n, costPaise: 0n });
+      }
+      for (const item of items) {
+        const bucket = agg.get(item.bucket)!;
+        bucket.count += 1;
+        const [whole, frac = '000'] = item.weightG.split('.');
+        const mg = BigInt(whole!) * 1000n + BigInt(frac.padEnd(3, '0').slice(0, 3));
+        bucket.weightMg += mg;
+        if (item.costPaise !== null) bucket.costPaise += BigInt(item.costPaise);
+      }
+
+      const buckets: StockAgingBucket[] = BUCKET_ORDER.map((label) => {
+        const a = agg.get(label)!;
+        return {
+          label,
+          count:          a.count,
+          totalWeightMg:  a.weightMg.toString(),
+          totalCostPaise: a.costPaise.toString(),
+        };
+      });
+
+      return { buckets, items };
     });
   }
 }
