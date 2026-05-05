@@ -7,6 +7,7 @@ import {
   useStockAging, formatPaise, formatWeightMg,
   type StockAgingBucket,
 } from '../../src/features/reports/useReports';
+import { ExportButtons } from '../../src/features/reports/components/ExportButtons';
 
 const GOLD = '#B58A3C';
 const ALERT = '#C53030';
@@ -54,6 +55,8 @@ export default function StockAgingScreen(): React.ReactElement {
 
       {data && (
         <>
+          <ExportButtons reportType="stock-aging" />
+
           <View style={styles.bucketRow}>
             {data.buckets.map((b) => <BucketCard key={b.label} bucket={b} />)}
           </View>

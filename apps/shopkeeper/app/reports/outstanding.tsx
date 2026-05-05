@@ -5,6 +5,7 @@ import {
 import { colors, spacing } from '@goldsmith/ui-tokens';
 import { useOutstanding, formatPaise } from '../../src/features/reports/useReports';
 import type { OutstandingItem } from '../../src/features/reports/useReports';
+import { ExportButtons } from '../../src/features/reports/components/ExportButtons';
 
 const GOLD = '#B58A3C';
 const PAGE_LIMIT = 20;
@@ -44,6 +45,8 @@ export default function OutstandingScreen(): React.ReactElement {
 
   return (
     <View style={styles.container}>
+      <ExportButtons reportType="outstanding" />
+
       {isLoading && (
         <ActivityIndicator color={GOLD} size="large" style={{ marginTop: 60 }} />
       )}
