@@ -67,7 +67,12 @@ export default function StockAgingScreen(): React.ReactElement {
           {data.items.map((it) => {
             const isAged = it.bucket === '90d+';
             return (
-              <View key={it.id} style={[styles.itemRow, isAged && styles.itemRowAlert]}>
+              <View
+                key={it.id}
+                style={[styles.itemRow, isAged && styles.itemRowAlert]}
+                accessibilityRole="text"
+                accessibilityLabel={`${it.sku}, ${it.metal} ${it.purity}, ${it.weightG} ग्राम, ${it.daysInStock} दिन${isAged ? ', पुराना स्टॉक — ध्यान दें' : ''}`}
+              >
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemSku}>{it.sku}</Text>
                   <Text style={styles.itemSubLabel}>
