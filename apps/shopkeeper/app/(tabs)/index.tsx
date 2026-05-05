@@ -4,10 +4,14 @@ import { t } from '@goldsmith/i18n';
 import { Button, Skeleton, Toast } from '@goldsmith/ui-mobile';
 import { colors, typography, spacing } from '@goldsmith/ui-tokens';
 import { useTenantStore } from '../../src/stores/tenantStore';
+import { useAuthStore } from '../../src/stores/authStore';
+import { DashboardKpiCard } from '../../src/components/DashboardKpiCard';
 
 export default function DashboardScreen(): React.ReactElement {
   const tenant = useTenantStore((s) => s.tenant);
   const loading = useTenantStore((s) => s.loading);
+  const role    = useAuthStore((s) => s.user?.role);
+  const showKpis = process.env['EXPO_PUBLIC_DASHBOARD_KPIS'] === '1' && role !== 'shop_staff';
   const [stubMsg, setStubMsg] = useState<string | null>(null);
 
   const showStub = (): void => {
@@ -144,6 +148,9 @@ export default function DashboardScreen(): React.ReactElement {
           />
         </View>
       )}
+
+      {/* Flag-gated KPI card — admin/manager only when EXPO_PUBLIC_DASHBOARD_KPIS=1 */}
+      {showKpis && <DashboardKpiCard />}
 
       {/* Stub toast */}
       {stubMsg !== null && (

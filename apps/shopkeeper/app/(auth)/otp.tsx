@@ -93,7 +93,7 @@ export default function OtpScreen(): React.ReactElement {
       clear();
       router.replace('/(tabs)');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '';
+      const msg = err instanceof Error ? err.message : String(err);
       const isLocked = msg.includes('429') || msg.includes('locked') || msg.includes('too-many-requests');
       if (isLocked) {
         setErrorMsg(t('auth.otp.errors.locked'));

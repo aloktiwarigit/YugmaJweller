@@ -10,6 +10,11 @@ vi.mock('expo-router', () => ({
   Redirect: (): null => null,
 }));
 
+// Mock api client to prevent @goldsmith/auth-client → firebase import chain
+vi.mock('../src/api/client', () => ({
+  api: { get: vi.fn() },
+}));
+
 import Dashboard from '../app/(tabs)/index';
 import { useTenantStore } from '../src/stores/tenantStore';
 
