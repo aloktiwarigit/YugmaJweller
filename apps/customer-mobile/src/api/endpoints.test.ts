@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import MockAdapter from 'axios-mock-adapter';
 import { api } from './client';
 import {
@@ -6,6 +6,10 @@ import {
   getPublicRates,
   listPublicProducts,
   customerSelfDelete,
+  getPurchases,
+  getCustomOrders,
+  getRateLockBookings,
+  getTryAtHomeBookings,
 } from './endpoints';
 
 describe('endpoints', () => {
@@ -104,5 +108,59 @@ describe('endpoints', () => {
     await expect(customerSelfDelete()).rejects.toMatchObject({
       code: 'deletion.customer_app_not_yet_available',
     });
+  });
+});
+
+describe('customer timeline endpoints', () => {
+  let mock: MockAdapter;
+  beforeEach(() => { mock = new MockAdapter(api); });
+  afterEach(() => mock.reset());
+
+  it('getPurchases returns invoices list', async () => {
+    const payload = {
+      invoices: [{ invoiceId: 'inv-1', invoiceNumber: 'INV-001',
+        issuedAt: '2026-04-01T10:00:00.000Z', totalPaise: '250000', status: 'PAID' }],
+      total: 1,
+    };
+    mock.onGet('/api/v1/customer/purchases').reply(200, payload);
+    const result = await getPurchases({ limit: 20, offset: 0 });
+    expect(result).toEqual(payload);
+  });
+
+  it('getCustomOrders returns orders list', async () => {
+    const payload = {
+      orders: [{ id: 'ord-1', status: 'IN_PROGRESS', description: 'Ring',
+        quotedAmountPaise: '100000', depositAmountPaise: '20000',
+        estimatedDeliveryDate: null, createdAt: '2026-04-01T10:00:00.000Z' }],
+      total: 1,
+    };
+    mock.onGet('/api/v1/customer/custom-orders').reply(200, payload);
+    const result = await getCustomOrders({ limit: 20, offset: 0 });
+    expect(result).toEqual(payload);
+  });
+
+  it('getRateLockBookings returns bookings list', async () => {
+    const payload = {
+      bookings: [{ id: 'rl-1', status: 'ACTIVE',
+        lockedRate24kPaisePerGram: '700000', depositAmountPaise: '50000',
+        expiresAt: '2026-05-05T10:00:00.000Z', lockedAt: '2026-05-04T10:00:00.000Z' }],
+      total: 1,
+    };
+    mock.onGet('/api/v1/customer/rate-lock/bookings').reply(200, payload);
+    const result = await getRateLockBookings({ limit: 20, offset: 0 });
+    expect(result).toEqual(payload);
+  });
+
+  it('getTryAtHomeBookings returns bookings list', async () => {
+    const payload = {
+      bookings: [{ id: 'tah-1', shopId: 'shop-1', customerId: 'cust-1',
+        productIds: ['p1'], status: 'REQUESTED',
+        requestedAt: '2026-05-01T08:00:00.000Z',
+        dispatchAt: null, returnDueAt: null, notes: null }],
+      total: 1,
+    };
+    mock.onGet('/api/v1/customer/try-at-home/bookings').reply(200, payload);
+    const result = await getTryAtHomeBookings({ limit: 20, offset: 0 });
+    expect(result).toEqual(payload);
   });
 });

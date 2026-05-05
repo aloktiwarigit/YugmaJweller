@@ -311,3 +311,92 @@ export async function getProductImages(productId: string): Promise<ProductImageR
   );
   return res.data.images;
 }
+
+// ── Customer timeline ─────────────────────────────────────────────────────────
+
+export interface PurchaseHistorySummary {
+  invoiceId:     string;
+  invoiceNumber: string;
+  issuedAt:      string | null;
+  totalPaise:    string;
+  status:        string;
+}
+
+export interface PurchasesResponse {
+  invoices: PurchaseHistorySummary[];
+  total:    number;
+}
+
+export interface CustomerCustomOrderItem {
+  id:                    string;
+  status:                string;
+  description:           string;
+  quotedAmountPaise:     string | null;
+  depositAmountPaise:    string;
+  estimatedDeliveryDate: string | null;
+  createdAt:             string;
+}
+
+export interface CustomOrdersResponse {
+  orders: CustomerCustomOrderItem[];
+  total:  number;
+}
+
+export interface CustomerRateLockItem {
+  id:                        string;
+  status:                    string;
+  lockedRate24kPaisePerGram: string;
+  depositAmountPaise:        string;
+  expiresAt:                 string;
+  lockedAt:                  string;
+}
+
+export interface RateLockBookingsResponse {
+  bookings: CustomerRateLockItem[];
+  total:    number;
+}
+
+export interface CustomerTryAtHomeItem {
+  id:          string;
+  shopId:      string;
+  customerId:  string;
+  productIds:  string[];
+  status:      string;
+  requestedAt: string;
+  dispatchAt:  string | null;
+  returnDueAt: string | null;
+  notes:       string | null;
+}
+
+export interface TryAtHomeBookingsListResponse {
+  bookings: CustomerTryAtHomeItem[];
+  total:    number;
+}
+
+export async function getPurchases(
+  params: { limit?: number; offset?: number } = {},
+): Promise<PurchasesResponse> {
+  const res = await api.get<PurchasesResponse>('/api/v1/customer/purchases', { params });
+  return res.data;
+}
+
+export async function getCustomOrders(
+  params: { limit?: number; offset?: number } = {},
+): Promise<CustomOrdersResponse> {
+  const res = await api.get<CustomOrdersResponse>('/api/v1/customer/custom-orders', { params });
+  return res.data;
+}
+
+export async function getRateLockBookings(
+  params: { limit?: number; offset?: number } = {},
+): Promise<RateLockBookingsResponse> {
+  const res = await api.get<RateLockBookingsResponse>('/api/v1/customer/rate-lock/bookings', { params });
+  return res.data;
+}
+
+export async function getTryAtHomeBookings(
+  params: { limit?: number; offset?: number } = {},
+): Promise<TryAtHomeBookingsListResponse> {
+  const res = await api.get<TryAtHomeBookingsListResponse>('/api/v1/customer/try-at-home/bookings', { params });
+  return res.data;
+}
