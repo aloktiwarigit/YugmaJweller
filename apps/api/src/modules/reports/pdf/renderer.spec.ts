@@ -118,4 +118,26 @@ describe('PdfRenderer.render(stock-aging)', () => {
     expect(buf.length).toBeGreaterThan(1000);
     expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
   });
+
+  it('renders multi-page stock-aging without overflow', async () => {
+    const renderer = new PdfRenderer(mockStorage);
+    const items = Array.from({ length: 60 }, (_, i) => ({
+      id: `p${i}`, sku: `R-${String(i).padStart(3, '0')}`,
+      metal: 'GOLD', purity: '22K', weightG: '5.000',
+      daysInStock: i + 1, bucket: '<30d' as const,
+      costPaise: '5000000', firstListedAt: '2026-04-15T00:00:00.000Z',
+    }));
+    const data = {
+      buckets: [
+        { label: '<30d',   count: 60, totalWeightMg: '300000', totalCostPaise: '300000000' },
+        { label: '30-60d', count: 0,  totalWeightMg: '0',       totalCostPaise: '0' },
+        { label: '60-90d', count: 0,  totalWeightMg: '0',       totalCostPaise: '0' },
+        { label: '90d+',   count: 0,  totalWeightMg: '0',       totalCostPaise: '0' },
+      ],
+      items,
+    };
+    const buf = await renderer.render('stock-aging', data as never, branding);
+    expect(buf.length).toBeGreaterThan(2000);
+    expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
+  });
 });
