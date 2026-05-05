@@ -31,10 +31,10 @@ export async function renderOutstanding(
   const cols = [
     { key: 'invoice', label: 'Invoice',    w: 0.18 },
     { key: 'name',    label: 'Customer',   w: 0.32 },
-    { key: 'phone',   label: 'Phone',      w: 0.16 },
-    { key: 'total',   label: 'Total (Rs)', w: 0.13 },
-    { key: 'due',     label: 'Due (Rs)',   w: 0.11 },
-    { key: 'date',    label: 'Issued',     w: 0.10 },
+    { key: 'phone',   label: 'Phone',      w: 0.12 },
+    { key: 'total',   label: 'Total (Rs)', w: 0.14 },
+    { key: 'due',     label: 'Due (Rs)',   w: 0.15 },
+    { key: 'date',    label: 'Issued',     w: 0.09 },
   ];
 
   // Header row
@@ -51,10 +51,11 @@ export async function renderOutstanding(
   // Body rows
   doc.font('Devanagari').fontSize(9).fillColor('#1c1917');
   for (const it of data.items) {
-    const rowY = doc.y;
+    let rowY = doc.y;
     if (rowY > doc.page.height - doc.page.margins.bottom - 80) {
       doc.addPage();
       await drawHeader(doc, branding, 'बकाया भुगतान / Outstanding Payments (cont.)', storage);
+      rowY = doc.y;
     }
     x = left;
     const cells = [

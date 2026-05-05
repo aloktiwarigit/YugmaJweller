@@ -51,4 +51,19 @@ describe('PdfRenderer.render(outstanding)', () => {
     expect(buf.length).toBeGreaterThan(1000);
     expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
   });
+
+  it('renders multi-page outstanding without overflow', async () => {
+    const renderer = new PdfRenderer(mockStorage);
+    // Generate enough rows to force at least one page break.
+    const items = Array.from({ length: 40 }, (_, i) => ({
+      id: `i${i}`, invoice_number: `GS-2026-${String(i).padStart(4, '0')}`,
+      customer_name: `Customer ${i}`, customer_phone: `90000${String(i).padStart(5, '0')}`,
+      total_paise: '500000', balance_due_paise: '250000',
+      issued_at: '2026-04-01T10:00:00.000Z',
+    }));
+    const data = { total: 40, page: 1, limit: 100, items };
+    const buf = await renderer.render('outstanding', data, branding);
+    expect(buf.length).toBeGreaterThan(2000); // multi-page PDF will be larger
+    expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
+  });
 });
