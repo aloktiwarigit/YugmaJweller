@@ -23,3 +23,10 @@ describe('AuditAction — backfilled values', () => {
     expect(AuditAction[key as keyof typeof AuditAction]).toBe(key);
   });
 });
+
+describe('reports export audit actions', () => {
+  it('exposes REPORT_EXPORT_REQUESTED and REPORT_EXPORT_REGENERATED', () => {
+    expect(AuditAction.REPORT_EXPORT_REQUESTED).toBe('REPORT_EXPORT_REQUESTED');
+    expect(AuditAction.REPORT_EXPORT_REGENERATED).toBe('REPORT_EXPORT_REGENERATED');
+  });
+});
