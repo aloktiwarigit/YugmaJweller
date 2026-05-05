@@ -80,3 +80,20 @@ describe('PdfRenderer.render(customer-ltv)', () => {
     expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
   });
 });
+
+describe('PdfRenderer.render(loyalty-summary)', () => {
+  it('produces a non-empty PDF buffer', async () => {
+    const renderer = new PdfRenderer(mockStorage);
+    const data = {
+      points_issued: 5000, points_redeemed: 1200,
+      members_by_tier: [
+        { tier: 'GOLD',   count: 12 },
+        { tier: 'SILVER', count: 8 },
+        { tier: null,     count: 3 },
+      ],
+    };
+    const buf = await renderer.render('loyalty-summary', data, branding);
+    expect(buf.length).toBeGreaterThan(1000);
+    expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
+  });
+});
