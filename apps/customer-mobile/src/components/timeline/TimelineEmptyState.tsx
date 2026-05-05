@@ -1,14 +1,14 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { colors, typography, spacing } from '@goldsmith/ui-tokens';
-
-export type TimelineTab = 'purchases' | 'custom-orders' | 'rate-locks' | 'try-at-home';
+import type { TimelineTab } from './TimelineTabBar';
 
 const EMPTY_COPY: Record<TimelineTab, { icon: string; headline: string; subtext: string }> = {
   'purchases':     { icon: '🧾', headline: 'अभी तक कोई खरीदारी नहीं',        subtext: 'दुकान पर जाएं और अपनी पहली खरीद करें' },
   'custom-orders': { icon: '💍', headline: 'कोई कस्टम ऑर्डर नहीं',            subtext: 'अपने सपनों का गहना बनवाएं' },
   'rate-locks':    { icon: '🔒', headline: 'कोई दर-लॉक नहीं',                  subtext: 'सोने की कीमत लॉक करें, बाद में खरीदें' },
   'try-at-home':   { icon: '🏠', headline: 'कोई ट्राई-एट-होम बुकिंग नहीं',    subtext: 'घर पर गहने देखें और पसंद करें' },
+  'reviews':       { icon: '⭐', headline: 'कोई समीक्षा नहीं',                 subtext: 'अपनी खरीद पर समीक्षा दें' },
 };
 
 interface TimelineEmptyStateProps {
