@@ -164,6 +164,15 @@ export default function EditProductScreen(): React.ReactElement {
       </Pressable>
 
       <Pressable
+        style={styles.linkRow}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onPress={() => router.push(`/inventory/${id}/analytics` as any)}
+        accessibilityRole="link"
+        accessibilityLabel="ग्राहक रुचि">
+        <Text style={styles.linkText}>ग्राहक रुचि (व्यू एनालिटिक्स) →</Text>
+      </Pressable>
+
+      <Pressable
         style={[styles.saveBtn, mutation.isPending && styles.saveBtnDisabled]}
         onPress={() => mutation.mutate(form)}
         disabled={mutation.isPending}
