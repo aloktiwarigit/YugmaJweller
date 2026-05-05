@@ -5,7 +5,6 @@ import { useEffect, useRef } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { colors } from '@goldsmith/ui-tokens';
 import PostHog, { PostHogProvider, usePostHog } from 'posthog-react-native';
 import { AuthProvider } from '../src/providers/AuthProvider';
 import { TenantProvider } from '../src/providers/TenantProvider';
@@ -70,7 +69,6 @@ export default function RootLayout(): JSX.Element | null {
               <StatusBar style="dark" />
               <Stack
                 screenOptions={{
-                  contentStyle: { backgroundColor: colors.bg },
                   headerShown: false,
                 }}
               />

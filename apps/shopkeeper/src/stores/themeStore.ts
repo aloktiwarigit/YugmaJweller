@@ -14,16 +14,12 @@ import { DEFAULT_THEME_ID, THEMES, type ThemeId, type ThemePreset } from '@golds
 
 export interface ThemeState {
   themeId:    ThemeId;
-  hydrated:   boolean;
   setThemeId: (id: ThemeId) => void;
-  setHydrated: (b: boolean) => void;
 }
 
 export const useThemeStore = create<ThemeState>((set) => ({
-  themeId:     DEFAULT_THEME_ID,
-  hydrated:    false,
-  setThemeId:  (id): void => set({ themeId: id }),
-  setHydrated: (b): void => set({ hydrated: b }),
+  themeId:    DEFAULT_THEME_ID,
+  setThemeId: (id): void => set({ themeId: id }),
 }));
 
 /** Read the active preset (selector helper). */

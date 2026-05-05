@@ -23,8 +23,7 @@ export async function persistThemeId(id: ThemeId): Promise<void> {
  * unrecognised — could happen if a preset is removed in a future build).
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }): React.ReactElement {
-  const setThemeId  = useThemeStore((s) => s.setThemeId);
-  const setHydrated = useThemeStore((s) => s.setHydrated);
+  const setThemeId = useThemeStore((s) => s.setThemeId);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,14 +38,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }): Reac
         }
       } catch {
         if (!cancelled) setThemeId(DEFAULT_THEME_ID);
-      } finally {
-        if (!cancelled) setHydrated(true);
       }
     })();
     return (): void => {
       cancelled = true;
     };
-  }, [setThemeId, setHydrated]);
+  }, [setThemeId]);
 
   return <>{children}</>;
 }

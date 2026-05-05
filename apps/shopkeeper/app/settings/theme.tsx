@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { THEME_PRESETS, spacing, typography, type ThemeId } from '@goldsmith/ui-tokens';
@@ -18,11 +18,17 @@ export default function ThemeSwitcherScreen(): React.ReactElement {
   const activeId    = useThemeStore((s) => s.themeId);
   const setThemeId  = useThemeStore((s) => s.setThemeId);
 
+  // Defence in depth — settings/index.tsx already gates the link by __DEV__.
+  // If a release build somehow lands on this route (deep link, etc.) bail out.
+  // Must be in useEffect to avoid calling router.replace during render.
+  useEffect(() => {
+    if (!__DEV__) {
+      router.replace('/settings' as never);
+    }
+  }, []);
+
   if (!__DEV__) {
-    // Defence in depth — settings/index.tsx already gates the link by __DEV__.
-    // If a release build somehow lands on this route (deep link, etc.) bail out.
-    router.replace('/settings');
-    return <View />;
+    return <View style={{ flex: 1, backgroundColor: '#F5EDDD' }} />;
   }
 
   const onSelect = (id: ThemeId): void => {
