@@ -2,13 +2,19 @@ import React from 'react';
 import { ScrollView, Pressable, Text, View } from 'react-native';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 
-export type TimelineTab = 'purchases' | 'custom-orders' | 'rate-locks' | 'try-at-home';
+export type TimelineTab =
+  | 'purchases'
+  | 'custom-orders'
+  | 'rate-locks'
+  | 'try-at-home'
+  | 'reviews';
 
 const TABS: { id: TimelineTab; label: string }[] = [
   { id: 'purchases',    label: 'खरीदारी' },
   { id: 'custom-orders',label: 'कस्टम ऑर्डर' },
   { id: 'rate-locks',   label: 'दर-लॉक' },
   { id: 'try-at-home',  label: 'ट्राई-एट-होम' },
+  { id: 'reviews',      label: 'समीक्षा' },
 ];
 
 interface TimelineTabBarProps {

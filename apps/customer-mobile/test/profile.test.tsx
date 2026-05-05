@@ -43,12 +43,13 @@ describe('Profile screen', () => {
     expect(getByTestId('loyalty-card')).toBeTruthy();
   });
 
-  it('renders all 4 Hindi tab labels', () => {
+  it('renders all 5 Hindi tab labels', () => {
     const { container } = render(<Profile />, { wrapper });
     expect(container.textContent).toContain('खरीदारी');
     expect(container.textContent).toContain('कस्टम ऑर्डर');
     expect(container.textContent).toContain('दर-लॉक');
     expect(container.textContent).toContain('ट्राई-एट-होम');
+    expect(container.textContent).toContain('समीक्षा');
   });
 
   it('does not contain the string Goldsmith (white-label invariant)', () => {
