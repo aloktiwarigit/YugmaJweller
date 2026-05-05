@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { toCustomerLtvCsv, toDailySummaryCsv, toOutstandingCsv } from './reports.csv';
-import type { CustomerLtvItem, DailySummaryResult, OutstandingResult } from './reports.service';
+import { toCustomerLtvCsv, toDailySummaryCsv, toLoyaltySummaryCsv, toOutstandingCsv } from './reports.csv';
+import type { CustomerLtvItem, DailySummaryResult, LoyaltySummaryResult, OutstandingResult } from './reports.service';
 
 describe('toDailySummaryCsv', () => {
   it('emits header + one data row with paise→rupees conversion', () => {
@@ -97,5 +97,42 @@ describe('toCustomerLtvCsv', () => {
 
   it('emits header only when no customers', () => {
     expect(toCustomerLtvCsv([]).split('\r\n')).toHaveLength(1);
+  });
+});
+
+describe('toLoyaltySummaryCsv', () => {
+  it('emits a 2-section CSV: totals header+row, blank line, per-tier breakdown', () => {
+    const data: LoyaltySummaryResult = {
+      points_issued: 5000,
+      points_redeemed: 1200,
+      members_by_tier: [
+        { tier: 'GOLD',   count: 12 },
+        { tier: 'SILVER', count: 8  },
+        { tier: null,     count: 3  },
+      ],
+    };
+    const csv = toLoyaltySummaryCsv(data);
+    const lines = csv.split('\r\n');
+    expect(lines[0]).toBe('Points Issued,Points Redeemed,Net Points');
+    expect(lines[1]).toBe('5000,1200,3800');
+    expect(lines[2]).toBe('');
+    expect(lines[3]).toBe('Tier,Member Count');
+    expect(lines[4]).toBe('GOLD,12');
+    expect(lines[5]).toBe('SILVER,8');
+    expect(lines[6]).toBe('UNTIERED,3');
+  });
+
+  it('emits empty tier list cleanly', () => {
+    const data: LoyaltySummaryResult = {
+      points_issued: 0, points_redeemed: 0, members_by_tier: [],
+    };
+    const csv = toLoyaltySummaryCsv(data);
+    const lines = csv.split('\r\n');
+    expect(lines).toEqual([
+      'Points Issued,Points Redeemed,Net Points',
+      '0,0,0',
+      '',
+      'Tier,Member Count',
+    ]);
   });
 });

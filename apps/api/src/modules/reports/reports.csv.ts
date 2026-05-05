@@ -1,7 +1,6 @@
-import type { CustomerLtvItem, DailySummaryResult, OutstandingResult } from './reports.service';
-// Note: B4-B5 will each extend this import to add
-// LoyaltySummaryResult, StockAgingResult as their emitters land.
-// Pulling them all in now would trip TS6196 (noUnusedLocals).
+import type { CustomerLtvItem, DailySummaryResult, LoyaltySummaryResult, OutstandingResult } from './reports.service';
+// Note: B5 will extend this import to add StockAgingResult as its emitter lands.
+// Pulling it in now would trip TS6196 (noUnusedLocals).
 
 // Shared helpers — duplicated locally rather than extracted to packages/shared per
 // YAGNI; if a third caller appears, hoist these into @goldsmith/shared.
@@ -68,4 +67,18 @@ export function toCustomerLtvCsv(items: CustomerLtvItem[]): string {
     csvRow([c.customer_id, c.name, c.phone, paiseToRupees(c.ltv_paise)]),
   );
   return [header, ...rows].join(LE);
+}
+
+export function toLoyaltySummaryCsv(data: LoyaltySummaryResult): string {
+  const totalsHeader = csvRow(['Points Issued', 'Points Redeemed', 'Net Points']);
+  const totalsRow = csvRow([
+    data.points_issued,
+    data.points_redeemed,
+    data.points_issued - data.points_redeemed,
+  ]);
+  const tierHeader = csvRow(['Tier', 'Member Count']);
+  const tierRows = data.members_by_tier.map((t) =>
+    csvRow([t.tier ?? 'UNTIERED', t.count]),
+  );
+  return [totalsHeader, totalsRow, '', tierHeader, ...tierRows].join(LE);
 }
