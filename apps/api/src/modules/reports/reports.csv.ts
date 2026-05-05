@@ -1,6 +1,4 @@
-import type { CustomerLtvItem, DailySummaryResult, LoyaltySummaryResult, OutstandingResult } from './reports.service';
-// Note: B5 will extend this import to add StockAgingResult as its emitter lands.
-// Pulling it in now would trip TS6196 (noUnusedLocals).
+import type { CustomerLtvItem, DailySummaryResult, LoyaltySummaryResult, OutstandingResult, StockAgingResult } from './reports.service';
 
 // Shared helpers — duplicated locally rather than extracted to packages/shared per
 // YAGNI; if a third caller appears, hoist these into @goldsmith/shared.
@@ -81,4 +79,24 @@ export function toLoyaltySummaryCsv(data: LoyaltySummaryResult): string {
     csvRow([t.tier ?? 'UNTIERED', t.count]),
   );
   return [totalsHeader, totalsRow, '', tierHeader, ...tierRows].join(LE);
+}
+
+export function toStockAgingCsv(data: StockAgingResult): string {
+  const header = csvRow([
+    'SKU', 'Metal', 'Purity', 'Weight (g)',
+    'Days in Stock', 'Age Bucket', 'Cost (Rs)', 'First Listed',
+  ]);
+  const rows = data.items.map((it) =>
+    csvRow([
+      it.sku,
+      it.metal,
+      it.purity,
+      it.weightG,
+      it.daysInStock,
+      it.bucket,
+      it.costPaise === null ? '' : paiseToRupees(it.costPaise),
+      it.firstListedAt,
+    ]),
+  );
+  return [header, ...rows].join(LE);
 }

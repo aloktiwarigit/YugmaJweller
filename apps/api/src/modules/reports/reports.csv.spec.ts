@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { toCustomerLtvCsv, toDailySummaryCsv, toLoyaltySummaryCsv, toOutstandingCsv } from './reports.csv';
-import type { CustomerLtvItem, DailySummaryResult, LoyaltySummaryResult, OutstandingResult } from './reports.service';
+import { toCustomerLtvCsv, toDailySummaryCsv, toLoyaltySummaryCsv, toOutstandingCsv, toStockAgingCsv } from './reports.csv';
+import type { CustomerLtvItem, DailySummaryResult, LoyaltySummaryResult, OutstandingResult, StockAgingResult } from './reports.service';
 
 describe('toDailySummaryCsv', () => {
   it('emits header + one data row with paise→rupees conversion', () => {
@@ -134,5 +134,33 @@ describe('toLoyaltySummaryCsv', () => {
       '',
       'Tier,Member Count',
     ]);
+  });
+});
+
+describe('toStockAgingCsv', () => {
+  it('emits item-level CSV with bucket label and null cost as empty', () => {
+    const data: StockAgingResult = {
+      buckets: [], // unused by CSV
+      items: [
+        { id: 'p1', sku: 'R-001', metal: 'GOLD', purity: '22K',
+          weightG: '5.000', daysInStock: 10, bucket: '<30d',
+          costPaise: '5000000', firstListedAt: '2026-04-15T00:00:00.000Z' },
+        { id: 'p2', sku: 'C-002', metal: 'GOLD', purity: '22K',
+          weightG: '4.000', daysInStock: 75, bucket: '60-90d',
+          costPaise: null, firstListedAt: '2026-02-15T00:00:00.000Z' },
+      ],
+    };
+    const csv = toStockAgingCsv(data);
+    const lines = csv.split('\r\n');
+    expect(lines[0]).toBe(
+      'SKU,Metal,Purity,Weight (g),Days in Stock,Age Bucket,Cost (Rs),First Listed',
+    );
+    expect(lines[1]).toBe('R-001,GOLD,22K,5.000,10,<30d,50000.00,2026-04-15T00:00:00.000Z');
+    expect(lines[2]).toBe('C-002,GOLD,22K,4.000,75,60-90d,,2026-02-15T00:00:00.000Z');
+  });
+
+  it('emits header only when no items', () => {
+    const data: StockAgingResult = { buckets: [], items: [] };
+    expect(toStockAgingCsv(data).split('\r\n')).toHaveLength(1);
   });
 });
