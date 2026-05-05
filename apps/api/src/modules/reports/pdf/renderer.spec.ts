@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PdfRenderer } from './renderer';
 import type { ShopBranding } from './branding';
-import type { DailySummaryResult } from '../reports.service';
+import type { DailySummaryResult, OutstandingResult } from '../reports.service';
 
 const mockStorage = {
   downloadBuffer: vi.fn().mockRejectedValue(new Error('no logo')),
@@ -30,6 +30,24 @@ describe('PdfRenderer.render(daily-summary)', () => {
       invoice_count: 3, gold_weight_mg: '15000',
     };
     const buf = await renderer.render('daily-summary', data, branding);
+    expect(buf.length).toBeGreaterThan(1000);
+    expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
+  });
+});
+
+describe('PdfRenderer.render(outstanding)', () => {
+  it('produces a non-empty PDF buffer with %PDF- magic bytes', async () => {
+    const renderer = new PdfRenderer(mockStorage);
+    const data: OutstandingResult = {
+      total: 1, page: 1, limit: 100,
+      items: [{
+        id: 'i1', invoice_number: 'GS-2026-0001',
+        customer_name: 'राज कुमार', customer_phone: '9876543210',
+        total_paise: '100000', balance_due_paise: '50000',
+        issued_at: '2026-04-01T10:00:00.000Z',
+      }],
+    };
+    const buf = await renderer.render('outstanding', data, branding);
     expect(buf.length).toBeGreaterThan(1000);
     expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
   });
