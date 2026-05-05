@@ -71,6 +71,15 @@ export default function TabsLayout(): JSX.Element {
         }}
       />
       <Tabs.Screen
+        name="more"
+        options={{
+          title: 'अधिक',
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
+            <TabIcon name="grid-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: 'सेटिंग्स',
