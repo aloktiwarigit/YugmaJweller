@@ -237,7 +237,7 @@ describe('RateLockBookingsService.getBookingsForCustomer', () => {
   const SHOP_GBC     = '0a1b2c3d-4e5f-4000-8000-aaaaaaaaaaaa';
   const CUSTOMER_GBC = 'cccccccc-dddd-4000-8000-000000000001';
 
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns mapped bookings and total', async () => {
     const fakeRow = {

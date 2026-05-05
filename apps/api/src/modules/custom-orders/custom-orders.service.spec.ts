@@ -38,7 +38,7 @@ function makeService() {
 }
 
 describe('CustomOrdersService.getOrdersForCustomer', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns mapped orders and total', async () => {
     const fakeRow = {

@@ -251,6 +251,7 @@ export class TryAtHomeBookingsService {
 
   async getBookingsForCustomer(
     customerId: string,
+    // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- customer-facing endpoint; shopId from CustomerAuthGuard JWT, not TenantContext
     shopId: string,
     params: { limit: number; offset: number },
   ): Promise<{ bookings: BookingResponse[]; total: number }> {

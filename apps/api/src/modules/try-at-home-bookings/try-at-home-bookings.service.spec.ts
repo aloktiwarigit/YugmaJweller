@@ -279,7 +279,7 @@ describe('TryAtHomeBookingsService.getBookingsForCustomer', () => {
   const SHOP_GBC     = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   const CUSTOMER_GBC = 'cccccccc-cccc-4000-8000-000000000001';
 
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns mapped bookings and total', async () => {
     const fakeRow = {

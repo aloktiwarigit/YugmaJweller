@@ -325,6 +325,7 @@ export class CustomOrdersService {
 
   async getOrdersForCustomer(
     customerId: string,
+    // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- customer-facing endpoint; shopId from CustomerAuthGuard JWT, not TenantContext
     shopId: string,
     params: { limit: number; offset: number },
   ): Promise<{ orders: CustomerCustomOrderItem[]; total: number }> {
