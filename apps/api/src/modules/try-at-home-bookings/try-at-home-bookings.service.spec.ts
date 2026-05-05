@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { UnprocessableEntityException, BadRequestException } from '@nestjs/common';
-import { TryAtHomeBookingsService } from './try-at-home-bookings.service';
 
 // ── constants ──────────────────────────────────────────────────────────────
 const SHOP      = '0a1b2c3d-4e5f-4000-8000-000000000001';
@@ -17,6 +16,23 @@ vi.mock('@goldsmith/tenant-context', () => ({
     requireCurrent: () => ({ authenticated: true, shopId: SHOP, userId: USER }),
   },
 }));
+
+vi.mock('@goldsmith/db', () => ({
+  withShopTx:   vi.fn((_pool: unknown, _shopId: unknown, fn: (tx: unknown) => unknown) => fn(_pool)),
+  withTenantTx: vi.fn((_pool: unknown, fn: (tx: unknown) => unknown) => fn(_pool)),
+}));
+
+vi.mock('@goldsmith/audit', () => ({
+  auditLog: vi.fn(async () => undefined),
+  AuditAction: {
+    TRY_AT_HOME_BOOKING_CREATED:          'TRY_AT_HOME_BOOKING_CREATED',
+    TRY_AT_HOME_BOOKING_DISPATCHED:       'TRY_AT_HOME_BOOKING_DISPATCHED',
+    TRY_AT_HOME_BOOKING_RETURN_RECORDED:  'TRY_AT_HOME_BOOKING_RETURN_RECORDED',
+  },
+}));
+
+import { withShopTx } from '@goldsmith/db';
+import { TryAtHomeBookingsService } from './try-at-home-bookings.service';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function fakePool() {
@@ -256,5 +272,55 @@ describe('TryAtHomeBookingsService.recordReturn — creates invoice for kept pie
       returnedProductIds: [PROD_B], // PROD_B is not in booking
       keptProductIds:     [],
     })).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('TryAtHomeBookingsService.getBookingsForCustomer', () => {
+  const SHOP_GBC     = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const CUSTOMER_GBC = 'cccccccc-cccc-4000-8000-000000000001';
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('returns mapped bookings and total', async () => {
+    const fakeRow = {
+      id: 'tah-1', shop_id: SHOP_GBC, customer_id: CUSTOMER_GBC,
+      product_ids: ['p1', 'p2'], status: 'REQUESTED',
+      requested_at: new Date('2026-05-01T08:00:00.000Z'),
+      dispatch_at: null, return_due_at: null, notes: 'Handle carefully',
+    };
+    const mockTx = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [fakeRow] })
+        .mockResolvedValueOnce({ rows: [{ count: '1' }] }),
+    };
+    vi.mocked(withShopTx).mockImplementationOnce((_pool, _shopId, fn) => fn(mockTx as never));
+
+    const result = await buildSvc().getBookingsForCustomer(CUSTOMER_GBC, SHOP_GBC, { limit: 20, offset: 0 });
+
+    expect(result.total).toBe(1);
+    expect(result.bookings).toHaveLength(1);
+    expect(result.bookings[0]).toMatchObject({
+      id: 'tah-1',
+      status: 'REQUESTED',
+      productIds: ['p1', 'p2'],
+      requestedAt: '2026-05-01T08:00:00.000Z',
+      dispatchAt: null,
+      returnDueAt: null,
+      notes: 'Handle carefully',
+    });
+  });
+
+  it('returns empty list when customer has no bookings', async () => {
+    const mockTx = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] }),
+    };
+    vi.mocked(withShopTx).mockImplementationOnce((_pool, _shopId, fn) => fn(mockTx as never));
+
+    const result = await buildSvc().getBookingsForCustomer(CUSTOMER_GBC, SHOP_GBC, { limit: 20, offset: 0 });
+
+    expect(result.bookings).toHaveLength(0);
+    expect(result.total).toBe(0);
   });
 });

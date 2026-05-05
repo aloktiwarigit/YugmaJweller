@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 
 const SHOP     = '0a1b2c3d-4e5f-4000-8000-aaaaaaaaaaaa';
@@ -24,6 +24,21 @@ vi.mock('@goldsmith/audit', () => ({
   },
 }));
 
+vi.mock('@goldsmith/db', () => ({
+  withShopTx: vi.fn(async (_pool: any, _shopId: unknown, fn: (tx: unknown) => unknown) => {
+    // If pool has a connect() method, use client (mirrors real withShopTx for tests that set pool.connect).
+    if (typeof _pool?.connect === 'function') {
+      const client = await _pool.connect();
+      if (client && typeof client.query === 'function') {
+        return fn(client);
+      }
+    }
+    return fn(_pool);
+  }),
+  withTenantTx: vi.fn((_pool: unknown, fn: (tx: unknown) => unknown) => fn(_pool)),
+}));
+
+import { withShopTx } from '@goldsmith/db';
 import { RateLockBookingsService } from './rate-lock-bookings.service';
 
 function makePool(opts: {
@@ -215,5 +230,71 @@ describe('RateLockBookingsService', () => {
       const { svc } = makeSvc();
       expect(await svc.confirmAndMarkUsed(BOOKING, tx)).toBe(false);
     });
+  });
+});
+
+describe('RateLockBookingsService.getBookingsForCustomer', () => {
+  const SHOP_GBC     = '0a1b2c3d-4e5f-4000-8000-aaaaaaaaaaaa';
+  const CUSTOMER_GBC = 'cccccccc-dddd-4000-8000-000000000001';
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('returns mapped bookings and total', async () => {
+    const fakeRow = {
+      id: 'rl-1', status: 'ACTIVE',
+      locked_rate_24k_paise_per_gram: 700000n,
+      deposit_amount_paise: 50000n,
+      expires_at: new Date('2026-05-05T10:00:00.000Z'),
+      locked_at:  new Date('2026-05-04T10:00:00.000Z'),
+    };
+    const mockTx = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [fakeRow] })
+        .mockResolvedValueOnce({ rows: [{ count: '1' }] }),
+    };
+    vi.mocked(withShopTx).mockImplementation((_pool, _shopId, fn) => fn(mockTx as never));
+
+    const svc = new RateLockBookingsService(
+      makePool() as never,
+      { getCurrentRatesForTenant: vi.fn().mockResolvedValue({
+          GOLD_24K: { perGramPaise: 700000n, fetchedAt: new Date() },
+        }) } as never,
+      { createOrder: vi.fn(), verifySignature: vi.fn() } as never,
+      { set: vi.fn().mockResolvedValue('OK') } as never,
+    );
+
+    const result = await svc.getBookingsForCustomer(CUSTOMER_GBC, SHOP_GBC, { limit: 20, offset: 0 });
+
+    expect(result.total).toBe(1);
+    expect(result.bookings).toHaveLength(1);
+    expect(result.bookings[0]).toMatchObject({
+      id: 'rl-1',
+      status: 'ACTIVE',
+      lockedRate24kPaisePerGram: '700000',
+      depositAmountPaise: '50000',
+      expiresAt: '2026-05-05T10:00:00.000Z',
+      lockedAt:  '2026-05-04T10:00:00.000Z',
+    });
+  });
+
+  it('returns empty list when customer has no bookings', async () => {
+    const mockTx = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] }),
+    };
+    vi.mocked(withShopTx).mockImplementation((_pool, _shopId, fn) => fn(mockTx as never));
+
+    const svc = new RateLockBookingsService(
+      makePool() as never,
+      { getCurrentRatesForTenant: vi.fn() } as never,
+      { createOrder: vi.fn(), verifySignature: vi.fn() } as never,
+      { set: vi.fn().mockResolvedValue('OK') } as never,
+    );
+
+    const result = await svc.getBookingsForCustomer(CUSTOMER_GBC, SHOP_GBC, { limit: 20, offset: 0 });
+
+    expect(result.bookings).toHaveLength(0);
+    expect(result.total).toBe(0);
   });
 });

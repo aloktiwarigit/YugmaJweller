@@ -30,6 +30,15 @@ export interface ActiveLockPeek {
   lockedRate24kPaise: bigint;
 }
 
+export interface CustomerRateLockItem {
+  id:                        string;
+  status:                    string;
+  lockedRate24kPaisePerGram: string;
+  depositAmountPaise:        string;
+  expiresAt:                 string;
+  lockedAt:                  string;
+}
+
 // Pure function exported for billing.service.ts — scales all GOLD_* purity rates
 // proportionally when a customer has an active rate-lock booking.
 const GOLD_PURITIES: PurityKey[] = ['GOLD_24K', 'GOLD_22K', 'GOLD_20K', 'GOLD_18K', 'GOLD_14K'];
@@ -304,6 +313,47 @@ export class RateLockBookingsService {
       }).catch(() => undefined);
     }
     return count;
+  }
+
+  async getBookingsForCustomer(
+    customerId: string,
+    shopId: string,
+    params: { limit: number; offset: number },
+  ): Promise<{ bookings: CustomerRateLockItem[]; total: number }> {
+    const [data, count] = await withShopTx(this.pool, shopId, (tx) =>
+      Promise.all([
+        tx.query<{
+          id: string; status: string;
+          locked_rate_24k_paise_per_gram: bigint;
+          deposit_amount_paise: bigint;
+          expires_at: Date; locked_at: Date;
+        }>(
+          `SELECT id, status, locked_rate_24k_paise_per_gram, deposit_amount_paise,
+                  expires_at, locked_at
+           FROM rate_lock_bookings
+           WHERE customer_id = $1 AND shop_id = $2
+           ORDER BY locked_at DESC
+           LIMIT $3 OFFSET $4`,
+          [customerId, shopId, params.limit, params.offset],
+        ),
+        tx.query<{ count: string }>(
+          `SELECT COUNT(*) FROM rate_lock_bookings
+           WHERE customer_id = $1 AND shop_id = $2`,
+          [customerId, shopId],
+        ),
+      ]),
+    );
+    return {
+      bookings: data.rows.map((r) => ({
+        id:                        r.id,
+        status:                    r.status,
+        lockedRate24kPaisePerGram: r.locked_rate_24k_paise_per_gram.toString(),
+        depositAmountPaise:        r.deposit_amount_paise.toString(),
+        expiresAt:                 r.expires_at.toISOString(),
+        lockedAt:                  r.locked_at.toISOString(),
+      })),
+      total: Number(count.rows[0]!.count),
+    };
   }
 
   async listBookings(opts: { customerId?: string; status?: string }): Promise<unknown[]> {

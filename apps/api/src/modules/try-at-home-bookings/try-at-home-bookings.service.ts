@@ -248,4 +248,33 @@ export class TryAtHomeBookingsService {
     if (!booking) throw new NotFoundException({ code: 'try_at_home.booking_not_found' });
     return rowToResponse(booking);
   }
+
+  async getBookingsForCustomer(
+    customerId: string,
+    shopId: string,
+    params: { limit: number; offset: number },
+  ): Promise<{ bookings: BookingResponse[]; total: number }> {
+    const [data, count] = await withShopTx(this.pool, shopId, (tx) =>
+      Promise.all([
+        tx.query<TryAtHomeBookingRow>(
+          `SELECT id, shop_id, customer_id, product_ids, status,
+                  requested_at, dispatch_at, return_due_at, notes
+           FROM try_at_home_bookings
+           WHERE customer_id = $1 AND shop_id = $2
+           ORDER BY requested_at DESC
+           LIMIT $3 OFFSET $4`,
+          [customerId, shopId, params.limit, params.offset],
+        ),
+        tx.query<{ count: string }>(
+          `SELECT COUNT(*) FROM try_at_home_bookings
+           WHERE customer_id = $1 AND shop_id = $2`,
+          [customerId, shopId],
+        ),
+      ]),
+    );
+    return {
+      bookings: data.rows.map(rowToResponse),
+      total: Number(count.rows[0]!.count),
+    };
+  }
 }
