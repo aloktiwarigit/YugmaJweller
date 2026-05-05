@@ -20,7 +20,9 @@ export default function SettingsLayout(): React.ReactElement {
       <Stack.Screen name="rate-lock" options={{ title: 'Rate Lock की अवधि' }} />
       <Stack.Screen name="loyalty" options={{ title: 'लॉयल्टी प्रोग्राम' }} />
       <Stack.Screen name="shop-profile" options={{ title: 'शॉप प्रोफाइल' }} />
-      <Stack.Screen name="theme" options={{ title: 'थीम बदलें' }} />
+      {__DEV__ && (
+        <Stack.Screen name="theme" options={{ title: 'थीम बदलें (Demo)' }} />
+      )}
     </Stack>
   );
 }
