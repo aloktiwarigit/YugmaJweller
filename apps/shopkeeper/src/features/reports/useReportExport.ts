@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Linking } from 'react-native';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 
 export type ReportType =
@@ -30,6 +30,8 @@ export interface UseReportExportResult {
 
 export function useReportExport(reportType: ReportType): UseReportExportResult {
   const [exportId, setExportId] = useState<string | null>(null);
+  const [pollingStartedAt, setPollingStartedAt] = useState<number | null>(null);
+  const queryClient = useQueryClient();
 
   const start = useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
@@ -39,7 +41,10 @@ export function useReportExport(reportType: ReportType): UseReportExportResult {
       );
       return res.data;
     },
-    onSuccess: (data) => setExportId(data.id),
+    onSuccess: (data) => {
+      setExportId(data.id);
+      setPollingStartedAt(Date.now());
+    },
   });
 
   const status = useQuery({
@@ -53,6 +58,8 @@ export function useReportExport(reportType: ReportType): UseReportExportResult {
       const data = q.state.data as ExportStatusResponse | undefined;
       if (!data) return 2000;
       if (data.status === 'READY' || data.status === 'FAILED') return false;
+      // 2-minute polling ceiling — surfaces stuck-job state to senior shopkeeper
+      if (pollingStartedAt && Date.now() - pollingStartedAt > 120_000) return false;
       return 2000;
     },
   });
@@ -77,15 +84,30 @@ export function useReportExport(reportType: ReportType): UseReportExportResult {
   }, [exportId, status]);
 
   const reset = useCallback(() => {
+    if (exportId) {
+      queryClient.removeQueries({ queryKey: ['reports', 'exports', exportId] });
+    }
     setExportId(null);
     setOpenedFor(null);
-  }, []);
+    setPollingStartedAt(null);
+  }, [exportId, queryClient]);
+
+  const timedOut = pollingStartedAt !== null
+    && Date.now() - pollingStartedAt > 120_000
+    && status.data?.status !== 'READY'
+    && status.data?.status !== 'FAILED';
 
   return {
-    status:        exportId === null ? 'IDLE' : (status.data?.status ?? 'QUEUED'),
+    status: exportId === null
+      ? 'IDLE' as const
+      : timedOut
+        ? 'FAILED' as const
+        : (status.data?.status ?? 'QUEUED'),
     exportId,
     downloadUrl:   status.data?.downloadUrl,
-    errorMessage:  status.data?.errorMessage,
+    errorMessage:  timedOut
+      ? 'PDF तैयार नहीं हो सका — कृपया पुनः प्रयास करें।'
+      : status.data?.errorMessage,
     start:         (params) => start.mutate(params ?? {}),
     regenerate,
     reset,
