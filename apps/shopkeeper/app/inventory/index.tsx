@@ -46,6 +46,8 @@ export default function InventoryListScreen(): React.ReactElement {
             <Pressable
               key={action.href}
               testID={`quick-action-${action.href.split('/').pop()}`}
+              accessibilityRole="button"
+              accessibilityLabel={action.label}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               onPress={() => router.push(action.href as any)}
               style={styles.pill}
