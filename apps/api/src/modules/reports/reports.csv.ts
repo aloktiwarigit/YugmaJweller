@@ -1,6 +1,6 @@
-import type { DailySummaryResult } from './reports.service';
-// Note: B2-B5 will each extend this import to add OutstandingResult,
-// CustomerLtvItem, LoyaltySummaryResult, StockAgingResult as their emitters land.
+import type { DailySummaryResult, OutstandingResult } from './reports.service';
+// Note: B3-B5 will each extend this import to add CustomerLtvItem,
+// LoyaltySummaryResult, StockAgingResult as their emitters land.
 // Pulling them all in now would trip TS6196 (noUnusedLocals).
 
 // Shared helpers — duplicated locally rather than extracted to packages/shared per
@@ -42,4 +42,22 @@ export function toDailySummaryCsv(data: DailySummaryResult): string {
     mgToGrams(data.gold_weight_mg),
   ]);
   return [header, row].join(LE);
+}
+
+export function toOutstandingCsv(data: OutstandingResult): string {
+  const header = csvRow([
+    'Invoice Number', 'Customer Name', 'Customer Phone',
+    'Total (Rs)', 'Balance Due (Rs)', 'Issued At',
+  ]);
+  const rows = data.items.map((it) =>
+    csvRow([
+      it.invoice_number,
+      it.customer_name,
+      it.customer_phone ?? '',
+      paiseToRupees(it.total_paise),
+      paiseToRupees(it.balance_due_paise),
+      it.issued_at ?? '',
+    ]),
+  );
+  return [header, ...rows].join(LE);
 }

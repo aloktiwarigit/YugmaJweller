@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { toDailySummaryCsv } from './reports.csv';
-import type { DailySummaryResult } from './reports.service';
+import { toDailySummaryCsv, toOutstandingCsv } from './reports.csv';
+import type { DailySummaryResult, OutstandingResult } from './reports.service';
 
 describe('toDailySummaryCsv', () => {
   it('emits header + one data row with paise→rupees conversion', () => {
@@ -32,5 +32,43 @@ describe('toDailySummaryCsv', () => {
     };
     const csv = toDailySummaryCsv(data);
     expect(csv.split('\r\n')[1]).toBe('2026-04-01,0.00,0.00,0.00,0.00,0,0.000');
+  });
+});
+
+describe('toOutstandingCsv', () => {
+  it('escapes commas in customer names and emits all rows', () => {
+    const data: OutstandingResult = {
+      total: 2, page: 1, limit: 100,
+      items: [
+        {
+          id: 'inv-1', invoice_number: 'GS-2026-0001',
+          customer_name: 'Sharma, Ramesh', customer_phone: '9876543210',
+          total_paise: '100000', balance_due_paise: '50000',
+          issued_at: '2026-04-01T10:00:00.000Z',
+        },
+        {
+          id: 'inv-2', invoice_number: 'GS-2026-0002',
+          customer_name: 'राज कुमार', customer_phone: null,
+          total_paise: '200000', balance_due_paise: '200000',
+          issued_at: '2026-04-02T14:30:00.000Z',
+        },
+      ],
+    };
+    const csv = toOutstandingCsv(data);
+    const lines = csv.split('\r\n');
+    expect(lines[0]).toBe(
+      'Invoice Number,Customer Name,Customer Phone,Total (Rs),Balance Due (Rs),Issued At',
+    );
+    expect(lines[1]).toBe(
+      'GS-2026-0001,"Sharma, Ramesh",9876543210,1000.00,500.00,2026-04-01T10:00:00.000Z',
+    );
+    expect(lines[2]).toBe(
+      'GS-2026-0002,राज कुमार,,2000.00,2000.00,2026-04-02T14:30:00.000Z',
+    );
+  });
+
+  it('emits header only when no items', () => {
+    const data: OutstandingResult = { total: 0, page: 1, limit: 100, items: [] };
+    expect(toOutstandingCsv(data).split('\r\n')).toHaveLength(1);
   });
 });
