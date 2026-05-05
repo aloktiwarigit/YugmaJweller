@@ -12,11 +12,21 @@ const mockLoyaltySvc = {
 };
 
 const mockRateLockSvc = {
-  createBooking: vi.fn(),
+  createBooking:          vi.fn(),
+  getBookingsForCustomer: vi.fn(),
 };
 
 const mockTaSvc = {
-  createBooking: vi.fn(),
+  createBooking:          vi.fn(),
+  getBookingsForCustomer: vi.fn(),
+};
+
+const mockHistorySvc = {
+  getPurchaseHistory: vi.fn(),
+};
+
+const mockCustomOrdersSvc = {
+  getOrdersForCustomer: vi.fn(),
 };
 
 vi.mock('@goldsmith/tenant-context', () => ({
@@ -49,6 +59,8 @@ function makeCtrl() {
     mockLoyaltySvc as never,
     mockRateLockSvc as never,
     mockTaSvc as never,
+    mockHistorySvc as never,
+    mockCustomOrdersSvc as never,
   );
 }
 
@@ -128,6 +140,75 @@ describe('CustomerController', () => {
         productIds: ['p1', 'p2'],
         notes:      undefined,
       });
+    });
+  });
+
+  describe('getPurchases', () => {
+    it('returns purchase history from HistoryService', async () => {
+      const history = { invoices: [{ invoiceId: 'inv-1', invoiceNumber: 'INV-001',
+        issuedAt: '2026-04-01T10:00:00.000Z', totalPaise: '250000', status: 'PAID' }], total: 1 };
+      mockHistorySvc.getPurchaseHistory.mockResolvedValue(history);
+
+      const ctrl   = makeCtrl();
+      const result = await ctrl.getPurchases(fakeReq(), { limit: 20, offset: 0 });
+
+      expect(result).toEqual(history);
+      expect(mockHistorySvc.getPurchaseHistory).toHaveBeenCalledWith(
+        expect.objectContaining({ authenticated: true }),
+        DEV_CUSTOMER_ID,
+        { limit: 20, offset: 0 },
+      );
+    });
+  });
+
+  describe('getCustomOrders', () => {
+    it('returns custom orders from CustomOrdersService', async () => {
+      const orders = { orders: [{ id: 'ord-1', status: 'IN_PROGRESS', description: 'Ring',
+        quotedAmountPaise: '100000', depositAmountPaise: '20000',
+        estimatedDeliveryDate: null, createdAt: '2026-04-01T10:00:00.000Z' }], total: 1 };
+      mockCustomOrdersSvc.getOrdersForCustomer.mockResolvedValue(orders);
+
+      const ctrl   = makeCtrl();
+      const result = await ctrl.getCustomOrders(fakeReq(), { limit: 20, offset: 0 });
+
+      expect(result).toEqual(orders);
+      expect(mockCustomOrdersSvc.getOrdersForCustomer).toHaveBeenCalledWith(
+        DEV_CUSTOMER_ID, SHOP_ID, { limit: 20, offset: 0 },
+      );
+    });
+  });
+
+  describe('getRateLockBookings', () => {
+    it('returns rate lock bookings from RateLockBookingsService', async () => {
+      const bookings = { bookings: [{ id: 'rl-1', status: 'ACTIVE',
+        lockedRate24kPaisePerGram: '700000', depositAmountPaise: '50000',
+        expiresAt: '2026-05-05T10:00:00.000Z', lockedAt: '2026-05-04T10:00:00.000Z' }], total: 1 };
+      mockRateLockSvc.getBookingsForCustomer.mockResolvedValue(bookings);
+
+      const ctrl   = makeCtrl();
+      const result = await ctrl.getRateLockBookings(fakeReq(), { limit: 20, offset: 0 });
+
+      expect(result).toEqual(bookings);
+      expect(mockRateLockSvc.getBookingsForCustomer).toHaveBeenCalledWith(
+        DEV_CUSTOMER_ID, SHOP_ID, { limit: 20, offset: 0 },
+      );
+    });
+  });
+
+  describe('getTryAtHomeBookings', () => {
+    it('returns try-at-home bookings from TryAtHomeBookingsService', async () => {
+      const bookings = { bookings: [{ id: 'tah-1', shopId: SHOP_ID, customerId: DEV_CUSTOMER_ID,
+        productIds: ['p1'], status: 'REQUESTED', requestedAt: '2026-05-01T08:00:00.000Z',
+        dispatchAt: null, returnDueAt: null, notes: null }], total: 1 };
+      mockTaSvc.getBookingsForCustomer.mockResolvedValue(bookings);
+
+      const ctrl   = makeCtrl();
+      const result = await ctrl.getTryAtHomeBookings(fakeReq(), { limit: 20, offset: 0 });
+
+      expect(result).toEqual(bookings);
+      expect(mockTaSvc.getBookingsForCustomer).toHaveBeenCalledWith(
+        DEV_CUSTOMER_ID, SHOP_ID, { limit: 20, offset: 0 },
+      );
     });
   });
 });

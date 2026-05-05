@@ -9,6 +9,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -27,9 +28,13 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { CustomerAuthGuard, getCustomerCtx } from './customer-auth.guard';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { RateLockBookingsService } from '../rate-lock-bookings/rate-lock-bookings.service';
-import type { RateLockBookingResult } from '../rate-lock-bookings/rate-lock-bookings.service';
+import type { RateLockBookingResult, CustomerRateLockItem } from '../rate-lock-bookings/rate-lock-bookings.service';
 import { TryAtHomeBookingsService } from '../try-at-home-bookings/try-at-home-bookings.service';
 import type { BookingResponse } from '../try-at-home-bookings/try-at-home-bookings.service';
+import { HistoryService } from '../crm/history.service';
+import type { PurchaseHistoryResponse } from '../crm/history.service';
+import { CustomOrdersService } from '../custom-orders/custom-orders.service';
+import type { CustomerCustomOrderItem } from '../custom-orders/custom-orders.service';
 
 const CreateRateLockSchema = z.object({
   depositAmountPaise: z.string().regex(/^\d+$/, 'Must be a positive integer string'),
@@ -39,6 +44,12 @@ const CreateTryAtHomeSchema = z.object({
   productIds: z.array(z.string().uuid()).min(1).max(20),
   notes:      z.string().max(500).optional(),
 });
+
+const PaginationQuerySchema = z.object({
+  limit:  z.coerce.number().int().min(1).max(50).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+type PaginationQuery = z.infer<typeof PaginationQuerySchema>;
 
 @Controller('/api/v1/customer')
 @SkipAuth()
@@ -50,6 +61,8 @@ export class CustomerController {
     @Inject(LoyaltyService)            private readonly loyaltySvc: LoyaltyService,
     @Inject(RateLockBookingsService)   private readonly rateLockSvc: RateLockBookingsService,
     @Inject(TryAtHomeBookingsService)  private readonly taSvc: TryAtHomeBookingsService,
+    @Inject(HistoryService)            private readonly historySvc: HistoryService,
+    @Inject(CustomOrdersService)       private readonly customOrdersSvc: CustomOrdersService,
   ) {}
 
   // ── Loyalty ──────────────────────────────────────────────────────────────────
@@ -99,6 +112,53 @@ export class CustomerController {
     return tenantContext.runWith(ctx, () =>
       this.taSvc.createBooking({ customerId, productIds: dto.productIds, notes: dto.notes }),
     );
+  }
+
+  // ── Timeline: Purchases ───────────────────────────────────────────────────────
+
+  @Get('purchases')
+  async getPurchases(
+    @Req() req: Request,
+    @Query(new ZodValidationPipe(PaginationQuerySchema)) params: PaginationQuery,
+  ): Promise<PurchaseHistoryResponse> {
+    const { customerId, shopId } = getCustomerCtx(req);
+    const ctx = await this.buildSyntheticCtx(shopId, customerId);
+    return tenantContext.runWith(ctx, () =>
+      this.historySvc.getPurchaseHistory(ctx, customerId, params),
+    );
+  }
+
+  // ── Timeline: Custom Orders ───────────────────────────────────────────────────
+
+  @Get('custom-orders')
+  async getCustomOrders(
+    @Req() req: Request,
+    @Query(new ZodValidationPipe(PaginationQuerySchema)) params: PaginationQuery,
+  ): Promise<{ orders: CustomerCustomOrderItem[]; total: number }> {
+    const { customerId, shopId } = getCustomerCtx(req);
+    return this.customOrdersSvc.getOrdersForCustomer(customerId, shopId, params);
+  }
+
+  // ── Timeline: Rate-Lock Bookings ──────────────────────────────────────────────
+
+  @Get('rate-lock/bookings')
+  async getRateLockBookings(
+    @Req() req: Request,
+    @Query(new ZodValidationPipe(PaginationQuerySchema)) params: PaginationQuery,
+  ): Promise<{ bookings: CustomerRateLockItem[]; total: number }> {
+    const { customerId, shopId } = getCustomerCtx(req);
+    return this.rateLockSvc.getBookingsForCustomer(customerId, shopId, params);
+  }
+
+  // ── Timeline: Try-at-Home Bookings ────────────────────────────────────────────
+
+  @Get('try-at-home/bookings')
+  async getTryAtHomeBookings(
+    @Req() req: Request,
+    @Query(new ZodValidationPipe(PaginationQuerySchema)) params: PaginationQuery,
+  ): Promise<{ bookings: BookingResponse[]; total: number }> {
+    const { customerId, shopId } = getCustomerCtx(req);
+    return this.taSvc.getBookingsForCustomer(customerId, shopId, params);
   }
 
   // ── Rate-Lock Checkout Page ───────────────────────────────────────────────────
