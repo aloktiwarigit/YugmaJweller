@@ -39,10 +39,12 @@ export async function renderCustomerLtv(
   doc.moveDown(0.3);
 
   doc.font('Devanagari').fontSize(10).fillColor('#1c1917');
-  items.forEach((it, idx) => {
+  for (let idx = 0; idx < items.length; idx++) {
+    const it = items[idx]!;
     let rowY = doc.y;
     if (rowY > doc.page.height - doc.page.margins.bottom - 80) {
       doc.addPage();
+      await drawHeader(doc, branding, 'शीर्ष ग्राहक / Top Customers (cont.)', storage);
       rowY = doc.y;
     }
     x = left;
@@ -61,7 +63,10 @@ export async function renderCustomerLtv(
       x += tableWidth * cols[i]!.w;
     }
     doc.moveDown(0.5);
-  });
+    doc.moveTo(left, doc.y).lineTo(right, doc.y)
+       .strokeColor('#e7e5e4').lineWidth(0.5).stroke();
+    doc.moveDown(0.3);
+  }
 
   doc.flushPages();
   const range = doc.bufferedPageRange();
