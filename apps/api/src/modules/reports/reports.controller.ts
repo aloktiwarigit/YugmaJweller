@@ -4,6 +4,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { ReportsService } from './reports.service';
 import type {
   DailySummaryResult, OutstandingResult, CustomerLtvItem, LoyaltySummaryResult,
+  StockAgingResult,
 } from './reports.service';
 
 @Controller('/api/v1/reports')
@@ -47,5 +48,12 @@ export class ReportsController {
   @Roles('shop_admin', 'shop_manager')
   getLoyaltySummary(): Promise<LoyaltySummaryResult> {
     return this.svc.getLoyaltySummary();
+  }
+
+  @TenantWalkerRoute({ expectedStatus: 200 })
+  @Get('/stock-aging')
+  @Roles('shop_admin', 'shop_manager')
+  getStockAging(): Promise<StockAgingResult> {
+    return this.svc.getStockAging();
   }
 }
