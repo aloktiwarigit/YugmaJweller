@@ -52,7 +52,9 @@ export async function drawHeader(
      .lineTo(doc.page.width - doc.page.margins.right, dividerY)
      .strokeColor(GOLD).lineWidth(1).stroke();
 
-  doc.fillColor('#1c1917').strokeColor('#000');
+  // Reset to body defaults so callers don't inherit the 9pt generated-at state.
+  // Templates may override before writing their own content.
+  doc.font('Devanagari').fontSize(12).fillColor('#1c1917').strokeColor('#000');
   doc.y = dividerY + 12;
   return doc.y;
 }

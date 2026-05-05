@@ -10,7 +10,11 @@ export function drawFooter(
   pageNum: number,
   totalPages: number,
 ): void {
-  const footerY = doc.page.height - doc.page.margins.bottom + 8;
+  // Footer reserves ~24pt above the bottom margin boundary for two 8pt lines (address+GSTIN)
+  // plus the right-aligned page count. Subtracting 24 from the printable-area bottom keeps
+  // every line above the gutter; the right-aligned "Page N of M" sits on the same Y as the
+  // address line, two-line text on the left and one-line on the right.
+  const footerY = doc.page.height - doc.page.margins.bottom - 24;
   const left = doc.page.margins.left;
   const right = doc.page.width - doc.page.margins.right;
 
