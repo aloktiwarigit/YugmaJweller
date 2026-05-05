@@ -64,7 +64,7 @@ const DPDPA_SWEEP_CRON       = '30 20 * * *';
       },
     },
   ],
-  exports: [CrmService, CrmSearchService, FamilyService, NotesService, OccasionsService, DpdpaDeletionService, ConsentService],
+  exports: [CrmService, CrmSearchService, FamilyService, HistoryService, NotesService, OccasionsService, DpdpaDeletionService, ConsentService],
 })
 export class CrmModule implements OnModuleInit {
   private readonly logger = new Logger(CrmModule.name);

@@ -64,6 +64,16 @@ export interface MilestoneResponse {
   createdAt:     string;
 }
 
+export interface CustomerCustomOrderItem {
+  id:                    string;
+  status:                string;
+  description:           string;
+  quotedAmountPaise:     string | null;
+  depositAmountPaise:    string;
+  estimatedDeliveryDate: string | null;
+  createdAt:             string;
+}
+
 function rowToResponse(r: CustomOrderRow): CustomOrderResponse {
   return {
     id:                    r.id,
@@ -311,5 +321,45 @@ export class CustomOrdersService {
     const key = `custom-orders/${ctx.shopId}/${orderId}/${Date.now()}-${filename}`;
     const uploadUrl = await this.storage.getPresignedUploadUrl(key, 'image/jpeg');
     return { uploadUrl, key };
+  }
+
+  async getOrdersForCustomer(
+    customerId: string,
+    shopId: string,
+    params: { limit: number; offset: number },
+  ): Promise<{ orders: CustomerCustomOrderItem[]; total: number }> {
+    const [data, count] = await withShopTx(this.pool, shopId, (tx) =>
+      Promise.all([
+        tx.query<{
+          id: string; status: string; description: string;
+          quoted_amount_paise: bigint | null; deposit_amount_paise: bigint;
+          estimated_delivery_date: string | null; created_at: Date;
+        }>(
+          `SELECT id, status, description, quoted_amount_paise, deposit_amount_paise,
+                  estimated_delivery_date, created_at
+           FROM custom_orders
+           WHERE customer_id = $1 AND shop_id = $2
+           ORDER BY created_at DESC
+           LIMIT $3 OFFSET $4`,
+          [customerId, shopId, params.limit, params.offset],
+        ),
+        tx.query<{ count: string }>(
+          `SELECT COUNT(*) FROM custom_orders WHERE customer_id = $1 AND shop_id = $2`,
+          [customerId, shopId],
+        ),
+      ]),
+    );
+    return {
+      orders: data.rows.map((r) => ({
+        id:                    r.id,
+        status:                r.status,
+        description:           r.description,
+        quotedAmountPaise:     r.quoted_amount_paise?.toString() ?? null,
+        depositAmountPaise:    r.deposit_amount_paise.toString(),
+        estimatedDeliveryDate: r.estimated_delivery_date,
+        createdAt:             r.created_at.toISOString(),
+      })),
+      total: Number(count.rows[0]!.count),
+    };
   }
 }
