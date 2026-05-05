@@ -202,6 +202,81 @@ export class ReportsService {
     });
   }
 
+  /**
+   * Like getOutstanding but bypasses the 100-row HTTP cap, capped instead at a
+   * higher PDF-export ceiling. Use only from the BullMQ PDF worker — never from
+   * an HTTP route (large unbounded JSON arrays would explode response times).
+   *
+   * Anchor jeweller's outstanding list typically has < 100 entries; the 5000-row
+   * ceiling is paranoia headroom for wholesale-heavy shops.
+   */
+  async getAllOutstanding(): Promise<OutstandingResult> {
+    const HARD_CAP = 5000;
+    return withTenantTx(this.pool, async (tx) => {
+      const countRes = await tx.query<{ total: string }>(
+        // nosemgrep: goldsmith.require-tenant-transaction
+        `SELECT COUNT(*)::text AS total
+         FROM invoices i
+         WHERE i.status = 'ISSUED'
+           AND i.total_paise - COALESCE(
+             (SELECT SUM(p.amount_paise)
+              FROM payments p
+              WHERE p.invoice_id = i.id AND p.status = 'CONFIRMED'), 0
+           ) > 0`,
+        [],
+      );
+
+      const itemsRes = await tx.query<{
+        id:               string;
+        invoice_number:   string;
+        customer_name:    string;
+        customer_phone:   string | null;
+        total_paise:      string;
+        balance_due_paise: string;
+        issued_at:        Date | null;
+      }>(
+        // nosemgrep: goldsmith.require-tenant-transaction
+        `SELECT
+           i.id,
+           i.invoice_number,
+           i.customer_name,
+           i.customer_phone,
+           i.total_paise::text,
+           (i.total_paise - COALESCE(
+             (SELECT SUM(p.amount_paise)
+              FROM payments p
+              WHERE p.invoice_id = i.id AND p.status = 'CONFIRMED'), 0
+           ))::text AS balance_due_paise,
+           i.issued_at
+         FROM invoices i
+         WHERE i.status = 'ISSUED'
+           AND i.total_paise - COALESCE(
+             (SELECT SUM(p.amount_paise)
+              FROM payments p
+              WHERE p.invoice_id = i.id AND p.status = 'CONFIRMED'), 0
+           ) > 0
+         ORDER BY i.issued_at DESC
+         LIMIT $1`,
+        [HARD_CAP],
+      );
+
+      return {
+        items: itemsRes.rows.map((row) => ({
+          id:               row.id,
+          invoice_number:   row.invoice_number,
+          customer_name:    row.customer_name,
+          customer_phone:   row.customer_phone,
+          total_paise:      row.total_paise,
+          balance_due_paise: row.balance_due_paise,
+          issued_at:        row.issued_at?.toISOString() ?? null,
+        })),
+        total: parseInt(countRes.rows[0]!.total, 10),
+        page:  1,
+        limit: HARD_CAP,
+      };
+    });
+  }
+
   async getCustomerLtv(limit: number): Promise<CustomerLtvItem[]> {
     const safeLimit = Math.min(Math.max(1, limit), 50);
 

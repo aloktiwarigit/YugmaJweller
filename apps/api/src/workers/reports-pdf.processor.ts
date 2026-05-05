@@ -42,15 +42,24 @@ export class ReportsPdfProcessor extends WorkerHost {
     const ctx = await this.buildTenantCtx(shopId);
 
     return tenantContext.runWith(ctx, async () => {
-      // 1. Mark RUNNING (idempotent on retries — only QUEUED → RUNNING)
-      await withTenantTx(this.pool, async (tx) => {
-        await tx.query(
+      // 1. Mark RUNNING (idempotent on retries — only QUEUED → RUNNING).
+      //    If 0 rows affected, the row is already in a terminal state (READY
+      //    or FAILED) from a prior attempt — exit fast to avoid re-rendering
+      //    and clobbering the original terminal state.
+      const runningResult = await withTenantTx(this.pool, async (tx) => {
+        return tx.query(
           `UPDATE reports_pdf_exports
            SET status = 'RUNNING'
            WHERE id = $1 AND status = 'QUEUED'`,
           [exportId],
         );
       });
+      if (runningResult.rowCount === 0) {
+        this.logger.log(
+          `reports-pdf: skipping exportId=${exportId} — already in non-QUEUED state (likely a retry of a completed/failed job)`,
+        );
+        return { storageKey: 'skipped' };
+      }
 
       try {
         // 2. Fetch report data
@@ -65,15 +74,22 @@ export class ReportsPdfProcessor extends WorkerHost {
         const key = `tenants/${shopId}/reports/${reportType}/${filename}`;
         await this.storage.uploadBuffer(key, buf, 'application/pdf');
 
-        // 5. Mark READY
-        await withTenantTx(this.pool, async (tx) => {
-          await tx.query(
+        // 5. Mark READY (guard with status='RUNNING' to prevent overwriting a
+        //    terminal FAILED row if execution path reached here under unusual
+        //    retry/state transitions).
+        const readyResult = await withTenantTx(this.pool, async (tx) => {
+          return tx.query(
             `UPDATE reports_pdf_exports
              SET status = 'READY', storage_key = $2, completed_at = now()
-             WHERE id = $1`,
+             WHERE id = $1 AND status = 'RUNNING'`,
             [exportId, key],
           );
         });
+        if (readyResult.rowCount === 0) {
+          this.logger.warn(
+            `reports-pdf: READY update affected 0 rows for exportId=${exportId} (state already terminal); skipping overwrite`,
+          );
+        }
 
         this.logger.log(
           `reports-pdf ok: shopId=${shopId} exportId=${exportId} key=${key}`,
@@ -108,7 +124,7 @@ export class ReportsPdfProcessor extends WorkerHost {
         return this.reports.getDailySummary(date);
       }
       case 'outstanding':
-        return this.reports.getOutstanding(1, 1000);
+        return this.reports.getAllOutstanding();
       case 'customer-ltv':
         return this.reports.getCustomerLtv((params['limit'] as number) ?? 50);
       case 'loyalty-summary':

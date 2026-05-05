@@ -8,6 +8,7 @@ const EXPORT_ID = '11111111-2222-4000-8000-000000000000';
 let fakeReports: {
   getDailySummary:    ReturnType<typeof vi.fn>;
   getOutstanding:     ReturnType<typeof vi.fn>;
+  getAllOutstanding:  ReturnType<typeof vi.fn>;
   getCustomerLtv:     ReturnType<typeof vi.fn>;
   getLoyaltySummary:  ReturnType<typeof vi.fn>;
   getStockAging:      ReturnType<typeof vi.fn>;
@@ -32,6 +33,7 @@ beforeEach(() => {
   fakeReports = {
     getDailySummary:    vi.fn().mockResolvedValue({ date: '2026-04-29' }),
     getOutstanding:     vi.fn(),
+    getAllOutstanding:  vi.fn(),
     getCustomerLtv:     vi.fn(),
     getLoyaltySummary:  vi.fn(),
     getStockAging:      vi.fn(),
