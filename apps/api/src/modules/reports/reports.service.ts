@@ -316,6 +316,9 @@ export class ReportsService {
       for (const item of items) {
         const bucket = agg.get(item.bucket)!;
         bucket.count += 1;
+        // gross_weight_g is DECIMAL(12,4); aggregating to milligrams (3 decimals).
+        // The 4th decimal (0.1 mg) is truncated — acceptable for an aging report
+        // (totals are dashboard-precision); never use this code path for billing.
         const [whole, frac = '000'] = item.weightG.split('.');
         const mg = BigInt(whole!) * 1000n + BigInt(frac.padEnd(3, '0').slice(0, 3));
         bucket.weightMg += mg;
