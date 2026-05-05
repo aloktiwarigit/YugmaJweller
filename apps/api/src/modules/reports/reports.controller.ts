@@ -1,8 +1,11 @@
 import {
-  Controller, Get, Query, ParseIntPipe, DefaultValuePipe,
+  Controller, Get, Post, Body, Param, Query, Inject,
+  ParseIntPipe, DefaultValuePipe,
 } from '@nestjs/common';
+import { z } from 'zod';
 import { TenantWalkerRoute } from '../../common/decorators/tenant-walker-route.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { ReportsService } from './reports.service';
 import type {
   DailySummaryResult, OutstandingResult, CustomerLtvItem, LoyaltySummaryResult,
@@ -12,10 +15,22 @@ import {
   toDailySummaryCsv, toOutstandingCsv, toCustomerLtvCsv,
   toLoyaltySummaryCsv, toStockAgingCsv,
 } from './reports.csv';
+import { ReportsExportService } from './reports-export.service';
+import type { ExportStatusResult } from './reports-export.service';
+import type { ReportType } from './pdf/renderer';
+
+const ExportRequestSchema = z.object({
+  reportType: z.enum(['daily-summary', 'outstanding', 'customer-ltv', 'loyalty-summary', 'stock-aging']),
+  params: z.record(z.unknown()).optional().default({}),
+});
+type ExportRequestDto = z.infer<typeof ExportRequestSchema>;
 
 @Controller('/api/v1/reports')
 export class ReportsController {
-  constructor(private readonly svc: ReportsService) {}
+  constructor(
+    private readonly svc: ReportsService,
+    @Inject(ReportsExportService) private readonly exports: ReportsExportService,
+  ) {}
 
   @TenantWalkerRoute({ expectedStatus: 400 })
   @Get('/daily-summary')
@@ -113,5 +128,31 @@ export class ReportsController {
 
   private todayIST(): string {
     return new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  }
+
+  @TenantWalkerRoute({
+    expectedStatus: 400,
+    body: { /* missing reportType triggers Zod 400 */ },
+  })
+  @Post('/exports')
+  @Roles('shop_admin', 'shop_manager')
+  async createExport(
+    @Body(new ZodValidationPipe(ExportRequestSchema)) dto: ExportRequestDto,
+  ): Promise<{ id: string; status: 'QUEUED' }> {
+    return this.exports.enqueue(dto.reportType as ReportType, dto.params);
+  }
+
+  @TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-4000-8000-000000000000' } })
+  @Get('/exports/:id')
+  @Roles('shop_admin', 'shop_manager')
+  async getExportStatus(@Param('id') id: string): Promise<ExportStatusResult> {
+    return this.exports.getStatus(id);
+  }
+
+  @TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-4000-8000-000000000000' } })
+  @Post('/exports/:id/regenerate')
+  @Roles('shop_admin', 'shop_manager')
+  async regenerateExport(@Param('id') id: string): Promise<ExportStatusResult> {
+    return this.exports.regenerate(id);
   }
 }
