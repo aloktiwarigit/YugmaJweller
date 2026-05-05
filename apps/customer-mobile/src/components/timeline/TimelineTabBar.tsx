@@ -37,6 +37,9 @@ export function TimelineTabBar({ activeTab, onTabChange }: TimelineTabBarProps):
               key={tab.id}
               testID={isActive ? 'timeline-tab-active' : `timeline-tab-${tab.id}`}
               onPress={() => onTabChange(tab.id)}
+              accessibilityRole="tab"
+              accessibilityLabel={tab.label}
+              accessibilityState={{ selected: isActive }}
               style={{
                 minHeight:         48,
                 paddingHorizontal: spacing.md,
