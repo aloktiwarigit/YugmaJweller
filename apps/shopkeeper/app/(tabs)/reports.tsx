@@ -3,13 +3,12 @@ import {
   View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet,
 } from 'react-native';
 import { router, type Href } from 'expo-router';
-import { colors, spacing } from '@goldsmith/ui-tokens';
+import { spacing, type ThemeColors } from '@goldsmith/ui-tokens';
+import { useThemeTokens } from '../../src/hooks/useThemeTokens';
 import {
   useDailySummary, useOutstanding, useCustomerLtv, useLoyaltySummary,
   formatPaise,
 } from '../../src/features/reports/useReports';
-
-const GOLD = '#B58A3C';
 
 // ---------------------------------------------------------------------------
 // Report card
@@ -21,27 +20,43 @@ interface ReportCardProps {
   metricLabel: string;
   onPress: () => void;
   loading: boolean;
+  colors:  ThemeColors;
 }
 
-function ReportCard({ title, metric, metricLabel, onPress, loading }: ReportCardProps): React.ReactElement {
+function ReportCard({ title, metric, metricLabel, onPress, loading, colors }: ReportCardProps): React.ReactElement {
   return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>{title}</Text>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.background, borderColor: colors.border },
+      ]}
+    >
+      <Text style={[styles.cardTitle, { color: colors.ink }]}>{title}</Text>
       {loading ? (
-        <ActivityIndicator color={GOLD} style={{ marginVertical: 12 }} />
+        <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />
       ) : (
         <View style={styles.metricRow}>
-          <Text style={styles.metricValue} numberOfLines={1} adjustsFontSizeToFit>{metric}</Text>
-          <Text style={styles.metricLabel}>{metricLabel}</Text>
+          <Text
+            style={[styles.metricValue, { color: colors.primary }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {metric}
+          </Text>
+          <Text style={[styles.metricLabel, { color: colors.inkMute }]}>{metricLabel}</Text>
         </View>
       )}
       <Pressable
         onPress={onPress}
-        style={({ pressed }) => [styles.viewBtn, pressed && styles.viewBtnPressed]}
+        style={({ pressed }) => [
+          styles.viewBtn,
+          { backgroundColor: colors.primary },
+          pressed && styles.viewBtnPressed,
+        ]}
         accessibilityRole="button"
         accessibilityLabel={`${title} देखें`}
       >
-        <Text style={styles.viewBtnText}>देखें →</Text>
+        <Text style={[styles.viewBtnText, { color: colors.white }]}>देखें →</Text>
       </Pressable>
     </View>
   );
@@ -52,10 +67,11 @@ function ReportCard({ title, metric, metricLabel, onPress, loading }: ReportCard
 // ---------------------------------------------------------------------------
 
 export default function ReportsScreen(): React.ReactElement {
-  const daily    = useDailySummary();
+  const colors      = useThemeTokens();
+  const daily       = useDailySummary();
   const outstanding = useOutstanding(1, 20);
-  const ltv      = useCustomerLtv(1);
-  const loyalty  = useLoyaltySummary();
+  const ltv         = useCustomerLtv(1);
+  const loyalty     = useLoyaltySummary();
 
   const totalToday = daily.data ? formatPaise(daily.data.total_paise) : '—';
   const outstandingCount = outstanding.data ? `${outstanding.data.total}` : '—';
@@ -66,17 +82,18 @@ export default function ReportsScreen(): React.ReactElement {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.bg }]}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.pageTitle}>रिपोर्ट</Text>
+      <Text style={[styles.pageTitle, { color: colors.ink }]}>रिपोर्ट</Text>
 
       <ReportCard
         title="दैनिक बिक्री सारांश"
         metric={totalToday}
         metricLabel="आज की कुल बिक्री"
         loading={daily.isLoading}
+        colors={colors}
         onPress={() => router.push('/reports/daily-summary' as Href<string>)}
       />
 
@@ -85,6 +102,7 @@ export default function ReportsScreen(): React.ReactElement {
         metric={outstandingCount}
         metricLabel="लंबित चालान"
         loading={outstanding.isLoading}
+        colors={colors}
         onPress={() => router.push('/reports/outstanding' as Href<string>)}
       />
 
@@ -93,6 +111,7 @@ export default function ReportsScreen(): React.ReactElement {
         metric={topCustomer}
         metricLabel="सर्वाधिक खरीदार"
         loading={ltv.isLoading}
+        colors={colors}
         onPress={() => router.push('/reports/customer-ltv' as Href<string>)}
       />
 
@@ -101,19 +120,26 @@ export default function ReportsScreen(): React.ReactElement {
         metric={loyaltyMembers}
         metricLabel="कुल सदस्य"
         loading={loyalty.isLoading}
+        colors={colors}
         onPress={() => router.push('/reports/loyalty-summary' as Href<string>)}
       />
 
       {/* GSTR export link */}
       <Pressable
-        style={({ pressed }) => [styles.gstrCard, pressed && styles.viewBtnPressed]}
+        style={({ pressed }) => [
+          styles.gstrCard,
+          { backgroundColor: colors.primaryLight, borderColor: colors.border },
+          pressed && styles.viewBtnPressed,
+        ]}
         onPress={() => router.push('/reports/gstr-export' as Href<string>)}
         accessibilityRole="button"
         accessibilityLabel="GSTR रिपोर्ट निर्यात करें"
       >
-        <Text style={styles.gstrTitle}>GSTR निर्यात</Text>
-        <Text style={styles.gstrSub}>GSTR-1 / GSTR-3B CSV डाउनलोड करें</Text>
-        <Text style={styles.viewBtnText}>देखें →</Text>
+        <Text style={[styles.gstrTitle, { color: colors.ink }]}>GSTR निर्यात</Text>
+        <Text style={[styles.gstrSub, { color: colors.inkMute }]}>
+          GSTR-1 / GSTR-3B CSV डाउनलोड करें
+        </Text>
+        <Text style={[styles.viewBtnText, { color: colors.primary }]}>देखें →</Text>
       </Pressable>
     </ScrollView>
   );
@@ -126,7 +152,6 @@ export default function ReportsScreen(): React.ReactElement {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bg,
   },
   content: {
     paddingHorizontal: spacing.lg,
@@ -137,15 +162,12 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontFamily: 'YatraOne',
     fontSize:   28,
-    color:      colors.ink,
     marginBottom: 8,
   },
   card: {
-    backgroundColor: colors.background,
     borderRadius:    12,
     padding:         spacing.lg,
     borderWidth:     1,
-    borderColor:     colors.border,
     shadowColor:     '#000',
     shadowOpacity:   0.04,
     shadowRadius:    4,
@@ -156,7 +178,6 @@ const styles = StyleSheet.create({
     fontFamily:  'NotoSansDevanagari',
     fontSize:    18,
     fontWeight:  '700',
-    color:       colors.ink,
     marginBottom: 8,
   },
   metricRow: {
@@ -165,18 +186,15 @@ const styles = StyleSheet.create({
   metricValue: {
     fontFamily: 'MuktaVaani-700',
     fontSize:   24,
-    color:      GOLD,
     lineHeight: 30,
   },
   metricLabel: {
     fontFamily: 'NotoSansDevanagari',
     fontSize:   14,
-    color:      colors.inkMute,
     marginTop:  2,
   },
   viewBtn: {
     alignSelf:         'flex-start',
-    backgroundColor:   GOLD,
     borderRadius:      8,
     paddingVertical:   10,
     paddingHorizontal: 20,
@@ -190,26 +208,21 @@ const styles = StyleSheet.create({
     fontFamily:  'NotoSansDevanagari',
     fontSize:    16,
     fontWeight:  '600',
-    color:       '#fff',
   },
   gstrCard: {
-    backgroundColor: '#FFF8E7',
     borderRadius:    12,
     padding:         spacing.lg,
     borderWidth:     1,
-    borderColor:     '#E8D5A3',
     gap:             4,
   },
   gstrTitle: {
     fontFamily:  'NotoSansDevanagari',
     fontSize:    18,
     fontWeight:  '700',
-    color:       colors.ink,
   },
   gstrSub: {
     fontFamily:  'NotoSansDevanagari',
     fontSize:    14,
-    color:       colors.inkMute,
     marginBottom: 8,
   },
 });

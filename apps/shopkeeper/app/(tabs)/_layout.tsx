@@ -2,7 +2,7 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/stores/authStore';
-import { colors } from '@goldsmith/ui-tokens';
+import { useThemeTokens } from '../../src/hooks/useThemeTokens';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -19,7 +19,8 @@ function TabIcon({
 }
 
 export default function TabsLayout(): JSX.Element {
-  const role = useAuthStore((s) => s.user?.role);
+  const colors = useThemeTokens();
+  const role   = useAuthStore((s) => s.user?.role);
 
   // If role is not yet loaded, fail open (show all tabs); route guards protect actual screens.
   const isStaff = role === 'shop_staff';
