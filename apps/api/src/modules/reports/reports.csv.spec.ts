@@ -80,6 +80,24 @@ describe('toOutstandingCsv', () => {
     const data: OutstandingResult = { total: 0, page: 1, limit: 100, items: [] };
     expect(toOutstandingCsv(data).split('\r\n')).toHaveLength(1);
   });
+
+  it('neutralizes Excel formula injection in customer names', () => {
+    const data: OutstandingResult = {
+      total: 1, page: 1, limit: 100,
+      items: [{
+        id: 'i1', invoice_number: 'GS-2026-0099',
+        customer_name: '=HYPERLINK("https://evil","Click")',
+        customer_phone: '9876543210',
+        total_paise: '100000', balance_due_paise: '50000',
+        issued_at: '2026-04-01T10:00:00.000Z',
+      }],
+    };
+    const csv = toOutstandingCsv(data);
+    const lines = csv.split('\r\n');
+    // Cell starts with =, must be prefixed with ' AND quoted (because it contains comma + quotes).
+    // Result: the leading ' makes Excel treat the rest as text, neutralizing the formula.
+    expect(lines[1]).toContain(`"'=HYPERLINK(""https://evil"",""Click"")"`);
+  });
 });
 
 describe('toCustomerLtvCsv', () => {

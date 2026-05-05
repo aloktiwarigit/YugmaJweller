@@ -3,10 +3,16 @@ import type { CustomerLtvItem, DailySummaryResult, LoyaltySummaryResult, Outstan
 // Shared helpers — duplicated locally rather than extracted to packages/shared per
 // YAGNI; if a third caller appears, hoist these into @goldsmith/shared.
 function escapeCsv(value: string): string {
-  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-    return `"${value.replace(/"/g, '""')}"`;
+  // Block Excel/Sheets formula injection: prepend single quote when the cell
+  // starts with =, +, -, @, \t, or \r so spreadsheet apps treat it as text.
+  // Without this guard, a hostile customer_name like =HYPERLINK(...) in
+  // outstanding.csv would silently exfiltrate adjacent financial cells.
+  let v = value;
+  if (v.length > 0 && /^[=+\-@\t\r]/.test(v)) v = `'${v}`;
+  if (v.includes(',') || v.includes('"') || v.includes('\n')) {
+    return `"${v.replace(/"/g, '""')}"`;
   }
-  return value;
+  return v;
 }
 
 // Accepts string|number (gstr-export.service.ts accepts string[] only — reconcile on hoist to @goldsmith/shared).
