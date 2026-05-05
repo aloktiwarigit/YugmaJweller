@@ -10,6 +10,8 @@ export const router = {
 
 export const useRouter = (): typeof router => router;
 
+export function useLocalSearchParams<T extends Record<string, string>>(): T { return {} as T; }
+
 export function Redirect(_props: { href: string }): null {
   return null;
 }
