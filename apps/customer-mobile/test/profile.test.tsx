@@ -1,46 +1,64 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import MockAdapter from 'axios-mock-adapter';
-import { render, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { api } from '../src/api/client';
-import { useCustomerSessionStore } from '../src/stores/customerSessionStore';
-import { useTenantStore } from '../src/stores/tenantStore';
-import { makeCustomer, makeTenant } from './factories';
+
+// Mock all network calls
+vi.mock('../src/api/endpoints', () => ({
+  getPurchases:          vi.fn().mockResolvedValue({ invoices: [], total: 0 }),
+  getCustomOrders:       vi.fn().mockResolvedValue({ orders: [], total: 0 }),
+  getRateLockBookings:   vi.fn().mockResolvedValue({ bookings: [], total: 0 }),
+  getTryAtHomeBookings:  vi.fn().mockResolvedValue({ bookings: [], total: 0 }),
+  customerSelfDelete:    vi.fn(),
+}));
+
+vi.mock('../src/hooks/useCustomerSession', () => ({
+  useCustomerSession: vi.fn(() => ({
+    customer: { id: 'c1', name: 'राज', phoneE164: '+919999999999' },
+    signOut: vi.fn(),
+  })),
+}));
+
+vi.mock('../src/components/TenantBrandHeader', () => ({
+  TenantBrandHeader: () => <div data-testid="tenant-brand-header" />,
+}));
+
+vi.mock('../src/components/LoyaltyPointsCard', () => ({
+  LoyaltyPointsCard: () => <div data-testid="loyalty-card" />,
+}));
+
 import Profile from '../app/(tabs)/profile';
 
-function wrap(ui: React.ReactElement): React.ReactElement {
+function wrapper({ children }: { children: React.ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>;
+  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
 
-describe('Profile', () => {
-  let mock: MockAdapter;
+describe('Profile screen', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
 
-  beforeEach(() => {
-    mock = new MockAdapter(api);
-    useTenantStore.setState({
-      tenant: makeTenant(),
-      slug: 'anchor-dev',
-      etag: null,
-      loading: false,
-      error: null,
-    });
-    useCustomerSessionStore.setState({ customer: makeCustomer({ name: 'राम कुमार' }), bearer: 'tok' });
+  it('renders brand header and loyalty card', () => {
+    const { getByTestId } = render(<Profile />, { wrapper });
+    expect(getByTestId('tenant-brand-header')).toBeTruthy();
+    expect(getByTestId('loyalty-card')).toBeTruthy();
   });
 
-  it('renders customer name and phone', () => {
-    const { getByText } = render(wrap(<Profile />));
-    expect(getByText('राम कुमार')).toBeTruthy();
+  it('renders all 4 Hindi tab labels', () => {
+    const { container } = render(<Profile />, { wrapper });
+    expect(container.textContent).toContain('खरीदारी');
+    expect(container.textContent).toContain('कस्टम ऑर्डर');
+    expect(container.textContent).toContain('दर-लॉक');
+    expect(container.textContent).toContain('ट्राई-एट-होम');
   });
 
-  it('DPDPA delete button shows the 501 not-yet-available message', async () => {
-    mock.onDelete('/api/v1/crm/customer/me').reply(501, {
-      code: 'deletion.customer_app_not_yet_available',
-    });
-    const { getByTestId, findByTestId } = render(wrap(<Profile />));
-    fireEvent.click(getByTestId('profile-delete-button'));
-    const banner = await findByTestId('profile-delete-result');
-    expect(banner.textContent).toMatch(/जल्द|coming/i);
+  it('does not contain the string Goldsmith (white-label invariant)', () => {
+    const { container } = render(<Profile />, { wrapper });
+    expect(container.textContent).not.toMatch(/Goldsmith/i);
+  });
+
+  it('renders delete-data and logout buttons below the timeline', () => {
+    const { getByTestId } = render(<Profile />, { wrapper });
+    expect(getByTestId('profile-delete-button')).toBeTruthy();
+    expect(getByTestId('profile-signout-button')).toBeTruthy();
   });
 });

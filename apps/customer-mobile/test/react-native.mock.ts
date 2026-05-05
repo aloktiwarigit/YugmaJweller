@@ -88,7 +88,7 @@ export const StyleSheet = {
       : ((s ?? {}) as Record<string, unknown>),
 };
 
-const noopAnimation = { start: (_cb?: () => void) => {} };
+const noopAnimation = { start: (_cb?: () => void) => {}, stop: () => {}, reset: () => {} };
 export const Animated = {
   Value: class {
     constructor(_v: number) {}
@@ -101,4 +101,5 @@ export const Animated = {
   parallel: (_animations: unknown[]) => noopAnimation,
   spring: (_val: unknown, _config: unknown) => noopAnimation,
   delay: (_ms: number) => noopAnimation,
+  loop: (_animation: unknown) => noopAnimation,
 };
