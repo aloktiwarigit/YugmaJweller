@@ -39,7 +39,16 @@ export class PdfRenderer {
     try {
       doc.registerFont('Devanagari',      path.join(FONT_DIR, 'NotoSansDevanagari-Regular.ttf'));
       doc.registerFont('Devanagari-Bold', path.join(FONT_DIR, 'NotoSansDevanagari-Bold.ttf'));
-    } catch {
+    } catch (err) {
+      if (process.env['NODE_ENV'] === 'production') {
+        // Hindi-first content is non-negotiable per CLAUDE.md. Helvetica cannot render
+        // Devanagari script — silently substituting it would ship blank-rectangle PDFs.
+        throw new Error(
+          `PdfRenderer: Devanagari font not found at ${FONT_DIR}. ` +
+          `Deploy assets before rendering. Cause: ${(err as Error).message}`,
+        );
+      }
+      // Dev/CI fallback: PDFs render with Latin glyphs only; sufficient for smoke tests.
       doc.registerFont('Devanagari',      'Helvetica');
       doc.registerFont('Devanagari-Bold', 'Helvetica-Bold');
     }

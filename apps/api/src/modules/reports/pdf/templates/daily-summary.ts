@@ -40,10 +40,13 @@ export async function renderDailySummary(
   for (const [label, value] of rows) {
     const y = doc.y;
     doc.text(label, labelX, y, { width: right - left - 120 });
+    const afterLabel = doc.y;
     doc.text(value, labelX, y, {
       width: right - left,
       align: 'right',
     });
+    // Advance past the taller of the two columns so a wrapped label doesn't overprint the value.
+    doc.y = Math.max(afterLabel, doc.y);
     doc.moveDown(0.5);
     doc.moveTo(left, doc.y).lineTo(right, doc.y)
        .strokeColor('#e7e5e4').lineWidth(0.5).stroke();
