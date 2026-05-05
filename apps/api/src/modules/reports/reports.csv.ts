@@ -1,5 +1,5 @@
-import type { DailySummaryResult, OutstandingResult } from './reports.service';
-// Note: B3-B5 will each extend this import to add CustomerLtvItem,
+import type { CustomerLtvItem, DailySummaryResult, OutstandingResult } from './reports.service';
+// Note: B4-B5 will each extend this import to add
 // LoyaltySummaryResult, StockAgingResult as their emitters land.
 // Pulling them all in now would trip TS6196 (noUnusedLocals).
 
@@ -58,6 +58,14 @@ export function toOutstandingCsv(data: OutstandingResult): string {
       paiseToRupees(it.balance_due_paise),
       it.issued_at ?? '',
     ]),
+  );
+  return [header, ...rows].join(LE);
+}
+
+export function toCustomerLtvCsv(items: CustomerLtvItem[]): string {
+  const header = csvRow(['Customer ID', 'Name', 'Phone', 'Lifetime Value (Rs)']);
+  const rows = items.map((c) =>
+    csvRow([c.customer_id, c.name, c.phone, paiseToRupees(c.ltv_paise)]),
   );
   return [header, ...rows].join(LE);
 }

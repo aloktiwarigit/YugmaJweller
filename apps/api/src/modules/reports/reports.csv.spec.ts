@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { toDailySummaryCsv, toOutstandingCsv } from './reports.csv';
-import type { DailySummaryResult, OutstandingResult } from './reports.service';
+import { toCustomerLtvCsv, toDailySummaryCsv, toOutstandingCsv } from './reports.csv';
+import type { CustomerLtvItem, DailySummaryResult, OutstandingResult } from './reports.service';
 
 describe('toDailySummaryCsv', () => {
   it('emits header + one data row with paise→rupees conversion', () => {
@@ -79,5 +79,23 @@ describe('toOutstandingCsv', () => {
   it('emits header only when no items', () => {
     const data: OutstandingResult = { total: 0, page: 1, limit: 100, items: [] };
     expect(toOutstandingCsv(data).split('\r\n')).toHaveLength(1);
+  });
+});
+
+describe('toCustomerLtvCsv', () => {
+  it('emits header + data rows sorted by descending LTV (input order preserved)', () => {
+    const data: CustomerLtvItem[] = [
+      { customer_id: 'c1', name: 'रमेश सिंह', phone: '9900000001', ltv_paise: '2000000' },
+      { customer_id: 'c2', name: 'सुमन देवी', phone: '9900000002', ltv_paise: '1500000' },
+    ];
+    const csv = toCustomerLtvCsv(data);
+    const lines = csv.split('\r\n');
+    expect(lines[0]).toBe('Customer ID,Name,Phone,Lifetime Value (Rs)');
+    expect(lines[1]).toBe('c1,रमेश सिंह,9900000001,20000.00');
+    expect(lines[2]).toBe('c2,सुमन देवी,9900000002,15000.00');
+  });
+
+  it('emits header only when no customers', () => {
+    expect(toCustomerLtvCsv([]).split('\r\n')).toHaveLength(1);
   });
 });
