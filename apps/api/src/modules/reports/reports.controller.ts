@@ -1,4 +1,6 @@
-import { Controller, Get, Query, ParseIntPipe, DefaultValuePipe } from '@nestjs/common';
+import {
+  Controller, Get, Query, ParseIntPipe, DefaultValuePipe,
+} from '@nestjs/common';
 import { TenantWalkerRoute } from '../../common/decorators/tenant-walker-route.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ReportsService } from './reports.service';
@@ -6,6 +8,10 @@ import type {
   DailySummaryResult, OutstandingResult, CustomerLtvItem, LoyaltySummaryResult,
   StockAgingResult,
 } from './reports.service';
+import {
+  toDailySummaryCsv, toOutstandingCsv, toCustomerLtvCsv,
+  toLoyaltySummaryCsv, toStockAgingCsv,
+} from './reports.csv';
 
 @Controller('/api/v1/reports')
 export class ReportsController {
@@ -55,5 +61,56 @@ export class ReportsController {
   @Roles('shop_admin', 'shop_manager')
   getStockAging(): Promise<StockAgingResult> {
     return this.svc.getStockAging();
+  }
+
+  @TenantWalkerRoute({ expectedStatus: 200 })
+  @Get('/daily-summary.csv')
+  @Roles('shop_admin', 'shop_manager')
+  async getDailySummaryCsv(
+    @Query('date') date?: string,
+  ): Promise<{ csv: string; filename: string }> {
+    const target = date ?? this.todayIST();
+    const data = await this.svc.getDailySummary(target);
+    return { csv: toDailySummaryCsv(data), filename: `daily-summary-${target}.csv` };
+  }
+
+  @TenantWalkerRoute({ expectedStatus: 200 })
+  @Get('/outstanding.csv')
+  @Roles('shop_admin', 'shop_manager')
+  async getOutstandingCsv(): Promise<{ csv: string; filename: string }> {
+    // CSV exports the FULL list (capped at 1000 — anchor jeweller's outstanding
+    // never exceeds low hundreds; cap protects worker memory in pathological cases).
+    const data = await this.svc.getOutstanding(1, 1000);
+    return { csv: toOutstandingCsv(data), filename: `outstanding-${this.todayIST()}.csv` };
+  }
+
+  @TenantWalkerRoute({ expectedStatus: 200 })
+  @Get('/customer-ltv.csv')
+  @Roles('shop_admin', 'shop_manager')
+  async getCustomerLtvCsv(
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+  ): Promise<{ csv: string; filename: string }> {
+    const data = await this.svc.getCustomerLtv(limit);
+    return { csv: toCustomerLtvCsv(data), filename: `customer-ltv-${this.todayIST()}.csv` };
+  }
+
+  @TenantWalkerRoute({ expectedStatus: 200 })
+  @Get('/loyalty-summary.csv')
+  @Roles('shop_admin', 'shop_manager')
+  async getLoyaltySummaryCsv(): Promise<{ csv: string; filename: string }> {
+    const data = await this.svc.getLoyaltySummary();
+    return { csv: toLoyaltySummaryCsv(data), filename: `loyalty-summary-${this.todayIST()}.csv` };
+  }
+
+  @TenantWalkerRoute({ expectedStatus: 200 })
+  @Get('/stock-aging.csv')
+  @Roles('shop_admin', 'shop_manager')
+  async getStockAgingCsv(): Promise<{ csv: string; filename: string }> {
+    const data = await this.svc.getStockAging();
+    return { csv: toStockAgingCsv(data), filename: `stock-aging-${this.todayIST()}.csv` };
+  }
+
+  private todayIST(): string {
+    return new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
   }
 }
