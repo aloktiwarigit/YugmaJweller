@@ -1,4 +1,4 @@
-import { uuid, text, timestamp, decimal, integer, pgEnum } from 'drizzle-orm/pg-core';
+import { bigint, uuid, text, timestamp, decimal, integer, pgEnum } from 'drizzle-orm/pg-core';
 import { tenantScopedTable } from './_helpers/tenantScopedTable';
 import { productCategories } from './product-categories';
 
@@ -14,6 +14,7 @@ export const products = tenantScopedTable('products', {
   sku:                        text('sku').notNull(),
   metal:                      text('metal').notNull(),
   purity:                     text('purity').notNull(),
+  cost_paise:                 bigint('cost_paise', { mode: 'bigint' }),
   gross_weight_g:             decimal('gross_weight_g', { precision: 12, scale: 4 }).notNull(),
   net_weight_g:               decimal('net_weight_g',   { precision: 12, scale: 4 }).notNull(),
   stone_weight_g:             decimal('stone_weight_g', { precision: 12, scale: 4 }).default('0.0000').notNull(),
