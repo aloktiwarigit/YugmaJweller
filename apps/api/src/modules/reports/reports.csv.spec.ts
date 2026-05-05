@@ -163,4 +163,17 @@ describe('toStockAgingCsv', () => {
     const data: StockAgingResult = { buckets: [], items: [] };
     expect(toStockAgingCsv(data).split('\r\n')).toHaveLength(1);
   });
+
+  it('renders zero-cost item as 0.00, not blank', () => {
+    const data: StockAgingResult = {
+      buckets: [],
+      items: [
+        { id: 'p3', sku: 'Z-001', metal: 'GOLD', purity: '22K',
+          weightG: '1.000', daysInStock: 5, bucket: '<30d',
+          costPaise: '0', firstListedAt: '2026-05-01T00:00:00.000Z' },
+      ],
+    };
+    const lines = toStockAgingCsv(data).split('\r\n');
+    expect(lines[1]).toBe('Z-001,GOLD,22K,1.000,5,<30d,0.00,2026-05-01T00:00:00.000Z');
+  });
 });

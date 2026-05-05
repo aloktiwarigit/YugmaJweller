@@ -94,6 +94,7 @@ export function toStockAgingCsv(data: StockAgingResult): string {
       it.weightG,
       it.daysInStock,
       it.bucket,
+      // === null intentional: costPaise is string|null; ?? '' would render '0' as blank
       it.costPaise === null ? '' : paiseToRupees(it.costPaise),
       it.firstListedAt,
     ]),
