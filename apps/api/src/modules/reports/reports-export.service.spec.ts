@@ -142,6 +142,7 @@ describe('ReportsExportService.regenerate', () => {
     const result = await svc.regenerate(EXPORT_ID);
     expect(result.downloadUrl).toBe('https://signed.example/readme');
     expect(fakeQueue.add).not.toHaveBeenCalled();
+    expect(fakeStorage.getPresignedReadUrl).toHaveBeenCalledWith('tenants/x/reports/daily-summary/foo.pdf');
   });
 
   it('re-enqueues when blob is missing', async () => {

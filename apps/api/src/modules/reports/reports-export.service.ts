@@ -100,15 +100,24 @@ export class ReportsExportService {
     }
 
     const ctx = tenantContext.requireCurrent();
-    const userId = ctx.authenticated ? ctx.userId : undefined;
+    if (!ctx.authenticated) {
+      throw new BadRequestException({ code: 'reports.export.unauthenticated' });
+    }
+    const userId = ctx.userId;
 
     // Try to re-sign existing blob if within retention window.
     const ageMs = Date.now() - row.created_at.getTime();
     const withinRetention = ageMs < BLOB_RETENTION_DAYS * 86400_000 && row.storage_key !== null;
 
     if (withinRetention) {
+      let blobExists = false;
       try {
         await this.storage.downloadBuffer(row.storage_key!); // probes blob existence
+        blobExists = true;
+      } catch {
+        // blob missing — fall through to re-render
+      }
+      if (blobExists) {
         await auditLog(this.pool, {
           action: AuditAction.REPORT_EXPORT_REGENERATED,
           subjectType: 'report',
@@ -117,8 +126,6 @@ export class ReportsExportService {
           metadata: { mode: 'resign' },
         });
         return this.toStatusResult({ ...row, status: 'READY' });
-      } catch {
-        // blob missing — fall through to re-render
       }
     }
 
