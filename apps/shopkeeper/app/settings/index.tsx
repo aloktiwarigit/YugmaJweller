@@ -3,7 +3,14 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-nati
 import { router } from 'expo-router';
 import { colors, spacing, typography } from '@goldsmith/ui-tokens';
 
-const items = [
+interface SettingsItem {
+  key:    string;
+  label:  string;
+  route:  string;
+  devOnly?: boolean;
+}
+
+const items: readonly SettingsItem[] = [
   { key: 'account', label: 'मेरा खाता', route: '/settings/account' },
   { key: 'shop_profile', label: 'शॉप प्रोफाइल', route: '/settings/shop-profile' },
   { key: 'staff', label: 'स्टाफ प्रबंधन', route: '/settings/staff' },
@@ -18,13 +25,17 @@ const items = [
   { key: 'billing', label: 'बिलिंग', route: '/settings/billing' },
   { key: 'reports', label: 'रिपोर्ट्स', route: '/settings/reports' },
   { key: 'audit_log', label: 'गतिविधि लॉग', route: '/settings/audit-log' },
-] as const;
+  // Dev-only: visible only in __DEV__ builds (filtered below).
+  { key: 'theme', label: 'थीम बदलें (Demo)', route: '/settings/theme', devOnly: true },
+];
 
 export default function SettingsScreen(): React.ReactElement {
+  const visible = items.filter((item) => !item.devOnly || __DEV__);
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>सेटिंग्स</Text>
-      {items.map((item) => (
+      {visible.map((item) => (
         <TouchableOpacity
           key={item.key}
           testID={`settings-item-${item.key}`}

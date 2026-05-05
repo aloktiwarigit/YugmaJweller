@@ -9,6 +9,7 @@ import { colors } from '@goldsmith/ui-tokens';
 import PostHog, { PostHogProvider, usePostHog } from 'posthog-react-native';
 import { AuthProvider } from '../src/providers/AuthProvider';
 import { TenantProvider } from '../src/providers/TenantProvider';
+import { ThemeProvider } from '../src/providers/ThemeProvider';
 
 const POSTHOG_API_KEY = process.env.EXPO_PUBLIC_POSTHOG_API_KEY;
 const posthogClient = POSTHOG_API_KEY
@@ -62,18 +63,20 @@ export default function RootLayout(): JSX.Element | null {
   const tree = (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <TenantProvider>
-            <ScreenTracker />
-            <StatusBar style="dark" />
-            <Stack
-              screenOptions={{
-                contentStyle: { backgroundColor: colors.bg },
-                headerShown: false,
-              }}
-            />
-          </TenantProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <TenantProvider>
+              <ScreenTracker />
+              <StatusBar style="dark" />
+              <Stack
+                screenOptions={{
+                  contentStyle: { backgroundColor: colors.bg },
+                  headerShown: false,
+                }}
+              />
+            </TenantProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </SafeAreaProvider>
     </QueryClientProvider>
   );
