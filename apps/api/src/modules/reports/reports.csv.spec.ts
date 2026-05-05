@@ -38,7 +38,7 @@ describe('toDailySummaryCsv', () => {
 describe('toOutstandingCsv', () => {
   it('escapes commas in customer names and emits all rows', () => {
     const data: OutstandingResult = {
-      total: 2, page: 1, limit: 100,
+      total: 3, page: 1, limit: 100,
       items: [
         {
           id: 'inv-1', invoice_number: 'GS-2026-0001',
@@ -52,6 +52,12 @@ describe('toOutstandingCsv', () => {
           total_paise: '200000', balance_due_paise: '200000',
           issued_at: '2026-04-02T14:30:00.000Z',
         },
+        {
+          id: 'inv-3', invoice_number: 'GS-2026-0003',
+          customer_name: 'O"Brien', customer_phone: '9999999999',
+          total_paise: '50000', balance_due_paise: '25000',
+          issued_at: '2026-04-03T09:00:00.000Z',
+        },
       ],
     };
     const csv = toOutstandingCsv(data);
@@ -64,6 +70,9 @@ describe('toOutstandingCsv', () => {
     );
     expect(lines[2]).toBe(
       'GS-2026-0002,राज कुमार,,2000.00,2000.00,2026-04-02T14:30:00.000Z',
+    );
+    expect(lines[3]).toBe(
+      'GS-2026-0003,"O""Brien",9999999999,500.00,250.00,2026-04-03T09:00:00.000Z',
     );
   });
 
