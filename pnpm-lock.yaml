@@ -13,6 +13,9 @@ importers:
       '@types/node':
         specifier: ^20.11.0
         version: 20.19.39
+      '@types/pg':
+        specifier: ^8.11.0
+        version: 8.20.0
       '@typescript-eslint/eslint-plugin':
         specifier: ^7.0.0
         version: 7.18.0(@typescript-eslint/parser@7.18.0(eslint@8.57.1)(typescript@5.9.3))(eslint@8.57.1)(typescript@5.9.3)
@@ -37,6 +40,9 @@ importers:
       fast-glob:
         specifier: ^3.3.2
         version: 3.3.3
+      pg:
+        specifier: ^8.11.0
+        version: 8.20.0
       prettier:
         specifier: ^3.2.5
         version: 3.8.3
