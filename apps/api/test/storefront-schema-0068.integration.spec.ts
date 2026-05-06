@@ -184,7 +184,7 @@ describe('migration 0068: composite FK cross-tenant guard', () => {
 describe('migration 0068: maintain trigger (SECURITY INVOKER)', () => {
   it('trigger auto-sets primary_image_id on first clean image INSERT', async () => {
     // Products start with NULL primary_image_id; inserting a clean image should trigger recompute.
-    const imageId = await insertImage(SHOP_A, ctxA, productAId, userAId, { sortOrder: 99 });
+    await insertImage(SHOP_A, ctxA, productAId, userAId, { sortOrder: 99 });
 
     // The trigger should have set products.primary_image_id to this image.
     // Use raw pool connection to bypass RLS for the assertion read.
