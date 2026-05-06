@@ -80,8 +80,8 @@
     }
   },
   "rate_lock": {
-    "title": "Rate Lock की अवधि",
-    "label": "Rate Lock की अवधि (दिनों में)",
+    "title": "दर-लॉक की अवधि",
+    "label": "दर-लॉक की अवधि (दिनों में)",
     "description": "इतने दिनों तक customer आज की gold rate पर खरीद सकते हैं",
     "save_success": "बदलाव सहेज लिया ✓",
     "errors": {
@@ -113,7 +113,7 @@
     }
   },
   "try_at_home": {
-    "title": "घर पर try करें",
+    "title": "घर पर आज़माएँ",
     "description": "Customer घर पर कुछ pieces try करके खरीद सकते हैं",
     "max_pieces_label": "अधिकतम pieces per booking",
     "save_success": "बदलाव सहेज लिया ✓",

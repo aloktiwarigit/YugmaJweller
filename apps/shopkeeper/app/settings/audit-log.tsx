@@ -132,26 +132,17 @@ export default function AuditLogScreen(): React.ReactElement {
   const user = useAuthStore((s) => s.user);
   const role = user?.role;
 
+  // All hooks must be called unconditionally — role gate is applied AFTER hooks.
   const [dateRange, setDateRange] = useState<DateRange>('7d');
   const [category, setCategory] = useState<Category | undefined>(undefined);
   const [page, setPage] = useState(1);
-
-  // Role gate — show before any API call. The query is also disabled via `enabled` below.
-  if (role === 'shop_staff') {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.deniedText}>इस पेज तक पहुंच नहीं है</Text>
-        <Text style={styles.deniedSub}>केवल मालिक और प्रबंधक देख सकते हैं।</Text>
-      </View>
-    );
-  }
 
   const isAllowed = role === 'shop_admin' || role === 'shop_manager';
 
   const { data, isLoading, isError, refetch } = useQuery<AuditLogResponse, Error>({
     queryKey: ['audit-log', dateRange, category, page],
     queryFn: () => fetchAuditLog({ dateRange, category, page }),
-    enabled: isAllowed,
+    enabled: isAllowed,  // don't run for shop_staff
   });
 
   const totalPages = data !== undefined ? Math.ceil(data.total / PAGE_SIZE) : 1;
@@ -162,6 +153,16 @@ export default function AuditLogScreen(): React.ReactElement {
       setPage((p) => p + 1);
     }
   }, [hasMore, isLoading]);
+
+  // Role gate AFTER all hooks — safe conditional return.
+  if (!isAllowed) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.deniedText}>इस पेज तक पहुंच नहीं है</Text>
+        <Text style={styles.deniedSub}>केवल मालिक और प्रबंधक देख सकते हैं।</Text>
+      </View>
+    );
+  }
 
   const handleDateRange = (range: DateRange): void => {
     setDateRange(range);

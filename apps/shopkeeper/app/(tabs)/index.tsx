@@ -72,7 +72,7 @@ export default function DashboardScreen(): React.ReactElement {
           accessibilityLabel="सेटिंग्स"
           testID="dashboard-settings-icon"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={{ padding: 4 }}
+          style={{ padding: 8 }}
         >
           <Ionicons name="settings-outline" size={24} color={colors.inkMute} />
         </Pressable>
