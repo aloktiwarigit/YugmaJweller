@@ -446,13 +446,14 @@ describe('storefront_config_json tenant isolation', () => {
     );
 
     // Verify tenant B's row is untouched (read as superuser to bypass RLS)
-    const { rows } = await pool.query<{ storefront_config_json: { heroBanners?: unknown[] } }>(
+    const { rows } = await pool.query<{ storefront_config_json: Record<string, unknown> }>(
       `SELECT storefront_config_json FROM shop_settings WHERE shop_id = $1`,
       [TENANT_B],
     );
-    expect(rows[0]!.storefront_config_json.heroBanners).toBeDefined();
-    // Tenant A's trustPillarsOverride must NOT appear in tenant B's row
-    const hasAMarker = JSON.stringify(rows[0]!.storefront_config_json).includes('दुकान ए');
-    expect(hasAMarker).toBe(false);
+    // Tenant B's heroBanners must still be present (structural proof it survived)
+    expect(rows[0]!.storefront_config_json['heroBanners']).toBeDefined();
+    // Tenant A's trustPillarsOverride key must NOT appear in tenant B's row
+    // Assert structurally (not via string scan) so a marker rename cannot orphan this check
+    expect(rows[0]!.storefront_config_json['trustPillarsOverride']).toBeUndefined();
   });
 });

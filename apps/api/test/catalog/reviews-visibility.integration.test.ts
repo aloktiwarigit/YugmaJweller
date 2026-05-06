@@ -42,6 +42,19 @@ describe('product_reviews.is_publicly_visible — column + index (Phase A)', () 
     expect(rows[0]!.is_nullable).toBe('NO');
   });
 
+  it('column DEFAULT is TRUE (opt-out DPDPA contract — preserves pre-existing public rows)', async () => {
+    // pg_get_expr is the canonical source for default expressions — DDL-rendering-independent
+    const { rows } = await pool.query<{ column_default: string }>(
+      `SELECT pg_get_expr(adbin, adrelid) AS column_default
+         FROM pg_attrdef
+         JOIN pg_attribute ON attrelid = adrelid AND attnum = adnum
+         JOIN pg_class     ON pg_class.oid = adrelid
+        WHERE relname = 'product_reviews' AND attname = 'is_publicly_visible'`,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.column_default).toBe('true');
+  });
+
   it('partial index idx_product_reviews_public exists with WHERE is_publicly_visible predicate', async () => {
     const { rows } = await pool.query<{ indexname: string; indexdef: string }>(
       `SELECT indexname, indexdef FROM pg_indexes
