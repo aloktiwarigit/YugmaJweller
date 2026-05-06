@@ -17,13 +17,16 @@
     "db:assert-marked": "tsx packages/db/src/codegen/assert-all-tables-marked.ts",
     "semgrep": "semgrep --config ops/semgrep/ --error",
     "seed:anchor": "tsx scripts/seed-anchor.ts",
+    "seed:demo": "tsx scripts/seed/demo-tenant.ts",
     "docs:context": "tsx scripts/docs/scan-repo-context.ts && tsx scripts/docs/extract-adrs.ts && tsx scripts/docs/extract-bmad-trace.ts && tsx scripts/docs/scan-docs.ts && tsx scripts/docs/extract-acceptance.ts",
     "docs:validate": "tsx scripts/docs/validate-agent-context.ts",
     "test:ci": "pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:integration && pnpm test:tenant-isolation && pnpm semgrep && pnpm docs:validate"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "@types/pg": "^8.11.0",
     "dotenv": "^16.4.0",
+    "pg": "^8.11.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.57.0",
