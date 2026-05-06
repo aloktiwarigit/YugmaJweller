@@ -133,6 +133,7 @@ describe('migration 0067: collections + collection_products RLS + composite FK',
           return r.rows;
         }),
       );
+      expect(rowsA.length).toBeGreaterThan(0);
       expect(rowsA.every((r) => r.shop_id === SHOP_A)).toBe(true);
 
       const rowsB = await tenantContext.runWith(ctxFor(SHOP_B), () =>
@@ -141,6 +142,7 @@ describe('migration 0067: collections + collection_products RLS + composite FK',
           return r.rows;
         }),
       );
+      expect(rowsB.length).toBeGreaterThan(0);
       expect(rowsB.every((r) => r.shop_id === SHOP_B)).toBe(true);
     });
   });
@@ -163,17 +165,17 @@ describe('migration 0067: collections + collection_products RLS + composite FK',
       // Use raw superuser pool to verify without RLS interference.
       const c = await pool.connect();
       try {
-        const jp = await c.query<{ count: string }>(
+        const jp = await c.query<{ count: number }>(
           `SELECT count(*)::int AS count FROM collection_products WHERE collection_id = $1`,
           [colId],
         );
-        expect(Number(jp.rows[0]!.count)).toBe(0);
+        expect(jp.rows[0]!.count).toBe(0);
 
-        const pr = await c.query<{ count: string }>(
+        const pr = await c.query<{ count: number }>(
           `SELECT count(*)::int AS count FROM products WHERE id = $1`,
           [productAId],
         );
-        expect(Number(pr.rows[0]!.count)).toBe(1);
+        expect(pr.rows[0]!.count).toBe(1);
       } finally { c.release(); }
     });
 
@@ -205,17 +207,17 @@ describe('migration 0067: collections + collection_products RLS + composite FK',
 
       const c = await pool.connect();
       try {
-        const jr = await c.query<{ count: string }>(
+        const jr = await c.query<{ count: number }>(
           `SELECT count(*)::int AS count FROM collection_products WHERE product_id = $1`,
           [tmpProdId],
         );
-        expect(Number(jr.rows[0]!.count)).toBe(0);
+        expect(jr.rows[0]!.count).toBe(0);
 
-        const cr = await c.query<{ count: string }>(
+        const cr = await c.query<{ count: number }>(
           `SELECT count(*)::int AS count FROM collections WHERE id = $1`,
           [tmpColId],
         );
-        expect(Number(cr.rows[0]!.count)).toBe(1);
+        expect(cr.rows[0]!.count).toBe(1);
       } finally { c.release(); }
     });
   });
