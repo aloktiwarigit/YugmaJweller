@@ -44,8 +44,9 @@ UPDATE products
       LIMIT 1
    );
 
--- Step 5a: BEFORE DELETE trigger function — clears primary_image_id on the product
--- before the image row is removed so the composite FK constraint is satisfied.
+-- Step 5a: BEFORE DELETE/UPDATE(product_id) trigger function — clears primary_image_id
+-- on the product before the image row is removed or reparented so the composite FK
+-- constraint is satisfied.
 -- SECURITY INVOKER: runs under session user privileges; RLS on products must allow
 -- the UPDATE (withTenantTx sets the GUC that satisfies RLS for the owning tenant).
 CREATE OR REPLACE FUNCTION clear_products_primary_image()
@@ -55,20 +56,28 @@ SECURITY INVOKER
 AS $$
 BEGIN
   -- Clear primary_image_id only when the product currently points at this image.
-  -- This avoids a spurious UPDATE when a non-primary image is deleted.
+  -- This avoids a spurious UPDATE when a non-primary image is deleted/moved away.
+  -- On DELETE: OLD.product_id is the product that held this image.
+  -- On UPDATE OF product_id: OLD.product_id is the product losing this image.
   UPDATE products
      SET primary_image_id = NULL
    WHERE id = OLD.product_id
      AND primary_image_id = OLD.id;
 
-  -- BEFORE trigger: return OLD to allow the delete to proceed.
-  RETURN OLD;
+  -- BEFORE trigger: return OLD (DELETE) or NEW (UPDATE) to allow the operation to proceed.
+  IF (TG_OP = 'DELETE') THEN
+    RETURN OLD;
+  ELSE
+    RETURN NEW;
+  END IF;
 END;
 $$;
 
 -- Fires BEFORE DELETE so the FK reference is cleared before the row is removed.
+-- Also fires BEFORE UPDATE OF product_id so the old product's FK is cleared before
+-- the image changes ownership (Codex P2 fix: handle same-shop reparenting).
 CREATE TRIGGER trg_clear_products_primary_image
-BEFORE DELETE
+BEFORE DELETE OR UPDATE OF product_id
 ON product_images
 FOR EACH ROW
 EXECUTE FUNCTION clear_products_primary_image();
@@ -84,7 +93,24 @@ AS $$
 DECLARE
   v_product_id UUID;
 BEGIN
-  -- COALESCE handles both DELETE (NEW is null) and INSERT/UPDATE (OLD may be null).
+  -- For product_id reparenting: recompute the OLD product first (Codex P2 fix).
+  -- The BEFORE trigger has already cleared primary_image_id on OLD.product_id; now
+  -- recompute it from whatever clean images remain on that product.
+  IF (TG_OP = 'UPDATE' AND OLD.product_id IS DISTINCT FROM NEW.product_id) THEN
+    UPDATE products
+       SET primary_image_id = (
+         SELECT pi.id
+           FROM product_images pi
+          WHERE pi.product_id = OLD.product_id
+            AND pi.scan_status = 'clean'
+          ORDER BY pi.sort_order ASC, pi.created_at ASC
+          LIMIT 1
+       )
+     WHERE id = OLD.product_id;
+  END IF;
+
+  -- Recompute the NEW (or only) product's primary image.
+  -- COALESCE handles DELETE (NEW is null) and INSERT/UPDATE (NEW.product_id).
   v_product_id := COALESCE(NEW.product_id, OLD.product_id);
 
   UPDATE products
@@ -104,13 +130,14 @@ BEGIN
 END;
 $$;
 
--- Fires after any of the four mutation events that can change which image is "primary":
---   INSERT      — new image added; may become primary if it has the lowest sort_order
---   DELETE      — image removed; BEFORE trigger clears FK first, AFTER recomputes
+-- Fires after any of the five mutation events that can change which image is "primary":
+--   INSERT              — new image added; may become primary if lowest sort_order
+--   DELETE              — image removed; BEFORE trigger clears FK first, AFTER recomputes
 --   UPDATE OF sort_order  — reorder can change which image is first
 --   UPDATE OF scan_status — an image becoming 'clean' or 'rejected' changes eligibility
+--   UPDATE OF product_id  — reparenting: recompute both old and new product (Codex P2 fix)
 CREATE TRIGGER trg_maintain_products_primary_image
-AFTER INSERT OR DELETE OR UPDATE OF sort_order, scan_status
+AFTER INSERT OR DELETE OR UPDATE OF sort_order, scan_status, product_id
 ON product_images
 FOR EACH ROW
 EXECUTE FUNCTION maintain_products_primary_image();
