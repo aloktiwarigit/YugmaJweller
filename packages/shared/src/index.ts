@@ -213,3 +213,16 @@ export type {
   LoyaltyTransactionType,
   AdjustPointsBody,
 } from './schemas/loyalty.schema';
+export {
+  StorefrontConfigSchema,
+  PatchStorefrontConfigSchema,
+  HeroBannerSchema,
+  GiftPersonaOverrideSchema,
+  TrustPillarSchema,
+  BrandPaletteSchema,
+  STOREFRONT_CONFIG_DEFAULTS,
+} from './schemas/storefront-config.schema';
+export type {
+  StorefrontConfig,
+  PatchStorefrontConfigDto,
+} from './schemas/storefront-config.schema';
