@@ -757,21 +757,84 @@ async function main(): Promise<void> {
     const shopId = existing.rows[0].id;
     const client = await pool.connect();
     try {
-      // Delete in reverse dependency order (FK-safe)
-      await client.query(`DELETE FROM try_at_home_bookings  WHERE shop_id = $1`, [shopId]);
-      await client.query(`DELETE FROM rate_lock_bookings    WHERE shop_id = $1`, [shopId]);
-      await client.query(`DELETE FROM custom_orders         WHERE shop_id = $1`, [shopId]);
-      await client.query(`DELETE FROM customer_loyalty      WHERE shop_id = $1`, [shopId]);
-      await client.query(`DELETE FROM loyalty_transactions  WHERE shop_id = $1`, [shopId]);
-      await client.query(`DELETE FROM payments              WHERE shop_id = $1`, [shopId]);
-      await client.query(`DELETE FROM invoice_items         WHERE shop_id = $1`, [shopId]);
-      await client.query(`DELETE FROM invoices              WHERE shop_id = $1`, [shopId]);
-      await client.query(`DELETE FROM customers             WHERE shop_id = $1`, [shopId]);
-      await client.query(`DELETE FROM products              WHERE shop_id = $1`, [shopId]);
-      await client.query(`DELETE FROM product_categories    WHERE shop_id = $1`, [shopId]);
-      await client.query(`DELETE FROM shop_settings         WHERE shop_id = $1`, [shopId]);
-      await client.query(`DELETE FROM shops                 WHERE id = $1`, [shopId]);
+      await client.query('BEGIN');
+
+      // Delete in reverse dependency order (FK-safe: children before parents).
+      //
+      // Intentionally NOT deleted (rows accumulate across reseeds — see notes below):
+      //   - audit_events         : SECURITY DEFINER immutability trigger + ON DELETE RESTRICT
+      //                            on shops(id). Seed upserts the shop row via ON CONFLICT.
+      //   - stock_movements      : SECURITY DEFINER immutability trigger (PMLA 5-yr retention).
+      //   - loyalty_transactions : SECURITY DEFINER immutability trigger.
+      //   - customers            : loyalty_transactions.customer_id is NOT NULL FK pointing here;
+      //                            since loyalty_transactions is immutable, customers cannot be
+      //                            deleted either. Seed upserts via ON CONFLICT (shop_id, phone).
+      //   - shops (row itself)   : blocked by audit_events ON DELETE RESTRICT (see above).
+
+      // ── Leaf tables (no FK children) ──────────────────────────────────────
+      await client.query(`DELETE FROM try_at_home_bookings    WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM rate_lock_bookings      WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM wishlists               WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM product_reviews         WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM product_views           WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM viewing_consent         WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM customer_occasions      WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM customer_notes          WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM customer_balances       WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM family_members          WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM pmla_aggregates         WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM urd_purchases           WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM credit_notes            WHERE shop_id = $1`, [shopId]);
+
+      // ── Custom orders (milestones are children) ───────────────────────────
+      await client.query(`DELETE FROM custom_order_milestones WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM custom_orders           WHERE shop_id = $1`, [shopId]);
+
+      // ── Loyalty (only the mutable aggregate; loyalty_transactions is immutable) ──
+      await client.query(`DELETE FROM customer_loyalty        WHERE shop_id = $1`, [shopId]);
+      // NOTE: loyalty_transactions rows accumulate across reseeds (immutable).
+      // The seed inserts them with invoice_id=NULL so the unique-accrual index
+      // (shop_id, invoice_id WHERE type='ACCRUAL') does not block re-insertion.
+
+      // ── Billing stack (payments + items depend on invoices) ───────────────
+      await client.query(`DELETE FROM payments                WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM invoice_items           WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM invoices                WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM estimates               WHERE shop_id = $1`, [shopId]);
+
+      // ── Inventory (product_images depend on products; categories on shop) ─
+      await client.query(`DELETE FROM product_images          WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM products                WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM product_categories      WHERE shop_id = $1`, [shopId]);
+      // NOTE: customers rows are intentionally NOT deleted here.
+      // loyalty_transactions.customer_id is NOT NULL and loyalty_transactions is immutable,
+      // so deleting customers would violate the FK. The seed upserts customers via
+      // ON CONFLICT (shop_id, phone) DO UPDATE, preserving IDs for immutable-table references.
+
+      // ── Sync infra ────────────────────────────────────────────────────────
+      await client.query(`DELETE FROM sync_change_log         WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM tenant_sync_cursors     WHERE shop_id = $1`, [shopId]);
+
+      // ── Rate overrides ────────────────────────────────────────────────────
+      await client.query(`DELETE FROM shop_rate_overrides     WHERE shop_id = $1`, [shopId]);
+
+      // ── Staff + permissions ───────────────────────────────────────────────
+      await client.query(`DELETE FROM role_permissions        WHERE shop_id = $1`, [shopId]);
+      await client.query(`DELETE FROM shop_users              WHERE shop_id = $1`, [shopId]);
+
+      // ── Shop-level settings (RESTRICT FK; must come after all children) ───
+      await client.query(`DELETE FROM shop_settings           WHERE shop_id = $1`, [shopId]);
+
+      // NOTE: shops row is intentionally NOT deleted here.
+      // audit_events has an immutable SECURITY DEFINER trigger and ON DELETE RESTRICT
+      // on shops(id), so deleting the shop row would fail if any audit rows exist.
+      // The main seed block uses ON CONFLICT DO UPDATE to upsert over the existing row.
+
+      await client.query('COMMIT');
       console.log('  Wipe complete.');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
     } finally {
       client.release();
     }
