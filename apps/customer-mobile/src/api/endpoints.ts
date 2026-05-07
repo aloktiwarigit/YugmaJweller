@@ -1,6 +1,25 @@
 import axios from 'axios';
 import { api } from './client';
 import type { Tenant, TenantBranding } from '../stores/tenantStore';
+import type {
+  PublicRateEntry,
+  PublicRatesResponse,
+  EstimatedPrice,
+  CatalogProduct,
+  CatalogProductsResponse,
+  HuidVerifyResult,
+} from '@goldsmith/customer-shared';
+
+// CatalogEstimatedPrice was the mobile-side name for EstimatedPrice.
+// Re-export as alias to avoid breaking existing mobile code that references it.
+export type { EstimatedPrice as CatalogEstimatedPrice } from '@goldsmith/customer-shared';
+export type {
+  PublicRateEntry,
+  PublicRatesResponse,
+  CatalogProduct,
+  CatalogProductsResponse,
+  HuidVerifyResult,
+} from '@goldsmith/customer-shared';
 
 interface TenantBootApiResponse {
   id: string;
@@ -8,63 +27,9 @@ interface TenantBootApiResponse {
   config: Record<string, unknown> | null;
 }
 
-export interface PublicRateEntry {
-  perGramRupees: string;
-  formattedINR: string;
-  fetchedAt: string;
-}
-export interface PublicRatesResponse {
-  GOLD_24K: PublicRateEntry;
-  GOLD_22K: PublicRateEntry;
-  SILVER_999: PublicRateEntry;
-  stale: boolean;
-  source: string;
-  refreshedAt: string;
-}
-
 export interface PublicProduct {
   id: string;
   name: string;
-}
-
-export interface CatalogEstimatedPrice {
-  totalFormatted: string;
-  totalPaise:     string;
-  breakdown: {
-    goldValuePaise:    string;
-    makingChargePaise: string;
-    gstMetalPaise:     string;
-    gstMakingPaise:    string;
-  };
-}
-
-export interface CatalogProduct {
-  id:                    string;
-  sku:                   string;
-  metal:                 string;
-  purity:                string;
-  categoryId:            string | null;
-  categoryName:          string | null;
-  grossWeightG:          string;
-  netWeightG:            string;
-  huid:                  string | null;
-  huidExemptionCategory: string;
-  quantity:              number;
-  priceAvailable:        boolean;
-  estimatedPrice?:       CatalogEstimatedPrice;
-  publishedAt:           string;
-}
-
-export interface CatalogProductsResponse {
-  items: CatalogProduct[];
-  total: number;
-  page:  number;
-}
-
-export interface HuidVerifyResult {
-  verified:       boolean;
-  huid:           string;
-  certifyingBody: string;
 }
 
 export interface PublicProductsResponse {
