@@ -33,7 +33,7 @@ export interface CatalogProduct {
   grossWeightG:          string;
   netWeightG:            string;
   huid:                  string | null;
-  huidExemptionCategory: string;
+  huidExemptionCategory: string | null;
   quantity:              number;
   priceAvailable:        boolean;
   estimatedPrice?:       EstimatedPrice;
@@ -67,7 +67,6 @@ export interface ReviewItem {
   reviewText:        string | null;
   customerFirstName: string | null;
   createdAt:         string;
-  isPubliclyVisible?: boolean;
 }
 
 export interface ReviewsResponse {
