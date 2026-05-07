@@ -12,6 +12,7 @@ import { AnalyticsService } from '../analytics/analytics.service';
 import { CatalogService } from './catalog.service';
 import type { TenantConfigResponse, CatalogProductsResponse, CatalogProduct, HuidVerifyResult, PublicImageRow } from './catalog.service';
 import { RatesUnavailableError } from '@goldsmith/rates';
+import type { PublicReviewsResponse } from '@goldsmith/customer-shared';
 
 // ---------------------------------------------------------------------------
 // Public rates response shape (Story 4.4 — unchanged)
@@ -153,6 +154,29 @@ export class CatalogController {
     if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
     const images = await this.catalogService.listPublicImages(productId, shopId);
     return { images };
+  }
+
+  // -------------------------------------------------------------------------
+  // GET /catalog/products/:id/reviews — Story B4 (PII-redacted, public)
+  // -------------------------------------------------------------------------
+
+  @Get('products/:id/reviews')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'public, max-age=120, stale-while-revalidate=600')
+  async getProductReviews(
+    @Param('id', new ParseUUIDPipe()) productId: string,
+    @Headers('x-tenant-id') shopId: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+  ): Promise<PublicReviewsResponse> {
+    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    return this.catalogService.getPublicProductReviews({
+      shopId,
+      productId,
+      page:  Math.max(1, parseInt(page, 10) || 1),
+      limit: Math.min(50, Math.max(1, parseInt(limit, 10) || 10)),
+    });
   }
 
   // -------------------------------------------------------------------------
