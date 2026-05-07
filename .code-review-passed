@@ -1,0 +1,8 @@
+code-review-passed: 2026-05-07T19:22:11Z
+branch: feat/catalog-filters-b1b3
+head: 1f468d1
+reviewer: feature-dev:code-reviewer (whole-branch pass)
+issues-fixed:
+  - isHotPath now includes !categoryId && !search && !metal (category pages get 30s TTL not 300s)
+  - CatalogProduct in @goldsmith/customer-shared synced: primaryImage added, huidExemptionCategory string (not null)
+assessment: Ready to merge
