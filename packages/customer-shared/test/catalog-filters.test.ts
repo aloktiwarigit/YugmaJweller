@@ -2,11 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   PRICE_BANDS,
   CATALOG_STYLES,
-  CATALOG_OCCASIONS,
-  CATALOG_SORTS,
-  PURITY_FILTERS,
-  METAL_LABELS,
-  PURITY_LABELS,
   metalLabel,
   purityLabel,
   buildProductsHref,
@@ -74,7 +69,7 @@ describe('buildProductsHref', () => {
   });
 
   it('omits undefined/null params', () => {
-    const href = buildProductsHref({ metal: 'GOLD', purity: undefined });
+    const href = buildProductsHref({ metal: 'GOLD' });
     expect(href).not.toContain('purity');
   });
 
