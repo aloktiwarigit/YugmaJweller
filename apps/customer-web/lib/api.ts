@@ -1,62 +1,26 @@
 // Typed fetch helpers for public catalog API.
-// Types are defined inline (not imported from API package — avoids circular dep).
+// Type definitions live in @goldsmith/customer-shared.
 
-export interface TenantConfigResponse {
-  shopId:          string;
-  primaryColor:    string;
-  logoUrl:         string | null;
-  appName:         string;
-  defaultLanguage: string;
-}
+export type {
+  TenantConfigResponse,
+  EstimatedPrice,
+  CatalogProduct,
+  CatalogProductsResponse,
+  PublicRateEntry,
+  PublicRatesResponse,
+  ReviewItem,
+  ReviewsResponse,
+  PublicImageItem,
+} from '@goldsmith/customer-shared';
 
-export interface EstimatedPrice {
-  totalFormatted: string;
-  totalPaise:     string;
-  breakdown: {
-    goldValuePaise:    string;
-    makingChargePaise: string;
-    gstMetalPaise:     string;
-    gstMakingPaise:    string;
-  };
-}
-
-export interface CatalogProduct {
-  id:                    string;
-  sku:                   string;
-  metal:                 string;
-  purity:                string;
-  categoryId:            string | null;
-  categoryName:          string | null;
-  grossWeightG:          string;
-  netWeightG:            string;
-  huid:                  string | null;
-  huidExemptionCategory: string;
-  quantity:              number;
-  priceAvailable:        boolean;
-  estimatedPrice?:       EstimatedPrice;
-  publishedAt:           string;
-}
-
-export interface CatalogProductsResponse {
-  items: CatalogProduct[];
-  total: number;
-  page:  number;
-}
-
-export interface PublicRateEntry {
-  perGramRupees: string;
-  formattedINR:  string;
-  fetchedAt:     string;
-}
-
-export interface PublicRatesResponse {
-  GOLD_24K:    PublicRateEntry;
-  GOLD_22K:    PublicRateEntry;
-  SILVER_999:  PublicRateEntry;
-  stale:       boolean;
-  source:      string;
-  refreshedAt: string;
-}
+import type {
+  TenantConfigResponse,
+  CatalogProduct,
+  CatalogProductsResponse,
+  PublicRatesResponse,
+  ReviewsResponse,
+  PublicImageItem,
+} from '@goldsmith/customer-shared';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:3001';
 
@@ -123,20 +87,6 @@ export async function fetchProduct(
   }
 }
 
-export interface ReviewItem {
-  id:                string;
-  rating:            number;
-  reviewText:        string | null;
-  customerFirstName: string | null;
-  createdAt:         string;
-}
-
-export interface ReviewsResponse {
-  reviews:       ReviewItem[];
-  averageRating: number | null;
-  total:         number;
-}
-
 export async function fetchProductReviews(
   productId: string,
   shopId: string,
@@ -151,16 +101,6 @@ export async function fetchProductReviews(
   } catch {
     return { reviews: [], averageRating: null, total: 0 };
   }
-}
-
-export interface PublicImageItem {
-  id:              string;
-  alt_text:        string | null;
-  width:           number;
-  height:          number;
-  srcset:          string;
-  default_url:     string;
-  placeholder_url: string;
 }
 
 export async function fetchProductImages(
