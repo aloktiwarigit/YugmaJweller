@@ -122,6 +122,7 @@ export class CatalogController {
     const isHotPath =
       parsedPage === 1 &&
       (!sort || sort === 'newest') &&
+      !categoryId && !search && !metal &&
       !purity && !priceMinRaw && !priceMaxRaw &&
       !inStockOnlyRaw && !style && !occasion && !giftPersona && !collection;
 
