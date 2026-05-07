@@ -5,3 +5,7 @@ findings: 0 exploitable (Finding 7 filtered as false positive — DB ::uuid cast
 sql-injection: CLEAN — all filter values via parameterised $N; buildSortClause() closed allowlist
 data-leakage: CLEAN — pi_storage_key never in CatalogProduct or API response
 tenant-isolation: CLEAN — collection slug lookup scoped to shop_id=$1; EXISTS subquery cp.shop_id=$1
+
+B4 security-review-passed: 2026-05-07 — 0 findings, all 7 PII+isolation checks clean
+branch: feat/reviews-public-b4
+reviewer: security-review skill (superpowers v5.1.0)

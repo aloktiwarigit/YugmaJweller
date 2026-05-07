@@ -1,1 +1,1 @@
-codex review passed 2026-05-07 — re-run after P2 FK fix (ON DELETE SET NULL column-list). P1 findings in first run were pre-existing code outside A2 scope.
+﻿codex review passed  — Story B4 feat/reviews-public-b4

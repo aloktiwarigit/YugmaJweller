@@ -76,6 +76,23 @@ export interface ReviewsResponse {
   total:         number;
 }
 
+// ─── Public reviews (Story B4) — PII-redacted, filtered by is_publicly_visible ─
+// NEVER add customerId, full name, email, or phone here.
+export interface PublicReviewItem {
+  id:                  string;
+  rating:              number;           // 1–5
+  reviewText:          string | null;
+  customerDisplayName: string;           // first name + last initial (e.g. "Priya S.") or "Anonymous"
+  createdAt:           string;           // ISO 8601
+}
+
+export interface PublicReviewsResponse {
+  items:           PublicReviewItem[];
+  total:           number;
+  page:            number;
+  ratingBreakdown: { 1: number; 2: number; 3: number; 4: number; 5: number };
+}
+
 export interface PublicImageItem {
   id:              string;
   alt_text:        string | null;
