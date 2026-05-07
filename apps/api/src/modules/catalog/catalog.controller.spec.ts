@@ -134,7 +134,8 @@ describe('CatalogController', () => {
       const res = await request(app.getHttpServer())
         .get('/api/v1/catalog/products').set('X-Tenant-Id', 'shop-uuid').expect(200);
       expect(res.body.items).toBeInstanceOf(Array);
-      expect(res.headers['cache-control']).toBe('public, max-age=30, stale-while-revalidate=60');
+      // No filter params + page=1 → hot path: 5-minute TTL
+      expect(res.headers['cache-control']).toBe('public, max-age=300, stale-while-revalidate=900');
     });
   });
 
