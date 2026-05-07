@@ -670,6 +670,19 @@ importers:
         specifier: ^1.4.0
         version: 1.6.1(@types/node@22.19.17)(jsdom@24.1.3)(lightningcss@1.27.0)(terser@5.46.1)
 
+  packages/customer-shared:
+    dependencies:
+      '@goldsmith/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.4.0
+        version: 1.6.1(@types/node@22.19.17)(jsdom@24.1.3)(lightningcss@1.27.0)(terser@5.46.1)
+
   packages/db:
     dependencies:
       '@goldsmith/observability':
