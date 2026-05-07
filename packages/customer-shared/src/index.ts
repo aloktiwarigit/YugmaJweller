@@ -7,6 +7,8 @@ export type {
   PublicRatesResponse,
   ReviewItem,
   ReviewsResponse,
+  PublicReviewItem,
+  PublicReviewsResponse,
   PublicImageItem,
   HuidVerifyResult,
   CatalogImage,
