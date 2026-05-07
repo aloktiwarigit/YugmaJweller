@@ -1,1 +1,1 @@
-{"timestamp":"2026-05-06T18:50:53Z","commit":"39f44a5855112a7b56e3898949b3adda9c1d0276","reviewer":"codex","model":"gpt-5.5","findings":"1 P2 (trigger reparenting — fixed in commit 39f44a5)","result":"pass-after-fix"}
+codex review passed 2026-05-07 — re-run after P2 FK fix (ON DELETE SET NULL column-list). P1 findings in first run were pre-existing code outside A2 scope.
