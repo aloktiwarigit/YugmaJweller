@@ -85,7 +85,7 @@ export const MEGA_MENU_CONTENT: Record<string, MegaMenuPanel> = {
       { labelHi: 'रोज़ाना',       labelEn: 'Daily Wear', href: '/products?metal=SILVER&style=DAILY_WEAR'   },
       { labelHi: 'मंदिर',         labelEn: 'Temple',     href: '/products?metal=SILVER&style=TEMPLE'       },
       { labelHi: 'ऑक्सीडाइज़्ड', labelEn: 'Oxidised',   href: '/products?metal=SILVER&search=oxidised'    },
-      { labelHi: 'सादा',          labelEn: 'Plain',      href: '/products?metal=SILVER&style=OFFICE'        },
+      { labelHi: 'सादा',          labelEn: 'Plain',      href: '/products?metal=SILVER&style=DAILY_WEAR'    },
       { labelHi: 'पारम्परिक',     labelEn: 'Traditional', href: '/products?metal=SILVER&occasion=FESTIVAL' },
     ],
     metalPurity: [

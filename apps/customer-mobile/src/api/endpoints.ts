@@ -8,6 +8,8 @@ import type {
   CatalogProduct,
   CatalogProductsResponse,
   HuidVerifyResult,
+  ReviewItem,
+  ReviewsResponse,
 } from '@goldsmith/customer-shared';
 
 // CatalogEstimatedPrice was the mobile-side name for EstimatedPrice.
@@ -19,6 +21,8 @@ export type {
   CatalogProduct,
   CatalogProductsResponse,
   HuidVerifyResult,
+  ReviewItem,
+  ReviewsResponse,
 } from '@goldsmith/customer-shared';
 
 interface TenantBootApiResponse {
@@ -215,20 +219,6 @@ export interface WishlistItem {
   netWeightG:   string;
   huid:         string | null;
   addedAt:      string;
-}
-
-export interface ReviewItem {
-  id:                string;
-  rating:            number;
-  reviewText:        string | null;
-  customerFirstName: string | null;
-  createdAt:         string;
-}
-
-export interface ReviewsResponse {
-  reviews:       ReviewItem[];
-  averageRating: number | null;
-  total:         number;
 }
 
 export async function getProductReviews(productId: string): Promise<ReviewsResponse> {
