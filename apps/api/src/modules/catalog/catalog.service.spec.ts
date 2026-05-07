@@ -355,3 +355,130 @@ describe('CatalogService.verifyHuid()', () => {
     await expect(svc.verifyHuid(PRODUCT_ID, SHOP_ID, 'AB1234')).rejects.toThrow(NotFoundException);
   });
 });
+
+// ---------------------------------------------------------------------------
+// WS-A: B1 — filter SQL construction
+// Test strategy: pass filter params, then assert pool.query.mock.calls[1][0]
+// (products SQL) contains the expected WHERE clause snippet, and
+// pool.query.mock.calls[1][1] (params array) contains the expected value.
+// Call[0] = shop_settings, Call[1] = products SQL (no collection slug lookup).
+// ---------------------------------------------------------------------------
+
+describe('CatalogService.getProducts() — B1 filter SQL (WS-A)', () => {
+  function makeFilterPool() {
+    return makePool([
+      { rows: [] },            // shop_settings (defaults)
+      { rows: [baseProduct] }, // products
+    ]);
+  }
+  function makeSvc(pool: ReturnType<typeof makePool>) {
+    return new CatalogService(
+      pool as never,
+      mockPricingService as never,
+      mockSettingsRepo as never,
+      stubUrlBuilder as never,
+    );
+  }
+
+  it('appends purity = $N when purity param provided', async () => {
+    const pool = makeFilterPool();
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', purity: 'GOLD_22K', page: 1, limit: 12 });
+    const sql    = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    const params = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][1] as unknown[];
+    expect(sql).toContain('p.purity = $');
+    expect(params).toContain('GOLD_22K');
+  });
+
+  it('appends quantity > 0 when inStockOnly=true', async () => {
+    const pool = makeFilterPool();
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', inStockOnly: true, page: 1, limit: 12 });
+    const sql = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    expect(sql).toContain('p.quantity > 0');
+  });
+
+  it('appends style = $N when style param provided', async () => {
+    const pool = makeFilterPool();
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', style: 'JHUMKA', page: 1, limit: 12 });
+    const sql    = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    const params = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][1] as unknown[];
+    expect(sql).toContain('p.style = $');
+    expect(params).toContain('JHUMKA');
+  });
+
+  it('appends $N = ANY(p.occasion) when occasion param provided', async () => {
+    const pool = makeFilterPool();
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', occasion: 'WEDDING', page: 1, limit: 12 });
+    const sql    = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    const params = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][1] as unknown[];
+    expect(sql).toContain('= ANY(p.occasion)');
+    expect(params).toContain('WEDDING');
+  });
+
+  it('appends $N = ANY(p.gift_persona) when giftPersona param provided', async () => {
+    const pool = makeFilterPool();
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', giftPersona: 'BRIDE', page: 1, limit: 12 });
+    const sql    = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    const params = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][1] as unknown[];
+    expect(sql).toContain('= ANY(p.gift_persona)');
+    expect(params).toContain('BRIDE');
+  });
+
+  it('appends price_snapshot_paise >= $N when priceMin provided', async () => {
+    const pool = makeFilterPool();
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', priceMin: 500_000, page: 1, limit: 12 });
+    const sql    = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    const params = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][1] as unknown[];
+    expect(sql).toContain('p.price_snapshot_paise >=');
+    expect(params).toContain(500_000);
+  });
+
+  it('appends price_snapshot_paise < $N when priceMax provided', async () => {
+    const pool = makeFilterPool();
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', priceMax: 5_000_000, page: 1, limit: 12 });
+    const sql    = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    const params = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][1] as unknown[];
+    expect(sql).toContain('p.price_snapshot_paise <');
+    expect(params).toContain(5_000_000);
+  });
+
+  it('appends collection EXISTS when collection is a UUID', async () => {
+    const pool = makeFilterPool();
+    const uuid = '11111111-1111-1111-1111-111111111111';
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', collection: uuid, page: 1, limit: 12 });
+    const sql    = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    const params = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][1] as unknown[];
+    expect(sql).toContain('collection_products cp');
+    expect(params).toContain(uuid);
+  });
+
+  it('resolves collection slug to UUID via extra query, then applies filter', async () => {
+    // When collection is a slug (not UUID), an extra query fires at calls[0],
+    // shifting shop_settings to calls[1] and products to calls[2].
+    const resolvedUuid = '22222222-2222-2222-2222-222222222222';
+    const pool = makePool([
+      { rows: [{ id: resolvedUuid }] }, // slug lookup
+      { rows: [] },                      // shop_settings
+      { rows: [baseProduct] },           // products
+    ]);
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', collection: 'bridal-collection', page: 1, limit: 12 });
+    const slugSql    = (pool.query as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    const slugParams = (pool.query as ReturnType<typeof vi.fn>).mock.calls[0][1] as unknown[];
+    const productSql = (pool.query as ReturnType<typeof vi.fn>).mock.calls[2][0] as string;
+    const productParams = (pool.query as ReturnType<typeof vi.fn>).mock.calls[2][1] as unknown[];
+    expect(slugSql).toContain('FROM collections WHERE shop_id = $1 AND slug = $2');
+    expect(slugParams).toContain('bridal-collection');
+    expect(productSql).toContain('collection_products cp');
+    expect(productParams).toContain(resolvedUuid);
+  });
+
+  it('returns empty results when collection slug not found', async () => {
+    const pool = makePool([
+      { rows: [] }, // slug lookup — not found
+    ]);
+    const result = await makeSvc(pool).getProducts({
+      shopId: 'shop-1', collection: 'no-such-slug', page: 1, limit: 12,
+    });
+    expect(result.items).toHaveLength(0);
+    expect(result.total).toBe(0);
+  });
+});
