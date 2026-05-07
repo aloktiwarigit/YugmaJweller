@@ -613,3 +613,129 @@ describe('CatalogService.getProduct() — B3 primaryImage', () => {
     expect(serialized).not.toContain('storage_key');
   });
 });
+
+// ---------------------------------------------------------------------------
+// WS-C: Sort — verify ORDER BY SQL for all 5 sort modes
+// ---------------------------------------------------------------------------
+
+describe('CatalogService.getProducts() — WS-C sort ORDER BY', () => {
+  const sortCases: Array<[string | undefined, string]> = [
+    [undefined,    'p.published_at DESC'],
+    ['newest',     'p.published_at DESC'],
+    ['priceAsc',   'p.price_snapshot_paise ASC NULLS LAST, p.published_at DESC'],
+    ['priceDesc',  'p.price_snapshot_paise DESC NULLS LAST, p.published_at DESC'],
+    ['trending',   'p.view_count_30d DESC, p.published_at DESC'],
+    ['bestseller', '(p.sales_count_30d * 2 + p.view_count_30d) DESC, p.published_at DESC'],
+  ];
+
+  it.each(sortCases)('sort=%s produces ORDER BY "%s"', async (sort, expectedOrderBy) => {
+    const pool = makePool([{ rows: [] }, { rows: [] }]);
+    const svc = new CatalogService(
+      pool as never,
+      mockPricingService as never,
+      mockSettingsRepo as never,
+      stubUrlBuilder as never,
+    );
+    await svc.getProducts({ shopId: 'shop-1', sort: sort as never, page: 1, limit: 12 });
+    const sql = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    expect(sql).toContain(expectedOrderBy);
+  });
+
+  it('unknown sort value defaults to newest (published_at DESC)', async () => {
+    const pool = makePool([{ rows: [] }, { rows: [] }]);
+    const svc = new CatalogService(
+      pool as never,
+      mockPricingService as never,
+      mockSettingsRepo as never,
+      stubUrlBuilder as never,
+    );
+    await svc.getProducts({ shopId: 'shop-1', sort: 'unknown_sort' as never, page: 1, limit: 12 });
+    const sql = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    expect(sql).toContain('p.published_at DESC');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WS-D: Edge cases
+// ---------------------------------------------------------------------------
+
+describe('CatalogService.getProducts() — WS-D edge cases', () => {
+  function makeSvc(pool: ReturnType<typeof makePool>) {
+    return new CatalogService(
+      pool as never,
+      { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) } as never,
+      mockSettingsRepo as never,
+      stubUrlBuilder as never,
+    );
+  }
+
+  it('NULLS LAST appears in ORDER BY for priceAsc (null price_snapshot_paise does not go to top)', async () => {
+    const pool = makePool([{ rows: [] }, { rows: [] }]);
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', sort: 'priceAsc', page: 1, limit: 12 });
+    const sql = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    expect(sql).toContain('NULLS LAST');
+  });
+
+  it('NULLS LAST appears in ORDER BY for priceDesc', async () => {
+    const pool = makePool([{ rows: [] }, { rows: [] }]);
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', sort: 'priceDesc', page: 1, limit: 12 });
+    const sql = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    expect(sql).toContain('NULLS LAST');
+  });
+
+  it('NULLS LAST does NOT appear for newest/trending/bestseller sort', async () => {
+    for (const sort of ['newest', 'trending', 'bestseller'] as const) {
+      const pool = makePool([{ rows: [] }, { rows: [] }]);
+      await makeSvc(pool).getProducts({ shopId: 'shop-1', sort, page: 1, limit: 12 });
+      const sql = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+      expect(sql).not.toContain('NULLS LAST');
+    }
+  });
+
+  it('inStockOnly=false does not append quantity filter', async () => {
+    const pool = makePool([{ rows: [] }, { rows: [] }]);
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', inStockOnly: false, page: 1, limit: 12 });
+    const sql = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    expect(sql).not.toContain('p.quantity > 0');
+  });
+
+  it('empty-string purity is ignored (no WHERE clause added)', async () => {
+    const pool = makePool([{ rows: [] }, { rows: [] }]);
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', purity: '   ', page: 1, limit: 12 });
+    const sql = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    expect(sql).not.toContain('p.purity =');
+  });
+
+  it('returns items with primaryImage=null when pi_storage_key is null (e.g. priceAsc with no snapshot)', async () => {
+    const productNoImage = {
+      ...baseProduct,
+      pi_storage_key: null,
+    };
+    const pool = makePool([
+      { rows: [] },
+      { rows: [productNoImage] },
+    ]);
+    const result = await makeSvc(pool).getProducts({ shopId: 'shop-1', sort: 'priceAsc', page: 1, limit: 12 });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].primaryImage).toBeNull();
+  });
+
+  it('all old params (categoryId, search, metal) still work unchanged', async () => {
+    const pool = makePool([{ rows: [] }, { rows: [baseProduct] }]);
+    await makeSvc(pool).getProducts({
+      shopId: 'shop-1',
+      categoryId: 'cat-99',
+      search: 'ring',
+      metal: 'silver',
+      page: 1, limit: 12,
+    });
+    const sql    = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    const params = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][1] as unknown[];
+    expect(sql).toContain('p.category_id = $');
+    expect(sql).toContain('p.metal = $');
+    expect(sql).toContain('ILIKE');
+    expect(params).toContain('cat-99');
+    expect(params).toContain('SILVER');
+    expect(params).toContain('%ring%');
+  });
+});
