@@ -1,1 +1,7 @@
-{"timestamp":"2026-05-06T19:30:00Z","branch":"feat/storefront-schema-a1a3","reviewer":"claude-sonnet-4-6","method":"multi-agent-parallel-fp-filter","scope":"migration 0066 + migration 0068 + Drizzle schema","findings_identified":5,"findings_after_fp_filter":0,"result":"PASS","notes":"All 5 candidate findings excluded as false positives. No SECURITY DEFINER. Composite FK closes cross-tenant image reference loophole at schema layer."}
+security-review-passed: 2026-05-07T19:17:23Z
+branch: feat/catalog-filters-b1b3
+reviewer: security-review skill (superpowers v5.1.0)
+findings: 0 exploitable (Finding 7 filtered as false positive — DB ::uuid cast in RLS policies closes the gap)
+sql-injection: CLEAN — all filter values via parameterised $N; buildSortClause() closed allowlist
+data-leakage: CLEAN — pi_storage_key never in CatalogProduct or API response
+tenant-isolation: CLEAN — collection slug lookup scoped to shop_id=$1; EXISTS subquery cp.shop_id=$1

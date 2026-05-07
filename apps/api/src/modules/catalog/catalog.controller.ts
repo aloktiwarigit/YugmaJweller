@@ -1,9 +1,10 @@
 import {
   BadRequestException, Body, Controller, Get, Header,
   Headers, HttpCode, HttpException, HttpStatus,
-  Inject, Ip, Param, ParseUUIDPipe, Post, Query,
+  Inject, Ip, Param, ParseUUIDPipe, Post, Query, Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { SkipAuth } from '../../common/decorators/skip-auth.decorator';
 import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
@@ -82,23 +83,72 @@ export class CatalogController {
   @Get('products')
   @SkipAuth()
   @SkipTenant()
-  @Header('Cache-Control', 'public, max-age=30, stale-while-revalidate=60')
   async listPublished(
     @Headers('x-tenant-id') shopId: string,
-    @Query('categoryId') categoryId?: string,
-    @Query('search') search?: string,
-    @Query('metal') metal?: string,
-    @Query('page') page = '1',
-    @Query('limit') limit = '12',
+    @Query('categoryId')  categoryId?: string,
+    @Query('search')      search?: string,
+    @Query('metal')       metal?: string,
+    @Query('purity')      purity?: string,
+    @Query('priceMin')    priceMinRaw?: string,
+    @Query('priceMax')    priceMaxRaw?: string,
+    @Query('inStockOnly') inStockOnlyRaw?: string,
+    @Query('style')       style?: string,
+    @Query('occasion')    occasion?: string,
+    @Query('giftPersona') giftPersona?: string,
+    @Query('collection')  collection?: string,
+    @Query('sort')        sort?: string,
+    @Query('page')        page = '1',
+    @Query('limit')       limit = '12',
+    @Res({ passthrough: true }) res?: Response,
   ): Promise<CatalogProductsResponse> {
     if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+
+    let priceMin: number | undefined;
+    let priceMax: number | undefined;
+
+    if (priceMinRaw !== undefined) {
+      priceMin = parseInt(priceMinRaw, 10);
+      if (isNaN(priceMin)) throw new BadRequestException({ code: 'catalog.invalid_price_min' });
+    }
+    if (priceMaxRaw !== undefined) {
+      priceMax = parseInt(priceMaxRaw, 10);
+      if (isNaN(priceMax)) throw new BadRequestException({ code: 'catalog.invalid_price_max' });
+    }
+
+    const parsedPage  = Math.max(1, parseInt(page, 10) || 1);
+    const parsedLimit = Math.min(50, Math.max(1, parseInt(limit, 10) || 12));
+
+    // Homepage hot path: sort=newest (or default), page=1, no filters beyond base
+    const isHotPath =
+      parsedPage === 1 &&
+      (!sort || sort === 'newest') &&
+      !categoryId && !search && !metal &&
+      !purity && !priceMinRaw && !priceMaxRaw &&
+      !inStockOnlyRaw && !style && !occasion && !giftPersona && !collection;
+
+    res?.setHeader(
+      'Cache-Control',
+      isHotPath
+        ? 'public, max-age=300, stale-while-revalidate=900'
+        : 'public, max-age=30, stale-while-revalidate=60',
+    );
+
     return this.catalogService.getProducts({
       shopId,
       categoryId,
       search,
       metal,
-      page:  Math.max(1, parseInt(page, 10) || 1),
-      limit: Math.min(50, Math.max(1, parseInt(limit, 10) || 12)),
+      purity,
+      priceMin,
+      priceMax,
+      inStockOnly: inStockOnlyRaw === 'true',
+      style,
+      occasion,
+      giftPersona,
+      collection,
+      sort: sort as 'newest' | 'priceAsc' | 'priceDesc' | 'trending' | 'bestseller' | undefined,
+      page:  parsedPage,
+      limit: parsedLimit,
     });
   }
 

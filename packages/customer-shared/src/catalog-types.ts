@@ -22,7 +22,7 @@ export interface EstimatedPrice {
   };
 }
 
-// Phase 1 product shape (no primaryImage — added in Phase B B3)
+// Phase 1 product shape — updated in B3 to add primaryImage and fix huidExemptionCategory nullability
 export interface CatalogProduct {
   id:                    string;
   sku:                   string;
@@ -33,11 +33,12 @@ export interface CatalogProduct {
   grossWeightG:          string;
   netWeightG:            string;
   huid:                  string | null;
-  huidExemptionCategory: string | null;
+  huidExemptionCategory: string;        // NOT NULL DEFAULT 'none' — never null
   quantity:              number;
   priceAvailable:        boolean;
   estimatedPrice?:       EstimatedPrice;
   publishedAt:           string;
+  primaryImage:          CatalogImage | null;  // added in B3
 }
 
 export interface CatalogProductsResponse {

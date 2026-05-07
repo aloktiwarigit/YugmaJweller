@@ -20,6 +20,7 @@
     "@azure/storage-blob": "^12.17.0",
     "@goldsmith/audit": "workspace:*",
     "@goldsmith/cache": "workspace:*",
+    "@goldsmith/customer-shared": "workspace:*",
     "@goldsmith/compliance": "workspace:*",
     "@goldsmith/crypto-envelope": "workspace:*",
     "@goldsmith/db": "workspace:*",

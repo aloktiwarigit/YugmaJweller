@@ -12,6 +12,7 @@ import {
   IMAGEKIT_URL_BUILDER,
   ImageKitTransformUrlBuilder,
 } from '@goldsmith/integrations-storage';
+import type { CatalogImage } from '@goldsmith/customer-shared';
 
 // ---------------------------------------------------------------------------
 // Response shapes
@@ -51,6 +52,7 @@ export interface CatalogProduct {
   priceAvailable:        boolean;
   estimatedPrice?:       EstimatedPrice;
   publishedAt:           string;
+  primaryImage:          CatalogImage | null;   // B3
 }
 
 export interface CatalogProductsResponse {
@@ -60,12 +62,22 @@ export interface CatalogProductsResponse {
 }
 
 export interface GetProductsParams {
-  shopId:      string;
-  categoryId?: string;
-  search?:     string;
-  metal?:      string;
-  page:        number;
-  limit:       number;
+  shopId:       string;
+  categoryId?:  string;
+  search?:      string;
+  metal?:       string;
+  // B1 new params
+  purity?:      string;
+  priceMin?:    number;
+  priceMax?:    number;
+  inStockOnly?: boolean;
+  style?:       string;
+  occasion?:    string;
+  giftPersona?: string;
+  collection?:  string; // UUID or slug — resolved inside withShopTx
+  sort?:        'newest' | 'priceAsc' | 'priceDesc' | 'trending' | 'bestseller';
+  page:         number;
+  limit:        number;
 }
 
 export interface HuidVerifyResult {
@@ -150,6 +162,26 @@ export interface ProductCatalogRow {
   quantity:                  number;
   published_at:              Date;
   total_count:               string;
+  // B3: image columns from LEFT JOIN product_images pi
+  pi_storage_key:            string | null;
+  pi_alt_text:               string | null;
+  pi_width:                  number | null;
+  pi_height:                 number | null;
+}
+
+// ---------------------------------------------------------------------------
+// Sort clause builder — maps known enum values to hardcoded SQL strings only.
+// No user input ever appears in the SQL template (injection-safe).
+// ---------------------------------------------------------------------------
+
+function buildSortClause(sort?: string): string {
+  switch (sort) {
+    case 'priceAsc':   return 'p.price_snapshot_paise ASC NULLS LAST, p.published_at DESC';
+    case 'priceDesc':  return 'p.price_snapshot_paise DESC NULLS LAST, p.published_at DESC';
+    case 'trending':   return 'p.view_count_30d DESC, p.published_at DESC';
+    case 'bestseller': return '(p.sales_count_30d * 2 + p.view_count_30d) DESC, p.published_at DESC';
+    default:           return 'p.published_at DESC';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -186,56 +218,121 @@ export class CatalogService {
   }
 
   async getProducts(params: GetProductsParams): Promise<CatalogProductsResponse> {
-    const { shopId, categoryId, search, metal, page, limit } = params;
+    const {
+      shopId, categoryId, search, metal, purity, priceMin, priceMax,
+      inStockOnly, style, occasion, giftPersona, collection, sort, page, limit,
+    } = params;
     const safePage  = Math.max(1, page);
     const safeLimit = Math.min(50, Math.max(1, limit));
     const offset    = (safePage - 1) * safeLimit;
-
-    const queryParams: unknown[] = [shopId];
-    let whereExtra = '';
-
-    if (categoryId) {
-      queryParams.push(categoryId);
-      whereExtra += ` AND p.category_id = $${queryParams.length}`;
-    }
-    if (metal && metal.trim().length > 0) {
-      queryParams.push(metal.trim().toUpperCase());
-      whereExtra += ` AND p.metal = $${queryParams.length}`;
-    }
-    if (search && search.trim().length > 0) {
-      const term = `%${search.trim()}%`;
-      queryParams.push(term);
-      const idx = queryParams.length;
-      whereExtra += ` AND (p.sku ILIKE $${idx} OR p.metal ILIKE $${idx} OR p.purity ILIKE $${idx})`;
-    }
-
-    queryParams.push(safeLimit, offset);
-    const limitIdx  = queryParams.length - 1;
-    const offsetIdx = queryParams.length;
-
-    // EXISTS guard: suspended/terminated tenants must not surface products via the public
-    // catalog. Without this, anyone holding a (cached) shop_id can keep fetching after
-    // platform admin suspends the tenant.
-    const sql = `
-      SELECT p.id, p.sku, p.metal, p.purity, p.category_id,
-             pc.name AS category_name,
-             p.gross_weight_g, p.net_weight_g,
-             p.making_charge_override_pct,
-             p.huid, p.huid_exemption_category, p.quantity, p.published_at,
-             COUNT(*) OVER() AS total_count
-        FROM products p
-        LEFT JOIN product_categories pc ON pc.id = p.category_id
-       WHERE p.shop_id = $1
-         AND EXISTS (SELECT 1 FROM shops WHERE id = $1 AND status = 'ACTIVE')
-         AND p.published_at IS NOT NULL
-         ${whereExtra}
-       ORDER BY p.published_at DESC
-       LIMIT $${limitIdx} OFFSET $${offsetIdx}
-    `;
+    const orderBy   = buildSortClause(sort);
 
     const [ratesResult, scopedResult] = await Promise.all([
       this.pricingService.getCurrentRates(),
       withShopTx(this.pool, shopId, async (tx) => {
+        const queryParams: unknown[] = [shopId];
+        let whereExtra = '';
+
+        // ─── existing filters ────────────────────────────────────────────────
+        if (categoryId) {
+          queryParams.push(categoryId);
+          whereExtra += ` AND p.category_id = $${queryParams.length}`;
+        }
+        if (metal && metal.trim().length > 0) {
+          queryParams.push(metal.trim().toUpperCase());
+          whereExtra += ` AND p.metal = $${queryParams.length}`;
+        }
+        if (search && search.trim().length > 0) {
+          const term = `%${search.trim()}%`;
+          queryParams.push(term);
+          const idx = queryParams.length;
+          whereExtra += ` AND (p.sku ILIKE $${idx} OR p.metal ILIKE $${idx} OR p.purity ILIKE $${idx})`;
+        }
+
+        // ─── B1 new filters ──────────────────────────────────────────────────
+        if (purity && purity.trim().length > 0) {
+          queryParams.push(purity.trim());
+          whereExtra += ` AND p.purity = $${queryParams.length}`;
+        }
+        if (priceMin !== undefined) {
+          queryParams.push(priceMin);
+          whereExtra += ` AND p.price_snapshot_paise >= $${queryParams.length}`;
+        }
+        if (priceMax !== undefined) {
+          queryParams.push(priceMax);
+          whereExtra += ` AND p.price_snapshot_paise < $${queryParams.length}`;
+        }
+        if (inStockOnly) {
+          whereExtra += ` AND p.quantity > 0`;
+        }
+        if (style && style.trim().length > 0) {
+          queryParams.push(style.trim());
+          whereExtra += ` AND p.style = $${queryParams.length}`;
+        }
+        if (occasion && occasion.trim().length > 0) {
+          queryParams.push(occasion.trim());
+          whereExtra += ` AND $${queryParams.length} = ANY(p.occasion)`;
+        }
+        if (giftPersona && giftPersona.trim().length > 0) {
+          queryParams.push(giftPersona.trim());
+          whereExtra += ` AND $${queryParams.length} = ANY(p.gift_persona)`;
+        }
+
+        // ─── collection filter (UUID passthrough or slug → id lookup) ────────
+        if (collection && collection.trim().length > 0) {
+          const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          let collectionId: string;
+          if (UUID_RE.test(collection)) {
+            collectionId = collection;
+          } else {
+            const r = await tx.query<{ id: string }>(
+              `SELECT id FROM collections WHERE shop_id = $1 AND slug = $2 AND published_at IS NOT NULL`,
+              [shopId, collection.trim()],
+            );
+            if (!r.rows[0]) {
+              return {
+                mcResult:       { rows: [] } as { rows: Array<{ making_charges_json: MakingChargeConfig[] | null }> },
+                productsResult: { rows: [] } as { rows: Array<ProductCatalogRow> },
+              };
+            }
+            collectionId = r.rows[0].id;
+          }
+          queryParams.push(collectionId);
+          whereExtra += ` AND EXISTS (
+          SELECT 1 FROM collection_products cp
+           WHERE cp.product_id    = p.id
+             AND cp.shop_id       = $1
+             AND cp.collection_id = $${queryParams.length}
+        )`;
+        }
+
+        queryParams.push(safeLimit, offset);
+        const limitIdx  = queryParams.length - 1;
+        const offsetIdx = queryParams.length;
+
+        // EXISTS guard: suspended/terminated tenants must not surface products.
+        const sql = `
+        SELECT p.id, p.sku, p.metal, p.purity, p.category_id,
+               pc.name AS category_name,
+               p.gross_weight_g, p.net_weight_g,
+               p.making_charge_override_pct,
+               p.huid, p.huid_exemption_category, p.quantity, p.published_at,
+               pi.storage_key AS pi_storage_key,
+               pi.alt_text    AS pi_alt_text,
+               pi.width       AS pi_width,
+               pi.height      AS pi_height,
+               COUNT(*) OVER() AS total_count
+          FROM products p
+          LEFT JOIN product_categories pc ON pc.id = p.category_id
+          LEFT JOIN product_images pi ON pi.id = p.primary_image_id
+         WHERE p.shop_id = $1
+           AND EXISTS (SELECT 1 FROM shops WHERE id = $1 AND status = 'ACTIVE')
+           AND p.published_at IS NOT NULL
+           ${whereExtra}
+         ORDER BY ${orderBy}
+         LIMIT $${limitIdx} OFFSET $${offsetIdx}
+      `;
+
         const [mcResult, productsResult] = await Promise.all([
           tx.query<{ making_charges_json: MakingChargeConfig[] | null }>(
             `SELECT making_charges_json FROM shop_settings WHERE shop_id = $1`,
@@ -246,17 +343,14 @@ export class CatalogService {
         return { mcResult, productsResult };
       }),
     ]);
-    const { mcResult, productsResult } = scopedResult;
 
+    const { mcResult, productsResult } = scopedResult;
     const configs: MakingChargeConfig[] = mcResult.rows[0]?.making_charges_json ?? MAKING_CHARGE_DEFAULTS;
     const mcMap = new Map<string, string>(configs.map((c) => [c.category, c.value]));
-
     const total = productsResult.rows.length > 0 ? Number(productsResult.rows[0].total_count) : 0;
-
     const items: CatalogProduct[] = productsResult.rows.map((row) =>
       this.computeCatalogProduct(row, ratesResult, mcMap),
     );
-
     return { items, total, page: safePage };
   }
 
@@ -277,9 +371,14 @@ export class CatalogService {
                     p.gross_weight_g, p.net_weight_g,
                     p.making_charge_override_pct,
                     p.huid, p.huid_exemption_category, p.quantity, p.published_at,
+                    pi.storage_key AS pi_storage_key,
+                    pi.alt_text    AS pi_alt_text,
+                    pi.width       AS pi_width,
+                    pi.height      AS pi_height,
                     '1' AS total_count
                FROM products p
               LEFT JOIN product_categories pc ON pc.id = p.category_id
+              LEFT JOIN product_images pi ON pi.id = p.primary_image_id
              WHERE p.id = $1 AND p.shop_id = $2
                AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
                AND p.published_at IS NOT NULL`,
@@ -327,6 +426,18 @@ export class CatalogService {
     const productHuid = r.rows[0].huid;
     const verified = productHuid !== null && productHuid.toUpperCase() === extractedHuid;
     return { verified, huid: extractedHuid, certifyingBody };
+  }
+
+  private toCardImage(row: Pick<ProductCatalogRow, 'pi_storage_key' | 'pi_alt_text' | 'pi_width' | 'pi_height'>): CatalogImage | null {
+    if (!row.pi_storage_key) return null;
+    return {
+      url:            this.urlBuilder.url(row.pi_storage_key, { width: 640 }),
+      placeholderUrl: this.urlBuilder.url(row.pi_storage_key, { width: 40, blur: 30 }),
+      srcset:         this.urlBuilder.cardSrcset(row.pi_storage_key),
+      width:          row.pi_width  ?? 0,
+      height:         row.pi_height ?? 0,
+      alt:            row.pi_alt_text,
+    };
   }
 
   private computeCatalogProduct(
@@ -385,6 +496,7 @@ export class CatalogService {
       priceAvailable,
       estimatedPrice,
       publishedAt:           row.published_at.toISOString(),
+      primaryImage:          this.toCardImage(row),  // B3
     };
   }
 
