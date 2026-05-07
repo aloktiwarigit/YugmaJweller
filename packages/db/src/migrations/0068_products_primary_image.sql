@@ -14,8 +14,17 @@ BEGIN;
 -- product_images.id is already a PRIMARY KEY (unique), but FKs can only reference
 -- UNIQUE or PRIMARY KEY constraints. Adding an explicit UNIQUE(shop_id, id) lets
 -- the composite FK reference (shop_id, id) while the primary key covers (id) alone.
-ALTER TABLE product_images
-  ADD CONSTRAINT product_images_shop_id_id_uniq UNIQUE (shop_id, id);
+-- Guard: migration 0067 (collections) also creates this constraint if it ran first.
+-- When both migrations are applied in numeric order (0067 before 0068) the constraint
+-- already exists; skip to avoid a duplicate-constraint error.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'product_images_shop_id_id_uniq'
+  ) THEN
+    ALTER TABLE product_images ADD CONSTRAINT product_images_shop_id_id_uniq UNIQUE (shop_id, id);
+  END IF;
+END $$;
 
 -- Step 2: Add primary_image_id column (nullable — NULL = no clean image available).
 ALTER TABLE products
