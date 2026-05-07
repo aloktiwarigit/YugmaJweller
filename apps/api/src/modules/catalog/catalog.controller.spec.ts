@@ -137,6 +137,27 @@ describe('CatalogController', () => {
       // No filter params + page=1 → hot path: 5-minute TTL
       expect(res.headers['cache-control']).toBe('public, max-age=300, stale-while-revalidate=900');
     });
+    it('priceMin NaN → 400', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/catalog/products?priceMin=abc')
+        .set('X-Tenant-Id', 'shop-uuid')
+        .expect(400);
+      expect(res.body).toMatchObject({ code: 'catalog.invalid_price_min' });
+    });
+    it('priceMax NaN → 400', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/catalog/products?priceMax=xyz')
+        .set('X-Tenant-Id', 'shop-uuid')
+        .expect(400);
+      expect(res.body).toMatchObject({ code: 'catalog.invalid_price_max' });
+    });
+    it('filtered cache header when B1 filter param present', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/catalog/products?purity=GOLD_22K')
+        .set('X-Tenant-Id', 'shop-uuid')
+        .expect(200);
+      expect(res.headers['cache-control']).toBe('public, max-age=30, stale-while-revalidate=60');
+    });
   });
 
   describe('GET /api/v1/catalog/products/:id', () => {
