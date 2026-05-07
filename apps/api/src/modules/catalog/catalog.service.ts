@@ -12,6 +12,7 @@ import {
   IMAGEKIT_URL_BUILDER,
   ImageKitTransformUrlBuilder,
 } from '@goldsmith/integrations-storage';
+import type { CatalogImage } from '@goldsmith/customer-shared';
 
 // ---------------------------------------------------------------------------
 // Response shapes
@@ -51,6 +52,7 @@ export interface CatalogProduct {
   priceAvailable:        boolean;
   estimatedPrice?:       EstimatedPrice;
   publishedAt:           string;
+  primaryImage:          CatalogImage | null;   // B3
 }
 
 export interface CatalogProductsResponse {
@@ -160,6 +162,11 @@ export interface ProductCatalogRow {
   quantity:                  number;
   published_at:              Date;
   total_count:               string;
+  // B3: image columns from LEFT JOIN product_images pi
+  pi_storage_key:            string | null;
+  pi_alt_text:               string | null;
+  pi_width:                  number | null;
+  pi_height:                 number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -310,9 +317,14 @@ export class CatalogService {
                p.gross_weight_g, p.net_weight_g,
                p.making_charge_override_pct,
                p.huid, p.huid_exemption_category, p.quantity, p.published_at,
+               pi.storage_key AS pi_storage_key,
+               pi.alt_text    AS pi_alt_text,
+               pi.width       AS pi_width,
+               pi.height      AS pi_height,
                COUNT(*) OVER() AS total_count
           FROM products p
           LEFT JOIN product_categories pc ON pc.id = p.category_id
+          LEFT JOIN product_images pi ON pi.id = p.primary_image_id
          WHERE p.shop_id = $1
            AND EXISTS (SELECT 1 FROM shops WHERE id = $1 AND status = 'ACTIVE')
            AND p.published_at IS NOT NULL
@@ -359,9 +371,14 @@ export class CatalogService {
                     p.gross_weight_g, p.net_weight_g,
                     p.making_charge_override_pct,
                     p.huid, p.huid_exemption_category, p.quantity, p.published_at,
+                    pi.storage_key AS pi_storage_key,
+                    pi.alt_text    AS pi_alt_text,
+                    pi.width       AS pi_width,
+                    pi.height      AS pi_height,
                     '1' AS total_count
                FROM products p
               LEFT JOIN product_categories pc ON pc.id = p.category_id
+              LEFT JOIN product_images pi ON pi.id = p.primary_image_id
              WHERE p.id = $1 AND p.shop_id = $2
                AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
                AND p.published_at IS NOT NULL`,
@@ -409,6 +426,18 @@ export class CatalogService {
     const productHuid = r.rows[0].huid;
     const verified = productHuid !== null && productHuid.toUpperCase() === extractedHuid;
     return { verified, huid: extractedHuid, certifyingBody };
+  }
+
+  private toCardImage(row: Pick<ProductCatalogRow, 'pi_storage_key' | 'pi_alt_text' | 'pi_width' | 'pi_height'>): CatalogImage | null {
+    if (!row.pi_storage_key) return null;
+    return {
+      url:            this.urlBuilder.url(row.pi_storage_key, { width: 640 }),
+      placeholderUrl: this.urlBuilder.url(row.pi_storage_key, { width: 40, blur: 30 }),
+      srcset:         this.urlBuilder.cardSrcset(row.pi_storage_key),
+      width:          row.pi_width  ?? 0,
+      height:         row.pi_height ?? 0,
+      alt:            row.pi_alt_text,
+    };
   }
 
   private computeCatalogProduct(
@@ -467,6 +496,7 @@ export class CatalogService {
       priceAvailable,
       estimatedPrice,
       publishedAt:           row.published_at.toISOString(),
+      primaryImage:          this.toCardImage(row),  // B3
     };
   }
 

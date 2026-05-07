@@ -26,6 +26,8 @@ const stubUrlBuilder = {
     `https://ik.imagekit.io/goldsmith/${key}?tr=w-${opts.width}${opts.blur ? `,bl-${opts.blur}` : ''},mb-0.25`,
   srcset: (key: string) =>
     [320, 640, 1024, 1920].map((w) => `https://ik.imagekit.io/goldsmith/${key}?tr=w-${w},mb-0.25 ${w}w`).join(', '),
+  cardSrcset: (key: string) =>
+    [320, 640].map((w) => `https://ik.imagekit.io/goldsmith/${key}?tr=w-${w},mb-0.25 ${w}w`).join(', '),
 };
 
 function makePool(responses: Array<{ rows: object[] }>) {
@@ -84,6 +86,19 @@ const baseProduct = {
   making_charge_override_pct: null,
   huid: 'HU123456', huid_exemption_category: 'none',
   quantity: 2, published_at: NOW, total_count: '1',
+  // B3: image fields (null = no primary image set)
+  pi_storage_key: null as string | null,
+  pi_alt_text: null as string | null,
+  pi_width: null as number | null,
+  pi_height: null as number | null,
+};
+
+const baseProductWithImage = {
+  ...baseProduct,
+  pi_storage_key: 'shops/shop-1/products/prod-1/main.jpg',
+  pi_alt_text: '22K सोने की अंगूठी',
+  pi_width: 800,
+  pi_height: 1000,
 };
 
 // ---------------------------------------------------------------------------
@@ -480,5 +495,70 @@ describe('CatalogService.getProducts() — B1 filter SQL (WS-A)', () => {
     });
     expect(result.items).toHaveLength(0);
     expect(result.total).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WS-B: B3 — primaryImage in list response
+// ---------------------------------------------------------------------------
+
+describe('CatalogService.getProducts() — B3 primaryImage (WS-B)', () => {
+  function makeSvc(pool: ReturnType<typeof makePool>) {
+    return new CatalogService(
+      pool as never,
+      { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) } as never,
+      mockSettingsRepo as never,
+      stubUrlBuilder as never,
+    );
+  }
+
+  it('returns primaryImage=null when pi_storage_key IS NULL', async () => {
+    const pool = makePool([
+      { rows: [] },
+      { rows: [baseProduct] }, // pi_storage_key: null
+    ]);
+    const result = await makeSvc(pool).getProducts({ shopId: 'shop-1', page: 1, limit: 12 });
+    expect(result.items[0].primaryImage).toBeNull();
+  });
+
+  it('returns primaryImage with url/placeholderUrl/srcset/width/height/alt when image present', async () => {
+    const pool = makePool([
+      { rows: [] },
+      { rows: [baseProductWithImage] },
+    ]);
+    const result = await makeSvc(pool).getProducts({ shopId: 'shop-1', page: 1, limit: 12 });
+    const img = result.items[0].primaryImage;
+    expect(img).not.toBeNull();
+    expect(img!.url).toContain('shops/shop-1/products/prod-1/main.jpg');
+    expect(img!.placeholderUrl).toContain('w-40');
+    expect(img!.srcset).toContain('320w');
+    expect(img!.srcset).toContain('640w');
+    expect(img!.width).toBe(800);
+    expect(img!.height).toBe(1000);
+    expect(img!.alt).toBe('22K सोने की अंगूठी');
+  });
+
+  it('NEVER exposes pi_storage_key in the response', async () => {
+    const pool = makePool([
+      { rows: [] },
+      { rows: [baseProductWithImage] },
+    ]);
+    const result = await makeSvc(pool).getProducts({ shopId: 'shop-1', page: 1, limit: 12 });
+    const item = result.items[0] as unknown as Record<string, unknown>;
+    expect(item['pi_storage_key']).toBeUndefined();
+    const serialized = JSON.stringify(item);
+    expect(serialized).not.toContain('pi_storage_key');
+    expect(serialized).not.toContain('storage_key');
+  });
+
+  it('SQL includes LEFT JOIN product_images via primary_image_id', async () => {
+    const pool = makePool([
+      { rows: [] },
+      { rows: [] },
+    ]);
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', page: 1, limit: 12 });
+    const sql = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    expect(sql).toContain('LEFT JOIN product_images pi ON pi.id = p.primary_image_id');
+    expect(sql).toContain('pi.storage_key AS pi_storage_key');
   });
 });
