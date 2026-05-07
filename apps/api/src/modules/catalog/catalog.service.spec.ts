@@ -355,3 +355,97 @@ describe('CatalogService.verifyHuid()', () => {
     await expect(svc.verifyHuid(PRODUCT_ID, SHOP_ID, 'AB1234')).rejects.toThrow(NotFoundException);
   });
 });
+
+// ---------------------------------------------------------------------------
+// getPublicProductReviews — Story B4
+// ---------------------------------------------------------------------------
+
+describe('CatalogService.getPublicProductReviews()', () => {
+  it('throws NotFoundException when product is not found for this tenant', async () => {
+    // Response sequence: existence check returns 0 rows → NotFoundException
+    const pool = makePool([{ rows: [] }]);
+    const svc = new CatalogService(
+      pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never,
+    );
+
+    await expect(
+      svc.getPublicProductReviews({
+        shopId: 'shop-1', productId: '00000000-0000-0000-0000-000000000001', page: 1, limit: 10,
+      }),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('returns PII-redacted items and ratingBreakdown for a published product', async () => {
+    // Response sequence: [existence check, reviews, breakdown]
+    const pool = makePool([
+      { rows: [{ id: '1' }] }, // existence check → product found
+      { rows: [
+        {
+          id: 'rev-1', rating: 5, review_text: 'Excellent!',
+          customer_display_name: 'Priya S.', created_at: new Date('2026-01-15T10:00:00Z'),
+        },
+      ]}, // reviews query
+      { rows: [{ rating: 5, cnt: 1 }] }, // breakdown query
+    ]);
+    const svc = new CatalogService(
+      pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never,
+    );
+
+    const result = await svc.getPublicProductReviews({
+      shopId: 'shop-1', productId: '00000000-0000-0000-0000-000000000001', page: 1, limit: 10,
+    });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].id).toBe('rev-1');
+    expect(result.items[0].rating).toBe(5);
+    expect(result.items[0].customerDisplayName).toBe('Priya S.');
+    expect(result.items[0].reviewText).toBe('Excellent!');
+    expect(result.items[0].createdAt).toBe('2026-01-15T10:00:00.000Z');
+    expect(result.total).toBe(1);
+    expect(result.page).toBe(1);
+    expect(result.ratingBreakdown[5]).toBe(1);
+    expect(result.ratingBreakdown[1]).toBe(0);
+    expect(result.ratingBreakdown[2]).toBe(0);
+    expect(result.ratingBreakdown[3]).toBe(0);
+    expect(result.ratingBreakdown[4]).toBe(0);
+  });
+
+  it('returns empty items + zeroed breakdown when product has no public reviews', async () => {
+    const pool = makePool([
+      { rows: [{ id: '1' }] }, // existence check → product found
+      { rows: [] },             // reviews → empty
+      { rows: [] },             // breakdown → empty
+    ]);
+    const svc = new CatalogService(
+      pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never,
+    );
+
+    const result = await svc.getPublicProductReviews({
+      shopId: 'shop-1', productId: '00000000-0000-0000-0000-000000000001', page: 1, limit: 10,
+    });
+
+    expect(result.items).toHaveLength(0);
+    expect(result.total).toBe(0);
+    expect(result.ratingBreakdown).toEqual({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
+  });
+
+  it('caps safeLimit at 50 even when caller passes limit=200', async () => {
+    const pool = makePool([
+      { rows: [{ id: '1' }] },
+      { rows: [] },
+      { rows: [] },
+    ]);
+    const svc = new CatalogService(
+      pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never,
+    );
+
+    await svc.getPublicProductReviews({
+      shopId: 'shop-1', productId: '00000000-0000-0000-0000-000000000001', page: 1, limit: 200,
+    });
+
+    // Third pool.query call is the reviews query — check LIMIT param is ≤ 50
+    const reviewsCallArgs = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1];
+    const limitParam = reviewsCallArgs[1][2]; // $3 = safeLimit
+    expect(limitParam).toBeLessThanOrEqual(50);
+  });
+});
