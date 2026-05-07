@@ -73,6 +73,9 @@ importers:
       '@goldsmith/crypto-envelope':
         specifier: workspace:*
         version: link:../../packages/crypto-envelope
+      '@goldsmith/customer-shared':
+        specifier: workspace:*
+        version: link:../../packages/customer-shared
       '@goldsmith/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -236,6 +239,9 @@ importers:
       '@goldsmith/auth-client':
         specifier: workspace:*
         version: link:../../packages/auth-client
+      '@goldsmith/customer-shared':
+        specifier: workspace:*
+        version: link:../../packages/customer-shared
       '@goldsmith/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
@@ -363,6 +369,9 @@ importers:
       '@goldsmith/auth-client':
         specifier: workspace:*
         version: link:../../packages/auth-client
+      '@goldsmith/customer-shared':
+        specifier: workspace:*
+        version: link:../../packages/customer-shared
       '@goldsmith/ui-tokens':
         specifier: workspace:*
         version: link:../../packages/ui-tokens

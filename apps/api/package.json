@@ -19,6 +19,7 @@
   "dependencies": {
     "@azure/storage-blob": "^12.17.0",
     "@goldsmith/audit": "workspace:*",
+    "@goldsmith/customer-shared": "workspace:*",
     "@goldsmith/cache": "workspace:*",
     "@goldsmith/compliance": "workspace:*",
     "@goldsmith/crypto-envelope": "workspace:*",
