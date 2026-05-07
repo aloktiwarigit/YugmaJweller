@@ -7,7 +7,7 @@ export const METAL_LABELS: Record<string, string> = {
   PLATINUM: 'प्लेटिनम',
 };
 
-// PURITY_LABELS is also re-exported from catalog-filters.ts as a public constant.
+// Will also be re-exported as a public constant from catalog-filters.ts (Task 3).
 export const PURITY_LABELS: Record<string, string> = {
   GOLD_24K:   '24K',
   GOLD_22K:   '22K',
