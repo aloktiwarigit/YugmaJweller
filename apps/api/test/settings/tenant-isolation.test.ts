@@ -389,3 +389,71 @@ describe('loyalty config tenant isolation', () => {
     expect(rows.length).toBe(0);
   });
 });
+
+describe('storefront_config_json tenant isolation', () => {
+  it('T7: tenant A cannot read tenant B storefront_config_json via RLS (zero rows returned)', async () => {
+    // Seed tenant B's storefront_config_json as superuser (bypasses RLS)
+    await pool.query(
+      `INSERT INTO shop_settings (shop_id, storefront_config_json)
+       VALUES ($1, $2::jsonb)
+       ON CONFLICT (shop_id) DO UPDATE SET storefront_config_json = $2::jsonb`,
+      [TENANT_B, JSON.stringify({ heroBanners: [{ imageId: 'b-banner-id', headlineHi: 'दुकान बी' }] })],
+    );
+
+    // Tenant A queries shop_settings for tenant B's shop_id — RLS must block it
+    const tenantA = makeTenant(TENANT_A, 'shop-a', 'Shop A');
+    const ctxA = makeCtx(TENANT_A, tenantA);
+
+    const rows = await tenantContext.runWith(ctxA, () =>
+      withTenantTx(pool, async (tx) => {
+        const r = await tx.query<{ shop_id: string; storefront_config_json: unknown }>(
+          `SELECT shop_id, storefront_config_json FROM shop_settings WHERE shop_id = $1`,
+          [TENANT_B],
+        );
+        return r.rows;
+      }),
+    );
+
+    // RLS policy filters rows by current_setting('app.current_shop_id') — tenant B's row
+    // must not be visible to tenant A's session
+    expect(rows).toHaveLength(0);
+  });
+
+  it('T7b: tenant A storefront_config_json write does not affect tenant B row', async () => {
+    const MARKER_A = JSON.stringify({ trustPillarsOverride: [{ titleHi: 'दुकान ए', descriptionHi: 'A only' }] });
+    const MARKER_B = JSON.stringify({ heroBanners: [{ imageId: 'b-banner-id', headlineHi: 'दुकान बी' }] });
+
+    // Ensure tenant B has a known value
+    await pool.query(
+      `INSERT INTO shop_settings (shop_id, storefront_config_json)
+       VALUES ($1, $2::jsonb)
+       ON CONFLICT (shop_id) DO UPDATE SET storefront_config_json = $2::jsonb`,
+      [TENANT_B, MARKER_B],
+    );
+
+    // Tenant A updates its own storefront_config_json
+    const tenantA = makeTenant(TENANT_A, 'shop-a', 'Shop A');
+    const ctxA = makeCtx(TENANT_A, tenantA);
+    await tenantContext.runWith(ctxA, () =>
+      withTenantTx(pool, async (tx) => {
+        await tx.query(
+          `INSERT INTO shop_settings (shop_id, storefront_config_json)
+           VALUES ($1, $2::jsonb)
+           ON CONFLICT (shop_id) DO UPDATE SET storefront_config_json = $2::jsonb`,
+          [TENANT_A, MARKER_A],
+        );
+      }),
+    );
+
+    // Verify tenant B's row is untouched (read as superuser to bypass RLS)
+    const { rows } = await pool.query<{ storefront_config_json: Record<string, unknown> }>(
+      `SELECT storefront_config_json FROM shop_settings WHERE shop_id = $1`,
+      [TENANT_B],
+    );
+    // Tenant B's heroBanners must still be present (structural proof it survived)
+    expect(rows[0]!.storefront_config_json['heroBanners']).toBeDefined();
+    // Tenant A's trustPillarsOverride key must NOT appear in tenant B's row
+    // Assert structurally (not via string scan) so a marker rename cannot orphan this check
+    expect(rows[0]!.storefront_config_json['trustPillarsOverride']).toBeUndefined();
+  });
+});
