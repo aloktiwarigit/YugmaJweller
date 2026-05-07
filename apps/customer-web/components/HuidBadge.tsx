@@ -1,6 +1,6 @@
 interface HuidBadgeProps {
   huid: string | null;
-  exemptionCategory: string;
+  exemptionCategory: string | null;
 }
 
 export function HuidBadge({ huid, exemptionCategory }: HuidBadgeProps) {
