@@ -12,6 +12,7 @@ import {
   IMAGEKIT_URL_BUILDER,
   ImageKitTransformUrlBuilder,
 } from '@goldsmith/integrations-storage';
+import type { PublicReviewItem, PublicReviewsResponse } from '@goldsmith/customer-shared';
 
 // ---------------------------------------------------------------------------
 // Response shapes
@@ -433,5 +434,97 @@ export class CatalogService {
   async getReturnPolicy(): Promise<{ returnPolicyText: string | null }> {
     const text = await this.settingsRepo.getReturnPolicy();
     return { returnPolicyText: text };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Story B4 — public reviews with PII redaction + visibility filter
+  // ---------------------------------------------------------------------------
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint; shopId from x-tenant-id header, not TenantContext
+  async getPublicProductReviews(params: {
+    shopId:    string;
+    productId: string;
+    page:      number;
+    limit:     number;
+  }): Promise<PublicReviewsResponse> {
+    const { shopId, productId } = params;
+    const safePage  = Math.max(1, params.page);
+    const safeLimit = Math.min(50, Math.max(1, params.limit));
+    const offset    = (safePage - 1) * safeLimit;
+
+    return withShopTx(this.pool, shopId, async (tx) => {
+      // Step 1 — existence guard: product must belong to this (active) tenant and be published.
+      // 404 on miss prevents tenant enumeration (caller cannot distinguish "no reviews"
+      // from "wrong tenant / suspended shop").
+      const existsResult = await tx.query<{ id: string }>(
+        `SELECT 1 AS id FROM products
+          WHERE id = $1
+            AND shop_id = $2
+            AND published_at IS NOT NULL
+            AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')`,
+        [productId, shopId],
+      );
+      if (existsResult.rows.length === 0) {
+        throw new NotFoundException({ code: 'catalog.product_not_found' });
+      }
+
+      // Step 2 — reviews list + rating breakdown run in parallel inside the same tx.
+      // PII redaction is computed in SQL: raw customer name never reaches the app layer.
+      // LEFT JOIN handles deleted-customer rows (null name → 'Anonymous').
+      const [reviewsResult, breakdownResult] = await Promise.all([
+        tx.query<{
+          id:                    string;
+          rating:                number;
+          review_text:           string | null;
+          customer_display_name: string;
+          created_at:            Date;
+        }>(
+          `SELECT
+             pr.id,
+             pr.rating,
+             pr.review_text,
+             CASE
+               WHEN c.name IS NULL THEN 'Anonymous'
+               WHEN position(' ' IN c.name) = 0 THEN c.name
+               ELSE split_part(c.name, ' ', 1) || ' ' || LEFT(split_part(c.name, ' ', -1), 1) || '.'
+             END AS customer_display_name,
+             pr.created_at
+           FROM product_reviews pr
+           LEFT JOIN customers c ON c.id = pr.customer_id AND c.shop_id = pr.shop_id
+           WHERE pr.shop_id = $1
+             AND pr.product_id = $2
+             AND pr.is_publicly_visible = TRUE
+           ORDER BY pr.created_at DESC
+           LIMIT $3 OFFSET $4`,
+          [shopId, productId, safeLimit, offset],
+        ),
+        tx.query<{ rating: number; cnt: number }>(
+          `SELECT rating, COUNT(*)::int AS cnt
+             FROM product_reviews
+            WHERE shop_id = $1
+              AND product_id = $2
+              AND is_publicly_visible = TRUE
+            GROUP BY rating`,
+          [shopId, productId],
+        ),
+      ]);
+
+      const breakdown: Record<1 | 2 | 3 | 4 | 5, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      let total = 0;
+      for (const row of breakdownResult.rows) {
+        const star = row.rating as 1 | 2 | 3 | 4 | 5;
+        breakdown[star] = row.cnt;
+        total += row.cnt;
+      }
+
+      const items: PublicReviewItem[] = reviewsResult.rows.map((row) => ({
+        id:                  row.id,
+        rating:              row.rating,
+        reviewText:          row.review_text,
+        customerDisplayName: row.customer_display_name,
+        createdAt:           row.created_at.toISOString(),
+      }));
+
+      return { items, total, page: safePage, ratingBreakdown: breakdown };
+    });
   }
 }
