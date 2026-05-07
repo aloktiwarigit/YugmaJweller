@@ -38,10 +38,12 @@ CREATE TABLE collections (
 
   -- Composite FK: prevents cross-tenant hero image assignment.
   -- Requires product_images.UNIQUE(shop_id, id) added above.
+  -- ON DELETE SET NULL (hero_image_id): Postgres 15+ column-list syntax.
+  -- Only hero_image_id is nulled on image deletion; shop_id (NOT NULL) is preserved.
   CONSTRAINT collections_shop_image_fkey
     FOREIGN KEY (shop_id, hero_image_id)
     REFERENCES product_images (shop_id, id)
-    ON DELETE SET NULL
+    ON DELETE SET NULL (hero_image_id)
 );
 
 -- Listing hot path: published collections ordered by sort_order.
