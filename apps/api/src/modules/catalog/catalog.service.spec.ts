@@ -562,3 +562,54 @@ describe('CatalogService.getProducts() — B3 primaryImage (WS-B)', () => {
     expect(sql).toContain('pi.storage_key AS pi_storage_key');
   });
 });
+
+// ---------------------------------------------------------------------------
+// WS-B: B3 — primaryImage in getProduct() detail response
+// Call[0] = shop_settings (withShopTx), Call[1] = product detail SQL
+// ---------------------------------------------------------------------------
+
+describe('CatalogService.getProduct() — B3 primaryImage', () => {
+  function makeSvc(pool: ReturnType<typeof makePool>) {
+    return new CatalogService(
+      pool as never,
+      { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) } as never,
+      mockSettingsRepo as never,
+      stubUrlBuilder as never,
+    );
+  }
+
+  it('getProduct() SQL contains LEFT JOIN product_images and pi_storage_key alias', async () => {
+    const pool = makePool([
+      { rows: [] },            // shop_settings (defaults)
+      { rows: [baseProduct] }, // product detail
+    ]);
+    await makeSvc(pool).getProduct('prod-1', 'shop-1');
+    const sql = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    expect(sql).toContain('LEFT JOIN product_images pi ON pi.id = p.primary_image_id');
+    expect(sql).toContain('pi.storage_key AS pi_storage_key');
+  });
+
+  it('returns populated primaryImage when pi_storage_key is non-null', async () => {
+    const pool = makePool([
+      { rows: [] },                      // shop_settings (defaults)
+      { rows: [baseProductWithImage] },  // product detail with image
+    ]);
+    const result = await makeSvc(pool).getProduct('prod-1', 'shop-1');
+    expect(result.primaryImage).not.toBeNull();
+    expect(result.primaryImage!.url).toContain('shops/shop-1/products/prod-1/main.jpg');
+    expect(result.primaryImage!.srcset).toContain('320w');
+    expect(result.primaryImage!.srcset).toContain('640w');
+    expect(result.primaryImage!.width).toBe(800);
+    expect(result.primaryImage!.alt).toBe('22K सोने की अंगूठी');
+  });
+
+  it('storage_key is never present in the serialized response JSON', async () => {
+    const pool = makePool([
+      { rows: [] },                      // shop_settings (defaults)
+      { rows: [baseProductWithImage] },  // product detail with image
+    ]);
+    const result = await makeSvc(pool).getProduct('prod-1', 'shop-1');
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain('storage_key');
+  });
+});
