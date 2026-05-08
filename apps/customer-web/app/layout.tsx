@@ -4,6 +4,7 @@ import { Yatra_One, Mukta, Hind } from 'next/font/google';
 import './globals.css';
 import { fetchTenantConfig } from '@/lib/api';
 import { buildThemeStyle } from '@/lib/theme';
+import StorefrontHeader from '@/components/StorefrontHeader';
 
 const yatraOne = Yatra_One({
   weight: '400',
@@ -12,7 +13,6 @@ const yatraOne = Yatra_One({
   display: 'swap',
 });
 
-// Primary UI font — Devanagari + Latin body copy
 const mukta = Mukta({
   weight: ['400', '500', '600', '700'],
   subsets: ['devanagari', 'latin'],
@@ -20,7 +20,6 @@ const mukta = Mukta({
   display: 'swap',
 });
 
-// Long-form prose font (> 30 words)
 const hind = Hind({
   weight: ['400', '500'],
   subsets: ['devanagari', 'latin'],
@@ -74,6 +73,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const config = await fetchTenantConfig(slug);
   if (!config) return unavailablePage;
 
+  // XSS guard: only allow https:// logo URLs
   const safeLogoUrl =
     config.logoUrl && config.logoUrl.startsWith('https://') ? config.logoUrl : null;
 
@@ -90,32 +90,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         >
           मुख्य सामग्री पर जाएं
         </a>
-        <StorefrontHeaderPlaceholder
-          shopName={config.appName}
-          logoUrl={safeLogoUrl}
-        />
+        <StorefrontHeader shopName={config.appName} logoUrl={safeLogoUrl} />
         <main id="main-content">{children}</main>
       </body>
     </html>
-  );
-}
-
-// Inline minimal header — replaced by StorefrontHeader import after commit 5
-function StorefrontHeaderPlaceholder({
-  shopName,
-  logoUrl,
-}: {
-  shopName: string;
-  logoUrl: string | null;
-}) {
-  return (
-    <header className="border-b border-border bg-surface/80 backdrop-blur-sm sticky top-0 z-40">
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
-        {logoUrl && (
-          <img src={logoUrl} alt={`${shopName} का लोगो`} className="h-10 w-auto object-contain" />
-        )}
-        <span className="font-heading text-xl text-ink">{shopName}</span>
-      </div>
-    </header>
   );
 }
