@@ -13,6 +13,8 @@ import {
   ImageKitTransformUrlBuilder,
 } from '@goldsmith/integrations-storage';
 import type { CatalogImage, Collection, CategoryNode, PublicReviewItem, PublicReviewsResponse } from '@goldsmith/customer-shared';
+import { withSpan } from '@goldsmith/observability';
+import * as Sentry from '@sentry/node';
 
 // ---------------------------------------------------------------------------
 // Response shapes
@@ -198,26 +200,31 @@ export class CatalogService {
   ) {}
 
   async getTenantConfig(slug: string): Promise<TenantConfigResponse> {
-    const r = await this.pool.query<ShopRow>(
-      `SELECT id, display_name, logo_url, config
-         FROM shops
-        WHERE slug = $1 AND status = 'ACTIVE'`,
-      [slug],
-    );
-    if (r.rows.length === 0) {
-      throw new NotFoundException({ code: 'catalog.shop_not_found' });
-    }
-    const row = r.rows[0];
-    return {
-      shopId:          row.id,
-      primaryColor:    (row.config?.['primaryColor'] as string | undefined) ?? '#B58A3C',
-      logoUrl:         row.logo_url ?? null,
-      appName:         row.display_name,
-      defaultLanguage: (row.config?.['defaultLanguage'] as string | undefined) ?? 'hi',
-    };
+    return withSpan('catalog.getTenantConfig', { 'catalog.slug': slug }, async () => {
+      Sentry.addBreadcrumb({ category: 'catalog', message: 'getTenantConfig', data: { slug }, level: 'info' });
+      const r = await this.pool.query<ShopRow>(
+        `SELECT id, display_name, logo_url, config
+           FROM shops
+          WHERE slug = $1 AND status = 'ACTIVE'`,
+        [slug],
+      );
+      if (r.rows.length === 0) {
+        throw new NotFoundException({ code: 'catalog.shop_not_found' });
+      }
+      const row = r.rows[0];
+      return {
+        shopId:          row.id,
+        primaryColor:    (row.config?.['primaryColor'] as string | undefined) ?? '#B58A3C',
+        logoUrl:         row.logo_url ?? null,
+        appName:         row.display_name,
+        defaultLanguage: (row.config?.['defaultLanguage'] as string | undefined) ?? 'hi',
+      };
+    });
   }
 
   async getProducts(params: GetProductsParams): Promise<CatalogProductsResponse> {
+    Sentry.addBreadcrumb({ category: 'catalog', message: 'getProducts', data: { tenant_id: params.shopId, sort: params.sort }, level: 'info' });
+    return withSpan('catalog.getProducts', { 'tenant.id': params.shopId, 'catalog.sort': params.sort ?? 'newest' }, async () => {
     const {
       shopId, categoryId, search, metal, purity, priceMin, priceMax,
       inStockOnly, style, occasion, giftPersona, collection, sort, page, limit,
@@ -352,10 +359,13 @@ export class CatalogService {
       this.computeCatalogProduct(row, ratesResult, mcMap),
     );
     return { items, total, page: safePage };
+    }); // withSpan catalog.getProducts
   }
 
   // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint; shopId from slug lookup, not TenantContext
   async getProduct(id: string, shopId: string): Promise<CatalogProduct> {
+    Sentry.addBreadcrumb({ category: 'catalog', message: 'getProduct', data: { tenant_id: shopId }, level: 'info' });
+    return withSpan('catalog.getProduct', { 'tenant.id': shopId }, async () => {
     const [ratesResult, scopedResult] = await Promise.all([
       this.pricingService.getCurrentRates(),
       withShopTx(this.pool, shopId, async (tx) => {
@@ -398,10 +408,13 @@ export class CatalogService {
     const mcMap = new Map<string, string>(configs.map((c) => [c.category, c.value]));
 
     return this.computeCatalogProduct(productResult.rows[0], ratesResult, mcMap);
+    }); // withSpan catalog.getProduct
   }
 
   // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint; shopId from slug lookup, not TenantContext
   async verifyHuid(productId: string, shopId: string, qrPayload: string): Promise<HuidVerifyResult> {
+    Sentry.addBreadcrumb({ category: 'catalog', message: 'verifyHuid', data: { tenant_id: shopId }, level: 'info' });
+    return withSpan('catalog.verifyHuid', { 'tenant.id': shopId }, async () => {
     const extractedHuid = parseHuidFromQr(qrPayload);
     if (!extractedHuid) {
       throw new BadRequestException({ code: 'catalog.huid_qr_invalid' });
@@ -426,6 +439,7 @@ export class CatalogService {
     const productHuid = r.rows[0].huid;
     const verified = productHuid !== null && productHuid.toUpperCase() === extractedHuid;
     return { verified, huid: extractedHuid, certifyingBody };
+    }); // withSpan catalog.verifyHuid
   }
 
   private toCardImage(row: Pick<ProductCatalogRow, 'pi_storage_key' | 'pi_alt_text' | 'pi_width' | 'pi_height'>): CatalogImage | null {
@@ -508,6 +522,8 @@ export class CatalogService {
   // ---------------------------------------------------------------------------
   // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint; shopId from slug lookup, not TenantContext
   async listPublicImages(productId: string, shopId: string): Promise<PublicImageRow[]> {
+    Sentry.addBreadcrumb({ category: 'catalog', message: 'listPublicImages', data: { tenant_id: shopId }, level: 'info' });
+    return withSpan('catalog.listPublicImages', { 'tenant.id': shopId }, async () => {
     // Only show images for published products of ACTIVE shops (security guard).
     // "Published" = products.published_at IS NOT NULL (set by publishProduct() in
     // inventory.service). The products.status column is independent of publish state
@@ -528,6 +544,7 @@ export class CatalogService {
       ),
     );
     return r.rows.map((row) => this.toPublicImageRow(row));
+    }); // withSpan catalog.listPublicImages
   }
 
   private toPublicImageRow(row: { id: string; alt_text: string | null; width: number; height: number; storage_key: string }): PublicImageRow {
@@ -543,6 +560,7 @@ export class CatalogService {
   }
 
   async getReturnPolicy(): Promise<{ returnPolicyText: string | null }> {
+    Sentry.addBreadcrumb({ category: 'catalog', message: 'getReturnPolicy', data: {}, level: 'info' });
     const text = await this.settingsRepo.getReturnPolicy();
     return { returnPolicyText: text };
   }
@@ -557,6 +575,8 @@ export class CatalogService {
     page:      number;
     limit:     number;
   }): Promise<PublicReviewsResponse> {
+    Sentry.addBreadcrumb({ category: 'catalog', message: 'getPublicProductReviews', data: { tenant_id: params.shopId }, level: 'info' });
+    return withSpan('catalog.getPublicProductReviews', { 'tenant.id': params.shopId }, async () => {
     const { shopId, productId } = params;
     const safePage  = Math.max(1, params.page);
     const safeLimit = Math.min(50, Math.max(1, params.limit));
@@ -637,6 +657,7 @@ export class CatalogService {
 
       return { items, total, page: safePage, ratingBreakdown: breakdown };
     });
+    }); // withSpan catalog.getPublicProductReviews
   }
 
   // ---------------------------------------------------------------------------
@@ -703,6 +724,8 @@ export class CatalogService {
   // ---------------------------------------------------------------------------
   // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint
   async getCategories(shopId: string): Promise<{ categories: CategoryNode[] }> {
+    Sentry.addBreadcrumb({ category: 'catalog', message: 'getCategories', data: { tenant_id: shopId }, level: 'info' });
+    return withSpan('catalog.getCategories', { 'tenant.id': shopId }, async () => {
     const result = await withShopTx(this.pool, shopId, async (tx) =>
       tx.query<{ id: string; name: string; name_hi: string | null; product_count: number }>(
         `SELECT pc.id, pc.name, pc.name_hi, COUNT(p.id)::int AS product_count
@@ -726,6 +749,7 @@ export class CatalogService {
       productCount: row.product_count,
     }));
     return { categories };
+    }); // withSpan catalog.getCategories
   }
 
   // ---------------------------------------------------------------------------
@@ -733,6 +757,8 @@ export class CatalogService {
   // ---------------------------------------------------------------------------
   // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint
   async getCollections(shopId: string): Promise<{ items: Collection[] }> {
+    Sentry.addBreadcrumb({ category: 'catalog', message: 'getCollections', data: { tenant_id: shopId }, level: 'info' });
+    return withSpan('catalog.getCollections', { 'tenant.id': shopId }, async () => {
     const result = await withShopTx(this.pool, shopId, async (tx) =>
       tx.query<{
         id: string; slug: string; title_hi: string; title_en: string | null;
@@ -775,6 +801,7 @@ export class CatalogService {
       isPremium:    row.is_premium,
     }));
     return { items };
+    }); // withSpan catalog.getCollections
   }
 
   // ---------------------------------------------------------------------------
@@ -787,6 +814,8 @@ export class CatalogService {
     page: number,
     limit: number,
   ): Promise<{ collection: Collection; products: CatalogProductsResponse }> {
+    Sentry.addBreadcrumb({ category: 'catalog', message: 'getCollection', data: { tenant_id: shopId }, level: 'info' });
+    return withSpan('catalog.getCollection', { 'tenant.id': shopId }, async () => {
     // Validate collection exists (also gates product list)
     const colResult = await withShopTx(this.pool, shopId, async (tx) =>
       tx.query<{ id: string; title_hi: string; title_en: string | null; subtitle_hi: string | null; is_premium: boolean; hero_storage_key: string | null; hero_alt: string | null; hero_w: number | null; hero_h: number | null }>(
@@ -818,6 +847,7 @@ export class CatalogService {
     const products = await this.getProducts({ shopId, collection: col.id, page, limit });
     collection.productCount = products.total;
     return { collection, products };
+    }); // withSpan catalog.getCollection
   }
 
   // ---------------------------------------------------------------------------
@@ -825,6 +855,8 @@ export class CatalogService {
   // ---------------------------------------------------------------------------
   // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint
   async getFeatured(shopId: string, limit: number): Promise<{ items: CatalogProduct[] }> {
+    Sentry.addBreadcrumb({ category: 'catalog', message: 'getFeatured', data: { tenant_id: shopId }, level: 'info' });
+    return withSpan('catalog.getFeatured', { 'tenant.id': shopId }, async () => {
     const items = await this.fetchProductCards(
       shopId,
       'AND p.featured_score > 0',
@@ -833,6 +865,7 @@ export class CatalogService {
       limit,
     );
     return { items };
+    }); // withSpan catalog.getFeatured
   }
 
   // ---------------------------------------------------------------------------
@@ -840,6 +873,8 @@ export class CatalogService {
   // ---------------------------------------------------------------------------
   // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint
   async getNewArrivals(shopId: string, limit: number): Promise<{ items: CatalogProduct[] }> {
+    Sentry.addBreadcrumb({ category: 'catalog', message: 'getNewArrivals', data: { tenant_id: shopId }, level: 'info' });
+    return withSpan('catalog.getNewArrivals', { 'tenant.id': shopId }, async () => {
     const items = await this.fetchProductCards(
       shopId,
       `AND p.published_at >= NOW() - INTERVAL '30 days'`,
@@ -848,6 +883,7 @@ export class CatalogService {
       limit,
     );
     return { items };
+    }); // withSpan catalog.getNewArrivals
   }
 
   // ---------------------------------------------------------------------------
@@ -855,6 +891,8 @@ export class CatalogService {
   // ---------------------------------------------------------------------------
   // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint
   async getTopSellers(shopId: string, limit: number): Promise<{ items: CatalogProduct[] }> {
+    Sentry.addBreadcrumb({ category: 'catalog', message: 'getTopSellers', data: { tenant_id: shopId }, level: 'info' });
+    return withSpan('catalog.getTopSellers', { 'tenant.id': shopId }, async () => {
     const items = await this.fetchProductCards(
       shopId,
       '',
@@ -863,6 +901,7 @@ export class CatalogService {
       limit,
     );
     return { items };
+    }); // withSpan catalog.getTopSellers
   }
 
   // ---------------------------------------------------------------------------
@@ -870,6 +909,8 @@ export class CatalogService {
   // ---------------------------------------------------------------------------
   // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint
   async getStorefrontConfig(shopId: string): Promise<StorefrontConfig> {
+    Sentry.addBreadcrumb({ category: 'catalog', message: 'getStorefrontConfig', data: { tenant_id: shopId }, level: 'info' });
+    return withSpan('catalog.getStorefrontConfig', { 'tenant.id': shopId }, async () => {
     const result = await withShopTx(this.pool, shopId, async (tx) =>
       tx.query<{ storefront_config_json: unknown }>(
         `SELECT ss.storefront_config_json
@@ -888,6 +929,7 @@ export class CatalogService {
       this.logger.warn(`storefront-config parse failed for shop ${shopId} — returning defaults`);
       return STOREFRONT_CONFIG_DEFAULTS;
     }
+    }); // withSpan catalog.getStorefrontConfig
   }
 
   // ---------------------------------------------------------------------------
@@ -896,6 +938,8 @@ export class CatalogService {
   // ---------------------------------------------------------------------------
   // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint
   async getRecommendations(productId: string, shopId: string): Promise<{ items: CatalogProduct[] }> {
+    Sentry.addBreadcrumb({ category: 'catalog', message: 'getRecommendations', data: { tenant_id: shopId }, level: 'info' });
+    return withSpan('catalog.getRecommendations', { 'tenant.id': shopId }, async () => {
     // Step 1: fetch the source product's attributes for tier matching
     const srcResult = await withShopTx(this.pool, shopId, async (tx) =>
       tx.query<{ collection_id: string | null; style: string | null; metal: string; purity: string; net_weight_g: string }>(
@@ -1001,6 +1045,7 @@ export class CatalogService {
     }
 
     return { items: merged.map((row) => this.computeCatalogProduct(row, ratesResult, mcMap)) };
+    }); // withSpan catalog.getRecommendations
   }
 
   private readonly logger = new Logger(CatalogService.name);
