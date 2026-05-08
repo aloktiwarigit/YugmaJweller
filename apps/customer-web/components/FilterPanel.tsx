@@ -63,7 +63,7 @@ export interface ActiveFilters {
   inStockOnly?: boolean;
   style?:       string;
   occasion?:    string;
-  sort?:        string;
+  sort?:        CatalogSort;
   search?:      string;
 }
 
@@ -291,7 +291,7 @@ export function FilterControls({ filters, totalCount }: { filters: ActiveFilters
           <select
             id="sort-select"
             value={filters.sort ?? 'newest'}
-            onChange={e => apply({ sort: e.target.value })}
+            onChange={e => apply({ sort: e.target.value as CatalogSort })}
             className="rounded-md border border-border bg-surface px-3 py-2 font-ui text-sm text-ink focus-visible:outline-2 focus-visible:outline-primary"
           >
             {SORT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.labelHi}</option>)}

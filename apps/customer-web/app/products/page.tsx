@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import { fetchTenantConfig, fetchProducts } from '@/lib/api';
 import { ProductGrid } from '@/components/ProductGrid';
 import { FilterSidebar, FilterControls, type ActiveFilters } from '@/components/FilterPanel';
+import type { CatalogSort } from '@goldsmith/customer-shared';
 import { NoResults } from '@/components/NoResults';
 
 function resolveSlug(): string | null {
@@ -58,7 +59,8 @@ export default async function ProductsPage({ searchParams }: PageProps) {
 
   const activeFilters: ActiveFilters = {
     search, metal, purity, priceMin, priceMax,
-    inStockOnly, style, occasion, sort,
+    inStockOnly, style, occasion,
+    sort: sort as CatalogSort | undefined,
   };
 
   function buildPageHref(p: number) {
