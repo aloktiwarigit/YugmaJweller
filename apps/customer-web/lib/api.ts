@@ -164,6 +164,45 @@ export async function fetchRecommendations(
   }
 }
 
+export async function fetchNewArrivals(shopId: string): Promise<CatalogProductsResponse | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/catalog/products/new-arrivals`, {
+      headers: { 'X-Tenant-Id': shopId },
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return null;
+    return res.json() as Promise<CatalogProductsResponse>;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchTopSellers(shopId: string): Promise<CatalogProductsResponse | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/catalog/products/top-sellers`, {
+      headers: { 'X-Tenant-Id': shopId },
+      next: { revalidate: 600 },
+    });
+    if (!res.ok) return null;
+    return res.json() as Promise<CatalogProductsResponse>;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchFeaturedProducts(shopId: string): Promise<CatalogProductsResponse | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/catalog/products/featured`, {
+      headers: { 'X-Tenant-Id': shopId },
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return null;
+    return res.json() as Promise<CatalogProductsResponse>;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchReturnPolicy(shopId: string): Promise<string | null> {
   try {
     const res = await fetch(`${API_URL}/api/v1/catalog/return-policy`, {
