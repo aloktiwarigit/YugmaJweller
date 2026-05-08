@@ -2,13 +2,28 @@ import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   ActivityIndicator, Modal, Alert, TextInput,
+  SafeAreaView, Share,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
-import { getCatalogProduct, verifyHuid } from '../../src/api/endpoints';
+import {
+  getCatalogProduct,
+  verifyHuid,
+  getProductRecommendations,
+  getCatalogProductReviews,
+} from '../../src/api/endpoints';
+import type { CatalogProduct } from '../../src/api/endpoints';
 import { ProductGallery } from '../../src/components/products/ProductGallery';
 import { useProductImages } from '../../src/hooks/useProductImages';
+
+// ─── Colour tokens not yet on origin/main (land with D1D2D5) ───────────────────
+const SURFACE_ELEVATED = '#FFFBF2';
+const SUCCESS_JADE     = '#2F7D5B';
+const SUCCESS_WASH     = '#DCEEE3';
+const SURFACE_RECESSED = '#EDE2CC';
+const WARNING_SAFFRON  = '#C68A1F';
+// ───────────────────────────────────────────────────────────────────────────────
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -39,7 +54,69 @@ function fmtPaise(paiseStr: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// HuidScanModal — wraps expo-camera QR scan. Shows manual fallback too.
+// StarRow
+// ---------------------------------------------------------------------------
+
+function StarRow({ rating }: { rating: number }): React.ReactElement {
+  const stars = Array.from({ length: 5 }, (_, i) => i < Math.round(rating));
+  return (
+    <View style={{ flexDirection: 'row', gap: 2 }}>
+      {stars.map((filled, i) => (
+        <Text
+          key={i}
+          style={{ fontSize: 14, color: filled ? WARNING_SAFFRON : colors.border }}
+          accessibilityElementsHidden
+        >
+          {filled ? '★' : '☆'}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CompactProductCard — for "complete the look" row
+// ---------------------------------------------------------------------------
+
+function CompactProductCard({ product }: { product: CatalogProduct }): React.ReactElement {
+  return (
+    <TouchableOpacity
+      onPress={() => router.push(`/browse/${product.id}`)}
+      style={{
+        width: 120,
+        backgroundColor: colors.white,
+        borderRadius: radii.md,
+        borderWidth: 1,
+        borderColor: colors.border,
+        overflow: 'hidden',
+        marginRight: spacing.sm,
+      }}
+      accessibilityLabel={`${purityLabel(product.purity)} — ${product.sku}`}
+      accessibilityRole="button"
+    >
+      <View style={{ width: 120, height: 150, backgroundColor: colors.border }} />
+      <View style={{ padding: spacing.xs }}>
+        <Text
+          style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.ink, fontWeight: '600' }}
+          numberOfLines={1}
+        >
+          {purityLabel(product.purity)}
+        </Text>
+        {product.priceAvailable && product.estimatedPrice && (
+          <Text
+            style={{ fontFamily: typography.body.family, fontSize: 11, color: colors.inkMute, marginTop: 2 }}
+            numberOfLines={1}
+          >
+            {product.estimatedPrice.totalFormatted}
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// HuidScanModal
 // ---------------------------------------------------------------------------
 
 interface HuidScanModalProps {
@@ -52,9 +129,6 @@ function HuidScanModal({ productId, onClose, onVerified }: HuidScanModalProps): 
   const [manualHuid, setManualHuid] = useState('');
   const [cameraReady, setCameraReady] = useState(false);
 
-  // Camera import is dynamic to avoid a hard crash if the native module is absent
-  // (Expo Go / fresh build without expo-camera linked). We gracefully fall back
-  // to the manual entry mode if the import fails.
   const [CameraComponent, setCameraComponent] = useState<React.ComponentType<{
     style: object;
     onBarcodeScanned: (data: { data: string }) => void;
@@ -104,7 +178,6 @@ function HuidScanModal({ productId, onClose, onVerified }: HuidScanModalProps): 
       accessibilityViewIsModal
     >
       <View style={{ flex: 1, backgroundColor: colors.bg }}>
-        {/* Header */}
         <View
           style={{
             flexDirection: 'row',
@@ -125,37 +198,25 @@ function HuidScanModal({ productId, onClose, onVerified }: HuidScanModalProps): 
         </View>
 
         <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.lg }}>
-          {/* Instructions */}
           <Text style={{ fontFamily: typography.body.family, fontSize: 14, color: colors.inkMute, textAlign: 'center' }}>
             आभूषण पर BIS हॉलमार्क QR कोड को कैमरे के सामने रखें।
           </Text>
 
-          {/* Camera viewfinder */}
           {cameraReady && CameraComponent ? (
             <View style={{ borderRadius: radii.lg, overflow: 'hidden', aspectRatio: 1 }}>
               <CameraComponent
                 style={{ flex: 1 }}
                 onBarcodeScanned={(e) => handleScan(e.data)}
               />
-              {/* Scan overlay */}
               <View
                 style={{
                   position: 'absolute',
                   top: 0, bottom: 0, left: 0, right: 0,
-                  justifyContent: 'center',
-                  alignItems: 'center',
+                  justifyContent: 'center', alignItems: 'center',
                 }}
                 pointerEvents="none"
               >
-                <View
-                  style={{
-                    width: 180,
-                    height: 180,
-                    borderWidth: 2,
-                    borderColor: colors.primary,
-                    borderRadius: radii.md,
-                  }}
-                />
+                <View style={{ width: 180, height: 180, borderWidth: 2, borderColor: colors.primary, borderRadius: radii.md }} />
               </View>
             </View>
           ) : (
@@ -164,8 +225,7 @@ function HuidScanModal({ productId, onClose, onVerified }: HuidScanModalProps): 
                 backgroundColor: colors.border,
                 borderRadius: radii.lg,
                 aspectRatio: 1,
-                justifyContent: 'center',
-                alignItems: 'center',
+                justifyContent: 'center', alignItems: 'center',
               }}
             >
               <Text style={{ fontFamily: typography.body.family, fontSize: 14, color: colors.inkMute, textAlign: 'center', padding: spacing.md }}>
@@ -174,21 +234,11 @@ function HuidScanModal({ productId, onClose, onVerified }: HuidScanModalProps): 
             </View>
           )}
 
-          {/* Manual HUID entry fallback */}
           <View style={{ gap: spacing.sm }}>
             <Text style={{ fontFamily: typography.body.family, fontSize: 13, color: colors.ink, fontWeight: '600' }}>
               या HUID मैन्युअली दर्ज करें
             </Text>
-            <View
-              style={{
-                flexDirection: 'row',
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: radii.md,
-                overflow: 'hidden',
-                minHeight: 48,
-              }}
-            >
+            <View style={{ flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, overflow: 'hidden', minHeight: 48 }}>
               <TextInput
                 value={manualHuid}
                 onChangeText={setManualHuid}
@@ -196,37 +246,21 @@ function HuidScanModal({ productId, onClose, onVerified }: HuidScanModalProps): 
                 placeholderTextColor={colors.inkMute}
                 autoCapitalize="characters"
                 maxLength={6}
-                style={{
-                  paddingHorizontal: spacing.sm,
-                  fontFamily: 'monospace',
-                  fontSize: 16,
-                  color: colors.ink,
-                  flex: 1,
-                  minHeight: 48,
-                }}
+                style={{ paddingHorizontal: spacing.sm, fontFamily: 'monospace', fontSize: 16, color: colors.ink, flex: 1, minHeight: 48 }}
                 accessibilityLabel="HUID दर्ज करें"
               />
               <TouchableOpacity
                 onPress={() => {
-                  // For now, trigger verify with the typed HUID
                   const huid = manualHuid.trim().toUpperCase();
                   if (huid.length === 6) handleScan(huid);
                   else Alert.alert('अमान्य', 'HUID 6 अक्षर का होना चाहिए');
                 }}
-                style={{
-                  backgroundColor: colors.primary,
-                  paddingHorizontal: spacing.md,
-                  justifyContent: 'center',
-                  minHeight: 48,
-                }}
+                style={{ backgroundColor: colors.primary, paddingHorizontal: spacing.md, justifyContent: 'center', minHeight: 48 }}
                 accessibilityLabel="HUID सत्यापित करें"
               >
                 <Text style={{ fontFamily: typography.body.family, color: colors.white }}>सत्यापित करें</Text>
               </TouchableOpacity>
             </View>
-            <Text style={{ fontFamily: typography.body.family, fontSize: 11, color: colors.inkMute }}>
-              HUID आभूषण पर या BIS हॉलमार्क सर्टिफिकेट पर मिलेगा।
-            </Text>
           </View>
 
           {verifyMutation.isPending && (
@@ -250,6 +284,7 @@ function HuidScanModal({ productId, onClose, onVerified }: HuidScanModalProps): 
 export default function ProductDetailScreen(): React.ReactElement {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [showScanModal, setShowScanModal] = useState(false);
+  const [isWishlisted, setIsWishlisted]   = useState(false);
   const [verifyResult, setVerifyResult] = useState<{
     verified: boolean; huid: string; certifyingBody: string;
   } | null>(null);
@@ -262,6 +297,23 @@ export default function ProductDetailScreen(): React.ReactElement {
   });
 
   const { data: productImages } = useProductImages(id);
+
+  const { data: recommendationsData } = useQuery({
+    queryKey: ['product-recommendations', id],
+    queryFn:  () => getProductRecommendations(id!),
+    enabled:  !!id,
+    retry: false,
+  });
+
+  const { data: reviewsData } = useQuery({
+    queryKey: ['product-reviews-public', id],
+    queryFn:  () => getCatalogProductReviews(id!),
+    enabled:  !!id,
+    retry: false,
+  });
+
+  const recommendations = recommendationsData?.items ?? [];
+  const reviews         = reviewsData?.items ?? [];
 
   if (isLoading) {
     return (
@@ -288,12 +340,27 @@ export default function ProductDetailScreen(): React.ReactElement {
     );
   }
 
-  const isUnavailable = product.quantity === 0;
+  const isUnavailable  = product.quantity === 0;
   const displayPurity  = purityLabel(product.purity);
+  const priceFormatted = product.priceAvailable && product.estimatedPrice
+    ? product.estimatedPrice.totalFormatted
+    : null;
+
+  const handleShare = async (): Promise<void> => {
+    try {
+      await Share.share({
+        message: `${displayPurity} — SKU ${product.sku}${priceFormatted ? `\nअनुमानित मूल्य: ${priceFormatted}` : ''}`,
+        title: displayPurity,
+      });
+    } catch {
+      // user dismissed
+    }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}>
+      {/* Main scrollable content — paddingBottom reserves space for sticky bar */}
+      <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md, paddingBottom: 96 }}>
         {/* Back */}
         <TouchableOpacity
           onPress={() => router.back()}
@@ -305,20 +372,16 @@ export default function ProductDetailScreen(): React.ReactElement {
           </Text>
         </TouchableOpacity>
 
-        {/* Product gallery — LQIP via expo-image, FlatList paging */}
+        {/* Product gallery */}
         <View style={{ marginHorizontal: -spacing.md, overflow: 'hidden' }}>
-          <ProductGallery
-            images={productImages}
-            productName={product.purity}
-          />
+          <ProductGallery images={productImages} productName={product.purity} />
           {isUnavailable && (
             <View
               style={{
                 position: 'absolute',
                 top: 0, bottom: 0, left: 0, right: 0,
                 backgroundColor: 'rgba(0,0,0,0.4)',
-                justifyContent: 'center',
-                alignItems: 'center',
+                justifyContent: 'center', alignItems: 'center',
               }}
               pointerEvents="none"
             >
@@ -335,38 +398,23 @@ export default function ProductDetailScreen(): React.ReactElement {
             {displayPurity}
           </Text>
           <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.inkMute }}>
-            SKU: {product.sku}
-            {product.categoryName ? ` · ${product.categoryName}` : ''}
+            SKU: {product.sku}{product.categoryName ? ` · ${product.categoryName}` : ''}
           </Text>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs }}>
             {product.huid && (
-              <View
-                style={{
-                  backgroundColor: '#F0FDF4',
-                  borderColor: '#86EFAC',
-                  borderWidth: 1,
-                  borderRadius: radii.pill,
-                  paddingHorizontal: spacing.sm,
-                  paddingVertical: 3,
-                }}
-              >
-                <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: '#15803D' }}>
-                  हॉलमार्क ✓ BIS प्रमाणित
+              <View style={{ backgroundColor: SUCCESS_WASH, borderColor: SUCCESS_JADE, borderWidth: 1, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 }}>
+                <Text
+                  style={{ fontFamily: typography.body.family, fontSize: 12, color: SUCCESS_JADE }}
+                  accessibilityLabel={`HUID सत्यापित — हॉलमार्क पंजीकरण क्रमांक ${product.huid}`}
+                  accessibilityRole="image"
+                >
+                  HUID ✓ BIS प्रमाणित
                 </Text>
               </View>
             )}
             {isUnavailable && (
-              <View
-                style={{
-                  backgroundColor: '#FEF2F2',
-                  borderColor: '#FECACA',
-                  borderWidth: 1,
-                  borderRadius: radii.pill,
-                  paddingHorizontal: spacing.sm,
-                  paddingVertical: 3,
-                }}
-              >
+              <View style={{ backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 }}>
                 <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: '#DC2626' }}>
                   उपलब्ध नहीं
                 </Text>
@@ -375,25 +423,47 @@ export default function ProductDetailScreen(): React.ReactElement {
           </View>
         </View>
 
+        {/* Trust strip — horizontally scrollable pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: spacing.xs }}
+        >
+          {[
+            { label: 'BIS/HUID ✓',        bg: SUCCESS_WASH, text: SUCCESS_JADE },
+            { label: 'निःशुल्क एक्सचेंज', bg: SURFACE_RECESSED, text: colors.ink },
+            { label: 'घर पर ट्राय',        bg: SURFACE_RECESSED, text: colors.ink },
+            { label: 'WhatsApp सहायता',    bg: SURFACE_RECESSED, text: colors.ink },
+          ].map(({ label, bg, text }) => (
+            <View
+              key={label}
+              style={{
+                backgroundColor: bg,
+                borderRadius: radii.sm,
+                paddingHorizontal: spacing.sm,
+                height: 28,
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ fontFamily: typography.body.family, fontSize: 12, fontWeight: '600', color: text }}>
+                {label}
+              </Text>
+            </View>
+          ))}
+        </ScrollView>
+
         {/* HUID verification result */}
         {verifyResult && (
           <View
             style={{
-              backgroundColor: verifyResult.verified ? '#F0FDF4' : '#FEF2F2',
-              borderColor: verifyResult.verified ? '#86EFAC' : '#FECACA',
+              backgroundColor: verifyResult.verified ? SUCCESS_WASH : '#FEF2F2',
+              borderColor: verifyResult.verified ? SUCCESS_JADE : '#FECACA',
               borderWidth: 1,
               borderRadius: radii.md,
               padding: spacing.md,
             }}
           >
-            <Text
-              style={{
-                fontFamily: typography.body.family,
-                fontSize: 14,
-                color: verifyResult.verified ? '#15803D' : '#DC2626',
-                fontWeight: '600',
-              }}
-            >
+            <Text style={{ fontFamily: typography.body.family, fontSize: 14, color: verifyResult.verified ? SUCCESS_JADE : '#DC2626', fontWeight: '600' }}>
               {verifyResult.verified
                 ? `✓ HUID सत्यापित — ${verifyResult.huid} (${verifyResult.certifyingBody})`
                 : `✗ HUID मेल नहीं खाया — ${verifyResult.huid}`}
@@ -402,17 +472,7 @@ export default function ProductDetailScreen(): React.ReactElement {
         )}
 
         {/* Weight */}
-        <View
-          style={{
-            backgroundColor: colors.white,
-            borderRadius: radii.md,
-            borderWidth: 1,
-            borderColor: colors.border,
-            padding: spacing.md,
-            flexDirection: 'row',
-            gap: spacing.md,
-          }}
-        >
+        <View style={{ backgroundColor: colors.white, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, flexDirection: 'row', gap: spacing.md }}>
           <View style={{ flex: 1 }}>
             <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.inkMute }}>कुल वज़न</Text>
             <Text style={{ fontFamily: typography.body.family, fontSize: 16, color: colors.ink, fontWeight: '600', marginTop: 2 }}>
@@ -429,16 +489,7 @@ export default function ProductDetailScreen(): React.ReactElement {
 
         {/* Price breakdown */}
         {product.priceAvailable && product.estimatedPrice ? (
-          <View
-            style={{
-              backgroundColor: colors.white,
-              borderRadius: radii.md,
-              borderWidth: 1,
-              borderColor: colors.border,
-              padding: spacing.md,
-              gap: spacing.sm,
-            }}
-          >
+          <View style={{ backgroundColor: colors.white, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, gap: spacing.sm }}>
             <Text style={{ fontFamily: typography.body.family, fontSize: 14, fontWeight: '600', color: colors.ink }}>
               मूल्य विवरण
             </Text>
@@ -453,19 +504,8 @@ export default function ProductDetailScreen(): React.ReactElement {
                 <Text style={{ fontFamily: typography.body.family, fontSize: 13, color: colors.ink }}>{fmtPaise(value)}</Text>
               </View>
             ))}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                borderTopWidth: 1,
-                borderTopColor: colors.border,
-                paddingTop: spacing.xs,
-                marginTop: spacing.xs,
-              }}
-            >
-              <Text style={{ fontFamily: typography.body.family, fontSize: 15, color: colors.ink, fontWeight: '600' }}>
-                अनुमानित कुल
-              </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.xs, marginTop: spacing.xs }}>
+              <Text style={{ fontFamily: typography.body.family, fontSize: 15, color: colors.ink, fontWeight: '600' }}>अनुमानित कुल</Text>
               <Text style={{ fontFamily: typography.body.family, fontSize: 15, color: colors.ink, fontWeight: '700' }}>
                 {product.estimatedPrice.totalFormatted}
               </Text>
@@ -475,35 +515,20 @@ export default function ProductDetailScreen(): React.ReactElement {
             </Text>
           </View>
         ) : (
-          <View
-            style={{
-              backgroundColor: colors.white,
-              borderRadius: radii.md,
-              borderWidth: 1,
-              borderColor: colors.border,
-              padding: spacing.md,
-            }}
-          >
+          <View style={{ backgroundColor: colors.white, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md }}>
             <Text style={{ fontFamily: typography.body.family, fontSize: 14, color: colors.inkMute }}>
               मूल्य के लिए कृपया दुकान पर संपर्क करें।
             </Text>
           </View>
         )}
 
-        {/* Action CTAs */}
+        {/* Action CTAs — HUID scan + Try at Home */}
         {!isUnavailable && (
           <View style={{ gap: spacing.sm }}>
-            {/* HUID QR scan */}
             {product.huid && (
               <TouchableOpacity
                 onPress={() => setShowScanModal(true)}
-                style={{
-                  backgroundColor: colors.primary,
-                  borderRadius: radii.md,
-                  paddingVertical: spacing.md,
-                  alignItems: 'center',
-                  minHeight: 48,
-                }}
+                style={{ backgroundColor: colors.primary, borderRadius: radii.md, paddingVertical: spacing.md, alignItems: 'center', minHeight: 48 }}
                 accessibilityLabel="HUID QR कोड स्कैन करें"
                 accessibilityRole="button"
               >
@@ -512,20 +537,10 @@ export default function ProductDetailScreen(): React.ReactElement {
                 </Text>
               </TouchableOpacity>
             )}
-
-            {/* Try at home */}
             <TouchableOpacity
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               onPress={() => router.push('/try-at-home' as any)}
-              style={{
-                backgroundColor: colors.white,
-                borderRadius: radii.md,
-                borderWidth: 1,
-                borderColor: colors.primary,
-                paddingVertical: spacing.md,
-                alignItems: 'center',
-                minHeight: 48,
-              }}
+              style={{ backgroundColor: colors.white, borderRadius: radii.md, borderWidth: 1, borderColor: colors.primary, paddingVertical: spacing.md, alignItems: 'center', minHeight: 48 }}
               accessibilityLabel="घर पर कोशिश करने की जानकारी"
               accessibilityRole="button"
             >
@@ -533,39 +548,217 @@ export default function ProductDetailScreen(): React.ReactElement {
                 🏠 कोशिश घर पर करें
               </Text>
             </TouchableOpacity>
+          </View>
+        )}
 
-            {/* Rate lock */}
-            <TouchableOpacity
+        {/* Share + Rate-lock + Wishlist row */}
+        <View style={{ flexDirection: 'row', gap: spacing.xs, paddingTop: spacing.xs }}>
+          {[
+            {
+              label: 'शेयर',
+              icon: '↗',
+              onPress: handleShare,
+              a11y: 'इस उत्पाद को शेयर करें',
+            },
+            {
+              label: 'दर-लॉक',
+              icon: '🔒',
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              onPress={() => router.push('/rate-lock' as any)}
+              onPress: () => router.push('/rate-lock' as any),
+              a11y: 'आज का मूल्य लॉक करें',
+            },
+            {
+              label: isWishlisted ? 'विशलिस्ट ✓' : 'विशलिस्ट',
+              icon: isWishlisted ? '♥' : '♡',
+              onPress: () => setIsWishlisted((v) => !v),
+              a11y: isWishlisted ? 'विशलिस्ट से हटाएं' : 'विशलिस्ट में जोड़ें',
+            },
+          ].map(({ label, icon, onPress, a11y }) => (
+            <TouchableOpacity
+              key={label}
+              onPress={onPress}
               style={{
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
                 backgroundColor: colors.white,
                 borderRadius: radii.md,
                 borderWidth: 1,
                 borderColor: colors.border,
-                paddingVertical: spacing.md,
-                alignItems: 'center',
-                minHeight: 48,
+                paddingVertical: spacing.sm,
+                minHeight: 56,
+                gap: 4,
               }}
-              accessibilityLabel="आज का मूल्य लॉक करें"
+              accessibilityLabel={a11y}
               accessibilityRole="button"
             >
-              <Text style={{ fontFamily: typography.body.family, fontSize: 15, color: colors.ink }}>
-                🔒 दर-लॉक बुकिंग
-              </Text>
+              <Text style={{ fontSize: 20 }}>{icon}</Text>
+              <Text style={{ fontFamily: typography.body.family, fontSize: 11, color: colors.inkMute }}>{label}</Text>
             </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* "Complete the look" row */}
+        {recommendations.length > 0 && (
+          <View style={{ gap: spacing.sm }}>
+            <Text style={{ fontFamily: typography.serif.family, fontSize: 16, color: colors.ink }}>
+              इसके साथ पहनें
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {recommendations.map((rec) => (
+                <CompactProductCard key={rec.id} product={rec} />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Reviews section */}
+        {reviews.length > 0 && (
+          <View style={{ gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }}>
+              <Text style={{ fontFamily: typography.serif.family, fontSize: 16, color: colors.ink }}>
+                समीक्षाएं
+              </Text>
+              {reviewsData?.total !== undefined && reviewsData.total > 0 && (
+                <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.inkMute }}>
+                  ({reviewsData.total})
+                </Text>
+              )}
+            </View>
+            {reviews.slice(0, 6).map((rev) => (
+              <View
+                key={rev.id}
+                style={{
+                  backgroundColor: colors.white,
+                  borderRadius: radii.md,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  padding: spacing.md,
+                  gap: spacing.xs,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <StarRow rating={rev.rating} />
+                  <Text
+                    style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.inkMute }}
+                    accessibilityLabel={`समीक्षा दिनांक ${new Date(rev.createdAt).toLocaleDateString('hi-IN')}`}
+                  >
+                    {new Date(rev.createdAt).toLocaleDateString('hi-IN')}
+                  </Text>
+                </View>
+                <Text
+                  style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.inkMute }}
+                  accessibilityLabel={`समीक्षक: ${rev.customerDisplayName}, ${rev.rating} में से 5 तारे`}
+                >
+                  {rev.customerDisplayName}
+                </Text>
+                {rev.reviewText && (
+                  <Text style={{ fontFamily: typography.body.family, fontSize: 14, color: colors.ink }}>
+                    {rev.reviewText}
+                  </Text>
+                )}
+              </View>
+            ))}
+            {reviewsData?.total !== undefined && reviewsData.total > 6 && (
+              <TouchableOpacity style={{ minHeight: 44, justifyContent: 'center' }}>
+                <Text style={{ fontFamily: typography.body.family, fontSize: 14, color: colors.primary }}>
+                  और समीक्षाएं →
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </ScrollView>
+
+      {/* ── Sticky bottom bar ─────────────────────────────────────────────── */}
+      <SafeAreaView
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: SURFACE_ELEVATED,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+        }}
+      >
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+          gap: spacing.sm,
+        }}>
+          {/* Price */}
+          <View style={{ flex: 1 }}>
+            {priceFormatted ? (
+              <>
+                <Text style={{ fontFamily: typography.body.family, fontSize: 20, fontWeight: '700', color: colors.ink }}>
+                  {priceFormatted}
+                </Text>
+                <Text style={{ fontFamily: typography.body.family, fontSize: 11, color: colors.inkMute }}>
+                  अनुमानित · आज की दर पर
+                </Text>
+              </>
+            ) : (
+              <Text style={{ fontFamily: typography.body.family, fontSize: 13, color: colors.inkMute }}>
+                मूल्य हेतु संपर्क करें
+              </Text>
+            )}
+          </View>
+
+          {/* Wishlist */}
+          <TouchableOpacity
+            onPress={() => setIsWishlisted((v) => !v)}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: radii.pill,
+              borderWidth: 1,
+              borderColor: isWishlisted ? colors.accent : colors.border,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+            accessibilityLabel={isWishlisted ? 'विशलिस्ट से हटाएं' : 'विशलिस्ट में जोड़ें'}
+            accessibilityRole="button"
+            accessibilityState={{ pressed: isWishlisted }}
+          >
+            <Text style={{ fontSize: 20, color: isWishlisted ? colors.accent : colors.inkMute }}>
+              {isWishlisted ? '♥' : '♡'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Primary CTA */}
+          {!isUnavailable && (
+            <TouchableOpacity
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              onPress={() => router.push('/try-at-home' as any)}
+              style={{
+                backgroundColor: colors.primary,
+                borderRadius: radii.md,
+                paddingHorizontal: spacing.lg,
+                height: 48,
+                justifyContent: 'center',
+                alignItems: 'center',
+                minWidth: 96,
+              }}
+              accessibilityLabel="उत्पाद जोड़ें — घर पर ट्राय करें"
+              accessibilityRole="button"
+            >
+              <Text style={{ fontFamily: typography.body.family, fontSize: 16, fontWeight: '600', color: '#FFFFFF' }}>
+                जोड़ें
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </SafeAreaView>
 
       {/* HUID scan modal */}
       {showScanModal && product.huid && (
         <HuidScanModal
           productId={product.id}
           onClose={() => setShowScanModal(false)}
-          onVerified={(result) => {
-            setVerifyResult(result);
-          }}
+          onVerified={(result) => setVerifyResult(result)}
         />
       )}
     </View>
