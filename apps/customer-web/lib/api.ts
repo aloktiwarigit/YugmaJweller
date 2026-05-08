@@ -49,15 +49,42 @@ export async function fetchPublicRates(): Promise<PublicRatesResponse | null> {
   }
 }
 
+export interface FetchProductsParams {
+  categoryId?:  string;
+  search?:      string;
+  metal?:       string;
+  purity?:      string;
+  priceMin?:    number;
+  priceMax?:    number;
+  inStockOnly?: boolean;
+  style?:       string;
+  occasion?:    string;
+  giftPersona?: string;
+  collection?:  string;
+  sort?:        string;
+  page?:        number;
+  limit?:       number;
+}
+
 export async function fetchProducts(
   shopId: string,
-  params: { categoryId?: string; search?: string; page?: number; limit?: number } = {},
+  params: FetchProductsParams = {},
 ): Promise<CatalogProductsResponse | null> {
   const qs = new URLSearchParams();
-  if (params.categoryId) qs.set('categoryId', params.categoryId);
-  if (params.search)     qs.set('search', params.search);
-  if (params.page)       qs.set('page', String(params.page));
-  if (params.limit)      qs.set('limit', String(params.limit));
+  if (params.categoryId)             qs.set('categoryId',  params.categoryId);
+  if (params.search)                 qs.set('search',      params.search);
+  if (params.metal)                  qs.set('metal',       params.metal);
+  if (params.purity)                 qs.set('purity',      params.purity);
+  if (params.priceMin !== undefined) qs.set('priceMin',    String(params.priceMin));
+  if (params.priceMax !== undefined) qs.set('priceMax',    String(params.priceMax));
+  if (params.inStockOnly)            qs.set('inStockOnly', 'true');
+  if (params.style)                  qs.set('style',       params.style);
+  if (params.occasion)               qs.set('occasion',    params.occasion);
+  if (params.giftPersona)            qs.set('giftPersona', params.giftPersona);
+  if (params.collection)             qs.set('collection',  params.collection);
+  if (params.sort)                   qs.set('sort',        params.sort);
+  if (params.page)                   qs.set('page',        String(params.page));
+  if (params.limit)                  qs.set('limit',       String(params.limit));
 
   try {
     const res = await fetch(`${API_URL}/api/v1/catalog/products?${qs.toString()}`, {
@@ -115,6 +142,23 @@ export async function fetchProductImages(
     if (!res.ok) return [];
     const data = await res.json() as { images: PublicImageItem[] };
     return data.images ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchRecommendations(
+  productId: string,
+  shopId: string,
+): Promise<CatalogProduct[]> {
+  try {
+    const res = await fetch(
+      `${API_URL}/api/v1/catalog/products/${productId}/recommendations`,
+      { headers: { 'X-Tenant-Id': shopId }, next: { revalidate: 300 } },
+    );
+    if (!res.ok) return [];
+    const data = await res.json() as { items?: CatalogProduct[] } | CatalogProduct[];
+    return Array.isArray(data) ? data : (data.items ?? []);
   } catch {
     return [];
   }
