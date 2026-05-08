@@ -1,1 +1,8 @@
-story-5.10+5.12 claude review passed 2026-04-27T02:14:26Z
+claude-review-passed: 2026-05-07
+branch: feat/catalog-api-b2b5b6b7
+reviewer: Claude Sonnet 4.6 (self-review, whole-branch)
+findings: 0 blocking
+sql-injection: CLEAN — all filter values parameterised; buildSortClause() uses closed allowlist; extraWhere in fetchProductCards uses only hardcoded SQL strings
+storage_key: CLEAN — pi_storage_key and hero_storage_key consumed by toCardImage() only; never in API response
+tenant-isolation: CLEAN — all new methods use withShopTx(pool, shopId); all SQL checks EXISTS shops.status=ACTIVE
+b7-stubs: intentional — PriceSnapshotRefreshProcessor and SalesAndViewsRollupProcessor registered as no-op (PA decision: deferred post-SOW)

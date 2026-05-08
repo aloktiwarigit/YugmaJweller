@@ -1,11 +1,10 @@
-security-review-passed: 2026-05-07T19:17:23Z
-branch: feat/catalog-filters-b1b3
-reviewer: security-review skill (superpowers v5.1.0)
-findings: 0 exploitable (Finding 7 filtered as false positive — DB ::uuid cast in RLS policies closes the gap)
-sql-injection: CLEAN — all filter values via parameterised $N; buildSortClause() closed allowlist
-data-leakage: CLEAN — pi_storage_key never in CatalogProduct or API response
-tenant-isolation: CLEAN — collection slug lookup scoped to shop_id=$1; EXISTS subquery cp.shop_id=$1
-
-B4 security-review-passed: 2026-05-07 — 0 findings, all 7 PII+isolation checks clean
-branch: feat/reviews-public-b4
-reviewer: security-review skill (superpowers v5.1.0)
+security-review-passed: 2026-05-07
+branch: feat/catalog-api-b2b5b6b7
+reviewer: Claude Sonnet 4.6
+findings: 0 exploitable
+new-endpoints: all @SkipAuth + @SkipTenant; tenant from x-tenant-id header only
+sql-injection: no user strings in SQL templates; parameterised queries throughout
+data-leakage: storage_key never in response; hero images built via toCardImage()
+tenant-isolation: withShopTx on every service method; EXISTS shops.status=ACTIVE guard
+recommendations-404: source product 404 prevents tenant enumeration (same pattern as B4)
+b7-stubs: no SQL writes; no-op; no attack surface
