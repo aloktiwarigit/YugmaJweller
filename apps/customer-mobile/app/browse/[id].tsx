@@ -721,7 +721,7 @@ export default function ProductDetailScreen(): React.ReactElement {
             }}
             accessibilityLabel={isWishlisted ? 'विशलिस्ट से हटाएं' : 'विशलिस्ट में जोड़ें'}
             accessibilityRole="button"
-            accessibilityState={{ pressed: isWishlisted }}
+            accessibilityState={{ selected: isWishlisted }}
           >
             <Text style={{ fontSize: 20, color: isWishlisted ? colors.accent : colors.inkMute }}>
               {isWishlisted ? '♥' : '♡'}
