@@ -1,8 +1,8 @@
 import { ProductCard } from './ProductCard';
-import type { CatalogProduct } from '@/lib/api';
+import type { CatalogProductCard } from '@goldsmith/customer-shared';
 
 interface ProductGridProps {
-  products: CatalogProduct[];
+  products: CatalogProductCard[];
   emptyMessage?: string;
 }
 
