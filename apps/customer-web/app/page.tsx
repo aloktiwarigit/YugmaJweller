@@ -60,7 +60,7 @@ export default async function HomePage() {
   return (
     <>
       {/* 1. Hero */}
-      <HeroSection shopName={config.appName} heroBanners={[]} primaryColor={config.primaryColor} />
+      <HeroSection shopName={config.appName} heroBanners={[]} />
 
       {/* 2. Live rate strip */}
       <RetailRateStrip rates={rates} />

@@ -1,4 +1,3 @@
-import { SectionHeading } from './SectionHeading';
 
 interface PremiumCollectionSectionProps {
   enabled?: boolean;
