@@ -99,24 +99,30 @@ export function SpotlightSection({ featuredCollection, spotlightProducts }: Spot
             </div>
           </a>
           <div className="grid grid-cols-2 gap-3">
-            {(tiles.length > 0 ? tiles.slice(0, 4) : [
-              { id: '1', href: '/products?style=BRIDAL', labelHi: 'ब्राइडल' },
-              { id: '2', href: '/products?style=TEMPLE', labelHi: 'मंदिर' },
-              { id: '3', href: '/products?style=STATEMENT', labelHi: 'स्टेटमेंट' },
-              { id: '4', href: '/products?style=OFFICE', labelHi: 'ऑफिस' },
-            ] as Array<{ id: string; href?: string; labelHi?: string } & Partial<CatalogProductCard>>).map((item, i) => {
-              const href = 'href' in item && item.href ? item.href : `/products/${item.id}`;
-              const label = 'labelHi' in item && item.labelHi ? item.labelHi : ((item as CatalogProductCard).categoryName ?? (item as CatalogProductCard).metal ?? '');
-              return (
-                <a
-                  key={item.id ?? i}
-                  href={href}
-                  className="flex items-center justify-center p-4 rounded-md bg-surface border border-borderSubtle font-ui text-sm text-ink hover:border-borderStrong"
-                >
-                  {label}
-                </a>
-              );
-            })}
+            {tiles.length > 0
+              ? tiles.slice(0, 4).map((p) => (
+                  <a
+                    key={p.id}
+                    href={`/products/${p.id}`}
+                    className="flex items-center justify-center p-4 rounded-md bg-surface border border-borderSubtle font-ui text-sm text-ink hover:border-borderStrong"
+                  >
+                    {p.categoryName ?? p.metal}
+                  </a>
+                ))
+              : [
+                  { key: 'bridal',    labelHi: 'ब्राइडल',   href: '/products?style=BRIDAL'    },
+                  { key: 'temple',    labelHi: 'मंदिर',      href: '/products?style=TEMPLE'    },
+                  { key: 'statement', labelHi: 'स्टेटमेंट', href: '/products?style=STATEMENT' },
+                  { key: 'office',    labelHi: 'ऑफिस',       href: '/products?style=OFFICE'    },
+                ].map((t) => (
+                  <a
+                    key={t.key}
+                    href={t.href}
+                    className="flex items-center justify-center p-4 rounded-md bg-surface border border-borderSubtle font-ui text-sm text-ink hover:border-borderStrong"
+                  >
+                    {t.labelHi}
+                  </a>
+                ))}
           </div>
         </div>
       </div>
