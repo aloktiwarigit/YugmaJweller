@@ -16,12 +16,12 @@ export function RetailRateStrip({ rates }: RetailRateStripProps) {
         className="bg-surfaceElevated border-y border-borderSubtle py-4 px-4 text-center"
       >
         <span className="font-ui text-sm text-inkSoft">
-          दुकान से पूछें —{' '}
+          आज की दर के लिए{' '}
           <a
-            href="https://wa.me/"
+            href="/contact"
             className="text-primary underline focus-visible:outline-2 focus-visible:outline-primary"
           >
-            WhatsApp करें
+            दुकान से संपर्क करें
           </a>
         </span>
       </section>
