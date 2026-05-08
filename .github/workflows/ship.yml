@@ -198,12 +198,31 @@ jobs:
           test -f apps/shopkeeper/e2e/auth-flow.yaml
           head -1 apps/shopkeeper/e2e/auth-flow.yaml | grep -q '^appId:'
 
-  lighthouse-stub:
+  lighthouse:
+    # Runs Lighthouse CI against the customer-web Next.js app.
+    # Lighthouse uses axe-core internally for the accessibility category.
+    # Performance assertions are warn (CI env throttling is unpredictable);
+    # a11y assertions are error (deterministic, fail-fast on serious violations).
     needs: install
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "lighthouse-stub — real Lighthouse run added in Epic 7 customer-web story. CI shape preserved."
+      - uses: pnpm/action-setup@v4
+        with: { version: "${{ env.PNPM_VERSION }}" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: "pnpm" }
+      - run: pnpm install --frozen-lockfile
+      - name: Build customer-web
+        run: pnpm exec turbo run build --filter=@goldsmith/customer-web
+        env:
+          # CI slug — API will 404, pages render graceful fallback state
+          NEXT_PUBLIC_SHOP_SLUG: ci-lighthouse-test
+      - name: Run Lighthouse CI (performance + axe-core a11y)
+        working-directory: apps/customer-web
+        run: pnpm lhci autorun
+        env:
+          NEXT_PUBLIC_SHOP_SLUG: ci-lighthouse-test
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
 
   docs-validate:
     name: docs-validate
@@ -223,7 +242,7 @@ jobs:
         run: pnpm docs:validate
 
   build:
-    needs: [typecheck, lint, unit, integration, tenant-isolation, semgrep, build-shopkeeper, a11y-shopkeeper, e2e-shopkeeper, lighthouse-stub]
+    needs: [typecheck, lint, unit, integration, tenant-isolation, semgrep, build-shopkeeper, a11y-shopkeeper, e2e-shopkeeper, lighthouse]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

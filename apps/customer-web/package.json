@@ -8,7 +8,9 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "next lint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:lighthouse-ci": "lhci autorun",
+    "test:axe": "lhci autorun --config=lighthouserc.cjs --collect.settings.onlyCategories=accessibility"
   },
   "dependencies": {
     "@goldsmith/auth-client": "workspace:*",
@@ -33,6 +35,7 @@
     "typescript": "^5.4.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.3",
-    "vitest": "^1.4.0"
+    "vitest": "^1.4.0",
+    "@lhci/cli": "^0.14.0"
   }
 }
