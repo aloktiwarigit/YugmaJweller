@@ -2,15 +2,15 @@ import React from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { colors, typography, spacing } from '@goldsmith/ui-tokens';
-import { listPublicProducts } from '../api/endpoints';
+import { getCatalogProducts } from '../api/endpoints';
 import { useTenantStore } from '../stores/tenantStore';
 import { ProductCard } from './ProductCard';
 
 export function ProductGrid(): React.ReactElement {
   const slug = useTenantStore((s) => s.slug);
   const q = useQuery({
-    queryKey: ['public-products', slug, 6],
-    queryFn: () => listPublicProducts({ limit: 6 }),
+    queryKey: ['catalog-products', slug, 6],
+    queryFn: () => getCatalogProducts({ limit: 6 }),
     retry: false,
   });
 
