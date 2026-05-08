@@ -3,18 +3,25 @@
 @tailwind utilities;
 
 :root {
-  --primary-color: #B58A3C;
+  /* Default theme tokens — overridden at runtime via buildThemeStyle() on <html> */
+  --color-primary:    #B58A3C;
+  --color-primary-fg: #FFFFFF;
+  --color-accent:     #D4745A;
+  --color-on-primary: #B58A3C;
+
+  /* Font vars — set by next/font/google in layout.tsx */
   --font-heading: 'Yatra One', Georgia, serif;
-  --font-body: 'Noto Sans Devanagari', system-ui, sans-serif;
+  --font-ui:      'Mukta', system-ui, sans-serif;
+  --font-prose:   'Hind', system-ui, sans-serif;
 }
 
 body {
   background-color: #F5EDDD;
   color: #1E2440;
-  font-family: var(--font-body);
+  font-family: var(--font-ui);
 }
 
 :focus-visible {
-  outline: 2px solid var(--primary-color);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }

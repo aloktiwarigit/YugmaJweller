@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
-import { Yatra_One, Noto_Sans_Devanagari } from 'next/font/google';
+import { Yatra_One, Mukta, Hind } from 'next/font/google';
 import './globals.css';
 import { fetchTenantConfig } from '@/lib/api';
 import { buildThemeStyle } from '@/lib/theme';
+import StorefrontHeader from '@/components/StorefrontHeader';
 
 const yatraOne = Yatra_One({
   weight: '400',
@@ -12,10 +13,17 @@ const yatraOne = Yatra_One({
   display: 'swap',
 });
 
-const notoSansDevanagari = Noto_Sans_Devanagari({
-  weight: ['400', '500', '600'],
-  subsets: ['devanagari'],
-  variable: '--font-body',
+const mukta = Mukta({
+  weight: ['400', '500', '600', '700'],
+  subsets: ['devanagari', 'latin'],
+  variable: '--font-ui',
+  display: 'swap',
+});
+
+const hind = Hind({
+  weight: ['400', '500'],
+  subsets: ['devanagari', 'latin'],
+  variable: '--font-prose',
   display: 'swap',
 });
 
@@ -34,14 +42,15 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+const fontClasses = `${yatraOne.variable} ${mukta.variable} ${hind.variable}`;
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const headersList = headers();
   const pathname = headersList.get('x-pathname') ?? '';
 
-  // Platform admin pages have their own layout and do not need tenant config.
   if (pathname.startsWith('/admin')) {
     return (
-      <html lang="en" className={`${yatraOne.variable} ${notoSansDevanagari.variable}`}>
+      <html lang="en" className={fontClasses}>
         <body>{children}</body>
       </html>
     );
@@ -50,10 +59,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const slug = resolveSlug();
 
   const unavailablePage = (
-    <html lang="hi" className={`${yatraOne.variable} ${notoSansDevanagari.variable}`}>
+    <html lang="hi" className={fontClasses}>
       <body>
         <main className="flex min-h-screen items-center justify-center bg-bg p-8">
-          <p className="font-body text-ink text-lg">यह दुकान उपलब्ध नहीं है।</p>
+          <p className="font-ui text-ink text-lg">यह दुकान उपलब्ध नहीं है।</p>
         </main>
       </body>
     </html>
@@ -71,39 +80,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html
       lang={config.defaultLanguage}
-      className={`${yatraOne.variable} ${notoSansDevanagari.variable}`}
+      className={fontClasses}
       style={buildThemeStyle(config.primaryColor)}
     >
-      <body className="bg-bg text-ink min-h-screen font-body">
+      <body className="bg-bg text-ink min-h-screen font-ui">
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 bg-primary text-white px-4 py-2 rounded z-50"
         >
           मुख्य सामग्री पर जाएं
         </a>
-        <header className="border-b border-border bg-white/80 backdrop-blur-sm sticky top-0 z-40">
-          <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
-            {safeLogoUrl && (
-              <img
-                src={safeLogoUrl}
-                alt={`${config.appName} का लोगो`}
-                className="h-10 w-auto object-contain"
-              />
-            )}
-            <span className="font-heading text-xl text-ink">{config.appName}</span>
-            <nav
-              className="ml-auto hidden items-center gap-4 text-sm font-body text-ink md:flex"
-              aria-label="मुख्य नेविगेशन"
-            >
-              <a className="hover:text-primary focus-visible:outline-2 focus-visible:outline-primary" href="/products">उत्पाद</a>
-              <a className="hover:text-primary focus-visible:outline-2 focus-visible:outline-primary" href="/wishlist">पसंदीदा</a>
-              <a className="hover:text-primary focus-visible:outline-2 focus-visible:outline-primary" href="/try-at-home">घर पर ट्राई</a>
-              <a className="hover:text-primary focus-visible:outline-2 focus-visible:outline-primary" href="/rate-lock">Rate Lock</a>
-              <a className="hover:text-primary focus-visible:outline-2 focus-visible:outline-primary" href="/loyalty">लॉयल्टी</a>
-              <a className="hover:text-primary focus-visible:outline-2 focus-visible:outline-primary" href="/return-policy">Return Policy</a>
-            </nav>
-          </div>
-        </header>
+        <StorefrontHeader shopName={config.appName} logoUrl={safeLogoUrl} />
         <main id="main-content">{children}</main>
       </body>
     </html>

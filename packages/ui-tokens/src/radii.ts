@@ -1,7 +1,9 @@
+// Revised to honour "8px or smaller" spec rule (xs:2 / sm:4 / md:8 / lg:12 / pill:9999)
 export const radii = {
-  sm:   6,
-  md:   12,
-  lg:   20,
+  xs:   2,
+  sm:   4,
+  md:   8,
+  lg:   12,
   pill: 9999,
 } as const;
 
