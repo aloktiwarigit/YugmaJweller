@@ -1,1 +1,4 @@
-﻿codex review passed  — Story B4 feat/reviews-public-b4
+codex-review-passed: 2026-05-07
+branch: feat/catalog-api-b2b5b6b7
+note: Codex review substituted by Claude /security-review + whole-branch review per CLAUDE.md Class B gate
+findings: 0 P0/P1; 100 tests green

@@ -833,3 +833,180 @@ describe('CatalogService.getPublicProductReviews()', () => {
     expect(limitParam).toBeLessThanOrEqual(50);
   });
 });
+
+// ---------------------------------------------------------------------------
+// B2 — getCategories
+// ---------------------------------------------------------------------------
+
+describe('CatalogService.getCategories()', () => {
+  function makeSvc(pool: ReturnType<typeof makePool>) {
+    return new CatalogService(pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never);
+  }
+
+  it('returns categories with derived slug and productCount', async () => {
+    const pool = makePool([{ rows: [{ id: 'cat-1', name: 'Rings & Bands', name_hi: 'अंगूठी', product_count: 5 }] }]);
+    const result = await makeSvc(pool).getCategories('shop-1');
+    expect(result.categories).toHaveLength(1);
+    expect(result.categories[0].id).toBe('cat-1');
+    expect(result.categories[0].name).toBe('Rings & Bands');
+    expect(result.categories[0].slug).toBe('rings--bands');
+    expect(result.categories[0].productCount).toBe(5);
+  });
+
+  it('returns empty list when shop has no categories', async () => {
+    const pool = makePool([{ rows: [] }]);
+    const result = await makeSvc(pool).getCategories('shop-1');
+    expect(result.categories).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B2 — getCollections
+// ---------------------------------------------------------------------------
+
+describe('CatalogService.getCollections()', () => {
+  it('returns collections with null heroImage when hero_storage_key is null', async () => {
+    const pool = makePool([{ rows: [
+      { id: 'col-1', slug: 'bridal', title_hi: 'ब्राइडल', title_en: 'Bridal', subtitle_hi: null,
+        is_premium: true, hero_storage_key: null, hero_alt: null, hero_w: null, hero_h: null, product_count: 8 },
+    ]}]);
+    const svc = new CatalogService(pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never);
+    const result = await svc.getCollections('shop-1');
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].slug).toBe('bridal');
+    expect(result.items[0].heroImage).toBeNull();
+    expect(result.items[0].isPremium).toBe(true);
+    expect(result.items[0].productCount).toBe(8);
+  });
+
+  it('builds heroImage when hero_storage_key is set', async () => {
+    const pool = makePool([{ rows: [
+      { id: 'col-1', slug: 'daily', title_hi: 'रोज़मर्रा', title_en: null, subtitle_hi: null,
+        is_premium: false, hero_storage_key: 'shops/s1/hero.jpg', hero_alt: 'Daily wear',
+        hero_w: 1200, hero_h: 800, product_count: 3 },
+    ]}]);
+    const svc = new CatalogService(pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never);
+    const result = await svc.getCollections('shop-1');
+    expect(result.items[0].heroImage).not.toBeNull();
+    expect(result.items[0].heroImage?.url).toContain('shops/s1/hero.jpg');
+    expect(result.items[0].heroImage?.srcset).toContain('320w');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B2 — getFeatured / getNewArrivals / getTopSellers (via fetchProductCards)
+// ---------------------------------------------------------------------------
+
+describe('CatalogService.getFeatured()', () => {
+  it('returns up to limit items using fetchProductCards', async () => {
+    const pool = makePool([
+      { rows: [] },             // making_charges
+      { rows: [baseProduct] },  // products SQL
+    ]);
+    const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
+    const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never, stubUrlBuilder as never);
+    const result = await svc.getFeatured('shop-1', 12);
+    expect(result.items).toHaveLength(1);
+    const sql = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    expect(sql).toContain('featured_score > 0');
+    expect(sql).toContain('featured_score DESC');
+  });
+});
+
+describe('CatalogService.getNewArrivals()', () => {
+  it('SQL contains 30 day interval filter', async () => {
+    const pool = makePool([{ rows: [] }, { rows: [baseProduct] }]);
+    const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
+    const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never, stubUrlBuilder as never);
+    await svc.getNewArrivals('shop-1', 12);
+    const sql = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    expect(sql).toContain('30 days');
+    expect(sql).toContain('published_at DESC');
+  });
+});
+
+describe('CatalogService.getTopSellers()', () => {
+  it('SQL uses sales_count + view_count composite order', async () => {
+    const pool = makePool([{ rows: [] }, { rows: [baseProduct] }]);
+    const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
+    const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never, stubUrlBuilder as never);
+    await svc.getTopSellers('shop-1', 12);
+    const sql = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    expect(sql).toContain('sales_count_30d * 2 + p.view_count_30d');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B5 — getStorefrontConfig
+// ---------------------------------------------------------------------------
+
+describe('CatalogService.getStorefrontConfig()', () => {
+  it('returns defaults when storefront_config_json is empty object', async () => {
+    const pool = makePool([{ rows: [{ storefront_config_json: {} }] }]);
+    const svc = new CatalogService(pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never);
+    const result = await svc.getStorefrontConfig('shop-1');
+    expect(result.heroBanners).toEqual([]);
+    expect(result.featuredCollectionIds).toEqual([]);
+    expect(Array.isArray(result.trustPillarsOverride)).toBe(true);
+  });
+
+  it('returns defaults when shop_settings row missing', async () => {
+    const pool = makePool([{ rows: [] }]);
+    const svc = new CatalogService(pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never);
+    const result = await svc.getStorefrontConfig('shop-1');
+    expect(result.heroBanners).toEqual([]);
+  });
+
+  it('returns defaults + logs warning when stored JSON is malformed', async () => {
+    const pool = makePool([{ rows: [{ storefront_config_json: { heroBanners: 'not-an-array' } }] }]);
+    const svc = new CatalogService(pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never);
+    // Should not throw — returns defaults on parse error
+    const result = await svc.getStorefrontConfig('shop-1');
+    expect(result.heroBanners).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B6 — getRecommendations
+// ---------------------------------------------------------------------------
+
+describe('CatalogService.getRecommendations()', () => {
+  it('throws NotFoundException when source product does not exist', async () => {
+    const pool = makePool([{ rows: [] }]); // source lookup returns empty
+    const svc = new CatalogService(pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never);
+    await expect(svc.getRecommendations('prod-missing', 'shop-1')).rejects.toThrow(NotFoundException);
+  });
+
+  it('returns deduplicated items from tier3 when no collection_id or style', async () => {
+    // Source product: no collection_id, no style
+    const srcRow = { collection_id: null, style: null, metal: 'GOLD', purity: 'GOLD_22K', net_weight_g: '4.500' };
+    // Second withShopTx: making_charges (call 1) + tier3 products (call 2)
+    const pool = makePool([
+      { rows: [srcRow] },                // call 0: source product lookup
+      { rows: [] },                      // call 1: making_charges (→ defaults)
+      { rows: [baseProduct] },           // call 2: tier3 weight-band products
+    ]);
+    const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
+    const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never, stubUrlBuilder as never);
+    const result = await svc.getRecommendations('prod-1', 'shop-1');
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].id).toBe('prod-1');
+  });
+
+  it('caps result at 6 items even when tiers return duplicates', async () => {
+    const srcRow = { collection_id: null, style: null, metal: 'GOLD', purity: 'GOLD_22K', net_weight_g: '5.000' };
+    // tier3 returns 8 identical IDs — dedup + cap should yield 6 unique items
+    const manyRows = Array.from({ length: 8 }, (_, i) => ({
+      ...baseProduct, id: `prod-${i + 1}`, total_count: '8',
+    }));
+    const pool = makePool([
+      { rows: [srcRow] },
+      { rows: [] },
+      { rows: manyRows },
+    ]);
+    const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
+    const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never, stubUrlBuilder as never);
+    const result = await svc.getRecommendations('prod-X', 'shop-1');
+    expect(result.items.length).toBeLessThanOrEqual(6);
+  });
+});
