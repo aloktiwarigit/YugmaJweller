@@ -10,6 +10,7 @@ import type {
   HuidVerifyResult,
   ReviewItem,
   ReviewsResponse,
+  PublicReviewsResponse,
 } from '@goldsmith/customer-shared';
 
 // CatalogEstimatedPrice was the mobile-side name for EstimatedPrice.
@@ -23,6 +24,7 @@ export type {
   HuidVerifyResult,
   ReviewItem,
   ReviewsResponse,
+  PublicReviewsResponse,
 } from '@goldsmith/customer-shared';
 
 interface TenantBootApiResponse {
@@ -102,19 +104,47 @@ export async function listPublicProducts(opts: { limit?: number } = {}): Promise
 }
 
 export async function getCatalogProducts(opts: {
-  metal?:      string;
-  search?:     string;
-  categoryId?: string;
-  page?:       number;
-  limit?:      number;
+  metal?:       string;
+  purity?:      string;
+  search?:      string;
+  categoryId?:  string;
+  priceMin?:    number;
+  priceMax?:    number;
+  inStockOnly?: boolean;
+  style?:       string;
+  occasion?:    string;
+  sort?:        string;
+  page?:        number;
+  limit?:       number;
 } = {}): Promise<CatalogProductsResponse> {
-  const params: Record<string, string | number> = {};
-  if (opts.metal)      params['metal']      = opts.metal;
-  if (opts.search)     params['search']     = opts.search;
-  if (opts.categoryId) params['categoryId'] = opts.categoryId;
-  if (opts.page)       params['page']       = opts.page;
-  if (opts.limit)      params['limit']      = opts.limit;
+  const params: Record<string, string | number | boolean> = {};
+  if (opts.metal)                    params['metal']       = opts.metal;
+  if (opts.purity)                   params['purity']      = opts.purity;
+  if (opts.search)                   params['search']      = opts.search;
+  if (opts.categoryId)               params['categoryId']  = opts.categoryId;
+  if (opts.priceMin !== undefined)   params['priceMin']    = opts.priceMin;
+  if (opts.priceMax !== undefined)   params['priceMax']    = opts.priceMax;
+  if (opts.inStockOnly)              params['inStockOnly'] = true;
+  if (opts.style)                    params['style']       = opts.style;
+  if (opts.occasion)                 params['occasion']    = opts.occasion;
+  if (opts.sort)                     params['sort']        = opts.sort;
+  if (opts.page)                     params['page']        = opts.page;
+  if (opts.limit)                    params['limit']       = opts.limit;
   const res = await api.get<CatalogProductsResponse>('/api/v1/catalog/products', { params });
+  return res.data;
+}
+
+export async function getProductRecommendations(productId: string): Promise<CatalogProductsResponse> {
+  const res = await api.get<CatalogProductsResponse>(
+    `/api/v1/catalog/products/${productId}/recommendations`,
+  );
+  return res.data;
+}
+
+export async function getCatalogProductReviews(productId: string): Promise<PublicReviewsResponse> {
+  const res = await api.get<PublicReviewsResponse>(
+    `/api/v1/catalog/products/${productId}/reviews`,
+  );
   return res.data;
 }
 

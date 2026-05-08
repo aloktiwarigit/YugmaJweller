@@ -8,23 +8,22 @@ import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 import { TenantBrandHeader } from '../../src/components/TenantBrandHeader';
+import { FilterSheet, SortModal } from '../../src/components/FilterSheet';
 import { getCatalogProducts } from '../../src/api/endpoints';
 import type { CatalogProduct } from '../../src/api/endpoints';
+import {
+  EMPTY_FILTERS,
+  countActiveFilters,
+  activeFilterChips,
+  removeFilterChip,
+} from '../../src/lib/catalog-filter-utils';
+import type { ActiveFilters } from '../../src/lib/catalog-filter-utils';
+import type { CatalogSort } from '@goldsmith/customer-shared';
 
-// ---------------------------------------------------------------------------
-// Metal tabs
-// ---------------------------------------------------------------------------
-
-interface MetalTab {
-  value: string;
-  label: string;
-}
-
-const METAL_TABS: MetalTab[] = [
-  { value: '',       label: 'सभी'   },
-  { value: 'GOLD',   label: 'सोना'  },
-  { value: 'SILVER', label: 'चाँदी' },
-];
+// ─── Colour tokens not yet on origin/main (land with D1D2D5) ───────────────────
+const PRIMARY_DEEP  = '#8C6628';
+const PRIMARY_WASH  = colors.primaryLight; // '#EFE3BE'
+// ───────────────────────────────────────────────────────────────────────────────
 
 // ---------------------------------------------------------------------------
 // Product card (browse variant)
@@ -61,8 +60,14 @@ function BrowseProductCard({ product }: { product: CatalogProduct }): React.Reac
       accessibilityLabel={`${metalLabel(product.purity)} — ${product.sku}${isUnavailable ? ', उपलब्ध नहीं' : ''}`}
       accessibilityRole="button"
     >
-      {/* Image placeholder */}
-      <View style={{ aspectRatio: 1, backgroundColor: colors.border }} />
+      {/* Image placeholder / primaryImage */}
+      {product.primaryImage ? (
+        <View style={{ aspectRatio: 4 / 5, backgroundColor: colors.border }} />
+      ) : (
+        <View style={{ aspectRatio: 4 / 5, backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ fontSize: 28, color: colors.inkMute }}>💎</Text>
+        </View>
+      )}
 
       <View style={{ padding: spacing.sm }}>
         <Text
@@ -111,10 +116,13 @@ function BrowseProductCard({ product }: { product: CatalogProduct }): React.Reac
 // ---------------------------------------------------------------------------
 
 export default function Browse(): React.ReactElement {
-  const [selectedMetal, setSelectedMetal] = useState('');
-  const [searchText, setSearchText]       = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const [searchText, setSearchText]             = useState('');
+  const [debouncedSearch, setDebouncedSearch]   = useState('');
+  const [page, setPage]                         = useState(1);
+  const [filters, setFilters]                   = useState<ActiveFilters>(EMPTY_FILTERS);
+  const [filterSheetOpen, setFilterSheetOpen]   = useState(false);
+  const [sortModalOpen, setSortModalOpen]        = useState(false);
+  const [sort, setSort]                         = useState<CatalogSort | undefined>(undefined);
 
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -125,25 +133,39 @@ export default function Browse(): React.ReactElement {
     debounceRef.current = setTimeout(() => setDebouncedSearch(text.trim()), 400);
   }, []);
 
-  const handleMetalSelect = useCallback((value: string) => {
-    setSelectedMetal(value);
+  const handleApplyFilters = useCallback((newFilters: ActiveFilters) => {
+    setFilters(newFilters);
+    setPage(1);
+  }, []);
+
+  const handleSortSelect = useCallback((newSort: CatalogSort) => {
+    setSort(newSort);
     setPage(1);
   }, []);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['catalog-products', selectedMetal, debouncedSearch, page],
+    queryKey: ['catalog-products', filters, sort, debouncedSearch, page],
     queryFn: () => getCatalogProducts({
-      metal:  selectedMetal || undefined,
-      search: debouncedSearch || undefined,
+      metal:       filters.metal || undefined,
+      purity:      filters.purity.length === 1 ? filters.purity[0] : undefined,
+      search:      debouncedSearch || undefined,
+      priceMin:    filters.priceMin,
+      priceMax:    filters.priceMax,
+      inStockOnly: filters.inStockOnly || undefined,
+      style:       filters.style.length === 1 ? filters.style[0] : undefined,
+      occasion:    filters.occasion.length === 1 ? filters.occasion[0] : undefined,
+      sort:        sort,
       page,
       limit: 12,
     }),
     retry: false,
   });
 
-  const products = data?.items ?? [];
-  const total    = data?.total ?? 0;
-  const lastPage = Math.max(1, Math.ceil(total / 12));
+  const products  = data?.items ?? [];
+  const total     = data?.total ?? 0;
+  const lastPage  = Math.max(1, Math.ceil(total / 12));
+  const filterCount = countActiveFilters(filters) + (sort ? 1 : 0);
+  const chips     = activeFilterChips(filters);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -182,49 +204,132 @@ export default function Browse(): React.ReactElement {
         </View>
       </View>
 
-      {/* Metal filter tabs */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.md,
-          paddingBottom: spacing.sm,
-          gap: spacing.xs,
-        }}
-      >
-        {METAL_TABS.map((tab) => {
-          const isActive = selectedMetal === tab.value;
-          return (
+      {/* Filter + Sort buttons */}
+      <View style={{
+        flexDirection: 'row',
+        gap: spacing.sm,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.xs,
+      }}>
+        {/* Filter button */}
+        <TouchableOpacity
+          onPress={() => setFilterSheetOpen(true)}
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: spacing.xs,
+            backgroundColor: filterCount > 0 ? PRIMARY_WASH : colors.white,
+            borderRadius: radii.md,
+            borderWidth: 1,
+            borderColor: filterCount > 0 ? PRIMARY_DEEP : colors.border,
+            minHeight: 44,
+          }}
+          accessibilityLabel={`फ़िल्टर${filterCount > 0 ? ` (${filterCount} सक्रिय)` : ''}`}
+          accessibilityRole="button"
+        >
+          <Text style={{
+            fontFamily: typography.body.family, fontSize: 14,
+            color: filterCount > 0 ? PRIMARY_DEEP : colors.ink,
+            fontWeight: filterCount > 0 ? '600' : '400',
+          }}>
+            ⚙ फ़िल्टर{filterCount > 0 ? ` (${filterCount})` : ''}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Sort button */}
+        <TouchableOpacity
+          onPress={() => setSortModalOpen(true)}
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: spacing.xs,
+            backgroundColor: sort ? PRIMARY_WASH : colors.white,
+            borderRadius: radii.md,
+            borderWidth: 1,
+            borderColor: sort ? PRIMARY_DEEP : colors.border,
+            minHeight: 44,
+          }}
+          accessibilityLabel="क्रमबद्ध करें"
+          accessibilityRole="button"
+        >
+          <Text style={{
+            fontFamily: typography.body.family, fontSize: 14,
+            color: sort ? PRIMARY_DEEP : colors.ink,
+            fontWeight: sort ? '600' : '400',
+          }}>
+            ↕ क्रमबद्ध करें
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Active filter chips */}
+      {chips.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.md,
+            paddingBottom: spacing.xs,
+            gap: spacing.xs,
+          }}
+        >
+          {chips.map((chip) => (
             <TouchableOpacity
-              key={tab.value}
-              onPress={() => handleMetalSelect(tab.value)}
-              style={{
-                backgroundColor: isActive ? colors.primary : colors.white,
-                borderRadius: radii.pill,
-                paddingHorizontal: spacing.md,
-                borderWidth: 1,
-                borderColor: isActive ? colors.primary : colors.border,
-                minHeight: 44,
-                justifyContent: 'center',
+              key={chip.key}
+              onPress={() => {
+                setFilters((prev) => removeFilterChip(prev, chip.key));
+                setPage(1);
               }}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: isActive }}
-              accessibilityLabel={tab.label}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: PRIMARY_WASH,
+                borderRadius: radii.pill,
+                paddingHorizontal: spacing.sm,
+                paddingVertical: spacing.xs,
+                gap: 4,
+                minHeight: 32,
+              }}
+              accessibilityLabel={`${chip.labelHi} फ़िल्टर हटाएं`}
+              accessibilityRole="button"
             >
-              <Text
-                style={{
-                  fontFamily: typography.body.family,
-                  fontSize: 14,
-                  color: isActive ? colors.white : colors.ink,
-                  fontWeight: isActive ? '600' : '400',
-                }}
-              >
-                {tab.label}
+              <Text style={{
+                fontFamily: typography.body.family, fontSize: 12,
+                color: PRIMARY_DEEP, fontWeight: '600',
+              }}>
+                {chip.labelHi}
               </Text>
+              <Text style={{ fontSize: 11, color: PRIMARY_DEEP }}>×</Text>
             </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+          ))}
+
+          {/* Clear all */}
+          <TouchableOpacity
+            onPress={() => { setFilters(EMPTY_FILTERS); setSort(undefined); setPage(1); }}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: colors.white,
+              borderRadius: radii.pill,
+              borderWidth: 1,
+              borderColor: colors.border,
+              paddingHorizontal: spacing.sm,
+              paddingVertical: spacing.xs,
+              minHeight: 32,
+            }}
+            accessibilityLabel="सभी फ़िल्टर हटाएं"
+            accessibilityRole="button"
+          >
+            <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.inkMute }}>
+              सभी हटाएं
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
 
       {/* Result count */}
       <Text
@@ -252,10 +357,21 @@ export default function Browse(): React.ReactElement {
       ) : products.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl }}>
           <Text style={{ fontFamily: typography.body.family, fontSize: 14, color: colors.inkMute, textAlign: 'center' }}>
-            {debouncedSearch || selectedMetal
+            {debouncedSearch || filterCount > 0
               ? 'इस खोज के लिए कोई उत्पाद नहीं मिला।'
               : 'अभी कोई उत्पाद उपलब्ध नहीं है।'}
           </Text>
+          {filterCount > 0 && (
+            <TouchableOpacity
+              onPress={() => { setFilters(EMPTY_FILTERS); setSort(undefined); setPage(1); }}
+              style={{ marginTop: spacing.md, minHeight: 44, justifyContent: 'center' }}
+              accessibilityLabel="सभी फ़िल्टर हटाएं"
+            >
+              <Text style={{ fontFamily: typography.body.family, fontSize: 14, color: colors.primary }}>
+                सभी फ़िल्टर हटाएं
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <FlatList
@@ -315,6 +431,23 @@ export default function Browse(): React.ReactElement {
           }
         />
       )}
+
+      {/* FilterSheet */}
+      <FilterSheet
+        visible={filterSheetOpen}
+        initialFilters={filters}
+        totalCount={total}
+        onClose={() => setFilterSheetOpen(false)}
+        onApply={handleApplyFilters}
+      />
+
+      {/* Sort modal */}
+      <SortModal
+        visible={sortModalOpen}
+        current={sort}
+        onSelect={handleSortSelect}
+        onClose={() => setSortModalOpen(false)}
+      />
     </View>
   );
 }
