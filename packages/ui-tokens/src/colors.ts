@@ -8,7 +8,7 @@ export const colors = {
   error:           '#B1402B',  // dangerRust
 
   // === Extended palette (Direction 5 Hindi-First Editorial) ===
-  primaryDeep:     '#8C6628',  // hover/pressed gold; AA on cream (#F5EDDD)
+  primaryDeep:     '#896024',  // hover/pressed gold; 4.8:1 AA on cream (#F5EDDD). #8C6628 from plan was 4.46:1 (fails AA)
   primaryWash:     '#EFE3BE',  // selected chip bg, subtle gold tint
   accentWash:      '#F8DDD3',  // accent chip bg
   surface:         '#FFFFFF',  // cards, sheets
