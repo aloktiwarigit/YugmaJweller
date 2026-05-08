@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { STOREFRONT_BROWSE_NAV, STOREFRONT_CATEGORY_TILES } from '@goldsmith/customer-shared';
+import { STOREFRONT_CATEGORY_TILES } from '@goldsmith/customer-shared';
 import MegaMenu from './MegaMenu';
 import MobileBrowseDrawer from './MobileBrowseDrawer';
 

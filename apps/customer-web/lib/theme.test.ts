@@ -28,24 +28,24 @@ describe('wcagContrastRatio', () => {
 
 describe('buildThemeStyle contrast guard', () => {
   it('white-on-primaryDeep → primaryFg stays white (passes AA)', () => {
-    const style = buildThemeStyle('#896024');
-    expect(style['--color-primary-fg' as string]).toBe('#FFFFFF');
+    const style = buildThemeStyle('#896024') as Record<string, string>;
+    expect(style['--color-primary-fg']).toBe('#FFFFFF');
   });
 
   it('bright yellow primary → primaryFg falls back to ink', () => {
     // #FFFF00 has near-zero contrast against white
-    const style = buildThemeStyle('#FFFF00');
-    expect(style['--color-primary-fg' as string]).toBe('#1E2440');
+    const style = buildThemeStyle('#FFFF00') as Record<string, string>;
+    expect(style['--color-primary-fg']).toBe('#1E2440');
   });
 
   it('dark primary → on-primary stays as primary color (readable on cream)', () => {
-    const style = buildThemeStyle('#1E2440');
-    expect(style['--color-on-primary' as string]).toBe('#1E2440');
+    const style = buildThemeStyle('#1E2440') as Record<string, string>;
+    expect(style['--color-on-primary']).toBe('#1E2440');
   });
 
   it('light primary that fails AA on cream → on-primary falls to ink', () => {
     // very light color: #F0E8D8 is near-cream, 1.1:1 on cream
-    const style = buildThemeStyle('#F0E8D8');
-    expect(style['--color-on-primary' as string]).toBe('#1E2440');
+    const style = buildThemeStyle('#F0E8D8') as Record<string, string>;
+    expect(style['--color-on-primary']).toBe('#1E2440');
   });
 });

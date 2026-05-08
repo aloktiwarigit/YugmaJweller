@@ -9,7 +9,7 @@ interface MobileBrowseDrawerProps {
   onClose: () => void;
 }
 
-function GroupChipShelf({ panel, label }: { panel: MegaMenuPanel; label: string }) {
+function GroupChipShelf({ panel, label: _label }: { panel: MegaMenuPanel; label: string }) {
   const groups: { key: keyof MegaMenuPanel; titleHi: string }[] = [
     { key: 'popular',     titleHi: 'लोकप्रिय'       },
     { key: 'style',       titleHi: 'स्टाइल'          },
