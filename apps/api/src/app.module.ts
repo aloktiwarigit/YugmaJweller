@@ -38,6 +38,8 @@ import { PlatformAdminModule } from './modules/platform-admin/platform-admin.mod
 import { DrizzleTenantLookup } from './drizzle-tenant-lookup';
 import { TenantAuditReporter } from './modules/tenant-boot/tenant-audit-reporter';
 import { ImpersonationSessionAdapter } from './modules/platform-admin/impersonation-session.adapter';
+import { PriceSnapshotRefreshProcessor, PRICE_SNAPSHOT_REFRESH_QUEUE } from './workers/price-snapshot-refresh.processor';
+import { SalesAndViewsRollupProcessor, SALES_AND_VIEWS_ROLLUP_QUEUE } from './workers/sales-and-views-rollup.processor';
 
 @Injectable()
 class ConditionalTenantInterceptor implements NestInterceptor {
@@ -92,9 +94,15 @@ class ConditionalTenantInterceptor implements NestInterceptor {
     WishlistModule,
     CustomerModule,
     PlatformAdminModule,
+    BullModule.registerQueue(
+      { name: PRICE_SNAPSHOT_REFRESH_QUEUE },
+      { name: SALES_AND_VIEWS_ROLLUP_QUEUE },
+    ),
   ],
   controllers: [HealthController],
   providers: [
+    PriceSnapshotRefreshProcessor,
+    SalesAndViewsRollupProcessor,
     HttpTenantResolver,
     {
       provide: TenantInterceptor,
