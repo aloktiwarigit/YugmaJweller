@@ -1,16 +1,29 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
-import { productDisplayName, formatInrFromPaise } from '@goldsmith/customer-shared';
+import {
+  productDisplayName,
+  formatInrFromPaise,
+  categoryToFallbackSvg,
+} from '@goldsmith/customer-shared';
 import type { CatalogProductCard, CatalogImage } from '@goldsmith/customer-shared';
 
-// TODO(Phase-E): replace with proper SVG illustrations from packages/customer-shared/illustrations
+// Category-aware illustrated fallback. SVG string -> data: URI works with
+// expo-image (and react-native-svg/png pipelines) without bundler magic.
 function FallbackPlaceholder({ categoryName }: { categoryName: string | null }): React.ReactElement {
+  const svgUri = useMemo(() => {
+    const svg = categoryToFallbackSvg(categoryName);
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  }, [categoryName]);
+
   return (
-    <View style={styles.fallback}>
-      <Text style={styles.fallbackText}>{categoryName ?? 'उत्पाद'}</Text>
-    </View>
+    <Image
+      source={{ uri: svgUri }}
+      contentFit="cover"
+      style={[StyleSheet.absoluteFill, { borderRadius: radii.sm }]}
+      accessibilityLabel={categoryName ?? 'उत्पाद'}
+    />
   );
 }
 
@@ -161,19 +174,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius:  radii.md,
     borderTopRightRadius: radii.md,
     overflow:        'hidden',
-  },
-  fallback: {
-    flex:            1,
-    backgroundColor: colors.surfaceRecessed,
-    alignItems:      'center',
-    justifyContent:  'center',
-    padding:         spacing.sm,
-  },
-  fallbackText: {
-    fontFamily: typography.body.family,
-    fontSize:   13,
-    color:      colors.inkSoft,
-    textAlign:  'center',
   },
   unavailableOverlay: {
     ...StyleSheet.absoluteFillObject,
