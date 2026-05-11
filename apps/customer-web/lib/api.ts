@@ -1,70 +1,45 @@
 // Typed fetch helpers for public catalog API.
-// Types are defined inline (not imported from API package — avoids circular dep).
+// Type definitions live in @goldsmith/customer-shared.
 
-export interface TenantConfigResponse {
-  shopId:          string;
-  primaryColor:    string;
-  logoUrl:         string | null;
-  appName:         string;
-  defaultLanguage: string;
-}
+export type {
+  TenantConfigResponse,
+  EstimatedPrice,
+  CatalogProduct,
+  CatalogProductsResponse,
+  PublicRateEntry,
+  PublicRatesResponse,
+  ReviewItem,
+  ReviewsResponse,
+  PublicImageItem,
+} from '@goldsmith/customer-shared';
 
-export interface EstimatedPrice {
-  totalFormatted: string;
-  totalPaise:     string;
-  breakdown: {
-    goldValuePaise:    string;
-    makingChargePaise: string;
-    gstMetalPaise:     string;
-    gstMakingPaise:    string;
-  };
-}
-
-export interface CatalogProduct {
-  id:                    string;
-  sku:                   string;
-  metal:                 string;
-  purity:                string;
-  categoryId:            string | null;
-  categoryName:          string | null;
-  grossWeightG:          string;
-  netWeightG:            string;
-  huid:                  string | null;
-  huidExemptionCategory: string;
-  quantity:              number;
-  priceAvailable:        boolean;
-  estimatedPrice?:       EstimatedPrice;
-  publishedAt:           string;
-}
-
-export interface CatalogProductsResponse {
-  items: CatalogProduct[];
-  total: number;
-  page:  number;
-}
-
-export interface PublicRateEntry {
-  perGramRupees: string;
-  formattedINR:  string;
-  fetchedAt:     string;
-}
-
-export interface PublicRatesResponse {
-  GOLD_24K:    PublicRateEntry;
-  GOLD_22K:    PublicRateEntry;
-  SILVER_999:  PublicRateEntry;
-  stale:       boolean;
-  source:      string;
-  refreshedAt: string;
-}
+import type {
+  TenantConfigResponse,
+  CatalogProduct,
+  CatalogProductsResponse,
+  PublicRatesResponse,
+  ReviewsResponse,
+  PublicImageItem,
+} from '@goldsmith/customer-shared';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:3001';
+
+// Per-request timeout protects TTFB budget (<500ms) — slow API calls fall back
+// to graceful empty/unavailable states instead of blocking the page render.
+// Tuned to 1500ms: API p95 should be <300ms in prod; this leaves headroom
+// for cold starts without exceeding the LCP budget (<2500ms).
+const FETCH_TIMEOUT_MS = 1500;
+
+function withTimeout(): { signal: AbortSignal } {
+  return { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) };
+}
 
 export async function fetchTenantConfig(slug: string): Promise<TenantConfigResponse | null> {
   try {
     const res = await fetch(`${API_URL}/api/v1/catalog/tenant-config`, {
       headers: { 'X-Shop-Slug': slug },
       next: { revalidate: 3600 },
+      ...withTimeout(),
     });
     if (!res.ok) return null;
     return res.json() as Promise<TenantConfigResponse>;
@@ -77,6 +52,7 @@ export async function fetchPublicRates(): Promise<PublicRatesResponse | null> {
   try {
     const res = await fetch(`${API_URL}/api/v1/catalog/rates`, {
       next: { revalidate: 60 },
+      ...withTimeout(),
     });
     if (!res.ok) return null;
     return res.json() as Promise<PublicRatesResponse>;
@@ -85,20 +61,48 @@ export async function fetchPublicRates(): Promise<PublicRatesResponse | null> {
   }
 }
 
+export interface FetchProductsParams {
+  categoryId?:  string;
+  search?:      string;
+  metal?:       string;
+  purity?:      string;
+  priceMin?:    number;
+  priceMax?:    number;
+  inStockOnly?: boolean;
+  style?:       string;
+  occasion?:    string;
+  giftPersona?: string;
+  collection?:  string;
+  sort?:        string;
+  page?:        number;
+  limit?:       number;
+}
+
 export async function fetchProducts(
   shopId: string,
-  params: { categoryId?: string; search?: string; page?: number; limit?: number } = {},
+  params: FetchProductsParams = {},
 ): Promise<CatalogProductsResponse | null> {
   const qs = new URLSearchParams();
-  if (params.categoryId) qs.set('categoryId', params.categoryId);
-  if (params.search)     qs.set('search', params.search);
-  if (params.page)       qs.set('page', String(params.page));
-  if (params.limit)      qs.set('limit', String(params.limit));
+  if (params.categoryId)             qs.set('categoryId',  params.categoryId);
+  if (params.search)                 qs.set('search',      params.search);
+  if (params.metal)                  qs.set('metal',       params.metal);
+  if (params.purity)                 qs.set('purity',      params.purity);
+  if (params.priceMin !== undefined) qs.set('priceMin',    String(params.priceMin));
+  if (params.priceMax !== undefined) qs.set('priceMax',    String(params.priceMax));
+  if (params.inStockOnly)            qs.set('inStockOnly', 'true');
+  if (params.style)                  qs.set('style',       params.style);
+  if (params.occasion)               qs.set('occasion',    params.occasion);
+  if (params.giftPersona)            qs.set('giftPersona', params.giftPersona);
+  if (params.collection)             qs.set('collection',  params.collection);
+  if (params.sort)                   qs.set('sort',        params.sort);
+  if (params.page)                   qs.set('page',        String(params.page));
+  if (params.limit)                  qs.set('limit',       String(params.limit));
 
   try {
     const res = await fetch(`${API_URL}/api/v1/catalog/products?${qs.toString()}`, {
       headers: { 'X-Tenant-Id': shopId },
       next: { revalidate: 30 },
+      ...withTimeout(),
     });
     if (!res.ok) return null;
     return res.json() as Promise<CatalogProductsResponse>;
@@ -115,26 +119,13 @@ export async function fetchProduct(
     const res = await fetch(`${API_URL}/api/v1/catalog/products/${productId}`, {
       headers: { 'X-Tenant-Id': shopId },
       next: { revalidate: 30 },
+      ...withTimeout(),
     });
     if (!res.ok) return null;
     return res.json() as Promise<CatalogProduct>;
   } catch {
     return null;
   }
-}
-
-export interface ReviewItem {
-  id:                string;
-  rating:            number;
-  reviewText:        string | null;
-  customerFirstName: string | null;
-  createdAt:         string;
-}
-
-export interface ReviewsResponse {
-  reviews:       ReviewItem[];
-  averageRating: number | null;
-  total:         number;
 }
 
 export async function fetchProductReviews(
@@ -145,22 +136,13 @@ export async function fetchProductReviews(
     const res = await fetch(`${API_URL}/api/v1/reviews/products/${productId}`, {
       headers: { 'X-Tenant-Id': shopId },
       next: { revalidate: 60 },
+      ...withTimeout(),
     });
     if (!res.ok) return { reviews: [], averageRating: null, total: 0 };
     return res.json() as Promise<ReviewsResponse>;
   } catch {
     return { reviews: [], averageRating: null, total: 0 };
   }
-}
-
-export interface PublicImageItem {
-  id:              string;
-  alt_text:        string | null;
-  width:           number;
-  height:          number;
-  srcset:          string;
-  default_url:     string;
-  placeholder_url: string;
 }
 
 export async function fetchProductImages(
@@ -171,6 +153,7 @@ export async function fetchProductImages(
     const res = await fetch(`${API_URL}/api/v1/catalog/products/${productId}/images`, {
       headers: { 'X-Tenant-Id': shopId },
       next: { revalidate: 60 },
+      ...withTimeout(),
     });
     if (!res.ok) return [];
     const data = await res.json() as { images: PublicImageItem[] };
@@ -180,11 +163,71 @@ export async function fetchProductImages(
   }
 }
 
+export async function fetchRecommendations(
+  productId: string,
+  shopId: string,
+): Promise<CatalogProduct[]> {
+  try {
+    const res = await fetch(
+      `${API_URL}/api/v1/catalog/products/${productId}/recommendations`,
+      { headers: { 'X-Tenant-Id': shopId }, next: { revalidate: 300 }, ...withTimeout() },
+    );
+    if (!res.ok) return [];
+    const data = await res.json() as { items?: CatalogProduct[] } | CatalogProduct[];
+    return Array.isArray(data) ? data : (data.items ?? []);
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchNewArrivals(shopId: string): Promise<CatalogProductsResponse | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/catalog/products/new-arrivals`, {
+      headers: { 'X-Tenant-Id': shopId },
+      next: { revalidate: 300 },
+      ...withTimeout(),
+    });
+    if (!res.ok) return null;
+    return res.json() as Promise<CatalogProductsResponse>;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchTopSellers(shopId: string): Promise<CatalogProductsResponse | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/catalog/products/top-sellers`, {
+      headers: { 'X-Tenant-Id': shopId },
+      next: { revalidate: 600 },
+      ...withTimeout(),
+    });
+    if (!res.ok) return null;
+    return res.json() as Promise<CatalogProductsResponse>;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchFeaturedProducts(shopId: string): Promise<CatalogProductsResponse | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/catalog/products/featured`, {
+      headers: { 'X-Tenant-Id': shopId },
+      next: { revalidate: 300 },
+      ...withTimeout(),
+    });
+    if (!res.ok) return null;
+    return res.json() as Promise<CatalogProductsResponse>;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchReturnPolicy(shopId: string): Promise<string | null> {
   try {
     const res = await fetch(`${API_URL}/api/v1/catalog/return-policy`, {
       headers: { 'X-Tenant-Id': shopId },
       next: { revalidate: 300 },
+      ...withTimeout(),
     });
     if (!res.ok) return null;
     const data = await res.json() as { returnPolicyText: string | null };

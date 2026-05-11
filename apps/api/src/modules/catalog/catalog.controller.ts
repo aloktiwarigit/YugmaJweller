@@ -1,9 +1,10 @@
 import {
   BadRequestException, Body, Controller, Get, Header,
   Headers, HttpCode, HttpException, HttpStatus,
-  Inject, Ip, Param, ParseUUIDPipe, Post, Query,
+  Inject, Ip, Param, ParseUUIDPipe, Post, Query, Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { SkipAuth } from '../../common/decorators/skip-auth.decorator';
 import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
@@ -12,6 +13,8 @@ import { AnalyticsService } from '../analytics/analytics.service';
 import { CatalogService } from './catalog.service';
 import type { TenantConfigResponse, CatalogProductsResponse, CatalogProduct, HuidVerifyResult, PublicImageRow } from './catalog.service';
 import { RatesUnavailableError } from '@goldsmith/rates';
+import type { PublicReviewsResponse, Collection, CategoryNode } from '@goldsmith/customer-shared';
+import type { StorefrontConfig } from '@goldsmith/shared';
 
 // ---------------------------------------------------------------------------
 // Public rates response shape (Story 4.4 — unchanged)
@@ -82,24 +85,125 @@ export class CatalogController {
   @Get('products')
   @SkipAuth()
   @SkipTenant()
-  @Header('Cache-Control', 'public, max-age=30, stale-while-revalidate=60')
   async listPublished(
     @Headers('x-tenant-id') shopId: string,
-    @Query('categoryId') categoryId?: string,
-    @Query('search') search?: string,
-    @Query('metal') metal?: string,
-    @Query('page') page = '1',
-    @Query('limit') limit = '12',
+    @Query('categoryId')  categoryId?: string,
+    @Query('search')      search?: string,
+    @Query('metal')       metal?: string,
+    @Query('purity')      purity?: string,
+    @Query('priceMin')    priceMinRaw?: string,
+    @Query('priceMax')    priceMaxRaw?: string,
+    @Query('inStockOnly') inStockOnlyRaw?: string,
+    @Query('style')       style?: string,
+    @Query('occasion')    occasion?: string,
+    @Query('giftPersona') giftPersona?: string,
+    @Query('collection')  collection?: string,
+    @Query('sort')        sort?: string,
+    @Query('page')        page = '1',
+    @Query('limit')       limit = '12',
+    @Res({ passthrough: true }) res?: Response,
   ): Promise<CatalogProductsResponse> {
     if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+
+    let priceMin: number | undefined;
+    let priceMax: number | undefined;
+
+    if (priceMinRaw !== undefined) {
+      priceMin = parseInt(priceMinRaw, 10);
+      if (isNaN(priceMin)) throw new BadRequestException({ code: 'catalog.invalid_price_min' });
+    }
+    if (priceMaxRaw !== undefined) {
+      priceMax = parseInt(priceMaxRaw, 10);
+      if (isNaN(priceMax)) throw new BadRequestException({ code: 'catalog.invalid_price_max' });
+    }
+
+    const parsedPage  = Math.max(1, parseInt(page, 10) || 1);
+    const parsedLimit = Math.min(50, Math.max(1, parseInt(limit, 10) || 12));
+
+    // Homepage hot path: sort=newest (or default), page=1, no filters beyond base
+    const isHotPath =
+      parsedPage === 1 &&
+      (!sort || sort === 'newest') &&
+      !categoryId && !search && !metal &&
+      !purity && !priceMinRaw && !priceMaxRaw &&
+      !inStockOnlyRaw && !style && !occasion && !giftPersona && !collection;
+
+    res?.setHeader(
+      'Cache-Control',
+      isHotPath
+        ? 'public, max-age=300, stale-while-revalidate=900'
+        : 'public, max-age=30, stale-while-revalidate=60',
+    );
+
     return this.catalogService.getProducts({
       shopId,
       categoryId,
       search,
       metal,
-      page:  Math.max(1, parseInt(page, 10) || 1),
-      limit: Math.min(50, Math.max(1, parseInt(limit, 10) || 12)),
+      purity,
+      priceMin,
+      priceMax,
+      inStockOnly: inStockOnlyRaw === 'true',
+      style,
+      occasion,
+      giftPersona,
+      collection,
+      sort: sort as 'newest' | 'priceAsc' | 'priceDesc' | 'trending' | 'bestseller' | undefined,
+      page:  parsedPage,
+      limit: parsedLimit,
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // B2 — GET /catalog/products/featured
+  // MUST be registered before products/:id to avoid NestJS matching "featured" as :id
+  // -------------------------------------------------------------------------
+
+  @Get('products/featured')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'public, max-age=300, stale-while-revalidate=900')
+  async getFeatured(
+    @Headers('x-tenant-id') shopId: string,
+    @Query('limit') limitRaw = '12',
+  ): Promise<{ items: CatalogProduct[] }> {
+    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    const limit = Math.min(20, Math.max(1, parseInt(limitRaw, 10) || 12));
+    return this.catalogService.getFeatured(shopId, limit);
+  }
+
+  // -------------------------------------------------------------------------
+  // B2 — GET /catalog/products/new-arrivals
+  // -------------------------------------------------------------------------
+
+  @Get('products/new-arrivals')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'public, max-age=300, stale-while-revalidate=900')
+  async getNewArrivals(
+    @Headers('x-tenant-id') shopId: string,
+    @Query('limit') limitRaw = '12',
+  ): Promise<{ items: CatalogProduct[] }> {
+    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    const limit = Math.min(20, Math.max(1, parseInt(limitRaw, 10) || 12));
+    return this.catalogService.getNewArrivals(shopId, limit);
+  }
+
+  // -------------------------------------------------------------------------
+  // B2 — GET /catalog/products/top-sellers
+  // -------------------------------------------------------------------------
+
+  @Get('products/top-sellers')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'public, max-age=600, stale-while-revalidate=1800')
+  async getTopSellers(
+    @Headers('x-tenant-id') shopId: string,
+    @Query('limit') limitRaw = '12',
+  ): Promise<{ items: CatalogProduct[] }> {
+    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    const limit = Math.min(20, Math.max(1, parseInt(limitRaw, 10) || 12));
+    return this.catalogService.getTopSellers(shopId, limit);
   }
 
   // -------------------------------------------------------------------------
@@ -153,6 +257,114 @@ export class CatalogController {
     if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
     const images = await this.catalogService.listPublicImages(productId, shopId);
     return { images };
+  }
+
+  // -------------------------------------------------------------------------
+  // GET /catalog/products/:id/reviews — Story B4 (PII-redacted, public)
+  // -------------------------------------------------------------------------
+
+  @Get('products/:id/reviews')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'public, max-age=120, stale-while-revalidate=600')
+  async getProductReviews(
+    @Param('id', new ParseUUIDPipe()) productId: string,
+    @Headers('x-tenant-id') shopId: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+  ): Promise<PublicReviewsResponse> {
+    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    return this.catalogService.getPublicProductReviews({
+      shopId,
+      productId,
+      page:  Math.max(1, parseInt(page, 10) || 1),
+      limit: Math.min(50, Math.max(1, parseInt(limit, 10) || 10)),
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // B6 — GET /catalog/products/:id/recommendations
+  // -------------------------------------------------------------------------
+
+  @Get('products/:id/recommendations')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'public, max-age=300')
+  async getRecommendations(
+    @Param('id', new ParseUUIDPipe()) productId: string,
+    @Headers('x-tenant-id') shopId: string,
+  ): Promise<{ items: CatalogProduct[] }> {
+    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    return this.catalogService.getRecommendations(productId, shopId);
+  }
+
+  // -------------------------------------------------------------------------
+  // B2 — GET /catalog/categories
+  // -------------------------------------------------------------------------
+
+  @Get('categories')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'public, max-age=900, stale-while-revalidate=3600')
+  async getCategories(
+    @Headers('x-tenant-id') shopId: string,
+  ): Promise<{ categories: CategoryNode[] }> {
+    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    return this.catalogService.getCategories(shopId);
+  }
+
+  // -------------------------------------------------------------------------
+  // B2 — GET /catalog/collections
+  // -------------------------------------------------------------------------
+
+  @Get('collections')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'public, max-age=300, stale-while-revalidate=900')
+  async getCollections(
+    @Headers('x-tenant-id') shopId: string,
+  ): Promise<{ items: Collection[] }> {
+    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    return this.catalogService.getCollections(shopId);
+  }
+
+  // -------------------------------------------------------------------------
+  // B2 — GET /catalog/collections/:slug
+  // -------------------------------------------------------------------------
+
+  @Get('collections/:slug')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'public, max-age=120, stale-while-revalidate=300')
+  async getCollection(
+    @Param('slug') slug: string,
+    @Headers('x-tenant-id') shopId: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '12',
+  ): Promise<{ collection: Collection; products: CatalogProductsResponse }> {
+    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    if (!slug) throw new BadRequestException({ code: 'catalog.slug_required' });
+    return this.catalogService.getCollection(
+      slug,
+      shopId,
+      Math.max(1, parseInt(page, 10) || 1),
+      Math.min(50, Math.max(1, parseInt(limit, 10) || 12)),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // B5 — GET /catalog/storefront-config
+  // -------------------------------------------------------------------------
+
+  @Get('storefront-config')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'public, max-age=600, stale-while-revalidate=1800')
+  async getStorefrontConfig(
+    @Headers('x-tenant-id') shopId: string,
+  ): Promise<StorefrontConfig> {
+    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    return this.catalogService.getStorefrontConfig(shopId);
   }
 
   // -------------------------------------------------------------------------

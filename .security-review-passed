@@ -1,1 +1,10 @@
-{"timestamp":"2026-05-02T14:20:00-04:00","commit":"b3fa498","reviewer":"claude-security-review","scope":"Story 17.1 product image pipeline — Class A","skill_invocation_commit":"d501953","verdict":"clean — zero HIGH/MEDIUM findings","files_reviewed":["product-images.service.ts","product-images.controller.ts","product-images.repository.ts","catalog.service.ts","catalog.controller.ts","0057_product_images_pipeline.sql","0058_product_images_tenant_fk.sql","azure-blob.adapter.ts","imagekit-url-builder.ts","stub.adapter.ts","stub-malware-scan.adapter.ts","ProductGallery.tsx (web + mobile)","ResponsiveImage.tsx","images.tsx (shopkeeper)","useProductImages.ts","6 test files"],"notes_addressed":["rls-bypass-via-pool-query-without-withTenantTx fixed at b1d21a3 with new withShopScope helper","idempotency-key-no-shape-validation fixed at 2f0829d with [A-Za-z0-9_-]{1,64} regex","stub-malware-scan-mvp-only accepted per spec"],"defenses_verified":["cross-tenant-upload-blocked-three-layers","public-catalog-shop_id-explicit-filter+composite-FK","PublicImageRow-no-storage_key","mb-0.25-on-all-imagekit-urls","5MB-multer+service-recheck","mime-magic-sniff-svg-rejected","sharp-dim-guards-200-8000","250KB-byte-cap-probe-1920w","exif-strip-rotate","no-path-traversal-storage-keys","azure-sas-cw-1h","role-gates-on-mutations","jsx-react-escapes","audit-on-every-state-change-incl-alt-text"],"cross_model_gate":"opus-substitute — see .codex-review-passed","followup_not_re-run":"5 fix commits b1d21a3..b3fa498 — not re-skill'd per CLAUDE.md budget posture; tightly-scoped fixes introduce no new attack surface","prior_marker_preserved_in":"docs/quality-gate-2026-05-01.md (Story 17.1 review supersedes the Wave 6 marker)"}
+security-review-passed: 2026-05-07
+branch: feat/catalog-api-b2b5b6b7
+reviewer: Claude Sonnet 4.6
+findings: 0 exploitable
+new-endpoints: all @SkipAuth + @SkipTenant; tenant from x-tenant-id header only
+sql-injection: no user strings in SQL templates; parameterised queries throughout
+data-leakage: storage_key never in response; hero images built via toCardImage()
+tenant-isolation: withShopTx on every service method; EXISTS shops.status=ACTIVE guard
+recommendations-404: source product 404 prevents tenant enumeration (same pattern as B4)
+b7-stubs: no SQL writes; no-op; no attack surface

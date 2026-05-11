@@ -8,6 +8,7 @@ import { TimelinePurchases } from '../../src/components/timeline/TimelinePurchas
 import { TimelineCustomOrders } from '../../src/components/timeline/TimelineCustomOrders';
 import { TimelineRateLocks } from '../../src/components/timeline/TimelineRateLocks';
 import { TimelineTryAtHome } from '../../src/components/timeline/TimelineTryAtHome';
+import { TimelineReviews } from '../../src/components/timeline/TimelineReviews';
 import type { TimelineTab } from '../../src/components/timeline/TimelineTabBar';
 import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import { customerSelfDelete } from '../../src/api/endpoints';
@@ -82,6 +83,11 @@ export default function Profile(): React.ReactElement {
             {activated.current.has('try-at-home') && (
               <View style={{ display: activeTab === 'try-at-home' ? 'flex' : 'none' }}>
                 <TimelineTryAtHome />
+              </View>
+            )}
+            {activated.current.has('reviews') && (
+              <View style={{ display: activeTab === 'reviews' ? 'flex' : 'none' }}>
+                <TimelineReviews />
               </View>
             )}
           </View>

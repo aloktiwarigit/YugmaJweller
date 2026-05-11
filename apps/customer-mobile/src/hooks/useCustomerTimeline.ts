@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import {
   getPurchases,
   getCustomOrders,
@@ -17,7 +17,7 @@ interface PaginationOpts {
   offset: number;
 }
 
-export function usePurchases(opts: PaginationOpts) {
+export function usePurchases(opts: PaginationOpts): UseQueryResult<PurchasesResponse> {
   return useQuery<PurchasesResponse>({
     queryKey:  ['customer-timeline', 'purchases', opts.limit, opts.offset],
     queryFn:   () => getPurchases(opts),
@@ -25,7 +25,7 @@ export function usePurchases(opts: PaginationOpts) {
   });
 }
 
-export function useCustomOrders(opts: PaginationOpts) {
+export function useCustomOrders(opts: PaginationOpts): UseQueryResult<CustomOrdersResponse> {
   return useQuery<CustomOrdersResponse>({
     queryKey:  ['customer-timeline', 'custom-orders', opts.limit, opts.offset],
     queryFn:   () => getCustomOrders(opts),
@@ -33,7 +33,7 @@ export function useCustomOrders(opts: PaginationOpts) {
   });
 }
 
-export function useRateLocks(opts: PaginationOpts) {
+export function useRateLocks(opts: PaginationOpts): UseQueryResult<RateLockBookingsResponse> {
   return useQuery<RateLockBookingsResponse>({
     queryKey:  ['customer-timeline', 'rate-locks', opts.limit, opts.offset],
     queryFn:   () => getRateLockBookings(opts),
@@ -41,7 +41,7 @@ export function useRateLocks(opts: PaginationOpts) {
   });
 }
 
-export function useTryAtHomeBookings(opts: PaginationOpts) {
+export function useTryAtHomeBookings(opts: PaginationOpts): UseQueryResult<TryAtHomeBookingsListResponse> {
   return useQuery<TryAtHomeBookingsListResponse>({
     queryKey:  ['customer-timeline', 'try-at-home', opts.limit, opts.offset],
     queryFn:   () => getTryAtHomeBookings(opts),

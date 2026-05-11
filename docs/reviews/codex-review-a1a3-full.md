@@ -1,0 +1,8345 @@
+OpenAI Codex v0.125.0 (research preview)
+--------
+workdir: C:\gs-stf-1
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\alokt\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019dfe97-d288-7eb1-881b-289778a3c60d
+--------
+user
+diff --git a/apps/api/test/storefront-schema-0066.integration.spec.ts b/apps/api/test/storefront-schema-0066.integration.spec.ts
+new file mode 100644
+index 0000000..d150102
+--- /dev/null
++++ b/apps/api/test/storefront-schema-0066.integration.spec.ts
+@@ -0,0 +1,216 @@
++// apps/api/test/storefront-schema-0066.integration.spec.ts
++//
++// Mandatory spec tests T3–T6 + weight-column invariant.
++// UUID prefix cc4xxxxx — non-overlapping with other test files.
++
++import { describe, it, expect, beforeAll, afterAll } from 'vitest';
++import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
++import { Pool } from 'pg';
++import { resolve } from 'node:path';
++import { createPool, runMigrations, withTenantTx } from '@goldsmith/db';
++import { tenantContext, type Tenant, type UnauthenticatedTenantContext } from '@goldsmith/tenant-context';
++
++// ---------------------------------------------------------------------------
++// Fixture UUIDs — non-overlapping with other integration test files
++// ---------------------------------------------------------------------------
++const SHOP_A = 'cc400001-cc00-4000-cc00-000000000001';
++
++const tenantA: Tenant = { id: SHOP_A, slug: 'stf-0066-a', display_name: '0066 Shop A', status: 'ACTIVE' };
++const ctxA: UnauthenticatedTenantContext = { shopId: SHOP_A, tenant: tenantA, authenticated: false };
++
++let container: StartedPostgreSqlContainer;
++let pool: Pool;
++let userAId: string;
++let productAId: string;
++
++beforeAll(async () => {
++  container = await new PostgreSqlContainer('postgres:15.6').start();
++  pool = createPool({ connectionString: container.getConnectionUri() });
++  await runMigrations(pool, resolve(__dirname, '../../../packages/db/src/migrations'));
++
++  // Seed shop via raw connection (no RLS on shops table from admin path)
++  const c = await pool.connect();
++  try {
++    await c.query(
++      `INSERT INTO shops (id, slug, display_name, status) VALUES ($1, 'stf-0066-a', '0066 Shop A', 'ACTIVE')`,
++      [SHOP_A],
++    );
++  } finally {
++    c.release();
++  }
++
++  // Seed shop_admin user
++  userAId = await tenantContext.runWith(ctxA, () =>
++    withTenantTx(pool, async (tx) => {
++      const r = await tx.query<{ id: string }>(
++        `INSERT INTO shop_users (shop_id, phone, display_name, role, status)
++           VALUES ($1, '+919400000101', 'Owner 0066', 'shop_admin', 'ACTIVE') RETURNING id`,
++        [SHOP_A],
++      );
++      return r.rows[0]!.id;
++    }),
++  );
++
++  // Seed a published product for index smoke tests (partial indexes filter published_at IS NOT NULL)
++  productAId = await tenantContext.runWith(ctxA, () =>
++    withTenantTx(pool, async (tx) => {
++      const r = await tx.query<{ id: string }>(
++        `INSERT INTO products
++           (shop_id, sku, metal, purity, gross_weight_g, net_weight_g, stone_weight_g,
++            status, created_by_user_id, published_at, published_by_user_id)
++         VALUES
++           ($1, 'STF0066-001', 'GOLD', '22K', '10.0000', '9.0000', '0.0000',
++            'IN_STOCK', $2, NOW(), $2)
++         RETURNING id`,
++        [SHOP_A, userAId],
++      );
++      return r.rows[0]!.id;
++    }),
++  );
++}, 180_000);
++
++afterAll(async () => {
++  await pool?.end();
++  await container?.stop();
++});
++
++// ---------------------------------------------------------------------------
++// T3 — CHECK constraint blocks invalid style
++// ---------------------------------------------------------------------------
++describe('migration 0066: style CHECK constraint', () => {
++  it('rejects style = UNKNOWN with CHECK violation (23514)', async () => {
++    await expect(
++      tenantContext.runWith(ctxA, () =>
++        withTenantTx(pool, (tx) =>
++          tx.query(`UPDATE products SET style = 'UNKNOWN' WHERE id = $1`, [productAId]),
++        ),
++      ),
++    ).rejects.toMatchObject({ code: '23514' });
++  });
++
++  it('accepts every valid style value without error', async () => {
++    const validStyles = [
++      'ENGAGEMENT','COUPLE','DAILY_WEAR','JHUMKA','STUDS','HOOPS',
++      'DROP','STATEMENT','TEMPLE','BRIDAL','OFFICE','KIDS',
++    ];
++    for (const style of validStyles) {
++      await expect(
++        tenantContext.runWith(ctxA, () =>
++          withTenantTx(pool, (tx) =>
++            tx.query(`UPDATE products SET style = $1 WHERE id = $2`, [style, productAId]),
++          ),
++        ),
++      ).resolves.not.toThrow();
++    }
++  });
++
++  it('accepts NULL style (column is nullable)', async () => {
++    await expect(
++      tenantContext.runWith(ctxA, () =>
++        withTenantTx(pool, (tx) =>
++          tx.query(`UPDATE products SET style = NULL WHERE id = $1`, [productAId]),
++        ),
++      ),
++    ).resolves.not.toThrow();
++  });
++});
++
++// ---------------------------------------------------------------------------
++// Weight column invariant — must remain DECIMAL(12,4) after migration
++// ---------------------------------------------------------------------------
++describe('migration 0066: weight column types unchanged', () => {
++  it('gross_weight_g and net_weight_g remain numeric(12,4)', async () => {
++    const r = await pool.query<{
++      column_name: string;
++      data_type: string;
++      numeric_precision: number;
++      numeric_scale: number;
++    }>(
++      `SELECT column_name, data_type, numeric_precision, numeric_scale
++         FROM information_schema.columns
++        WHERE table_name = 'products'
++          AND column_name IN ('gross_weight_g', 'net_weight_g')
++        ORDER BY column_name`,
++    );
++    expect(r.rows).toHaveLength(2);
++    for (const row of r.rows) {
++      expect(row.data_type).toBe('numeric');
++      expect(row.numeric_precision).toBe(12);
++      expect(row.numeric_scale).toBe(4);
++    }
++  });
++});
++
++// ---------------------------------------------------------------------------
++// T4 — GIN occasion index used by ANY(...)
++// ---------------------------------------------------------------------------
++describe('migration 0066: GIN occasion index', () => {
++  it('planner uses products_occasion_gin_idx for ANY(occasion) filter', async () => {
++    const client = await pool.connect();
++    try {
++      await client.query('SET enable_seqscan = off');
++      // GIN array indexes support @> (containment) operator; use that form
++      // rather than '= ANY()' which the planner may not route through GIN.
++      const r = await client.query<{ 'QUERY PLAN': string }>(
++        `EXPLAIN SELECT id FROM products WHERE occasion @> ARRAY['WEDDING']::text[]`,
++      );
++      const plan = r.rows.map((row) => row['QUERY PLAN']).join('\n');
++      expect(plan).toContain('products_occasion_gin_idx');
++    } finally {
++      await client.query('RESET enable_seqscan');
++      client.release();
++    }
++  });
++});
++
++// ---------------------------------------------------------------------------
++// T5 — composite top-sellers index used by ORDER BY expression
++// ---------------------------------------------------------------------------
++describe('migration 0066: top-sellers expression index', () => {
++  it('planner uses products_top_sellers_idx for (sales*2+views) DESC ORDER BY', async () => {
++    const client = await pool.connect();
++    try {
++      await client.query('SET enable_seqscan = off');
++      const r = await client.query<{ 'QUERY PLAN': string }>(
++        `EXPLAIN SELECT id FROM products
++          WHERE shop_id = $1 AND published_at IS NOT NULL
++          ORDER BY (sales_count_30d * 2 + view_count_30d) DESC, published_at DESC`,
++        [SHOP_A],
++      );
++      const plan = r.rows.map((row) => row['QUERY PLAN']).join('\n');
++      expect(plan).toContain('products_top_sellers_idx');
++    } finally {
++      await client.query('RESET enable_seqscan');
++      client.release();
++    }
++  });
++});
++
++// ---------------------------------------------------------------------------
++// T6 — pg_trgm GIN index used by similarity search
++// ---------------------------------------------------------------------------
++describe('migration 0066: pg_trgm similarity index', () => {
++  it('planner uses products_search_trgm_idx for expression % similarity query', async () => {
++    const client = await pool.connect();
++    try {
++      await client.query('SET enable_seqscan = off');
++      // Lower the similarity threshold so the trgm GIN index is considered.
++      await client.query('SET pg_trgm.similarity_threshold = 0.1');
++      // The index expression is: coalesce(sku,'') || ' ' || coalesce(metal,'') || ' ' || coalesce(purity,'')
++      // Query must match the exact expression to use the index.
++      // No published_at filter here — the index is non-partial so it applies
++      // to all rows; omitting the filter prevents the planner from choosing
++      // a competing partial BTree index instead.
++      const r = await client.query<{ 'QUERY PLAN': string }>(
++        `EXPLAIN SELECT id FROM products
++          WHERE (coalesce(sku, '') || ' ' || coalesce(metal, '') || ' ' || coalesce(purity, '')) % 'AB-1042'`,
++      );
++      const plan = r.rows.map((row) => row['QUERY PLAN']).join('\n');
++      expect(plan).toContain('products_search_trgm_idx');
++    } finally {
++      await client.query('RESET enable_seqscan');
++      await client.query('RESET pg_trgm.similarity_threshold');
++      client.release();
++    }
++  });
++});
+diff --git a/apps/api/test/storefront-schema-0068.integration.spec.ts b/apps/api/test/storefront-schema-0068.integration.spec.ts
+new file mode 100644
+index 0000000..f9c0339
+--- /dev/null
++++ b/apps/api/test/storefront-schema-0068.integration.spec.ts
+@@ -0,0 +1,259 @@
++// apps/api/test/storefront-schema-0068.integration.spec.ts
++//
++// Mandatory spec tests T1 (FK cross-tenant) and T2 (trigger SECURITY INVOKER).
++// UUID prefix dd5xxxxx / ee5xxxxx — non-overlapping with other test files.
++
++import { describe, it, expect, beforeAll, afterAll } from 'vitest';
++import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
++import { Pool } from 'pg';
++import { resolve } from 'node:path';
++import { createPool, runMigrations, withTenantTx } from '@goldsmith/db';
++import { tenantContext, type Tenant, type UnauthenticatedTenantContext } from '@goldsmith/tenant-context';
++
++// ---------------------------------------------------------------------------
++// Fixture UUIDs — non-overlapping with other integration test files
++// ---------------------------------------------------------------------------
++const SHOP_A = 'dd500001-dd00-4000-dd00-000000000001';
++const SHOP_B = 'ee500002-ee00-4000-ee00-000000000002';
++
++const tenantA: Tenant = { id: SHOP_A, slug: 'stf-0068-a', display_name: '0068 Shop A', status: 'ACTIVE' };
++const tenantB: Tenant = { id: SHOP_B, slug: 'stf-0068-b', display_name: '0068 Shop B', status: 'ACTIVE' };
++const ctxA: UnauthenticatedTenantContext = { shopId: SHOP_A, tenant: tenantA, authenticated: false };
++const ctxB: UnauthenticatedTenantContext = { shopId: SHOP_B, tenant: tenantB, authenticated: false };
++
++let container: StartedPostgreSqlContainer;
++let pool: Pool;
++let userAId: string;
++let userBId: string;
++let productAId: string;
++let productBId: string;
++
++// Inserts a product_images row in the given tenant context.
++const insertImage = (
++  shopId: string,
++  ctx: UnauthenticatedTenantContext,
++  productId: string,
++  uploaderId: string,
++  opts: { sortOrder?: number; scanStatus?: string } = {},
++) =>
++  tenantContext.runWith(ctx, () =>
++    withTenantTx(pool, async (tx) => {
++      const r = await tx.query<{ id: string }>(
++        `INSERT INTO product_images
++           (shop_id, product_id, storage_key, mime_type, byte_size, width, height,
++            exif_stripped_at, uploaded_by_user_id, scan_status, sort_order)
++         VALUES
++           ($1, $2, $3, 'image/jpeg', 1234, 800, 600,
++            NOW(), $4, $5, $6)
++         RETURNING id`,
++        [
++          shopId,
++          productId,
++          `tenant/${shopId}/products/${productId}/${Math.random().toString(36).slice(2)}.jpg`,
++          uploaderId,
++          opts.scanStatus ?? 'clean',
++          opts.sortOrder ?? 0,
++        ],
++      );
++      return r.rows[0]!.id;
++    }),
++  );
++
++beforeAll(async () => {
++  container = await new PostgreSqlContainer('postgres:15.6').start();
++  pool = createPool({ connectionString: container.getConnectionUri() });
++  await runMigrations(pool, resolve(__dirname, '../../../packages/db/src/migrations'));
++
++  // Seed shops via raw connection
++  const c = await pool.connect();
++  try {
++    await c.query(
++      `INSERT INTO shops (id, slug, display_name, status) VALUES
++        ($1, 'stf-0068-a', '0068 Shop A', 'ACTIVE'),
++        ($2, 'stf-0068-b', '0068 Shop B', 'ACTIVE')`,
++      [SHOP_A, SHOP_B],
++    );
++  } finally {
++    c.release();
++  }
++
++  // Seed users
++  userAId = await tenantContext.runWith(ctxA, () =>
++    withTenantTx(pool, async (tx) => {
++      const r = await tx.query<{ id: string }>(
++        `INSERT INTO shop_users (shop_id, phone, display_name, role, status)
++           VALUES ($1, '+919500000101', 'Owner 0068A', 'shop_admin', 'ACTIVE') RETURNING id`,
++        [SHOP_A],
++      );
++      return r.rows[0]!.id;
++    }),
++  );
++
++  userBId = await tenantContext.runWith(ctxB, () =>
++    withTenantTx(pool, async (tx) => {
++      const r = await tx.query<{ id: string }>(
++        `INSERT INTO shop_users (shop_id, phone, display_name, role, status)
++           VALUES ($1, '+919500000102', 'Owner 0068B', 'shop_admin', 'ACTIVE') RETURNING id`,
++        [SHOP_B],
++      );
++      return r.rows[0]!.id;
++    }),
++  );
++
++  // Seed products
++  productAId = await tenantContext.runWith(ctxA, () =>
++    withTenantTx(pool, async (tx) => {
++      const r = await tx.query<{ id: string }>(
++        `INSERT INTO products
++           (shop_id, sku, metal, purity, gross_weight_g, net_weight_g,
++            stone_weight_g, status, created_by_user_id)
++         VALUES ($1, 'STF0068-A-001', 'GOLD', '22K', '10.0000', '9.0000',
++                 '0.0000', 'IN_STOCK', $2)
++         RETURNING id`,
++        [SHOP_A, userAId],
++      );
++      return r.rows[0]!.id;
++    }),
++  );
++
++  productBId = await tenantContext.runWith(ctxB, () =>
++    withTenantTx(pool, async (tx) => {
++      const r = await tx.query<{ id: string }>(
++        `INSERT INTO products
++           (shop_id, sku, metal, purity, gross_weight_g, net_weight_g,
++            stone_weight_g, status, created_by_user_id)
++         VALUES ($1, 'STF0068-B-001', 'GOLD', '22K', '10.0000', '9.0000',
++                 '0.0000', 'IN_STOCK', $2)
++         RETURNING id`,
++        [SHOP_B, userBId],
++      );
++      return r.rows[0]!.id;
++    }),
++  );
++}, 180_000);
++
++afterAll(async () => {
++  await pool?.end();
++  await container?.stop();
++});
++
++// ---------------------------------------------------------------------------
++// T1 — primary_image_id FK does not bypass RLS via cross-tenant image
++// ---------------------------------------------------------------------------
++describe('migration 0068: composite FK cross-tenant guard', () => {
++  it('rejects setting primary_image_id to a cross-tenant image (FK violation 23503)', async () => {
++    // Insert a valid image in Shop B for Shop B's product.
++    const imageBId = await insertImage(SHOP_B, ctxB, productBId, userBId);
++
++    // Attempt to point Shop A's product at Shop B's image.
++    // Composite FK (shop_id, primary_image_id) → product_images(shop_id, id) requires
++    // that (SHOP_A, imageBId) exists in product_images — it does not → 23503.
++    await expect(
++      tenantContext.runWith(ctxA, () =>
++        withTenantTx(pool, (tx) =>
++          tx.query(
++            `UPDATE products SET primary_image_id = $1 WHERE id = $2`,
++            [imageBId, productAId],
++          ),
++        ),
++      ),
++    ).rejects.toMatchObject({ code: '23503' });
++  });
++
++  it('allows same-tenant primary_image_id assignment (control)', async () => {
++    // Insert a clean image in Shop A for Shop A's product.
++    const imageAId = await insertImage(SHOP_A, ctxA, productAId, userAId);
++
++    // Same-tenant assignment must succeed.
++    await expect(
++      tenantContext.runWith(ctxA, () =>
++        withTenantTx(pool, (tx) =>
++          tx.query(
++            `UPDATE products SET primary_image_id = $1 WHERE id = $2`,
++            [imageAId, productAId],
++          ),
++        ),
++      ),
++    ).resolves.not.toThrow();
++  });
++});
++
++// ---------------------------------------------------------------------------
++// T2 — maintain trigger respects RLS under SECURITY INVOKER
++// ---------------------------------------------------------------------------
++describe('migration 0068: maintain trigger (SECURITY INVOKER)', () => {
++  it('trigger auto-sets primary_image_id on first clean image INSERT', async () => {
++    // Products start with NULL primary_image_id; inserting a clean image should trigger recompute.
++    await insertImage(SHOP_A, ctxA, productAId, userAId, { sortOrder: 99 });
++
++    // The trigger should have set products.primary_image_id to this image.
++    // Use raw pool connection to bypass RLS for the assertion read.
++    const r = await pool.query<{ primary_image_id: string | null }>(
++      `SELECT primary_image_id FROM products WHERE id = $1`,
++      [productAId],
++    );
++    // primary_image_id must be some image belonging to productA (the one with lowest sort_order)
++    expect(r.rows[0]!.primary_image_id).toBeTruthy();
++  });
++
++  it('trigger NULLs primary_image_id when last clean image is deleted', async () => {
++    // Insert exactly one clean image in a fresh product to have a controlled state.
++    // Use a new product to avoid state from previous test.
++    const freshProductId = await tenantContext.runWith(ctxA, () =>
++      withTenantTx(pool, async (tx) => {
++        const r = await tx.query<{ id: string }>(
++          `INSERT INTO products
++             (shop_id, sku, metal, purity, gross_weight_g, net_weight_g,
++              stone_weight_g, status, created_by_user_id)
++           VALUES ($1, 'STF0068-A-002', 'GOLD', '22K', '10.0000', '9.0000',
++                   '0.0000', 'IN_STOCK', $2)
++           RETURNING id`,
++          [SHOP_A, userAId],
++        );
++        return r.rows[0]!.id;
++      }),
++    );
++
++    const onlyImageId = await insertImage(SHOP_A, ctxA, freshProductId, userAId, { sortOrder: 0 });
++
++    // Verify trigger set primary_image_id
++    const before = await pool.query<{ primary_image_id: string | null }>(
++      `SELECT primary_image_id FROM products WHERE id = $1`,
++      [freshProductId],
++    );
++    expect(before.rows[0]!.primary_image_id).toBe(onlyImageId);
++
++    // Delete the only clean image as Shop A user
++    await tenantContext.runWith(ctxA, () =>
++      withTenantTx(pool, (tx) =>
++        tx.query(`DELETE FROM product_images WHERE id = $1`, [onlyImageId]),
++      ),
++    );
++
++    // Trigger must have NULLed primary_image_id (no more clean images)
++    const after = await pool.query<{ primary_image_id: string | null }>(
++      `SELECT primary_image_id FROM products WHERE id = $1`,
++      [freshProductId],
++    );
++    expect(after.rows[0]!.primary_image_id).toBeNull();
++  });
++
++  it('trigger does not affect other tenant products (RLS under SECURITY INVOKER)', async () => {
++    // Record Shop B product primary_image_id before any Shop A operation
++    const beforeB = await pool.query<{ primary_image_id: string | null }>(
++      `SELECT primary_image_id FROM products WHERE id = $1`,
++      [productBId],
++    );
++    const bPrimaryBefore = beforeB.rows[0]!.primary_image_id;
++
++    // Insert a new image in Shop A (triggers recompute for Shop A's product only)
++    await insertImage(SHOP_A, ctxA, productAId, userAId, { sortOrder: 0 });
++
++    // Shop B's product primary_image_id must be unchanged
++    const afterB = await pool.query<{ primary_image_id: string | null }>(
++      `SELECT primary_image_id FROM products WHERE id = $1`,
++      [productBId],
++    );
++    expect(afterB.rows[0]!.primary_image_id).toBe(bPrimaryBefore);
++  });
++});
+diff --git a/docs/superpowers/plans/2026-05-05-ws-3a-reports-completion-plan.md b/docs/superpowers/plans/2026-05-05-ws-3a-reports-completion-plan.md
+new file mode 100644
+index 0000000..7ed2de6
+--- /dev/null
++++ b/docs/superpowers/plans/2026-05-05-ws-3a-reports-completion-plan.md
+@@ -0,0 +1,3685 @@
++# WS-3A — Reports Completion Implementation Plan
++
++> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
++
++**Goal:** Ship FR117 (stock-aging endpoint with `<30d / 30-60d / 60-90d / 90d+` buckets) and FR119 (CSV+PDF export for `daily-summary`, `outstanding`, `customer-ltv`, `loyalty-summary`, `stock-aging`) — sync CSV downloads + async PDFKit-rendered PDFs delivered via BullMQ + signed URL.
++
++**Architecture:** New endpoints alongside the existing `apps/api/src/modules/reports/`. CSV is sync (controller streams `text/csv`). PDF is async: `POST /reports/exports` inserts a row in `reports_pdf_exports` (migration 0072) and enqueues a `reports-pdf` BullMQ job; the processor renders via PDFKit, uploads to `STORAGE_PORT`, and updates the row. Client polls `GET /reports/exports/:id`. Mirrors the existing `apps/api/src/workers/gstr-export.processor.ts` pattern 1:1.
++
++**Tech Stack:** NestJS + `@nestjs/bullmq` + Drizzle/pg + `pdfkit` (new dep) + Noto Sans Devanagari TTFs + `@goldsmith/integrations-storage` + `@goldsmith/audit`. Mobile: Expo + TanStack Query.
++
++**Spec:** `docs/superpowers/specs/2026-05-05-ws-3a-reports-completion-design.md` (commit `41753e3`)
++
++---
++
++## File structure
++
++### Create (22 files)
++
++| Path | Responsibility |
++|---|---|
++| `packages/db/src/migrations/0072_reports_pdf_exports.sql` | Job table + RLS + grants |
++| `apps/api/assets/fonts/NotoSansDevanagari-Regular.ttf` | Devanagari font (binary) |
++| `apps/api/assets/fonts/NotoSansDevanagari-Bold.ttf` | Devanagari bold (binary) |
++| `apps/api/src/modules/reports/reports.csv.ts` | Pure CSV emitters per report |
++| `apps/api/src/modules/reports/reports.csv.spec.ts` | CSV emitter unit tests |
++| `apps/api/src/modules/reports/reports-export.service.ts` | Enqueue / poll / regenerate orchestration |
++| `apps/api/src/modules/reports/reports-export.service.spec.ts` | Export-service unit tests |
++| `apps/api/src/modules/reports/pdf/branding.ts` | Fetches `shops.{display_name, logo_url, address_json, gstin}` |
++| `apps/api/src/modules/reports/pdf/header.ts` | `drawHeader(doc, branding)` |
++| `apps/api/src/modules/reports/pdf/footer.ts` | `drawFooter(doc, branding, pageNum, totalPages)` |
++| `apps/api/src/modules/reports/pdf/renderer.ts` | `PdfRenderer.render(reportType, data, branding) → Buffer` |
++| `apps/api/src/modules/reports/pdf/renderer.spec.ts` | Buffer-shape tests for each template |
++| `apps/api/src/modules/reports/pdf/templates/daily-summary.ts` | PDFKit layout |
++| `apps/api/src/modules/reports/pdf/templates/outstanding.ts` | PDFKit layout |
++| `apps/api/src/modules/reports/pdf/templates/customer-ltv.ts` | PDFKit layout |
++| `apps/api/src/modules/reports/pdf/templates/loyalty-summary.ts` | PDFKit layout |
++| `apps/api/src/modules/reports/pdf/templates/stock-aging.ts` | PDFKit layout |
++| `apps/api/src/workers/reports-pdf.processor.ts` | BullMQ processor |
++| `apps/api/src/workers/reports-pdf.processor.spec.ts` | Processor unit tests |
++| `apps/shopkeeper/app/reports/stock-aging.tsx` | New mobile screen |
++| `apps/shopkeeper/src/features/reports/useReportExport.ts` | Polling hook for export readiness |
++| `apps/shopkeeper/src/features/reports/components/ExportButtons.tsx` | Reusable CSV/PDF buttons |
++
++### Modify (9 files)
++
++| Path | What changes |
++|---|---|
++| `apps/api/package.json` | Add `pdfkit` + `@types/pdfkit` |
++| `apps/api/src/modules/reports/reports.service.ts` | Add `getStockAging()` + types |
++| `apps/api/src/modules/reports/reports.service.spec.ts` | Add stock-aging tests |
++| `apps/api/src/modules/reports/reports.controller.ts` | Add 1 stock-aging GET + 5 `.csv` GETs + 3 `/exports*` routes |
++| `apps/api/src/modules/reports/reports.module.ts` | Wire `BullModule.registerQueue('reports-pdf')`, `StorageModule`, new providers, processor |
++| `packages/audit/src/audit-actions.ts` | Add `REPORT_EXPORT_REQUESTED`, `REPORT_EXPORT_REGENERATED` |
++| `apps/shopkeeper/src/features/reports/useReports.ts` | Add `useStockAging` |
++| `apps/shopkeeper/app/reports/_layout.tsx` | Add stock-aging route |
++| `apps/shopkeeper/app/reports/daily-summary.tsx` (+ outstanding, customer-ltv, loyalty-summary, gstr-export) | Render `<ExportButtons>` |
++
++---
++
++## Work streams overview
++
++| WS | Tasks | Description |
++|---|---|---|
++| **WS-A** | A1 – A2 | Stock-aging endpoint (FR117) |
++| **WS-B** | B1 – B6 | CSV sync exports for 5 reports (FR119 CSV half) |
++| **WS-C** | C1 – C13 | PDF async pipeline (migration, fonts, deps, branding, templates, service, processor, module wiring) |
++| **WS-D** | D1 – D5 | Shopkeeper UI: stock-aging screen + export-button plumbing |
++
++WS-A and WS-B are independent and can run in parallel. WS-C blocks WS-D's export buttons. TDD per task.
++
++---
++
++# WS-A — Stock-aging endpoint (FR117)
++
++## Task A1: Implement `ReportsService.getStockAging`
++
++**Files:**
++- Modify: `apps/api/src/modules/reports/reports.service.ts`
++- Test: `apps/api/src/modules/reports/reports.service.spec.ts`
++
++- [ ] **Step 1: Write the failing tests**
++
++Add to `apps/api/src/modules/reports/reports.service.spec.ts` (append after the last `describe` block):
++
++```typescript
++// ---------------------------------------------------------------------------
++// getStockAging
++// ---------------------------------------------------------------------------
++describe('getStockAging', () => {
++  it('aggregates products into 4 age buckets with counts and totals', async () => {
++    fakeTx = {
++      query: vi.fn().mockResolvedValue({
++        rows: [
++          // <30d
++          { id: 'p1', sku: 'R-001', metal: 'GOLD', purity: '22K', weight_g: '5.000',
++            cost_paise: '5000000', created_at: new Date(Date.now() - 10 * 86400_000), days_in_stock: 10, bucket: '<30d' },
++          { id: 'p2', sku: 'R-002', metal: 'GOLD', purity: '22K', weight_g: '3.000',
++            cost_paise: '3000000', created_at: new Date(Date.now() - 20 * 86400_000), days_in_stock: 20, bucket: '<30d' },
++          // 30-60d
++          { id: 'p3', sku: 'C-001', metal: 'SILVER', purity: '92.5', weight_g: '50.000',
++            cost_paise: '500000', created_at: new Date(Date.now() - 45 * 86400_000), days_in_stock: 45, bucket: '30-60d' },
++          // 60-90d
++          { id: 'p4', sku: 'C-002', metal: 'GOLD', purity: '22K', weight_g: '4.000',
++            cost_paise: null, created_at: new Date(Date.now() - 75 * 86400_000), days_in_stock: 75, bucket: '60-90d' },
++          // 90d+
++          { id: 'p5', sku: 'B-001', metal: 'GOLD', purity: '22K', weight_g: '8.000',
++            cost_paise: '8000000', created_at: new Date(Date.now() - 120 * 86400_000), days_in_stock: 120, bucket: '90d+' },
++        ],
++      }),
++    };
++
++    const svc = makeService();
++    const result = await svc.getStockAging();
++
++    expect(result.buckets).toHaveLength(4);
++    const byLabel = Object.fromEntries(result.buckets.map((b) => [b.label, b]));
++    expect(byLabel['<30d']!.count).toBe(2);
++    expect(byLabel['<30d']!.totalWeightMg).toBe('8000');     // (5 + 3) * 1000
++    expect(byLabel['<30d']!.totalCostPaise).toBe('8000000'); // 5000000 + 3000000
++    expect(byLabel['30-60d']!.count).toBe(1);
++    expect(byLabel['60-90d']!.count).toBe(1);
++    expect(byLabel['60-90d']!.totalCostPaise).toBe('0');     // null cost excluded
++    expect(byLabel['90d+']!.count).toBe(1);
++    expect(result.items).toHaveLength(5);
++    expect(result.items[0]!.bucket).toBeDefined();
++  });
++
++  it('returns all 4 buckets even when some are empty', async () => {
++    fakeTx = { query: vi.fn().mockResolvedValue({ rows: [] }) };
++    const svc = makeService();
++    const result = await svc.getStockAging();
++    expect(result.buckets).toHaveLength(4);
++    expect(result.buckets.every((b) => b.count === 0)).toBe(true);
++    expect(result.items).toEqual([]);
++  });
++
++  it('boundary: 29d → <30d, 30d → 30-60d, 89d → 60-90d, 90d → 90d+', async () => {
++    fakeTx = {
++      query: vi.fn().mockResolvedValue({
++        rows: [
++          { id: 'a', sku: 'A', metal: 'GOLD', purity: '22K', weight_g: '1.000',
++            cost_paise: '100000', created_at: new Date(), days_in_stock: 29, bucket: '<30d' },
++          { id: 'b', sku: 'B', metal: 'GOLD', purity: '22K', weight_g: '1.000',
++            cost_paise: '100000', created_at: new Date(), days_in_stock: 30, bucket: '30-60d' },
++          { id: 'c', sku: 'C', metal: 'GOLD', purity: '22K', weight_g: '1.000',
++            cost_paise: '100000', created_at: new Date(), days_in_stock: 89, bucket: '60-90d' },
++          { id: 'd', sku: 'D', metal: 'GOLD', purity: '22K', weight_g: '1.000',
++            cost_paise: '100000', created_at: new Date(), days_in_stock: 90, bucket: '90d+' },
++        ],
++      }),
++    };
++    const svc = makeService();
++    const result = await svc.getStockAging();
++    const byLabel = Object.fromEntries(result.buckets.map((b) => [b.label, b]));
++    expect(byLabel['<30d']!.count).toBe(1);
++    expect(byLabel['30-60d']!.count).toBe(1);
++    expect(byLabel['60-90d']!.count).toBe(1);
++    expect(byLabel['90d+']!.count).toBe(1);
++  });
++});
++```
++
++- [ ] **Step 2: Run tests to verify they fail**
++
++```bash
++pnpm --filter @goldsmith/api test reports.service.spec
++```
++
++Expected: FAIL — `svc.getStockAging is not a function`.
++
++- [ ] **Step 3: Implement `getStockAging`**
++
++Add to `apps/api/src/modules/reports/reports.service.ts` (append types near the other interfaces, then add the method to the class):
++
++```typescript
++// Append to interfaces block
++export type StockAgingBucketLabel = '<30d' | '30-60d' | '60-90d' | '90d+';
++
++export interface StockAgingBucket {
++  label: StockAgingBucketLabel;
++  count: number;
++  totalWeightMg: string;
++  totalCostPaise: string;
++}
++
++export interface StockAgingItem {
++  id: string;
++  sku: string;
++  metal: string;
++  purity: string;
++  weightG: string;
++  daysInStock: number;
++  bucket: StockAgingBucketLabel;
++  costPaise: string | null;
++  firstListedAt: string;
++}
++
++export interface StockAgingResult {
++  buckets: StockAgingBucket[];
++  items: StockAgingItem[];
++}
++
++const BUCKET_ORDER: StockAgingBucketLabel[] = ['<30d', '30-60d', '60-90d', '90d+'];
++```
++
++Add the method to the `ReportsService` class (next to the others):
++
++```typescript
++async getStockAging(): Promise<StockAgingResult> {
++  return withTenantTx(this.pool, async (tx) => {
++    const r = await tx.query<{
++      id: string;
++      sku: string;
++      metal: string;
++      purity: string;
++      weight_g: string;
++      cost_paise: string | null;
++      created_at: Date;
++      days_in_stock: number;
++      bucket: StockAgingBucketLabel;
++    }>(
++      // RLS scopes by app.current_shop_id; do NOT add WHERE shop_id = $1
++      // (would shadow RLS predicate; flagged by goldsmith.require-tenant-transaction).
++      `WITH aged AS (
++         SELECT id, sku, metal, purity,
++                gross_weight_g::text AS weight_g,
++                cost_paise::text     AS cost_paise,
++                created_at,
++                FLOOR(EXTRACT(EPOCH FROM (now() - created_at)) / 86400)::int AS days_in_stock
++         FROM products
++         WHERE status = 'IN_STOCK'
++       )
++       SELECT *,
++              CASE
++                WHEN days_in_stock <  30 THEN '<30d'
++                WHEN days_in_stock <  60 THEN '30-60d'
++                WHEN days_in_stock <  90 THEN '60-90d'
++                ELSE                          '90d+'
++              END AS bucket
++       FROM aged
++       ORDER BY days_in_stock DESC`,
++      [],
++    );
++
++    const items: StockAgingItem[] = r.rows.map((row) => ({
++      id:             row.id,
++      sku:            row.sku,
++      metal:          row.metal,
++      purity:         row.purity,
++      weightG:        row.weight_g,
++      daysInStock:    row.days_in_stock,
++      bucket:         row.bucket,
++      costPaise:      row.cost_paise,
++      firstListedAt:  row.created_at.toISOString(),
++    }));
++
++    // Aggregate buckets in one pass; ensure all 4 labels present even if empty.
++    const agg = new Map<StockAgingBucketLabel, { count: number; weightMg: bigint; costPaise: bigint }>();
++    for (const label of BUCKET_ORDER) {
++      agg.set(label, { count: 0, weightMg: 0n, costPaise: 0n });
++    }
++    for (const item of items) {
++      const bucket = agg.get(item.bucket)!;
++      bucket.count += 1;
++      // weight_g is "X.YYY"; convert to milligrams via string→bigint to preserve precision.
++      const [whole, frac = '000'] = item.weightG.split('.');
++      const mg = BigInt(whole!) * 1000n + BigInt(frac.padEnd(3, '0').slice(0, 3));
++      bucket.weightMg += mg;
++      if (item.costPaise !== null) bucket.costPaise += BigInt(item.costPaise);
++    }
++
++    const buckets: StockAgingBucket[] = BUCKET_ORDER.map((label) => {
++      const a = agg.get(label)!;
++      return {
++        label,
++        count:          a.count,
++        totalWeightMg:  a.weightMg.toString(),
++        totalCostPaise: a.costPaise.toString(),
++      };
++    });
++
++    return { buckets, items };
++  });
++}
++```
++
++- [ ] **Step 4: Run tests to verify they pass**
++
++```bash
++pnpm --filter @goldsmith/api test reports.service.spec
++```
++
++Expected: PASS — all `getStockAging` tests green plus the existing 9 tests untouched.
++
++- [ ] **Step 5: Commit**
++
++```bash
++git add apps/api/src/modules/reports/reports.service.ts apps/api/src/modules/reports/reports.service.spec.ts
++git commit -m "feat(ws-3a): add ReportsService.getStockAging with bucket aggregation"
++```
++
++---
++
++## Task A2: Add `GET /reports/stock-aging` route
++
++**Files:**
++- Modify: `apps/api/src/modules/reports/reports.controller.ts`
++
++- [ ] **Step 1: Add the route**
++
++Open `apps/api/src/modules/reports/reports.controller.ts` and:
++
++1. Update the import line at the top to include the new types:
++```typescript
++import type {
++  DailySummaryResult, OutstandingResult, CustomerLtvItem, LoyaltySummaryResult,
++  StockAgingResult,
++} from './reports.service';
++```
++
++2. Append a new method below `getLoyaltySummary`:
++```typescript
++@TenantWalkerRoute({ expectedStatus: 200 })
++@Get('/stock-aging')
++@Roles('shop_admin', 'shop_manager')
++getStockAging(): Promise<StockAgingResult> {
++  return this.svc.getStockAging();
++}
++```
++
++- [ ] **Step 2: Verify typecheck + endpoint walker**
++
++```bash
++pnpm --filter @goldsmith/api typecheck
++pnpm --filter @goldsmith/api test:e2e
++```
++
++Expected: typecheck PASS; endpoint-walker PASS (the new route is auto-discovered via `@TenantWalkerRoute` decorator and probed for cross-tenant denial — `expectedStatus: 200` means the walker expects a 200 response from a properly tenanted call, which is correct because there are no required query params or body).
++
++- [ ] **Step 3: Commit**
++
++```bash
++git add apps/api/src/modules/reports/reports.controller.ts
++git commit -m "feat(ws-3a): wire GET /reports/stock-aging route"
++```
++
++---
++
++# WS-B — CSV sync exports (FR119 CSV half)
++
++## Task B1: Create `reports.csv.ts` with `toDailySummaryCsv`
++
++**Files:**
++- Create: `apps/api/src/modules/reports/reports.csv.ts`
++- Create: `apps/api/src/modules/reports/reports.csv.spec.ts`
++
++- [ ] **Step 1: Write the failing test**
++
++Create `apps/api/src/modules/reports/reports.csv.spec.ts`:
++
++```typescript
++import { describe, expect, it } from 'vitest';
++import { toDailySummaryCsv } from './reports.csv';
++import type { DailySummaryResult } from './reports.service';
++
++describe('toDailySummaryCsv', () => {
++  it('emits header + one data row with paise→rupees conversion', () => {
++    const data: DailySummaryResult = {
++      date: '2026-04-29',
++      total_paise:    '500000',
++      cash_paise:     '300000',
++      upi_paise:      '200000',
++      other_paise:    '0',
++      invoice_count:  3,
++      gold_weight_mg: '15000',
++    };
++
++    const csv = toDailySummaryCsv(data);
++    const lines = csv.split('\r\n');
++
++    expect(lines[0]).toBe(
++      'Date,Total (Rs),Cash (Rs),UPI (Rs),Other (Rs),Invoice Count,Gold Sold (g)',
++    );
++    expect(lines[1]).toBe('2026-04-29,5000.00,3000.00,2000.00,0.00,3,15.000');
++    expect(lines).toHaveLength(2);
++  });
++
++  it('emits zeros when no invoices', () => {
++    const data: DailySummaryResult = {
++      date: '2026-04-01',
++      total_paise: '0', cash_paise: '0', upi_paise: '0', other_paise: '0',
++      invoice_count: 0, gold_weight_mg: '0',
++    };
++    const csv = toDailySummaryCsv(data);
++    expect(csv.split('\r\n')[1]).toBe('2026-04-01,0.00,0.00,0.00,0.00,0,0.000');
++  });
++});
++```
++
++- [ ] **Step 2: Run test to verify it fails**
++
++```bash
++pnpm --filter @goldsmith/api test reports.csv.spec
++```
++
++Expected: FAIL — `Cannot find module './reports.csv'`.
++
++- [ ] **Step 3: Implement `reports.csv.ts` skeleton + `toDailySummaryCsv`**
++
++Create `apps/api/src/modules/reports/reports.csv.ts`:
++
++```typescript
++import type {
++  DailySummaryResult, OutstandingResult, CustomerLtvItem,
++  LoyaltySummaryResult, StockAgingResult,
++} from './reports.service';
++
++// Shared helpers — duplicated locally rather than extracted to packages/shared per
++// YAGNI; if a third caller appears, hoist these into @goldsmith/shared.
++function escapeCsv(value: string): string {
++  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
++    return `"${value.replace(/"/g, '""')}"`;
++  }
++  return value;
++}
++
++function csvRow(cells: (string | number)[]): string {
++  return cells.map((c) => escapeCsv(String(c))).join(',');
++}
++
++function paiseToRupees(paise: bigint | string | number): string {
++  return (Number(paise) / 100).toFixed(2);
++}
++
++function mgToGrams(mg: bigint | string | number): string {
++  return (Number(mg) / 1000).toFixed(3);
++}
++
++const LE = '\r\n'; // Excel-friendly
++
++export function toDailySummaryCsv(data: DailySummaryResult): string {
++  const header = csvRow([
++    'Date', 'Total (Rs)', 'Cash (Rs)', 'UPI (Rs)', 'Other (Rs)',
++    'Invoice Count', 'Gold Sold (g)',
++  ]);
++  const row = csvRow([
++    data.date,
++    paiseToRupees(data.total_paise),
++    paiseToRupees(data.cash_paise),
++    paiseToRupees(data.upi_paise),
++    paiseToRupees(data.other_paise),
++    data.invoice_count,
++    mgToGrams(data.gold_weight_mg),
++  ]);
++  return [header, row].join(LE);
++}
++```
++
++- [ ] **Step 4: Run test to verify it passes**
++
++```bash
++pnpm --filter @goldsmith/api test reports.csv.spec
++```
++
++Expected: PASS.
++
++- [ ] **Step 5: Commit**
++
++```bash
++git add apps/api/src/modules/reports/reports.csv.ts apps/api/src/modules/reports/reports.csv.spec.ts
++git commit -m "feat(ws-3a): add toDailySummaryCsv emitter"
++```
++
++---
++
++## Task B2: Add `toOutstandingCsv`
++
++**Files:**
++- Modify: `apps/api/src/modules/reports/reports.csv.ts`
++- Modify: `apps/api/src/modules/reports/reports.csv.spec.ts`
++
++- [ ] **Step 1: Write the failing test**
++
++Append to `apps/api/src/modules/reports/reports.csv.spec.ts`:
++
++```typescript
++import { toOutstandingCsv } from './reports.csv';
++
++describe('toOutstandingCsv', () => {
++  it('escapes commas in customer names and emits all rows', () => {
++    const data: OutstandingResult = {
++      total: 2, page: 1, limit: 100,
++      items: [
++        {
++          id: 'inv-1', invoice_number: 'GS-2026-0001',
++          customer_name: 'Sharma, Ramesh', customer_phone: '9876543210',
++          total_paise: '100000', balance_due_paise: '50000',
++          issued_at: '2026-04-01T10:00:00.000Z',
++        },
++        {
++          id: 'inv-2', invoice_number: 'GS-2026-0002',
++          customer_name: 'राज कुमार', customer_phone: null,
++          total_paise: '200000', balance_due_paise: '200000',
++          issued_at: '2026-04-02T14:30:00.000Z',
++        },
++      ],
++    };
++    const csv = toOutstandingCsv(data);
++    const lines = csv.split('\r\n');
++    expect(lines[0]).toBe(
++      'Invoice Number,Customer Name,Customer Phone,Total (Rs),Balance Due (Rs),Issued At',
++    );
++    expect(lines[1]).toBe(
++      'GS-2026-0001,"Sharma, Ramesh",9876543210,1000.00,500.00,2026-04-01T10:00:00.000Z',
++    );
++    expect(lines[2]).toBe(
++      'GS-2026-0002,राज कुमार,,2000.00,2000.00,2026-04-02T14:30:00.000Z',
++    );
++  });
++
++  it('emits header only when no items', () => {
++    const data: OutstandingResult = { total: 0, page: 1, limit: 100, items: [] };
++    expect(toOutstandingCsv(data).split('\r\n')).toHaveLength(1);
++  });
++});
++```
++
++Add `OutstandingResult` to the existing `import type` line at the top:
++```typescript
++import type {
++  DailySummaryResult, OutstandingResult, CustomerLtvItem,
++  LoyaltySummaryResult, StockAgingResult,
++} from './reports.service';
++```
++
++- [ ] **Step 2: Run test to verify it fails**
++
++```bash
++pnpm --filter @goldsmith/api test reports.csv.spec
++```
++
++Expected: FAIL — `Cannot find name 'toOutstandingCsv'`.
++
++- [ ] **Step 3: Implement `toOutstandingCsv`**
++
++Append to `apps/api/src/modules/reports/reports.csv.ts`:
++
++```typescript
++export function toOutstandingCsv(data: OutstandingResult): string {
++  const header = csvRow([
++    'Invoice Number', 'Customer Name', 'Customer Phone',
++    'Total (Rs)', 'Balance Due (Rs)', 'Issued At',
++  ]);
++  const rows = data.items.map((it) =>
++    csvRow([
++      it.invoice_number,
++      it.customer_name,
++      it.customer_phone ?? '',
++      paiseToRupees(it.total_paise),
++      paiseToRupees(it.balance_due_paise),
++      it.issued_at ?? '',
++    ]),
++  );
++  return [header, ...rows].join(LE);
++}
++```
++
++- [ ] **Step 4: Run test to verify it passes**
++
++```bash
++pnpm --filter @goldsmith/api test reports.csv.spec
++```
++
++Expected: PASS.
++
++- [ ] **Step 5: Commit**
++
++```bash
++git add apps/api/src/modules/reports/reports.csv.ts apps/api/src/modules/reports/reports.csv.spec.ts
++git commit -m "feat(ws-3a): add toOutstandingCsv emitter"
++```
++
++---
++
++## Task B3: Add `toCustomerLtvCsv`
++
++**Files:**
++- Modify: `apps/api/src/modules/reports/reports.csv.ts`
++- Modify: `apps/api/src/modules/reports/reports.csv.spec.ts`
++
++- [ ] **Step 1: Write the failing test**
++
++Append to `apps/api/src/modules/reports/reports.csv.spec.ts`:
++
++```typescript
++import { toCustomerLtvCsv } from './reports.csv';
++
++describe('toCustomerLtvCsv', () => {
++  it('emits header + data rows sorted by descending LTV (input order preserved)', () => {
++    const data: CustomerLtvItem[] = [
++      { customer_id: 'c1', name: 'रमेश सिंह', phone: '9900000001', ltv_paise: '2000000' },
++      { customer_id: 'c2', name: 'सुमन देवी', phone: '9900000002', ltv_paise: '1500000' },
++    ];
++    const csv = toCustomerLtvCsv(data);
++    const lines = csv.split('\r\n');
++    expect(lines[0]).toBe('Customer ID,Name,Phone,Lifetime Value (Rs)');
++    expect(lines[1]).toBe('c1,रमेश सिंह,9900000001,20000.00');
++    expect(lines[2]).toBe('c2,सुमन देवी,9900000002,15000.00');
++  });
++
++  it('emits header only when no customers', () => {
++    expect(toCustomerLtvCsv([]).split('\r\n')).toHaveLength(1);
++  });
++});
++```
++
++- [ ] **Step 2: Run test to verify it fails**
++
++```bash
++pnpm --filter @goldsmith/api test reports.csv.spec
++```
++
++Expected: FAIL — `Cannot find name 'toCustomerLtvCsv'`.
++
++- [ ] **Step 3: Implement `toCustomerLtvCsv`**
++
++Append to `apps/api/src/modules/reports/reports.csv.ts`:
++
++```typescript
++export function toCustomerLtvCsv(items: CustomerLtvItem[]): string {
++  const header = csvRow(['Customer ID', 'Name', 'Phone', 'Lifetime Value (Rs)']);
++  const rows = items.map((c) =>
++    csvRow([c.customer_id, c.name, c.phone, paiseToRupees(c.ltv_paise)]),
++  );
++  return [header, ...rows].join(LE);
++}
++```
++
++- [ ] **Step 4: Run test to verify it passes**
++
++```bash
++pnpm --filter @goldsmith/api test reports.csv.spec
++```
++
++Expected: PASS.
++
++- [ ] **Step 5: Commit**
++
++```bash
++git add apps/api/src/modules/reports/reports.csv.ts apps/api/src/modules/reports/reports.csv.spec.ts
++git commit -m "feat(ws-3a): add toCustomerLtvCsv emitter"
++```
++
++---
++
++## Task B4: Add `toLoyaltySummaryCsv`
++
++**Files:**
++- Modify: `apps/api/src/modules/reports/reports.csv.ts`
++- Modify: `apps/api/src/modules/reports/reports.csv.spec.ts`
++
++- [ ] **Step 1: Write the failing test**
++
++Append to `apps/api/src/modules/reports/reports.csv.spec.ts`:
++
++```typescript
++import { toLoyaltySummaryCsv } from './reports.csv';
++
++describe('toLoyaltySummaryCsv', () => {
++  it('emits a 2-section CSV: totals header+row, blank line, per-tier breakdown', () => {
++    const data: LoyaltySummaryResult = {
++      points_issued: 5000,
++      points_redeemed: 1200,
++      members_by_tier: [
++        { tier: 'GOLD',   count: 12 },
++        { tier: 'SILVER', count: 8  },
++        { tier: null,     count: 3  },
++      ],
++    };
++    const csv = toLoyaltySummaryCsv(data);
++    const lines = csv.split('\r\n');
++    expect(lines[0]).toBe('Points Issued,Points Redeemed,Net Points');
++    expect(lines[1]).toBe('5000,1200,3800');
++    expect(lines[2]).toBe('');
++    expect(lines[3]).toBe('Tier,Member Count');
++    expect(lines[4]).toBe('GOLD,12');
++    expect(lines[5]).toBe('SILVER,8');
++    expect(lines[6]).toBe('UNTIERED,3');
++  });
++
++  it('emits empty tier list cleanly', () => {
++    const data: LoyaltySummaryResult = {
++      points_issued: 0, points_redeemed: 0, members_by_tier: [],
++    };
++    const csv = toLoyaltySummaryCsv(data);
++    const lines = csv.split('\r\n');
++    expect(lines).toEqual([
++      'Points Issued,Points Redeemed,Net Points',
++      '0,0,0',
++      '',
++      'Tier,Member Count',
++    ]);
++  });
++});
++```
++
++- [ ] **Step 2: Run test to verify it fails**
++
++```bash
++pnpm --filter @goldsmith/api test reports.csv.spec
++```
++
++Expected: FAIL — `Cannot find name 'toLoyaltySummaryCsv'`.
++
++- [ ] **Step 3: Implement `toLoyaltySummaryCsv`**
++
++Append to `apps/api/src/modules/reports/reports.csv.ts`:
++
++```typescript
++export function toLoyaltySummaryCsv(data: LoyaltySummaryResult): string {
++  const totalsHeader = csvRow(['Points Issued', 'Points Redeemed', 'Net Points']);
++  const totalsRow = csvRow([
++    data.points_issued,
++    data.points_redeemed,
++    data.points_issued - data.points_redeemed,
++  ]);
++  const tierHeader = csvRow(['Tier', 'Member Count']);
++  const tierRows = data.members_by_tier.map((t) =>
++    csvRow([t.tier ?? 'UNTIERED', t.count]),
++  );
++  return [totalsHeader, totalsRow, '', tierHeader, ...tierRows].join(LE);
++}
++```
++
++- [ ] **Step 4: Run test to verify it passes**
++
++```bash
++pnpm --filter @goldsmith/api test reports.csv.spec
++```
++
++Expected: PASS.
++
++- [ ] **Step 5: Commit**
++
++```bash
++git add apps/api/src/modules/reports/reports.csv.ts apps/api/src/modules/reports/reports.csv.spec.ts
++git commit -m "feat(ws-3a): add toLoyaltySummaryCsv emitter"
++```
++
++---
++
++## Task B5: Add `toStockAgingCsv`
++
++**Files:**
++- Modify: `apps/api/src/modules/reports/reports.csv.ts`
++- Modify: `apps/api/src/modules/reports/reports.csv.spec.ts`
++
++- [ ] **Step 1: Write the failing test**
++
++Append to `apps/api/src/modules/reports/reports.csv.spec.ts`:
++
++```typescript
++import { toStockAgingCsv } from './reports.csv';
++
++describe('toStockAgingCsv', () => {
++  it('emits item-level CSV with bucket label and null cost as empty', () => {
++    const data: StockAgingResult = {
++      buckets: [], // unused by CSV
++      items: [
++        { id: 'p1', sku: 'R-001', metal: 'GOLD', purity: '22K',
++          weightG: '5.000', daysInStock: 10, bucket: '<30d',
++          costPaise: '5000000', firstListedAt: '2026-04-15T00:00:00.000Z' },
++        { id: 'p2', sku: 'C-002', metal: 'GOLD', purity: '22K',
++          weightG: '4.000', daysInStock: 75, bucket: '60-90d',
++          costPaise: null, firstListedAt: '2026-02-15T00:00:00.000Z' },
++      ],
++    };
++    const csv = toStockAgingCsv(data);
++    const lines = csv.split('\r\n');
++    expect(lines[0]).toBe(
++      'SKU,Metal,Purity,Weight (g),Days in Stock,Age Bucket,Cost (Rs),First Listed',
++    );
++    expect(lines[1]).toBe('R-001,GOLD,22K,5.000,10,<30d,50000.00,2026-04-15T00:00:00.000Z');
++    expect(lines[2]).toBe('C-002,GOLD,22K,4.000,75,60-90d,,2026-02-15T00:00:00.000Z');
++  });
++
++  it('emits header only when no items', () => {
++    const data: StockAgingResult = { buckets: [], items: [] };
++    expect(toStockAgingCsv(data).split('\r\n')).toHaveLength(1);
++  });
++});
++```
++
++- [ ] **Step 2: Run test to verify it fails**
++
++```bash
++pnpm --filter @goldsmith/api test reports.csv.spec
++```
++
++Expected: FAIL — `Cannot find name 'toStockAgingCsv'`.
++
++- [ ] **Step 3: Implement `toStockAgingCsv`**
++
++Append to `apps/api/src/modules/reports/reports.csv.ts`:
++
++```typescript
++export function toStockAgingCsv(data: StockAgingResult): string {
++  const header = csvRow([
++    'SKU', 'Metal', 'Purity', 'Weight (g)',
++    'Days in Stock', 'Age Bucket', 'Cost (Rs)', 'First Listed',
++  ]);
++  const rows = data.items.map((it) =>
++    csvRow([
++      it.sku,
++      it.metal,
++      it.purity,
++      it.weightG,
++      it.daysInStock,
++      it.bucket,
++      it.costPaise === null ? '' : paiseToRupees(it.costPaise),
++      it.firstListedAt,
++    ]),
++  );
++  return [header, ...rows].join(LE);
++}
++```
++
++- [ ] **Step 4: Run test to verify it passes**
++
++```bash
++pnpm --filter @goldsmith/api test reports.csv.spec
++```
++
++Expected: PASS.
++
++- [ ] **Step 5: Commit**
++
++```bash
++git add apps/api/src/modules/reports/reports.csv.ts apps/api/src/modules/reports/reports.csv.spec.ts
++git commit -m "feat(ws-3a): add toStockAgingCsv emitter"
++```
++
++---
++
++## Task B6: Wire 5 `.csv` GET routes in `ReportsController`
++
++**Pattern note (from codebase):** The existing GSTR export endpoint at `apps/api/src/modules/billing/billing.controller.ts:264-279` returns `{ csv: string; filename: string }` JSON — NOT raw streamed `text/csv`. The mobile share flow then calls `Share.share({ message: csv })` (see `apps/shopkeeper/app/reports/gstr-export.tsx:39-43`). This sidesteps browser-auth complications and reuses the axios Bearer-token interceptor. The 5 new CSV endpoints follow this same pattern.
++
++**Files:**
++- Modify: `apps/api/src/modules/reports/reports.controller.ts`
++
++- [ ] **Step 1: Add the 5 routes**
++
++Replace the imports block at the top of `apps/api/src/modules/reports/reports.controller.ts` with:
++
++```typescript
++import {
++  Controller, Get, Query, ParseIntPipe, DefaultValuePipe,
++} from '@nestjs/common';
++import { TenantWalkerRoute } from '../../common/decorators/tenant-walker-route.decorator';
++import { Roles } from '../../common/decorators/roles.decorator';
++import { ReportsService } from './reports.service';
++import type {
++  DailySummaryResult, OutstandingResult, CustomerLtvItem, LoyaltySummaryResult,
++  StockAgingResult,
++} from './reports.service';
++import {
++  toDailySummaryCsv, toOutstandingCsv, toCustomerLtvCsv,
++  toLoyaltySummaryCsv, toStockAgingCsv,
++} from './reports.csv';
++```
++
++Append the following methods at the bottom of the `ReportsController` class:
++
++```typescript
++@TenantWalkerRoute({ expectedStatus: 200 })
++@Get('/daily-summary.csv')
++@Roles('shop_admin', 'shop_manager')
++async getDailySummaryCsv(
++  @Query('date') date?: string,
++): Promise<{ csv: string; filename: string }> {
++  const target = date ?? this.todayIST();
++  const data = await this.svc.getDailySummary(target);
++  return { csv: toDailySummaryCsv(data), filename: `daily-summary-${target}.csv` };
++}
++
++@TenantWalkerRoute({ expectedStatus: 200 })
++@Get('/outstanding.csv')
++@Roles('shop_admin', 'shop_manager')
++async getOutstandingCsv(): Promise<{ csv: string; filename: string }> {
++  // CSV exports the FULL list (capped at 1000 — anchor jeweller's outstanding
++  // never exceeds low hundreds; cap protects worker memory in pathological cases).
++  const data = await this.svc.getOutstanding(1, 1000);
++  return { csv: toOutstandingCsv(data), filename: `outstanding-${this.todayIST()}.csv` };
++}
++
++@TenantWalkerRoute({ expectedStatus: 200 })
++@Get('/customer-ltv.csv')
++@Roles('shop_admin', 'shop_manager')
++async getCustomerLtvCsv(
++  @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
++): Promise<{ csv: string; filename: string }> {
++  const data = await this.svc.getCustomerLtv(limit);
++  return { csv: toCustomerLtvCsv(data), filename: `customer-ltv-${this.todayIST()}.csv` };
++}
++
++@TenantWalkerRoute({ expectedStatus: 200 })
++@Get('/loyalty-summary.csv')
++@Roles('shop_admin', 'shop_manager')
++async getLoyaltySummaryCsv(): Promise<{ csv: string; filename: string }> {
++  const data = await this.svc.getLoyaltySummary();
++  return { csv: toLoyaltySummaryCsv(data), filename: `loyalty-summary-${this.todayIST()}.csv` };
++}
++
++@TenantWalkerRoute({ expectedStatus: 200 })
++@Get('/stock-aging.csv')
++@Roles('shop_admin', 'shop_manager')
++async getStockAgingCsv(): Promise<{ csv: string; filename: string }> {
++  const data = await this.svc.getStockAging();
++  return { csv: toStockAgingCsv(data), filename: `stock-aging-${this.todayIST()}.csv` };
++}
++
++private todayIST(): string {
++  return new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
++}
++```
++
++- [ ] **Step 2: Verify typecheck + endpoint walker**
++
++```bash
++pnpm --filter @goldsmith/api typecheck
++pnpm --filter @goldsmith/api test:e2e
++```
++
++Expected: typecheck PASS; endpoint-walker PASS for all 5 new `.csv` routes.
++
++- [ ] **Step 3: Commit**
++
++```bash
++git add apps/api/src/modules/reports/reports.controller.ts
++git commit -m "feat(ws-3a): wire 5 .csv sync export routes (FR119 CSV)"
++```
++
++---
++
++# WS-C — PDF async pipeline (FR119 PDF half)
++
++## Task C1: Migration 0072 — `reports_pdf_exports` table
++
++**Files:**
++- Create: `packages/db/src/migrations/0072_reports_pdf_exports.sql`
++
++- [ ] **Step 1: Write migration**
++
++Create `packages/db/src/migrations/0072_reports_pdf_exports.sql`:
++
++```sql
++-- 0072_reports_pdf_exports.sql
++-- Tracks asynchronous PDF export jobs (FR119). One row per requested PDF;
++-- status transitions QUEUED → RUNNING → READY/FAILED via reports-pdf BullMQ
++-- worker. Blob retention enforced via created_at + interval '7 days'
++-- (cleanup is a separate ops follow-up, not in this story).
++
++CREATE TABLE reports_pdf_exports (
++  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
++  shop_id               UUID NOT NULL REFERENCES shops(id) ON DELETE RESTRICT,
++  report_type           TEXT NOT NULL CHECK (report_type IN
++                          ('daily-summary','outstanding','customer-ltv',
++                           'loyalty-summary','stock-aging')),
++  params                JSONB NOT NULL DEFAULT '{}'::jsonb,
++  status                TEXT NOT NULL DEFAULT 'QUEUED' CHECK (status IN
++                          ('QUEUED','RUNNING','READY','FAILED')),
++  storage_key           TEXT,
++  error_message         TEXT,
++  requested_by_user_id  UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
++  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
++  completed_at          TIMESTAMPTZ
++);
++
++CREATE INDEX reports_pdf_exports_shop_created_idx
++  ON reports_pdf_exports (shop_id, created_at DESC);
++
++ALTER TABLE reports_pdf_exports ENABLE ROW LEVEL SECURITY;
++ALTER TABLE reports_pdf_exports FORCE ROW LEVEL SECURITY;
++
++CREATE POLICY rls_reports_pdf_exports_tenant_isolation ON reports_pdf_exports
++  FOR ALL
++  USING      (shop_id = current_setting('app.current_shop_id')::uuid)
++  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
++
++GRANT SELECT, INSERT, UPDATE ON reports_pdf_exports TO app_user;
++```
++
++- [ ] **Step 2: Run migration locally + tenant-isolation walker**
++
++```bash
++pnpm db:reset
++pnpm test:tenant-isolation
++```
++
++Expected: all migrations apply cleanly; tenant-isolation walker discovers `reports_pdf_exports` and confirms cross-tenant denial.
++
++- [ ] **Step 3: Commit**
++
++```bash
++git add packages/db/src/migrations/0072_reports_pdf_exports.sql
++git commit -m "feat(ws-3a): add reports_pdf_exports table (migration 0072)"
++```
++
++---
++
++## Task C2: Add audit-action enum entries
++
++**Files:**
++- Modify: `packages/audit/src/audit-actions.ts`
++- Test: `packages/audit/src/audit-actions.spec.ts`
++
++- [ ] **Step 1: Write the failing test**
++
++Append to `packages/audit/src/audit-actions.spec.ts`:
++
++```typescript
++describe('reports export audit actions', () => {
++  it('exposes REPORT_EXPORT_REQUESTED and REPORT_EXPORT_REGENERATED', () => {
++    expect(AuditAction.REPORT_EXPORT_REQUESTED).toBe('REPORT_EXPORT_REQUESTED');
++    expect(AuditAction.REPORT_EXPORT_REGENERATED).toBe('REPORT_EXPORT_REGENERATED');
++  });
++});
++```
++
++- [ ] **Step 2: Run test to verify it fails**
++
++```bash
++pnpm --filter @goldsmith/audit test
++```
++
++Expected: FAIL — `AuditAction.REPORT_EXPORT_REQUESTED` undefined.
++
++- [ ] **Step 3: Add enum entries**
++
++Append before the closing `}` in `packages/audit/src/audit-actions.ts`:
++
++```typescript
++  REPORT_EXPORT_REQUESTED          = 'REPORT_EXPORT_REQUESTED',
++  REPORT_EXPORT_REGENERATED        = 'REPORT_EXPORT_REGENERATED',
++```
++
++- [ ] **Step 4: Run test to verify it passes**
++
++```bash
++pnpm --filter @goldsmith/audit test
++```
++
++Expected: PASS.
++
++- [ ] **Step 5: Commit**
++
++```bash
++git add packages/audit/src/audit-actions.ts packages/audit/src/audit-actions.spec.ts
++git commit -m "feat(ws-3a): add REPORT_EXPORT_REQUESTED + _REGENERATED audit actions"
++```
++
++---
++
++## Task C3: Add `pdfkit` dep + ship Devanagari TTF assets
++
++**Files:**
++- Modify: `apps/api/package.json`
++- Create: `apps/api/assets/fonts/NotoSansDevanagari-Regular.ttf` (binary download)
++- Create: `apps/api/assets/fonts/NotoSansDevanagari-Bold.ttf` (binary download)
++- Modify: `apps/api/tsconfig.build.json` (if it excludes `assets/`)
++
++- [ ] **Step 1: Add deps**
++
++Edit `apps/api/package.json` — add `pdfkit` to `dependencies` (alphabetical order, after `passport-http-bearer`):
++
++```json
++    "pdfkit": "^0.15.0",
++```
++
++Add `@types/pdfkit` to `devDependencies` (alphabetical order, after `@types/passport-http-bearer`):
++
++```json
++    "@types/pdfkit": "^0.13.4",
++```
++
++Install:
++
++```bash
++pnpm install --filter @goldsmith/api
++```
++
++- [ ] **Step 2: Download Noto Sans Devanagari TTFs**
++
++Both files come from Google Fonts (SIL Open Font License). Use the static-TTF URLs from the official `notofonts/devanagari` GitHub:
++
++```bash
++mkdir -p apps/api/assets/fonts
++curl -L -o apps/api/assets/fonts/NotoSansDevanagari-Regular.ttf \
++  https://github.com/notofonts/devanagari/raw/main/fonts/NotoSansDevanagari/hinted/ttf/NotoSansDevanagari-Regular.ttf
++curl -L -o apps/api/assets/fonts/NotoSansDevanagari-Bold.ttf \
++  https://github.com/notofonts/devanagari/raw/main/fonts/NotoSansDevanagari/hinted/ttf/NotoSansDevanagari-Bold.ttf
++```
++
++Verify both files are non-empty TTFs:
++
++```bash
++file apps/api/assets/fonts/NotoSansDevanagari-Regular.ttf
++file apps/api/assets/fonts/NotoSansDevanagari-Bold.ttf
++```
++
++Expected: both report `TrueType Font data`. Files should be roughly 200-400 KB each.
++
++- [ ] **Step 3: Confirm assets are bundled at build time**
++
++Open `apps/api/tsconfig.build.json` (or `tsconfig.json` if no build variant). The default Nest build uses `tsc` which only emits `.ts → .js`; static assets aren't copied. We bundle by referencing them via absolute path at runtime (`path.resolve(__dirname, '../assets/fonts/...')` from `dist/`), so a post-build copy is needed. Add a `"copy-assets"` step.
++
++Edit `apps/api/package.json` `scripts.build` to use a portable Node-based copy (works on Windows + Linux runners — avoids `cp -r` shell-dependency):
++
++```json
++"build": "tsc -p tsconfig.build.json && node -e \"require('fs').cpSync('assets','dist/assets',{recursive:true})\"",
++```
++
++- [ ] **Step 4: Verify install + typecheck**
++
++```bash
++pnpm --filter @goldsmith/api typecheck
++```
++
++Expected: PASS.
++
++- [ ] **Step 5: Commit**
++
++```bash
++git add apps/api/package.json apps/api/assets/fonts/NotoSansDevanagari-Regular.ttf apps/api/assets/fonts/NotoSansDevanagari-Bold.ttf pnpm-lock.yaml
++git commit -m "feat(ws-3a): add pdfkit + Noto Sans Devanagari font assets"
++```
++
++---
++
++## Task C4: `BrandingLoader`
++
++**Files:**
++- Create: `apps/api/src/modules/reports/pdf/branding.ts`
++
++- [ ] **Step 1: Implement** (no tests — pure SQL passthrough; covered indirectly by renderer.spec.ts in Task C6+)
++
++Create `apps/api/src/modules/reports/pdf/branding.ts`:
++
++```typescript
++import { Inject, Injectable, NotFoundException } from '@nestjs/common';
++import type { Pool } from 'pg';
++import { withTenantTx } from '@goldsmith/db';
++import { tenantContext } from '@goldsmith/tenant-context';
++
++export interface ShopBranding {
++  displayName: string;
++  logoUrl: string | null;
++  addressText: string;
++  gstin: string | null;
++  contactPhone: string | null;
++}
++
++@Injectable()
++export class BrandingLoader {
++  constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
++
++  async load(): Promise<ShopBranding> {
++    const ctx = tenantContext.requireCurrent();
++    return withTenantTx(this.pool, async (tx) => {
++      const r = await tx.query<{
++        display_name:    string;
++        logo_url:        string | null;
++        address_json:    Record<string, unknown> | null;
++        gstin:           string | null;
++        contact_phone:   string | null;
++      }>(
++        `SELECT display_name, logo_url, address_json, gstin, contact_phone
++         FROM shops
++         WHERE id = $1`,
++        [ctx.shopId],
++      );
++      if (!r.rows[0]) throw new NotFoundException({ code: 'shop.not_found' });
++      const row = r.rows[0];
++      return {
++        displayName:  row.display_name,
++        logoUrl:      row.logo_url,
++        addressText:  row.address_json ? this.formatAddress(row.address_json) : '',
++        gstin:        row.gstin,
++        contactPhone: row.contact_phone,
++      };
++    });
++  }
++
++  private formatAddress(addr: Record<string, unknown>): string {
++    return [addr['line1'], addr['line2'], addr['city'], addr['state'], addr['pincode']]
++      .filter(Boolean)
++      .join(', ');
++  }
++}
++```
++
++- [ ] **Step 2: Verify typecheck**
++
++```bash
++pnpm --filter @goldsmith/api typecheck
++```
++
++Expected: PASS.
++
++- [ ] **Step 3: Commit**
++
++```bash
++git add apps/api/src/modules/reports/pdf/branding.ts
++git commit -m "feat(ws-3a): add BrandingLoader for PDF reports"
++```
++
++---
++
++## Task C5: `drawHeader` + `drawFooter` PDF primitives
++
++**Files:**
++- Create: `apps/api/src/modules/reports/pdf/header.ts`
++- Create: `apps/api/src/modules/reports/pdf/footer.ts`
++
++- [ ] **Step 1: Implement `drawHeader`**
++
++Create `apps/api/src/modules/reports/pdf/header.ts`:
++
++```typescript
++import type PDFDocument from 'pdfkit';
++import type { ShopBranding } from './branding';
++import type { StoragePort } from '@goldsmith/integrations-storage';
++
++const GOLD = '#B58A3C';
++
++/**
++ * Draws shop branding header on the current page.
++ * Returns the Y coordinate just below the header (where body content should start).
++ *
++ * Logo is fetched once per render via storage.downloadBuffer if logoUrl points to
++ * a tenant blob key; if logoUrl is empty/null/external-http, no logo is drawn.
++ */
++export async function drawHeader(
++  doc: PDFKit.PDFDocument,
++  branding: ShopBranding,
++  reportTitle: string,
++  storage: StoragePort,
++): Promise<number> {
++  const startY = doc.y;
++
++  // Logo (left)
++  let logoBottom = startY;
++  if (branding.logoUrl && branding.logoUrl.startsWith('tenants/')) {
++    try {
++      const buf = await storage.downloadBuffer(branding.logoUrl);
++      doc.image(buf, doc.page.margins.left, startY, { fit: [80, 40] });
++      logoBottom = startY + 40;
++    } catch {
++      // Best-effort; missing logo blob doesn't fail the render
++    }
++  }
++
++  // Shop name + report title (centre)
++  doc.font('Devanagari-Bold').fontSize(18).fillColor('#1c1917');
++  doc.text(branding.displayName, doc.page.margins.left + 90, startY, {
++    width: doc.page.width - doc.page.margins.left - doc.page.margins.right - 90,
++  });
++  doc.font('Devanagari').fontSize(14).fillColor(GOLD);
++  doc.text(reportTitle, doc.page.margins.left + 90, doc.y + 2);
++
++  // Generated-at (right)
++  const generatedAt = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
++  doc.font('Devanagari').fontSize(9).fillColor('#78716c');
++  doc.text(`Generated: ${generatedAt}`, doc.page.margins.left, startY, {
++    align: 'right',
++    width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
++  });
++
++  // Divider line
++  const dividerY = Math.max(logoBottom, doc.y) + 8;
++  doc.moveTo(doc.page.margins.left, dividerY)
++     .lineTo(doc.page.width - doc.page.margins.right, dividerY)
++     .strokeColor(GOLD).lineWidth(1).stroke();
++
++  doc.fillColor('#1c1917').strokeColor('#000');
++  doc.y = dividerY + 12;
++  return doc.y;
++}
++```
++
++- [ ] **Step 2: Implement `drawFooter`**
++
++Create `apps/api/src/modules/reports/pdf/footer.ts`:
++
++```typescript
++import type { ShopBranding } from './branding';
++
++/**
++ * Draws shop address + GSTIN + page N of M at the bottom of the current page.
++ * Called once per page; uses absolute Y near the page bottom rather than doc.y.
++ */
++export function drawFooter(
++  doc: PDFKit.PDFDocument,
++  branding: ShopBranding,
++  pageNum: number,
++  totalPages: number,
++): void {
++  const footerY = doc.page.height - doc.page.margins.bottom + 8;
++  const left = doc.page.margins.left;
++  const right = doc.page.width - doc.page.margins.right;
++
++  doc.font('Devanagari').fontSize(8).fillColor('#78716c');
++
++  // Address line (left)
++  if (branding.addressText) {
++    doc.text(branding.addressText, left, footerY, {
++      width: right - left - 100,
++      lineBreak: false,
++      ellipsis: true,
++    });
++  }
++
++  // GSTIN line under address
++  if (branding.gstin) {
++    doc.text(`GSTIN: ${branding.gstin}`, left, footerY + 10, {
++      width: right - left - 100,
++    });
++  }
++
++  // Page N of M (right)
++  doc.text(`Page ${pageNum} of ${totalPages}`, left, footerY, {
++    align: 'right',
++    width: right - left,
++  });
++
++  doc.fillColor('#1c1917');
++}
++```
++
++- [ ] **Step 3: Verify typecheck**
++
++```bash
++pnpm --filter @goldsmith/api typecheck
++```
++
++Expected: PASS.
++
++- [ ] **Step 4: Commit**
++
++```bash
++git add apps/api/src/modules/reports/pdf/header.ts apps/api/src/modules/reports/pdf/footer.ts
++git commit -m "feat(ws-3a): add PDF header/footer primitives"
++```
++
++---
++
++## Task C6: `PdfRenderer` service + daily-summary template
++
++**Files:**
++- Create: `apps/api/src/modules/reports/pdf/renderer.ts`
++- Create: `apps/api/src/modules/reports/pdf/templates/daily-summary.ts`
++- Create: `apps/api/src/modules/reports/pdf/renderer.spec.ts`
++
++- [ ] **Step 1: Write the failing test**
++
++Create `apps/api/src/modules/reports/pdf/renderer.spec.ts`:
++
++```typescript
++import { describe, expect, it, vi } from 'vitest';
++import { PdfRenderer } from './renderer';
++import type { ShopBranding } from './branding';
++import type { DailySummaryResult } from '../reports.service';
++
++const mockStorage = {
++  downloadBuffer: vi.fn().mockRejectedValue(new Error('no logo')),
++  uploadBuffer: vi.fn(),
++  getPublicUrl: vi.fn(),
++  getPresignedReadUrl: vi.fn(),
++  getPresignedUploadUrl: vi.fn(),
++  deleteBlob: vi.fn(),
++};
++
++const branding: ShopBranding = {
++  displayName: 'टेस्ट ज्वैलर्स',
++  logoUrl: null,
++  addressText: 'Ayodhya, UP, 224001',
++  gstin: '09ABCDE1234F1Z5',
++  contactPhone: '9876543210',
++};
++
++describe('PdfRenderer.render(daily-summary)', () => {
++  it('produces a non-empty PDF buffer with %PDF- magic bytes', async () => {
++    const renderer = new PdfRenderer(mockStorage);
++    const data: DailySummaryResult = {
++      date: '2026-04-29',
++      total_paise: '500000', cash_paise: '300000',
++      upi_paise: '200000', other_paise: '0',
++      invoice_count: 3, gold_weight_mg: '15000',
++    };
++    const buf = await renderer.render('daily-summary', data, branding);
++    expect(buf.length).toBeGreaterThan(1000);
++    expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
++  });
++});
++```
++
++- [ ] **Step 2: Run test to verify it fails**
++
++```bash
++pnpm --filter @goldsmith/api test renderer.spec
++```
++
++Expected: FAIL — `Cannot find module './renderer'`.
++
++- [ ] **Step 3: Implement `PdfRenderer`**
++
++Create `apps/api/src/modules/reports/pdf/renderer.ts`:
++
++```typescript
++import { Injectable, Inject } from '@nestjs/common';
++import * as path from 'node:path';
++import PDFDocument from 'pdfkit';
++import { STORAGE_PORT } from '@goldsmith/integrations-storage';
++import type { StoragePort } from '@goldsmith/integrations-storage';
++import type { ShopBranding } from './branding';
++import type {
++  DailySummaryResult, OutstandingResult, CustomerLtvItem,
++  LoyaltySummaryResult, StockAgingResult,
++} from '../reports.service';
++import { renderDailySummary } from './templates/daily-summary';
++
++const FONT_DIR = path.resolve(__dirname, '../../../../assets/fonts');
++
++export type ReportType =
++  | 'daily-summary' | 'outstanding' | 'customer-ltv'
++  | 'loyalty-summary' | 'stock-aging';
++
++export type ReportData =
++  | DailySummaryResult | OutstandingResult | CustomerLtvItem[]
++  | LoyaltySummaryResult | StockAgingResult;
++
++@Injectable()
++export class PdfRenderer {
++  constructor(@Inject(STORAGE_PORT) private readonly storage: StoragePort) {}
++
++  async render(
++    reportType: ReportType,
++    data: ReportData,
++    branding: ShopBranding,
++  ): Promise<Buffer> {
++    const doc = new PDFDocument({
++      size: 'A4',
++      margins: { top: 36, bottom: 60, left: 36, right: 36 },
++      bufferPages: true,
++    });
++
++    // Register Devanagari fonts; fallback to Helvetica if asset missing.
++    try {
++      doc.registerFont('Devanagari',      path.join(FONT_DIR, 'NotoSansDevanagari-Regular.ttf'));
++      doc.registerFont('Devanagari-Bold', path.join(FONT_DIR, 'NotoSansDevanagari-Bold.ttf'));
++    } catch {
++      doc.registerFont('Devanagari',      'Helvetica');
++      doc.registerFont('Devanagari-Bold', 'Helvetica-Bold');
++    }
++
++    const chunks: Buffer[] = [];
++    doc.on('data', (c: Buffer) => chunks.push(c));
++    const done = new Promise<void>((resolve) => doc.on('end', () => resolve()));
++
++    switch (reportType) {
++      case 'daily-summary':
++        await renderDailySummary(doc, data as DailySummaryResult, branding, this.storage);
++        break;
++      // outstanding / customer-ltv / loyalty-summary / stock-aging added in
++      // Tasks C7–C10. Until then, throw to fail fast.
++      default:
++        throw new Error(`reports.pdf.template_not_implemented:${reportType}`);
++    }
++
++    doc.end();
++    await done;
++    return Buffer.concat(chunks);
++  }
++}
++```
++
++- [ ] **Step 4: Implement daily-summary template**
++
++Create `apps/api/src/modules/reports/pdf/templates/daily-summary.ts`:
++
++```typescript
++import { drawHeader } from '../header';
++import { drawFooter } from '../footer';
++import type { ShopBranding } from '../branding';
++import type { DailySummaryResult } from '../../reports.service';
++import type { StoragePort } from '@goldsmith/integrations-storage';
++
++function formatINR(paise: bigint | string | number): string {
++  return `₹${(Number(paise) / 100).toLocaleString('en-IN', {
++    minimumFractionDigits: 2, maximumFractionDigits: 2,
++  })}`;
++}
++
++function formatGrams(mg: string | number): string {
++  return `${(Number(mg) / 1000).toFixed(3)} g`;
++}
++
++export async function renderDailySummary(
++  doc: PDFKit.PDFDocument,
++  data: DailySummaryResult,
++  branding: ShopBranding,
++  storage: StoragePort,
++): Promise<void> {
++  await drawHeader(doc, branding, `दैनिक बिक्री / Daily Summary — ${data.date}`, storage);
++
++  const left = doc.page.margins.left;
++  const right = doc.page.width - doc.page.margins.right;
++  const labelX = left;
++  const valueX = right;
++
++  doc.font('Devanagari').fontSize(12).fillColor('#1c1917');
++
++  const rows: [label: string, value: string][] = [
++    ['कुल बिक्री / Total Sales',   formatINR(data.total_paise)],
++    ['नकद / Cash',                  formatINR(data.cash_paise)],
++    ['UPI',                          formatINR(data.upi_paise)],
++    ['अन्य / Other',                 formatINR(data.other_paise)],
++    ['चालान संख्या / Invoice Count', `${data.invoice_count}`],
++    ['सोना बिका / Gold Sold',        formatGrams(data.gold_weight_mg)],
++  ];
++
++  for (const [label, value] of rows) {
++    const y = doc.y;
++    doc.text(label, labelX, y, { width: right - left - 120 });
++    doc.text(value, labelX, y, {
++      width: right - left,
++      align: 'right',
++    });
++    doc.moveDown(0.5);
++    doc.moveTo(left, doc.y).lineTo(right, doc.y)
++       .strokeColor('#e7e5e4').lineWidth(0.5).stroke();
++    doc.moveDown(0.4);
++  }
++
++  // Footer on this single page
++  doc.flushPages();
++  const range = doc.bufferedPageRange();
++  for (let i = range.start; i < range.start + range.count; i++) {
++    doc.switchToPage(i);
++    drawFooter(doc, branding, i - range.start + 1, range.count);
++  }
++}
++```
++
++- [ ] **Step 5: Run test to verify it passes**
++
++```bash
++pnpm --filter @goldsmith/api test renderer.spec
++```
++
++Expected: PASS — buffer non-empty + `%PDF-` magic bytes.
++
++- [ ] **Step 6: Commit**
++
++```bash
++git add apps/api/src/modules/reports/pdf/renderer.ts apps/api/src/modules/reports/pdf/renderer.spec.ts apps/api/src/modules/reports/pdf/templates/daily-summary.ts
++git commit -m "feat(ws-3a): add PdfRenderer + daily-summary template"
++```
++
++---
++
++## Task C7: Outstanding template
++
++**Files:**
++- Create: `apps/api/src/modules/reports/pdf/templates/outstanding.ts`
++- Modify: `apps/api/src/modules/reports/pdf/renderer.ts`
++- Modify: `apps/api/src/modules/reports/pdf/renderer.spec.ts`
++
++- [ ] **Step 1: Append to test**
++
++Append to `apps/api/src/modules/reports/pdf/renderer.spec.ts`:
++
++```typescript
++describe('PdfRenderer.render(outstanding)', () => {
++  it('produces a non-empty PDF buffer with %PDF- magic bytes', async () => {
++    const renderer = new PdfRenderer(mockStorage);
++    const data = {
++      total: 1, page: 1, limit: 100,
++      items: [{
++        id: 'i1', invoice_number: 'GS-2026-0001',
++        customer_name: 'राज कुमार', customer_phone: '9876543210',
++        total_paise: '100000', balance_due_paise: '50000',
++        issued_at: '2026-04-01T10:00:00.000Z',
++      }],
++    };
++    const buf = await renderer.render('outstanding', data, branding);
++    expect(buf.length).toBeGreaterThan(1000);
++    expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
++  });
++});
++```
++
++- [ ] **Step 2: Run test to verify it fails**
++
++```bash
++pnpm --filter @goldsmith/api test renderer.spec
++```
++
++Expected: FAIL — `reports.pdf.template_not_implemented:outstanding`.
++
++- [ ] **Step 3: Implement outstanding template**
++
++Create `apps/api/src/modules/reports/pdf/templates/outstanding.ts`:
++
++```typescript
++import { drawHeader } from '../header';
++import { drawFooter } from '../footer';
++import type { ShopBranding } from '../branding';
++import type { OutstandingResult } from '../../reports.service';
++import type { StoragePort } from '@goldsmith/integrations-storage';
++
++function formatINR(paise: string | number): string {
++  return (Number(paise) / 100).toLocaleString('en-IN', {
++    minimumFractionDigits: 2, maximumFractionDigits: 2,
++  });
++}
++
++function formatDate(iso: string | null): string {
++  if (!iso) return '—';
++  return new Date(iso).toLocaleDateString('en-IN', {
++    day: '2-digit', month: 'short', year: 'numeric',
++  });
++}
++
++export async function renderOutstanding(
++  doc: PDFKit.PDFDocument,
++  data: OutstandingResult,
++  branding: ShopBranding,
++  storage: StoragePort,
++): Promise<void> {
++  await drawHeader(doc, branding, 'बकाया भुगतान / Outstanding Payments', storage);
++
++  const left = doc.page.margins.left;
++  const right = doc.page.width - doc.page.margins.right;
++  const tableWidth = right - left;
++  const cols = [
++    { key: 'invoice', label: 'Invoice',    w: 0.18 },
++    { key: 'name',    label: 'Customer',   w: 0.32 },
++    { key: 'phone',   label: 'Phone',      w: 0.16 },
++    { key: 'total',   label: 'Total (Rs)', w: 0.13 },
++    { key: 'due',     label: 'Due (Rs)',   w: 0.11 },
++    { key: 'date',    label: 'Issued',     w: 0.10 },
++  ];
++
++  // Header row
++  doc.font('Devanagari-Bold').fontSize(10).fillColor('#57534e');
++  let x = left;
++  for (const c of cols) {
++    doc.text(c.label, x, doc.y, { width: tableWidth * c.w, continued: false });
++    x += tableWidth * c.w;
++  }
++  doc.moveDown(0.3);
++  doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor('#B58A3C').lineWidth(1).stroke();
++  doc.moveDown(0.3);
++
++  // Body rows
++  doc.font('Devanagari').fontSize(9).fillColor('#1c1917');
++  for (const it of data.items) {
++    const rowY = doc.y;
++    if (rowY > doc.page.height - doc.page.margins.bottom - 80) {
++      doc.addPage();
++      await drawHeader(doc, branding, 'बकाया भुगतान / Outstanding Payments (cont.)', storage);
++    }
++    x = left;
++    const cells = [
++      it.invoice_number,
++      it.customer_name,
++      it.customer_phone ?? '',
++      formatINR(it.total_paise),
++      formatINR(it.balance_due_paise),
++      formatDate(it.issued_at),
++    ];
++    for (let i = 0; i < cols.length; i++) {
++      doc.text(cells[i]!, x, rowY, {
++        width: tableWidth * cols[i]!.w,
++        ellipsis: true,
++        lineBreak: false,
++      });
++      x += tableWidth * cols[i]!.w;
++    }
++    doc.moveDown(0.5);
++    doc.moveTo(left, doc.y).lineTo(right, doc.y)
++       .strokeColor('#e7e5e4').lineWidth(0.5).stroke();
++    doc.moveDown(0.3);
++  }
++
++  // Footer per page
++  doc.flushPages();
++  const range = doc.bufferedPageRange();
++  for (let i = range.start; i < range.start + range.count; i++) {
++    doc.switchToPage(i);
++    drawFooter(doc, branding, i - range.start + 1, range.count);
++  }
++}
++```
++
++- [ ] **Step 4: Wire into renderer**
++
++Edit `apps/api/src/modules/reports/pdf/renderer.ts` — add import and case:
++
++```typescript
++import { renderOutstanding } from './templates/outstanding';
++```
++
++Replace the `switch` block with:
++```typescript
++switch (reportType) {
++  case 'daily-summary':
++    await renderDailySummary(doc, data as DailySummaryResult, branding, this.storage);
++    break;
++  case 'outstanding':
++    await renderOutstanding(doc, data as OutstandingResult, branding, this.storage);
++    break;
++  default:
++    throw new Error(`reports.pdf.template_not_implemented:${reportType}`);
++}
++```
++
++- [ ] **Step 5: Run test to verify it passes**
++
++```bash
++pnpm --filter @goldsmith/api test renderer.spec
++```
++
++Expected: PASS.
++
++- [ ] **Step 6: Commit**
++
++```bash
++git add apps/api/src/modules/reports/pdf/templates/outstanding.ts apps/api/src/modules/reports/pdf/renderer.ts apps/api/src/modules/reports/pdf/renderer.spec.ts
++git commit -m "feat(ws-3a): add outstanding PDF template"
++```
++
++---
++
++## Task C8: Customer LTV template
++
++**Files:**
++- Create: `apps/api/src/modules/reports/pdf/templates/customer-ltv.ts`
++- Modify: `apps/api/src/modules/reports/pdf/renderer.ts`
++- Modify: `apps/api/src/modules/reports/pdf/renderer.spec.ts`
++
++- [ ] **Step 1: Append to test**
++
++Append to `apps/api/src/modules/reports/pdf/renderer.spec.ts`:
++
++```typescript
++describe('PdfRenderer.render(customer-ltv)', () => {
++  it('produces a non-empty PDF buffer', async () => {
++    const renderer = new PdfRenderer(mockStorage);
++    const data = [
++      { customer_id: 'c1', name: 'रमेश सिंह', phone: '9900000001', ltv_paise: '2000000' },
++      { customer_id: 'c2', name: 'सुमन देवी', phone: '9900000002', ltv_paise: '1500000' },
++    ];
++    const buf = await renderer.render('customer-ltv', data, branding);
++    expect(buf.length).toBeGreaterThan(1000);
++    expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
++  });
++});
++```
++
++- [ ] **Step 2: Run test to verify it fails**
++
++```bash
++pnpm --filter @goldsmith/api test renderer.spec
++```
++
++Expected: FAIL — template not implemented.
++
++- [ ] **Step 3: Implement customer-ltv template**
++
++Create `apps/api/src/modules/reports/pdf/templates/customer-ltv.ts`:
++
++```typescript
++import { drawHeader } from '../header';
++import { drawFooter } from '../footer';
++import type { ShopBranding } from '../branding';
++import type { CustomerLtvItem } from '../../reports.service';
++import type { StoragePort } from '@goldsmith/integrations-storage';
++
++function formatINR(paise: string): string {
++  return (Number(paise) / 100).toLocaleString('en-IN', {
++    minimumFractionDigits: 2, maximumFractionDigits: 2,
++  });
++}
++
++export async function renderCustomerLtv(
++  doc: PDFKit.PDFDocument,
++  items: CustomerLtvItem[],
++  branding: ShopBranding,
++  storage: StoragePort,
++): Promise<void> {
++  await drawHeader(doc, branding, 'शीर्ष ग्राहक / Top Customers (Lifetime Value)', storage);
++
++  const left = doc.page.margins.left;
++  const right = doc.page.width - doc.page.margins.right;
++  const tableWidth = right - left;
++  const cols = [
++    { label: 'Rank',          w: 0.08 },
++    { label: 'Customer',      w: 0.45 },
++    { label: 'Phone',         w: 0.22 },
++    { label: 'LTV (Rs)',      w: 0.25 },
++  ];
++
++  doc.font('Devanagari-Bold').fontSize(10).fillColor('#57534e');
++  let x = left;
++  for (const c of cols) {
++    doc.text(c.label, x, doc.y, { width: tableWidth * c.w });
++    x += tableWidth * c.w;
++  }
++  doc.moveDown(0.3);
++  doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor('#B58A3C').lineWidth(1).stroke();
++  doc.moveDown(0.3);
++
++  doc.font('Devanagari').fontSize(10).fillColor('#1c1917');
++  items.forEach((it, idx) => {
++    const rowY = doc.y;
++    if (rowY > doc.page.height - doc.page.margins.bottom - 80) {
++      doc.addPage();
++    }
++    x = left;
++    const cells = [
++      `${idx + 1}`,
++      it.name,
++      it.phone,
++      formatINR(it.ltv_paise),
++    ];
++    for (let i = 0; i < cols.length; i++) {
++      doc.text(cells[i]!, x, rowY, {
++        width: tableWidth * cols[i]!.w,
++        ellipsis: true,
++        lineBreak: false,
++      });
++      x += tableWidth * cols[i]!.w;
++    }
++    doc.moveDown(0.5);
++  });
++
++  doc.flushPages();
++  const range = doc.bufferedPageRange();
++  for (let i = range.start; i < range.start + range.count; i++) {
++    doc.switchToPage(i);
++    drawFooter(doc, branding, i - range.start + 1, range.count);
++  }
++}
++```
++
++- [ ] **Step 4: Wire into renderer**
++
++Edit `apps/api/src/modules/reports/pdf/renderer.ts` — add import and case:
++
++```typescript
++import { renderCustomerLtv } from './templates/customer-ltv';
++```
++
++Add a case to the switch:
++```typescript
++case 'customer-ltv':
++  await renderCustomerLtv(doc, data as CustomerLtvItem[], branding, this.storage);
++  break;
++```
++
++- [ ] **Step 5: Run test to verify it passes**
++
++```bash
++pnpm --filter @goldsmith/api test renderer.spec
++```
++
++Expected: PASS.
++
++- [ ] **Step 6: Commit**
++
++```bash
++git add apps/api/src/modules/reports/pdf/templates/customer-ltv.ts apps/api/src/modules/reports/pdf/renderer.ts apps/api/src/modules/reports/pdf/renderer.spec.ts
++git commit -m "feat(ws-3a): add customer-ltv PDF template"
++```
++
++---
++
++## Task C9: Loyalty summary template
++
++**Files:**
++- Create: `apps/api/src/modules/reports/pdf/templates/loyalty-summary.ts`
++- Modify: `apps/api/src/modules/reports/pdf/renderer.ts`
++- Modify: `apps/api/src/modules/reports/pdf/renderer.spec.ts`
++
++- [ ] **Step 1: Append to test**
++
++Append to `apps/api/src/modules/reports/pdf/renderer.spec.ts`:
++
++```typescript
++describe('PdfRenderer.render(loyalty-summary)', () => {
++  it('produces a non-empty PDF buffer', async () => {
++    const renderer = new PdfRenderer(mockStorage);
++    const data = {
++      points_issued: 5000, points_redeemed: 1200,
++      members_by_tier: [
++        { tier: 'GOLD',   count: 12 },
++        { tier: 'SILVER', count: 8 },
++        { tier: null,     count: 3 },
++      ],
++    };
++    const buf = await renderer.render('loyalty-summary', data, branding);
++    expect(buf.length).toBeGreaterThan(1000);
++    expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
++  });
++});
++```
++
++- [ ] **Step 2: Run test to verify it fails**
++
++```bash
++pnpm --filter @goldsmith/api test renderer.spec
++```
++
++Expected: FAIL — template not implemented.
++
++- [ ] **Step 3: Implement loyalty-summary template**
++
++Create `apps/api/src/modules/reports/pdf/templates/loyalty-summary.ts`:
++
++```typescript
++import { drawHeader } from '../header';
++import { drawFooter } from '../footer';
++import type { ShopBranding } from '../branding';
++import type { LoyaltySummaryResult } from '../../reports.service';
++import type { StoragePort } from '@goldsmith/integrations-storage';
++
++export async function renderLoyaltySummary(
++  doc: PDFKit.PDFDocument,
++  data: LoyaltySummaryResult,
++  branding: ShopBranding,
++  storage: StoragePort,
++): Promise<void> {
++  await drawHeader(doc, branding, 'लॉयल्टी कार्यक्रम / Loyalty Programme', storage);
++
++  const left = doc.page.margins.left;
++  const right = doc.page.width - doc.page.margins.right;
++
++  // Totals card
++  doc.font('Devanagari-Bold').fontSize(13).fillColor('#1c1917');
++  doc.text('अंक सारांश / Points Summary', left, doc.y);
++  doc.moveDown(0.3);
++
++  doc.font('Devanagari').fontSize(11).fillColor('#1c1917');
++  const totalRows: [string, string][] = [
++    ['जारी / Issued',      `${data.points_issued}`],
++    ['भुनाए / Redeemed',   `${data.points_redeemed}`],
++    ['शुद्ध / Net',         `${data.points_issued - data.points_redeemed}`],
++  ];
++  for (const [label, value] of totalRows) {
++    const y = doc.y;
++    doc.text(label, left, y);
++    doc.text(value, left, y, { width: right - left, align: 'right' });
++    doc.moveDown(0.4);
++  }
++
++  doc.moveDown(0.5);
++  doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor('#B58A3C').lineWidth(1).stroke();
++  doc.moveDown(0.5);
++
++  // Tier breakdown
++  doc.font('Devanagari-Bold').fontSize(13).fillColor('#1c1917');
++  doc.text('स्तर के अनुसार / By Tier', left, doc.y);
++  doc.moveDown(0.3);
++
++  doc.font('Devanagari').fontSize(11).fillColor('#1c1917');
++  for (const t of data.members_by_tier) {
++    const y = doc.y;
++    doc.text(t.tier ?? 'UNTIERED', left, y);
++    doc.text(`${t.count}`, left, y, { width: right - left, align: 'right' });
++    doc.moveDown(0.4);
++  }
++
++  doc.flushPages();
++  const range = doc.bufferedPageRange();
++  for (let i = range.start; i < range.start + range.count; i++) {
++    doc.switchToPage(i);
++    drawFooter(doc, branding, i - range.start + 1, range.count);
++  }
++}
++```
++
++- [ ] **Step 4: Wire into renderer**
++
++Edit `apps/api/src/modules/reports/pdf/renderer.ts` — add import and case:
++
++```typescript
++import { renderLoyaltySummary } from './templates/loyalty-summary';
++```
++
++```typescript
++case 'loyalty-summary':
++  await renderLoyaltySummary(doc, data as LoyaltySummaryResult, branding, this.storage);
++  break;
++```
++
++- [ ] **Step 5: Run test to verify it passes**
++
++```bash
++pnpm --filter @goldsmith/api test renderer.spec
++```
++
++Expected: PASS.
++
++- [ ] **Step 6: Commit**
++
++```bash
++git add apps/api/src/modules/reports/pdf/templates/loyalty-summary.ts apps/api/src/modules/reports/pdf/renderer.ts apps/api/src/modules/reports/pdf/renderer.spec.ts
++git commit -m "feat(ws-3a): add loyalty-summary PDF template"
++```
++
++---
++
++## Task C10: Stock-aging template
++
++**Files:**
++- Create: `apps/api/src/modules/reports/pdf/templates/stock-aging.ts`
++- Modify: `apps/api/src/modules/reports/pdf/renderer.ts`
++- Modify: `apps/api/src/modules/reports/pdf/renderer.spec.ts`
++
++- [ ] **Step 1: Append to test**
++
++Append to `apps/api/src/modules/reports/pdf/renderer.spec.ts`:
++
++```typescript
++describe('PdfRenderer.render(stock-aging)', () => {
++  it('produces a non-empty PDF buffer with bucket summary + items', async () => {
++    const renderer = new PdfRenderer(mockStorage);
++    const data = {
++      buckets: [
++        { label: '<30d',   count: 2, totalWeightMg: '8000', totalCostPaise: '8000000' },
++        { label: '30-60d', count: 1, totalWeightMg: '50000', totalCostPaise: '500000' },
++        { label: '60-90d', count: 1, totalWeightMg: '4000',  totalCostPaise: '0' },
++        { label: '90d+',   count: 1, totalWeightMg: '8000',  totalCostPaise: '8000000' },
++      ],
++      items: [
++        { id: 'p1', sku: 'R-001', metal: 'GOLD', purity: '22K',
++          weightG: '5.000', daysInStock: 10, bucket: '<30d',
++          costPaise: '5000000', firstListedAt: '2026-04-15T00:00:00.000Z' },
++      ],
++    };
++    const buf = await renderer.render('stock-aging', data as never, branding);
++    expect(buf.length).toBeGreaterThan(1000);
++    expect(buf.slice(0, 5).toString('ascii')).toBe('%PDF-');
++  });
++});
++```
++
++- [ ] **Step 2: Run test to verify it fails**
++
++```bash
++pnpm --filter @goldsmith/api test renderer.spec
++```
++
++Expected: FAIL — template not implemented.
++
++- [ ] **Step 3: Implement stock-aging template**
++
++Create `apps/api/src/modules/reports/pdf/templates/stock-aging.ts`:
++
++```typescript
++import { drawHeader } from '../header';
++import { drawFooter } from '../footer';
++import type { ShopBranding } from '../branding';
++import type { StockAgingResult } from '../../reports.service';
++import type { StoragePort } from '@goldsmith/integrations-storage';
++
++function formatGrams(mg: string): string {
++  return `${(Number(mg) / 1000).toFixed(3)} g`;
++}
++
++function formatINR(paise: string): string {
++  return (Number(paise) / 100).toLocaleString('en-IN', {
++    minimumFractionDigits: 2, maximumFractionDigits: 2,
++  });
++}
++
++export async function renderStockAging(
++  doc: PDFKit.PDFDocument,
++  data: StockAgingResult,
++  branding: ShopBranding,
++  storage: StoragePort,
++): Promise<void> {
++  await drawHeader(doc, branding, 'पुराना स्टॉक / Stock Aging', storage);
++
++  const left = doc.page.margins.left;
++  const right = doc.page.width - doc.page.margins.right;
++  const tableWidth = right - left;
++
++  // Bucket summary
++  doc.font('Devanagari-Bold').fontSize(12).fillColor('#1c1917');
++  doc.text('आयु सारांश / Age Summary', left, doc.y);
++  doc.moveDown(0.3);
++
++  const bucketCols = [
++    { label: 'Bucket',    w: 0.20 },
++    { label: 'Items',     w: 0.20 },
++    { label: 'Weight',    w: 0.30 },
++    { label: 'Cost (Rs)', w: 0.30 },
++  ];
++  doc.font('Devanagari-Bold').fontSize(10).fillColor('#57534e');
++  let x = left;
++  for (const c of bucketCols) {
++    doc.text(c.label, x, doc.y, { width: tableWidth * c.w });
++    x += tableWidth * c.w;
++  }
++  doc.moveDown(0.3);
++  doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor('#B58A3C').lineWidth(1).stroke();
++  doc.moveDown(0.3);
++
++  doc.font('Devanagari').fontSize(10).fillColor('#1c1917');
++  for (const b of data.buckets) {
++    const y = doc.y;
++    x = left;
++    const cells = [b.label, `${b.count}`, formatGrams(b.totalWeightMg), formatINR(b.totalCostPaise)];
++    for (let i = 0; i < bucketCols.length; i++) {
++      doc.text(cells[i]!, x, y, { width: tableWidth * bucketCols[i]!.w });
++      x += tableWidth * bucketCols[i]!.w;
++    }
++    doc.moveDown(0.5);
++  }
++
++  doc.moveDown(0.5);
++
++  // Item list
++  doc.font('Devanagari-Bold').fontSize(12).fillColor('#1c1917');
++  doc.text('प्रत्येक उत्पाद / Per-Product Detail', left, doc.y);
++  doc.moveDown(0.3);
++
++  const itemCols = [
++    { label: 'SKU',     w: 0.15 },
++    { label: 'Metal',   w: 0.10 },
++    { label: 'Purity',  w: 0.10 },
++    { label: 'Weight',  w: 0.13 },
++    { label: 'Days',    w: 0.10 },
++    { label: 'Bucket',  w: 0.13 },
++    { label: 'Cost',    w: 0.15 },
++    { label: 'Listed',  w: 0.14 },
++  ];
++  doc.font('Devanagari-Bold').fontSize(9).fillColor('#57534e');
++  x = left;
++  for (const c of itemCols) {
++    doc.text(c.label, x, doc.y, { width: tableWidth * c.w });
++    x += tableWidth * c.w;
++  }
++  doc.moveDown(0.3);
++  doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor('#B58A3C').lineWidth(1).stroke();
++  doc.moveDown(0.3);
++
++  doc.font('Devanagari').fontSize(8).fillColor('#1c1917');
++  for (const it of data.items) {
++    const y = doc.y;
++    if (y > doc.page.height - doc.page.margins.bottom - 80) {
++      doc.addPage();
++    }
++    x = left;
++    const cells = [
++      it.sku,
++      it.metal,
++      it.purity,
++      it.weightG,
++      `${it.daysInStock}`,
++      it.bucket,
++      it.costPaise === null ? '—' : formatINR(it.costPaise),
++      it.firstListedAt.slice(0, 10),
++    ];
++    for (let i = 0; i < itemCols.length; i++) {
++      doc.text(cells[i]!, x, y, {
++        width: tableWidth * itemCols[i]!.w,
++        ellipsis: true,
++        lineBreak: false,
++      });
++      x += tableWidth * itemCols[i]!.w;
++    }
++    doc.moveDown(0.4);
++  }
++
++  doc.flushPages();
++  const range = doc.bufferedPageRange();
++  for (let i = range.start; i < range.start + range.count; i++) {
++    doc.switchToPage(i);
++    drawFooter(doc, branding, i - range.start + 1, range.count);
++  }
++}
++```
++
++- [ ] **Step 4: Wire into renderer**
++
++Edit `apps/api/src/modules/reports/pdf/renderer.ts` — add import and case:
++
++```typescript
++import { renderStockAging } from './templates/stock-aging';
++```
++
++```typescript
++case 'stock-aging':
++  await renderStockAging(doc, data as StockAgingResult, branding, this.storage);
++  break;
++```
++
++- [ ] **Step 5: Run test to verify it passes**
++
++```bash
++pnpm --filter @goldsmith/api test renderer.spec
++```
++
++Expected: PASS — all 5 templates green.
++
++- [ ] **Step 6: Commit**
++
++```bash
++git add apps/api/src/modules/reports/pdf/templates/stock-aging.ts apps/api/src/modules/reports/pdf/renderer.ts apps/api/src/modules/reports/pdf/renderer.spec.ts
++git commit -m "feat(ws-3a): add stock-aging PDF template (closes 5/5)"
++```
++
++---
++
++## Task C11: `ReportsExportService` (enqueue + poll + regenerate)
++
++**Files:**
++- Create: `apps/api/src/modules/reports/reports-export.service.ts`
++- Create: `apps/api/src/modules/reports/reports-export.service.spec.ts`
++
++- [ ] **Step 1: Write the failing test**
++
++Create `apps/api/src/modules/reports/reports-export.service.spec.ts`:
++
++```typescript
++import { describe, expect, it, vi, beforeEach } from 'vitest';
++import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
++import { ReportsExportService } from './reports-export.service';
++
++const SHOP = 'aaaaaaaa-bbbb-4000-8000-000000000000';
++const USER = 'uuuuuuuu-bbbb-4000-8000-000000000001';
++const EXPORT_ID = '11111111-2222-4000-8000-000000000000';
++
++vi.mock('@goldsmith/tenant-context', () => ({
++  tenantContext: {
++    requireCurrent: () => ({ authenticated: true, shopId: SHOP, userId: USER }),
++  },
++}));
++
++vi.mock('@goldsmith/db', () => ({
++  withTenantTx: async (_pool: unknown, fn: (tx: unknown) => Promise<unknown>) => fn(fakeTx),
++}));
++
++vi.mock('@goldsmith/audit', () => ({
++  auditLog: vi.fn(),
++  AuditAction: {
++    REPORT_EXPORT_REQUESTED: 'REPORT_EXPORT_REQUESTED',
++    REPORT_EXPORT_REGENERATED: 'REPORT_EXPORT_REGENERATED',
++  },
++}));
++
++let fakeTx: { query: ReturnType<typeof vi.fn> };
++let fakeQueue: { add: ReturnType<typeof vi.fn> };
++let fakeStorage: { getPresignedReadUrl: ReturnType<typeof vi.fn>; downloadBuffer: ReturnType<typeof vi.fn> };
++
++function makeSvc(): ReportsExportService {
++  return new ReportsExportService({} as never, fakeQueue as never, fakeStorage as never);
++}
++
++beforeEach(() => {
++  fakeTx = { query: vi.fn() };
++  fakeQueue = { add: vi.fn().mockResolvedValue(undefined) };
++  fakeStorage = {
++    getPresignedReadUrl: vi.fn().mockResolvedValue('https://signed.example/readme'),
++    downloadBuffer: vi.fn(),
++  };
++});
++
++describe('ReportsExportService.enqueue', () => {
++  it('rejects unknown reportType', async () => {
++    const svc = makeSvc();
++    await expect(svc.enqueue('unknown' as never, {})).rejects.toBeInstanceOf(BadRequestException);
++  });
++
++  it('inserts row and enqueues BullMQ job', async () => {
++    fakeTx.query.mockResolvedValueOnce({ rows: [{ id: EXPORT_ID }] });
++    const svc = makeSvc();
++    const result = await svc.enqueue('daily-summary', { date: '2026-04-29' });
++    expect(result).toEqual({ id: EXPORT_ID, status: 'QUEUED' });
++    expect(fakeQueue.add).toHaveBeenCalledWith(
++      'render',
++      expect.objectContaining({
++        shopId: SHOP,
++        exportId: EXPORT_ID,
++        reportType: 'daily-summary',
++        params: { date: '2026-04-29' },
++      }),
++      expect.any(Object),
++    );
++  });
++});
++
++describe('ReportsExportService.getStatus', () => {
++  it('throws NotFound when row missing (RLS-filtered or wrong tenant)', async () => {
++    fakeTx.query.mockResolvedValueOnce({ rows: [] });
++    const svc = makeSvc();
++    await expect(svc.getStatus(EXPORT_ID)).rejects.toBeInstanceOf(NotFoundException);
++  });
++
++  it('returns READY with freshly signed downloadUrl when blob within retention', async () => {
++    fakeTx.query.mockResolvedValueOnce({
++      rows: [{
++        id: EXPORT_ID, report_type: 'daily-summary', status: 'READY',
++        storage_key: 'tenants/x/reports/daily-summary/foo.pdf',
++        error_message: null,
++        created_at: new Date(),
++      }],
++    });
++    const svc = makeSvc();
++    const result = await svc.getStatus(EXPORT_ID);
++    expect(result.status).toBe('READY');
++    expect(result.downloadUrl).toBe('https://signed.example/readme');
++    expect(result.blobExpiresAt).toBeDefined();
++  });
++
++  it('returns READY without downloadUrl when blob older than 7 days', async () => {
++    const eightDaysAgo = new Date(Date.now() - 8 * 86400_000);
++    fakeTx.query.mockResolvedValueOnce({
++      rows: [{
++        id: EXPORT_ID, report_type: 'daily-summary', status: 'READY',
++        storage_key: 'tenants/x/reports/daily-summary/foo.pdf',
++        error_message: null,
++        created_at: eightDaysAgo,
++      }],
++    });
++    const svc = makeSvc();
++    const result = await svc.getStatus(EXPORT_ID);
++    expect(result.status).toBe('READY');
++    expect(result.downloadUrl).toBeUndefined();
++  });
++
++  it('returns FAILED with errorMessage', async () => {
++    fakeTx.query.mockResolvedValueOnce({
++      rows: [{
++        id: EXPORT_ID, report_type: 'daily-summary', status: 'FAILED',
++        storage_key: null,
++        error_message: 'render failed: out of memory',
++        created_at: new Date(),
++      }],
++    });
++    const svc = makeSvc();
++    const result = await svc.getStatus(EXPORT_ID);
++    expect(result.status).toBe('FAILED');
++    expect(result.errorMessage).toBe('render failed: out of memory');
++  });
++});
++
++describe('ReportsExportService.regenerate', () => {
++  it('rejects when export is QUEUED or RUNNING', async () => {
++    fakeTx.query.mockResolvedValueOnce({
++      rows: [{ id: EXPORT_ID, report_type: 'daily-summary', status: 'RUNNING',
++               storage_key: null, error_message: null, created_at: new Date(), params: {} }],
++    });
++    const svc = makeSvc();
++    await expect(svc.regenerate(EXPORT_ID)).rejects.toBeInstanceOf(ConflictException);
++  });
++
++  it('re-signs without re-rendering when blob fresh', async () => {
++    const freshDate = new Date(Date.now() - 86400_000); // 1 day ago
++    fakeTx.query.mockResolvedValueOnce({
++      rows: [{ id: EXPORT_ID, report_type: 'daily-summary', status: 'READY',
++               storage_key: 'tenants/x/reports/daily-summary/foo.pdf',
++               error_message: null, created_at: freshDate, params: {} }],
++    });
++    fakeStorage.downloadBuffer.mockResolvedValueOnce(Buffer.from([1, 2, 3]));
++    const svc = makeSvc();
++    const result = await svc.regenerate(EXPORT_ID);
++    expect(result.downloadUrl).toBe('https://signed.example/readme');
++    expect(fakeQueue.add).not.toHaveBeenCalled();
++  });
++
++  it('re-enqueues when blob is missing', async () => {
++    fakeTx.query
++      .mockResolvedValueOnce({
++        rows: [{ id: EXPORT_ID, report_type: 'daily-summary', status: 'READY',
++                 storage_key: 'tenants/x/reports/daily-summary/foo.pdf',
++                 error_message: null, created_at: new Date(), params: {} }],
++      })
++      .mockResolvedValueOnce({ rowCount: 1 });
++    fakeStorage.downloadBuffer.mockRejectedValueOnce(new Error('blob missing'));
++    const svc = makeSvc();
++    const result = await svc.regenerate(EXPORT_ID);
++    expect(result.status).toBe('QUEUED');
++    expect(fakeQueue.add).toHaveBeenCalled();
++  });
++});
++```
++
++- [ ] **Step 2: Run test to verify it fails**
++
++```bash
++pnpm --filter @goldsmith/api test reports-export.service.spec
++```
++
++Expected: FAIL — `Cannot find module './reports-export.service'`.
++
++- [ ] **Step 3: Implement `ReportsExportService`**
++
++Create `apps/api/src/modules/reports/reports-export.service.ts`:
++
++```typescript
++import {
++  BadRequestException, ConflictException, Inject, Injectable, NotFoundException,
++} from '@nestjs/common';
++import type { Pool } from 'pg';
++import { InjectQueue } from '@nestjs/bullmq';
++import type { Queue } from 'bullmq';
++import { withTenantTx } from '@goldsmith/db';
++import { tenantContext } from '@goldsmith/tenant-context';
++import { auditLog, AuditAction } from '@goldsmith/audit';
++import { STORAGE_PORT } from '@goldsmith/integrations-storage';
++import type { StoragePort } from '@goldsmith/integrations-storage';
++import type { ReportType } from './pdf/renderer';
++
++const VALID_REPORT_TYPES: ReportType[] = [
++  'daily-summary', 'outstanding', 'customer-ltv', 'loyalty-summary', 'stock-aging',
++];
++
++const BLOB_RETENTION_DAYS = 7;
++
++export interface ExportEnqueueParams {
++  date?: string;
++  limit?: number;
++  page?: number;
++}
++
++export interface ExportStatusResult {
++  id:             string;
++  reportType:     ReportType;
++  status:         'QUEUED' | 'RUNNING' | 'READY' | 'FAILED';
++  downloadUrl?:   string;
++  blobExpiresAt?: string;
++  errorMessage?:  string;
++}
++
++interface ExportRow {
++  id:             string;
++  report_type:    ReportType;
++  status:         'QUEUED' | 'RUNNING' | 'READY' | 'FAILED';
++  storage_key:    string | null;
++  error_message:  string | null;
++  created_at:     Date;
++  params:         ExportEnqueueParams;
++}
++
++@Injectable()
++export class ReportsExportService {
++  constructor(
++    @Inject('PG_POOL') private readonly pool: Pool,
++    @InjectQueue('reports-pdf') private readonly queue: Queue,
++    @Inject(STORAGE_PORT) private readonly storage: StoragePort,
++  ) {}
++
++  async enqueue(reportType: ReportType, params: ExportEnqueueParams): Promise<{ id: string; status: 'QUEUED' }> {
++    if (!VALID_REPORT_TYPES.includes(reportType)) {
++      throw new BadRequestException({ code: 'reports.export.invalid_report_type' });
++    }
++    const ctx = tenantContext.requireCurrent();
++    if (!ctx.authenticated) {
++      throw new BadRequestException({ code: 'reports.export.unauthenticated' });
++    }
++    const userId = ctx.userId;
++
++    const id = await withTenantTx(this.pool, async (tx) => {
++      const r = await tx.query<{ id: string }>(
++        `INSERT INTO reports_pdf_exports (shop_id, report_type, params, status, requested_by_user_id)
++         VALUES (current_setting('app.current_shop_id')::uuid, $1, $2::jsonb, 'QUEUED', $3)
++         RETURNING id`,
++        [reportType, JSON.stringify(params), userId],
++      );
++      return r.rows[0]!.id;
++    });
++
++    await this.queue.add('render', {
++      shopId:     ctx.shopId,
++      exportId:   id,
++      reportType,
++      params,
++    }, { attempts: 3, backoff: { type: 'exponential', delay: 5000 } });
++
++    await auditLog(this.pool, {
++      action: AuditAction.REPORT_EXPORT_REQUESTED,
++      subjectType: 'report',
++      subjectId: id,
++      actorUserId: userId,
++      after: { reportType, params },
++    });
++
++    return { id, status: 'QUEUED' };
++  }
++
++  async getStatus(id: string): Promise<ExportStatusResult> {
++    const row = await this.fetchRow(id);
++    return this.toStatusResult(row);
++  }
++
++  async regenerate(id: string): Promise<ExportStatusResult> {
++    const row = await this.fetchRow(id);
++    if (row.status === 'QUEUED' || row.status === 'RUNNING') {
++      throw new ConflictException({ code: 'reports.export.busy' });
++    }
++
++    const ctx = tenantContext.requireCurrent();
++    const userId = ctx.authenticated ? ctx.userId : undefined;
++
++    // Try to re-sign existing blob if within retention window.
++    const ageMs = Date.now() - row.created_at.getTime();
++    const withinRetention = ageMs < BLOB_RETENTION_DAYS * 86400_000 && row.storage_key !== null;
++
++    if (withinRetention) {
++      try {
++        await this.storage.downloadBuffer(row.storage_key!); // probes blob existence
++        await auditLog(this.pool, {
++          action: AuditAction.REPORT_EXPORT_REGENERATED,
++          subjectType: 'report',
++          subjectId: id,
++          actorUserId: userId,
++          metadata: { mode: 'resign' },
++        });
++        return this.toStatusResult({ ...row, status: 'READY' });
++      } catch {
++        // blob missing — fall through to re-render
++      }
++    }
++
++    // Re-render: reset row, enqueue fresh job.
++    await withTenantTx(this.pool, async (tx) => {
++      await tx.query(
++        `UPDATE reports_pdf_exports
++         SET status = 'QUEUED',
++             storage_key = NULL,
++             error_message = NULL,
++             completed_at = NULL,
++             created_at = now()
++         WHERE id = $1`,
++        [id],
++      );
++    });
++    await this.queue.add('render', {
++      shopId:     ctx.shopId,
++      exportId:   id,
++      reportType: row.report_type,
++      params:     row.params,
++    }, { attempts: 3, backoff: { type: 'exponential', delay: 5000 } });
++
++    await auditLog(this.pool, {
++      action: AuditAction.REPORT_EXPORT_REGENERATED,
++      subjectType: 'report',
++      subjectId: id,
++      actorUserId: userId,
++      metadata: { mode: 'rerender' },
++    });
++
++    return { id, reportType: row.report_type, status: 'QUEUED' };
++  }
++
++  private async fetchRow(id: string): Promise<ExportRow> {
++    const row = await withTenantTx(this.pool, async (tx) => {
++      const r = await tx.query<ExportRow>(
++        `SELECT id, report_type, status, storage_key, error_message, created_at, params
++         FROM reports_pdf_exports
++         WHERE id = $1`,
++        [id],
++      );
++      return r.rows[0];
++    });
++    if (!row) throw new NotFoundException({ code: 'reports.export.not_found' });
++    return row;
++  }
++
++  private async toStatusResult(row: ExportRow): Promise<ExportStatusResult> {
++    const result: ExportStatusResult = {
++      id:         row.id,
++      reportType: row.report_type,
++      status:     row.status,
++    };
++    if (row.error_message) result.errorMessage = row.error_message;
++    if (row.status === 'READY' && row.storage_key) {
++      const ageMs = Date.now() - row.created_at.getTime();
++      const blobExpiresAt = new Date(row.created_at.getTime() + BLOB_RETENTION_DAYS * 86400_000);
++      if (ageMs < BLOB_RETENTION_DAYS * 86400_000) {
++        result.downloadUrl = await this.storage.getPresignedReadUrl(row.storage_key);
++      }
++      result.blobExpiresAt = blobExpiresAt.toISOString();
++    }
++    return result;
++  }
++}
++```
++
++- [ ] **Step 4: Run tests to verify they pass**
++
++```bash
++pnpm --filter @goldsmith/api test reports-export.service.spec
++```
++
++Expected: PASS.
++
++- [ ] **Step 5: Commit**
++
++```bash
++git add apps/api/src/modules/reports/reports-export.service.ts apps/api/src/modules/reports/reports-export.service.spec.ts
++git commit -m "feat(ws-3a): add ReportsExportService (enqueue/status/regenerate)"
++```
++
++---
++
++## Task C12: `ReportsPdfProcessor` (BullMQ worker)
++
++**Files:**
++- Create: `apps/api/src/workers/reports-pdf.processor.ts`
++- Create: `apps/api/src/workers/reports-pdf.processor.spec.ts`
++
++- [ ] **Step 1: Write the failing test**
++
++Create `apps/api/src/workers/reports-pdf.processor.spec.ts`:
++
++```typescript
++import { describe, expect, it, vi, beforeEach } from 'vitest';
++import { ReportsPdfProcessor } from './reports-pdf.processor';
++
++const SHOP = 'aaaaaaaa-bbbb-4000-8000-000000000000';
++const EXPORT_ID = '11111111-2222-4000-8000-000000000000';
++
++let fakeReports: { getDailySummary: ReturnType<typeof vi.fn>; [k: string]: unknown };
++let fakeRenderer: { render: ReturnType<typeof vi.fn> };
++let fakeStorage: { uploadBuffer: ReturnType<typeof vi.fn> };
++let fakeBranding: { load: ReturnType<typeof vi.fn> };
++let fakePool: { query: ReturnType<typeof vi.fn> };
++
++vi.mock('@goldsmith/tenant-context', () => ({
++  tenantContext: {
++    runWith: async (_ctx: unknown, fn: () => Promise<unknown>) => fn(),
++  },
++}));
++
++vi.mock('@goldsmith/db', () => ({
++  withTenantTx: async (_pool: unknown, fn: (tx: unknown) => Promise<unknown>) =>
++    fn({ query: vi.fn().mockResolvedValue({ rowCount: 1 }) }),
++}));
++
++beforeEach(() => {
++  fakeReports = {
++    getDailySummary:    vi.fn().mockResolvedValue({ date: '2026-04-29' }),
++    getOutstanding:     vi.fn(),
++    getCustomerLtv:     vi.fn(),
++    getLoyaltySummary:  vi.fn(),
++    getStockAging:      vi.fn(),
++  };
++  fakeRenderer = { render: vi.fn().mockResolvedValue(Buffer.from('PDF-bytes')) };
++  fakeStorage = { uploadBuffer: vi.fn().mockResolvedValue(undefined) };
++  fakeBranding = { load: vi.fn().mockResolvedValue({ displayName: 'X', logoUrl: null, addressText: '', gstin: null, contactPhone: null }) };
++  fakePool = {
++    query: vi.fn().mockResolvedValueOnce({
++      rows: [{ id: SHOP, slug: 'x', display_name: 'X', status: 'ACTIVE' }],
++    }),
++  };
++});
++
++function makeProcessor(): ReportsPdfProcessor {
++  return new ReportsPdfProcessor(
++    fakeReports as never,
++    fakeRenderer as never,
++    fakeStorage as never,
++    fakeBranding as never,
++    fakePool as never,
++  );
++}
++
++describe('ReportsPdfProcessor', () => {
++  it('renders + uploads + updates row to READY', async () => {
++    const job = {
++      id: 'j1',
++      data: {
++        shopId: SHOP, exportId: EXPORT_ID,
++        reportType: 'daily-summary', params: { date: '2026-04-29' },
++      },
++    };
++    const proc = makeProcessor();
++    await proc.process(job as never);
++
++    expect(fakeReports.getDailySummary).toHaveBeenCalledWith('2026-04-29');
++    expect(fakeRenderer.render).toHaveBeenCalledWith(
++      'daily-summary', expect.anything(), expect.anything(),
++    );
++    expect(fakeStorage.uploadBuffer).toHaveBeenCalledWith(
++      expect.stringContaining(`tenants/${SHOP}/reports/daily-summary/`),
++      expect.any(Buffer),
++      'application/pdf',
++    );
++  });
++
++  it('marks row FAILED on render error', async () => {
++    fakeRenderer.render.mockRejectedValueOnce(new Error('render boom'));
++    const job = {
++      id: 'j2',
++      data: {
++        shopId: SHOP, exportId: EXPORT_ID,
++        reportType: 'daily-summary', params: {},
++      },
++    };
++    const proc = makeProcessor();
++    await expect(proc.process(job as never)).rejects.toThrow('render boom');
++  });
++});
++```
++
++- [ ] **Step 2: Run test to verify it fails**
++
++```bash
++pnpm --filter @goldsmith/api test reports-pdf.processor.spec
++```
++
++Expected: FAIL — `Cannot find module './reports-pdf.processor'`.
++
++- [ ] **Step 3: Implement processor**
++
++Create `apps/api/src/workers/reports-pdf.processor.ts`:
++
++```typescript
++import { Inject, Logger } from '@nestjs/common';
++import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
++import type { Job } from 'bullmq';
++import type { Pool } from 'pg';
++import { tenantContext } from '@goldsmith/tenant-context';
++import type { TenantContext, Tenant } from '@goldsmith/tenant-context';
++import { withTenantTx } from '@goldsmith/db';
++import { STORAGE_PORT } from '@goldsmith/integrations-storage';
++import type { StoragePort } from '@goldsmith/integrations-storage';
++import { ReportsService } from '../modules/reports/reports.service';
++import { PdfRenderer } from '../modules/reports/pdf/renderer';
++import type { ReportType, ReportData } from '../modules/reports/pdf/renderer';
++import { BrandingLoader } from '../modules/reports/pdf/branding';
++
++export interface ReportsPdfJob {
++  shopId:     string;
++  exportId:   string;
++  reportType: ReportType;
++  params:     Record<string, unknown>;
++}
++
++@Processor('reports-pdf')
++export class ReportsPdfProcessor extends WorkerHost {
++  private readonly logger = new Logger(ReportsPdfProcessor.name);
++
++  constructor(
++    @Inject(ReportsService)  private readonly reports: ReportsService,
++    @Inject(PdfRenderer)     private readonly renderer: PdfRenderer,
++    @Inject(STORAGE_PORT)    private readonly storage: StoragePort,
++    @Inject(BrandingLoader)  private readonly branding: BrandingLoader,
++    @Inject('PG_POOL')       private readonly pool: Pool,
++  ) {
++    super();
++  }
++
++  async process(job: Job<ReportsPdfJob>): Promise<{ storageKey: string }> {
++    const { shopId, exportId, reportType, params } = job.data;
++    this.logger.log(`reports-pdf: shopId=${shopId} exportId=${exportId} type=${reportType}`);
++
++    const ctx = await this.buildTenantCtx(shopId);
++
++    return tenantContext.runWith(ctx, async () => {
++      // 1. Mark RUNNING (idempotent on retries — only QUEUED → RUNNING)
++      await withTenantTx(this.pool, async (tx) => {
++        await tx.query(
++          `UPDATE reports_pdf_exports
++           SET status = 'RUNNING'
++           WHERE id = $1 AND status = 'QUEUED'`,
++          [exportId],
++        );
++      });
++
++      try {
++        // 2. Fetch report data
++        const data = await this.fetchReportData(reportType, params);
++
++        // 3. Render PDF
++        const branding = await this.branding.load();
++        const buf = await this.renderer.render(reportType, data, branding);
++
++        // 4. Upload
++        const filename = `${reportType}-${exportId}.pdf`;
++        const key = `tenants/${shopId}/reports/${reportType}/${filename}`;
++        await this.storage.uploadBuffer(key, buf, 'application/pdf');
++
++        // 5. Mark READY
++        await withTenantTx(this.pool, async (tx) => {
++          await tx.query(
++            `UPDATE reports_pdf_exports
++             SET status = 'READY', storage_key = $2, completed_at = now()
++             WHERE id = $1`,
++            [exportId, key],
++          );
++        });
++
++        return { storageKey: key };
++      } catch (err) {
++        const message = err instanceof Error ? err.message : 'unknown error';
++        await withTenantTx(this.pool, async (tx) => {
++          await tx.query(
++            `UPDATE reports_pdf_exports
++             SET status = 'FAILED', error_message = $2, completed_at = now()
++             WHERE id = $1`,
++            [exportId, message.slice(0, 500)],
++          );
++        });
++        throw err;
++      }
++    });
++  }
++
++  private async fetchReportData(
++    reportType: ReportType,
++    params: Record<string, unknown>,
++  ): Promise<ReportData> {
++    switch (reportType) {
++      case 'daily-summary': {
++        const date = (params['date'] as string) ??
++          new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
++        return this.reports.getDailySummary(date);
++      }
++      case 'outstanding':
++        return this.reports.getOutstanding(1, 1000);
++      case 'customer-ltv':
++        return this.reports.getCustomerLtv((params['limit'] as number) ?? 50);
++      case 'loyalty-summary':
++        return this.reports.getLoyaltySummary();
++      case 'stock-aging':
++        return this.reports.getStockAging();
++      default:
++        throw new Error(`reports.pdf.unknown_report_type:${reportType}`);
++    }
++  }
++
++  // eslint-disable-next-line goldsmith/no-raw-shop-id-param
++  private async buildTenantCtx(shopId: string): Promise<TenantContext> {
++    const r = await this.pool.query<{
++      id: string; slug: string; display_name: string; status: Tenant['status'];
++    }>(`SELECT id, slug, display_name, status FROM shops WHERE id = $1`, [shopId]);
++    const row = r.rows[0];
++    if (!row) throw new Error(`reports-pdf: shop ${shopId} not found`);
++    return {
++      authenticated: false,
++      shopId,
++      tenant: { id: row.id, slug: row.slug, display_name: row.display_name, status: row.status },
++    };
++  }
++
++  @OnWorkerEvent('failed')
++  onFailed(job: Job | undefined, error: Error): void {
++    this.logger.error(
++      `reports-pdf failed: jobId=${job?.id} exportId=${(job?.data as { exportId?: string })?.exportId} error=${error.message}`,
++      error.stack,
++    );
++  }
++}
++```
++
++- [ ] **Step 4: Run tests to verify they pass**
++
++```bash
++pnpm --filter @goldsmith/api test reports-pdf.processor.spec
++```
++
++Expected: PASS.
++
++- [ ] **Step 5: Commit**
++
++```bash
++git add apps/api/src/workers/reports-pdf.processor.ts apps/api/src/workers/reports-pdf.processor.spec.ts
++git commit -m "feat(ws-3a): add ReportsPdfProcessor BullMQ worker"
++```
++
++---
++
++## Task C13: Wire `ReportsModule` + add 3 `/exports*` controller routes
++
++**Files:**
++- Modify: `apps/api/src/modules/reports/reports.module.ts`
++- Modify: `apps/api/src/modules/reports/reports.controller.ts`
++
++- [ ] **Step 1: Update `ReportsModule`**
++
++Replace the contents of `apps/api/src/modules/reports/reports.module.ts`:
++
++```typescript
++import { Module } from '@nestjs/common';
++import { BullModule } from '@nestjs/bullmq';
++import { StorageModule } from '@goldsmith/integrations-storage';
++import { AuthModule } from '../auth/auth.module';
++import { ReportsController } from './reports.controller';
++import { ReportsService } from './reports.service';
++import { ReportsExportService } from './reports-export.service';
++import { BrandingLoader } from './pdf/branding';
++import { PdfRenderer } from './pdf/renderer';
++import { ReportsPdfProcessor } from '../../workers/reports-pdf.processor';
++
++@Module({
++  imports: [
++    AuthModule,
++    StorageModule,
++    BullModule.registerQueue({ name: 'reports-pdf' }),
++  ],
++  controllers: [ReportsController],
++  providers: [
++    ReportsService,
++    ReportsExportService,
++    BrandingLoader,
++    PdfRenderer,
++    ReportsPdfProcessor,
++  ],
++  exports: [ReportsService],
++})
++export class ReportsModule {}
++```
++
++- [ ] **Step 2: Add 3 controller routes**
++
++Edit `apps/api/src/modules/reports/reports.controller.ts`:
++
++1. Update imports — add `Body, Param, Post`, `ZodValidationPipe`, and `ReportsExportService`/`Inject`:
++
++```typescript
++import {
++  Controller, Get, Post, Body, Param, Query, Inject,
++  ParseIntPipe, DefaultValuePipe, Res,
++} from '@nestjs/common';
++import type { Response } from 'express';
++import { z } from 'zod';
++import { TenantWalkerRoute } from '../../common/decorators/tenant-walker-route.decorator';
++import { Roles } from '../../common/decorators/roles.decorator';
++import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
++import { ReportsService } from './reports.service';
++import type {
++  DailySummaryResult, OutstandingResult, CustomerLtvItem, LoyaltySummaryResult,
++  StockAgingResult,
++} from './reports.service';
++import {
++  toDailySummaryCsv, toOutstandingCsv, toCustomerLtvCsv,
++  toLoyaltySummaryCsv, toStockAgingCsv,
++} from './reports.csv';
++import { ReportsExportService } from './reports-export.service';
++import type { ExportStatusResult } from './reports-export.service';
++import type { ReportType } from './pdf/renderer';
++
++const ExportRequestSchema = z.object({
++  reportType: z.enum(['daily-summary', 'outstanding', 'customer-ltv', 'loyalty-summary', 'stock-aging']),
++  params: z.record(z.unknown()).optional().default({}),
++});
++type ExportRequestDto = z.infer<typeof ExportRequestSchema>;
++```
++
++2. Update the constructor to inject the export service:
++
++```typescript
++constructor(
++  private readonly svc: ReportsService,
++  @Inject(ReportsExportService) private readonly exports: ReportsExportService,
++) {}
++```
++
++3. Append three new methods at the bottom of the class (before `private todayIST()`):
++
++```typescript
++@TenantWalkerRoute({
++  expectedStatus: 400,
++  body: { /* missing reportType triggers Zod 400 */ },
++})
++@Post('/exports')
++@Roles('shop_admin', 'shop_manager')
++async createExport(
++  @Body(new ZodValidationPipe(ExportRequestSchema)) dto: ExportRequestDto,
++): Promise<{ id: string; status: 'QUEUED' }> {
++  return this.exports.enqueue(dto.reportType as ReportType, dto.params);
++}
++
++@TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-4000-8000-000000000000' } })
++@Get('/exports/:id')
++@Roles('shop_admin', 'shop_manager')
++async getExportStatus(@Param('id') id: string): Promise<ExportStatusResult> {
++  return this.exports.getStatus(id);
++}
++
++@TenantWalkerRoute({ expectedStatus: 404, pathParams: { id: '00000000-0000-4000-8000-000000000000' } })
++@Post('/exports/:id/regenerate')
++@Roles('shop_admin', 'shop_manager')
++async regenerateExport(@Param('id') id: string): Promise<ExportStatusResult> {
++  return this.exports.regenerate(id);
++}
++```
++
++- [ ] **Step 3: Verify typecheck + endpoint walker + integration**
++
++```bash
++pnpm --filter @goldsmith/api typecheck
++pnpm --filter @goldsmith/api test:e2e
++pnpm --filter @goldsmith/api test
++```
++
++Expected: All PASS.
++
++- [ ] **Step 4: Commit**
++
++```bash
++git add apps/api/src/modules/reports/reports.module.ts apps/api/src/modules/reports/reports.controller.ts
++git commit -m "feat(ws-3a): wire ReportsModule providers + 3 /exports routes"
++```
++
++---
++
++# WS-D — Shopkeeper UI
++
++## Task D1: `useStockAging` hook + add stock-aging route
++
++**Files:**
++- Modify: `apps/shopkeeper/src/features/reports/useReports.ts`
++- Modify: `apps/shopkeeper/app/reports/_layout.tsx`
++
++- [ ] **Step 1: Add types and hook to `useReports.ts`**
++
++Append to `apps/shopkeeper/src/features/reports/useReports.ts`:
++
++```typescript
++export interface StockAgingBucket {
++  label: '<30d' | '30-60d' | '60-90d' | '90d+';
++  count: number;
++  totalWeightMg: string;
++  totalCostPaise: string;
++}
++
++export interface StockAgingItem {
++  id: string;
++  sku: string;
++  metal: string;
++  purity: string;
++  weightG: string;
++  daysInStock: number;
++  bucket: StockAgingBucket['label'];
++  costPaise: string | null;
++  firstListedAt: string;
++}
++
++export interface StockAgingData {
++  buckets: StockAgingBucket[];
++  items: StockAgingItem[];
++}
++
++export function useStockAging(): UseQueryResult<StockAgingData> {
++  return useQuery({
++    queryKey: ['reports', 'stock-aging'],
++    queryFn: async () => {
++      const res = await api.get<StockAgingData>(`/api/v1/reports/stock-aging`);
++      return res.data;
++    },
++    staleTime: 300_000,
++  });
++}
++```
++
++- [ ] **Step 2: Register stock-aging route in `_layout.tsx`**
++
++Edit `apps/shopkeeper/app/reports/_layout.tsx` — add a `<Stack.Screen>` line:
++
++```typescript
++<Stack.Screen name="stock-aging"      options={{ title: 'पुराना स्टॉक' }} />
++```
++
++Final `_layout.tsx`:
++
++```typescript
++import React from 'react';
++import { Stack } from 'expo-router';
++
++export default function ReportsLayout(): React.ReactElement {
++  return (
++    <Stack
++      screenOptions={{
++        headerStyle: { backgroundColor: '#F5EDDD' },
++        headerTintColor: '#2C1810',
++        headerTitleStyle: { fontFamily: 'NotoSansDevanagari', fontSize: 18 },
++      }}
++    >
++      <Stack.Screen name="gstr-export"       options={{ title: 'GST रिपोर्ट' }} />
++      <Stack.Screen name="daily-summary"     options={{ title: 'दैनिक बिक्री' }} />
++      <Stack.Screen name="outstanding"       options={{ title: 'बकाया भुगतान' }} />
++      <Stack.Screen name="customer-ltv"      options={{ title: 'शीर्ष ग्राहक' }} />
++      <Stack.Screen name="loyalty-summary"   options={{ title: 'लॉयल्टी कार्यक्रम' }} />
++      <Stack.Screen name="stock-aging"       options={{ title: 'पुराना स्टॉक' }} />
++    </Stack>
++  );
++}
++```
++
++- [ ] **Step 3: Verify typecheck**
++
++```bash
++pnpm --filter @goldsmith/shopkeeper typecheck
++```
++
++Expected: PASS.
++
++- [ ] **Step 4: Commit**
++
++```bash
++git add apps/shopkeeper/src/features/reports/useReports.ts apps/shopkeeper/app/reports/_layout.tsx
++git commit -m "feat(ws-3a): add useStockAging hook + register stock-aging route"
++```
++
++---
++
++## Task D2: Stock-aging mobile screen
++
++**Files:**
++- Create: `apps/shopkeeper/app/reports/stock-aging.tsx`
++
++- [ ] **Step 1: Implement screen**
++
++Create `apps/shopkeeper/app/reports/stock-aging.tsx`:
++
++```typescript
++import React from 'react';
++import {
++  View, Text, ScrollView, ActivityIndicator, StyleSheet, Pressable,
++} from 'react-native';
++import { colors, spacing } from '@goldsmith/ui-tokens';
++import {
++  useStockAging, formatPaise, formatWeightMg,
++  type StockAgingBucket,
++} from '../../src/features/reports/useReports';
++
++const GOLD = '#B58A3C';
++const ALERT = '#C53030';
++
++const BUCKET_LABELS: Record<StockAgingBucket['label'], string> = {
++  '<30d':   '0–30 दिन',
++  '30-60d': '30–60 दिन',
++  '60-90d': '60–90 दिन',
++  '90d+':   '90+ दिन',
++};
++
++function BucketCard({ bucket }: { bucket: StockAgingBucket }): React.ReactElement {
++  const isAlert = bucket.label === '90d+' && bucket.count > 0;
++  return (
++    <View style={[styles.bucketCard, isAlert && styles.bucketCardAlert]}>
++      <Text style={[styles.bucketLabel, isAlert && styles.bucketLabelAlert]}>
++        {BUCKET_LABELS[bucket.label]}
++      </Text>
++      <Text style={[styles.bucketCount, isAlert && styles.bucketCountAlert]}>
++        {bucket.count}
++      </Text>
++      <Text style={styles.bucketSubLabel}>{formatWeightMg(bucket.totalWeightMg)}</Text>
++      <Text style={styles.bucketSubLabel}>{formatPaise(bucket.totalCostPaise)}</Text>
++    </View>
++  );
++}
++
++export default function StockAgingScreen(): React.ReactElement {
++  const { data, isLoading, error, refetch } = useStockAging();
++
++  return (
++    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
++      {isLoading && (
++        <ActivityIndicator color={GOLD} size="large" style={{ marginTop: 40 }} />
++      )}
++
++      {error && (
++        <View style={styles.errorBox}>
++          <Text style={styles.errorText}>डेटा लोड नहीं हो सका।</Text>
++          <Pressable onPress={() => void refetch()} style={styles.retryBtn}>
++            <Text style={styles.retryText}>पुनः प्रयास करें</Text>
++          </Pressable>
++        </View>
++      )}
++
++      {data && (
++        <>
++          <View style={styles.bucketRow}>
++            {data.buckets.map((b) => <BucketCard key={b.label} bucket={b} />)}
++          </View>
++
++          <Text style={styles.sectionHeader}>प्रत्येक उत्पाद / Per-Product</Text>
++
++          {data.items.length === 0 && (
++            <Text style={styles.emptyText}>कोई स्टॉक नहीं मिला।</Text>
++          )}
++
++          {data.items.map((it) => {
++            const isAged = it.bucket === '90d+';
++            return (
++              <View key={it.id} style={[styles.itemRow, isAged && styles.itemRowAlert]}>
++                <View style={{ flex: 1 }}>
++                  <Text style={styles.itemSku}>{it.sku}</Text>
++                  <Text style={styles.itemSubLabel}>
++                    {it.metal} {it.purity} · {it.weightG} g
++                  </Text>
++                </View>
++                <View style={styles.itemRight}>
++                  <Text style={[styles.itemDays, isAged && styles.itemDaysAlert]}>
++                    {it.daysInStock} दिन
++                  </Text>
++                  <Text style={styles.itemBucket}>{BUCKET_LABELS[it.bucket]}</Text>
++                </View>
++              </View>
++            );
++          })}
++        </>
++      )}
++    </ScrollView>
++  );
++}
++
++const styles = StyleSheet.create({
++  container:        { flex: 1, backgroundColor: colors.bg },
++  content:          { padding: spacing.lg, paddingBottom: 40 },
++  bucketRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
++  bucketCard:       { flexBasis: '48%', flexGrow: 1, padding: spacing.md, backgroundColor: colors.background, borderRadius: 12, borderWidth: 1, borderColor: colors.border, minHeight: 96 },
++  bucketCardAlert:  { borderColor: ALERT, backgroundColor: '#FFF5F5' },
++  bucketLabel:      { fontFamily: 'NotoSansDevanagari', fontSize: 13, color: colors.inkMute },
++  bucketLabelAlert: { color: ALERT },
++  bucketCount:      { fontFamily: 'MuktaVaani-700', fontSize: 28, color: GOLD, marginVertical: 4 },
++  bucketCountAlert: { color: ALERT },
++  bucketSubLabel:   { fontFamily: 'NotoSansDevanagari', fontSize: 11, color: colors.inkMute },
++  sectionHeader:    { fontFamily: 'NotoSansDevanagari', fontSize: 16, fontWeight: '600', color: colors.ink, marginTop: 16, marginBottom: 8 },
++  itemRow:          { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, minHeight: 48 },
++  itemRowAlert:     { backgroundColor: '#FFF5F5' },
++  itemSku:          { fontFamily: 'MuktaVaani-600', fontSize: 14, color: colors.ink },
++  itemSubLabel:     { fontFamily: 'NotoSansDevanagari', fontSize: 12, color: colors.inkMute, marginTop: 2 },
++  itemRight:        { alignItems: 'flex-end' },
++  itemDays:         { fontFamily: 'MuktaVaani-600', fontSize: 14, color: colors.ink },
++  itemDaysAlert:    { color: ALERT },
++  itemBucket:       { fontFamily: 'NotoSansDevanagari', fontSize: 11, color: colors.inkMute, marginTop: 2 },
++  emptyText:        { fontFamily: 'NotoSansDevanagari', fontSize: 14, color: colors.inkMute, textAlign: 'center', marginTop: 24 },
++  errorBox:         { alignItems: 'center', marginTop: 40 },
++  errorText:        { fontFamily: 'NotoSansDevanagari', fontSize: 16, color: colors.error, marginBottom: 16 },
++  retryBtn:         { backgroundColor: GOLD, borderRadius: 8, paddingVertical: 12, paddingHorizontal: 24, minHeight: 48, justifyContent: 'center' },
++  retryText:        { fontFamily: 'NotoSansDevanagari', fontSize: 16, color: '#fff', fontWeight: '600' },
++});
++```
++
++- [ ] **Step 2: Verify typecheck**
++
++```bash
++pnpm --filter @goldsmith/shopkeeper typecheck
++```
++
++Expected: PASS.
++
++- [ ] **Step 3: Commit**
++
++```bash
++git add apps/shopkeeper/app/reports/stock-aging.tsx
++git commit -m "feat(ws-3a): add stock-aging shopkeeper screen with bucket cards"
++```
++
++---
++
++## Task D3: `useReportExport` polling hook
++
++**Files:**
++- Create: `apps/shopkeeper/src/features/reports/useReportExport.ts`
++
++- [ ] **Step 1: Implement hook**
++
++Create `apps/shopkeeper/src/features/reports/useReportExport.ts`:
++
++```typescript
++import { useEffect, useState, useCallback } from 'react';
++import { Linking } from 'react-native';
++import { useMutation, useQuery, type UseMutationResult } from '@tanstack/react-query';
++import { api } from '../../api/client';
++
++export type ReportType =
++  | 'daily-summary' | 'outstanding' | 'customer-ltv'
++  | 'loyalty-summary' | 'stock-aging';
++
++export type ExportStatus = 'QUEUED' | 'RUNNING' | 'READY' | 'FAILED';
++
++export interface ExportStatusResponse {
++  id:             string;
++  reportType:     ReportType;
++  status:         ExportStatus;
++  downloadUrl?:   string;
++  blobExpiresAt?: string;
++  errorMessage?:  string;
++}
++
++export interface UseReportExportResult {
++  status:         ExportStatus | 'IDLE';
++  exportId:       string | null;
++  downloadUrl?:   string;
++  errorMessage?:  string;
++  start:          (params?: Record<string, unknown>) => void;
++  regenerate:     () => Promise<void>;
++  reset:          () => void;
++}
++
++export function useReportExport(reportType: ReportType): UseReportExportResult {
++  const [exportId, setExportId] = useState<string | null>(null);
++
++  const start = useMutation({
++    mutationFn: async (params: Record<string, unknown>) => {
++      const res = await api.post<{ id: string; status: 'QUEUED' }>(
++        '/api/v1/reports/exports',
++        { reportType, params },
++      );
++      return res.data;
++    },
++    onSuccess: (data) => setExportId(data.id),
++  });
++
++  const status = useQuery({
++    queryKey: ['reports', 'exports', exportId],
++    queryFn: async (): Promise<ExportStatusResponse> => {
++      const res = await api.get<ExportStatusResponse>(`/api/v1/reports/exports/${exportId!}`);
++      return res.data;
++    },
++    enabled: exportId !== null,
++    refetchInterval: (q) => {
++      const data = q.state.data as ExportStatusResponse | undefined;
++      if (!data) return 2000;
++      if (data.status === 'READY' || data.status === 'FAILED') return false;
++      return 2000;
++    },
++  });
++
++  // Auto-open when ready (single-trigger)
++  const [openedFor, setOpenedFor] = useState<string | null>(null);
++  useEffect(() => {
++    const data = status.data;
++    if (data && data.status === 'READY' && data.downloadUrl && openedFor !== data.id) {
++      setOpenedFor(data.id);
++      void Linking.openURL(data.downloadUrl);
++    }
++  }, [status.data, openedFor]);
++
++  const regenerate = useCallback(async () => {
++    if (!exportId) return;
++    const res = await api.post<ExportStatusResponse>(`/api/v1/reports/exports/${exportId}/regenerate`);
++    if (res.data.status === 'READY' && res.data.downloadUrl) {
++      void Linking.openURL(res.data.downloadUrl);
++    }
++    void status.refetch();
++  }, [exportId, status]);
++
++  const reset = useCallback(() => {
++    setExportId(null);
++    setOpenedFor(null);
++  }, []);
++
++  return {
++    status:        exportId === null ? 'IDLE' : (status.data?.status ?? 'QUEUED'),
++    exportId,
++    downloadUrl:   status.data?.downloadUrl,
++    errorMessage:  status.data?.errorMessage,
++    start:         (params) => start.mutate(params ?? {}),
++    regenerate,
++    reset,
++  };
++}
++```
++
++- [ ] **Step 2: Verify typecheck**
++
++```bash
++pnpm --filter @goldsmith/shopkeeper typecheck
++```
++
++Expected: PASS.
++
++- [ ] **Step 3: Commit**
++
++```bash
++git add apps/shopkeeper/src/features/reports/useReportExport.ts
++git commit -m "feat(ws-3a): add useReportExport polling hook"
++```
++
++---
++
++## Task D4: `ExportButtons` component
++
++**Files:**
++- Create: `apps/shopkeeper/src/features/reports/components/ExportButtons.tsx`
++
++- [ ] **Step 1: Implement component**
++
++Create `apps/shopkeeper/src/features/reports/components/ExportButtons.tsx`:
++
++```typescript
++import React, { useState } from 'react';
++import { View, Text, Pressable, ActivityIndicator, Linking, Share, StyleSheet } from 'react-native';
++import { colors } from '@goldsmith/ui-tokens';
++import { api } from '../../../api/client';
++import { useReportExport, type ReportType } from '../useReportExport';
++
++const GOLD = '#B58A3C';
++
++// Mirror of the existing GSTR pattern (apps/shopkeeper/app/reports/gstr-export.tsx:28).
++// Android Share API caps EXTRA_TEXT around ~100 KB; we surface a clear Hindi error
++// at 80 KB rather than letting the system silently truncate. Stock-aging in large
++// shops is the most likely report to hit this — instruct user to use PDF instead.
++const SHARE_TEXT_LIMIT_BYTES = 80 * 1024;
++
++function utf8ByteLength(s: string): number {
++  return new TextEncoder().encode(s).length;
++}
++
++interface ExportButtonsProps {
++  reportType: ReportType;
++  csvParams?: Record<string, string | number | undefined>;
++  pdfParams?: Record<string, unknown>;
++}
++
++export function ExportButtons(props: ExportButtonsProps): React.ReactElement {
++  const { reportType, csvParams = {}, pdfParams } = props;
++  const pdf = useReportExport(reportType);
++
++  const [csvBusy, setCsvBusy] = useState(false);
++  const [csvError, setCsvError] = useState<string | null>(null);
++
++  const onCsvPress = async (): Promise<void> => {
++    setCsvError(null);
++    setCsvBusy(true);
++    try {
++      const res = await api.get<{ csv: string; filename: string }>(
++        `/api/v1/reports/${reportType}.csv`,
++        { params: csvParams },
++      );
++      if (utf8ByteLength(res.data.csv) > SHARE_TEXT_LIMIT_BYTES) {
++        setCsvError('यह रिपोर्ट बहुत बड़ी है — कृपया PDF का उपयोग करें।');
++        return;
++      }
++      await Share.share({ title: res.data.filename, message: res.data.csv });
++    } catch {
++      setCsvError('CSV डाउनलोड नहीं हो सका। दोबारा कोशिश करें।');
++    } finally {
++      setCsvBusy(false);
++    }
++  };
++
++  const onPdfPress = (): void => {
++    if (pdf.status === 'IDLE' || pdf.status === 'FAILED') {
++      pdf.start(pdfParams);
++    } else if (pdf.status === 'READY' && pdf.downloadUrl) {
++      void Linking.openURL(pdf.downloadUrl);
++    }
++  };
++
++  const pdfLabel = ({
++    IDLE:    'PDF डाउनलोड',
++    QUEUED:  'तैयार हो रहा...',
++    RUNNING: 'तैयार हो रहा...',
++    READY:   'PDF खोलें',
++    FAILED:  'पुनः प्रयास',
++  })[pdf.status];
++
++  const isPdfBusy = pdf.status === 'QUEUED' || pdf.status === 'RUNNING';
++
++  return (
++    <View style={styles.row}>
++      <Pressable
++        onPress={onCsvPress}
++        disabled={csvBusy}
++        style={[styles.csvBtn, csvBusy && styles.btnBusy]}
++        accessibilityRole="button"
++        accessibilityLabel="CSV डाउनलोड"
++      >
++        {csvBusy && <ActivityIndicator size="small" color={GOLD} style={{ marginRight: 8 }} />}
++        <Text style={styles.csvBtnText}>CSV डाउनलोड</Text>
++      </Pressable>
++
++      <Pressable
++        onPress={onPdfPress}
++        disabled={isPdfBusy}
++        style={[styles.pdfBtn, isPdfBusy && styles.pdfBtnBusy]}
++        accessibilityRole="button"
++        accessibilityLabel={pdfLabel}
++      >
++        {isPdfBusy && <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />}
++        <Text style={styles.pdfBtnText}>{pdfLabel}</Text>
++      </Pressable>
++
++      {csvError && (
++        <Text style={styles.errorText} numberOfLines={2}>{csvError}</Text>
++      )}
++      {pdf.status === 'FAILED' && pdf.errorMessage && (
++        <Text style={styles.errorText} numberOfLines={2}>
++          त्रुटि: {pdf.errorMessage}
++        </Text>
++      )}
++    </View>
++  );
++}
++
++const styles = StyleSheet.create({
++  row:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 12 },
++  csvBtn:        { flexGrow: 1, minHeight: 48, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: GOLD, justifyContent: 'center', alignItems: 'center', flexDirection: 'row' },
++  csvBtnText:    { fontFamily: 'NotoSansDevanagari', fontSize: 14, color: GOLD, fontWeight: '600' },
++  pdfBtn:        { flexGrow: 1, minHeight: 48, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8, backgroundColor: GOLD, justifyContent: 'center', alignItems: 'center', flexDirection: 'row' },
++  pdfBtnBusy:    { backgroundColor: '#A07832' },
++  pdfBtnText:    { fontFamily: 'NotoSansDevanagari', fontSize: 14, color: '#fff', fontWeight: '600' },
++  btnBusy:       { opacity: 0.7 },
++  errorText:     { width: '100%', fontFamily: 'NotoSansDevanagari', fontSize: 12, color: colors.error, marginTop: 4 },
++});
++```
++
++- [ ] **Step 2: Verify typecheck**
++
++```bash
++pnpm --filter @goldsmith/shopkeeper typecheck
++```
++
++Expected: PASS.
++
++- [ ] **Step 3: Commit**
++
++```bash
++git add apps/shopkeeper/src/features/reports/components/ExportButtons.tsx
++git commit -m "feat(ws-3a): add ExportButtons (CSV download + PDF poll-and-open)"
++```
++
++---
++
++## Task D5: Wire `<ExportButtons>` into 5 existing report screens
++
++**Files:**
++- Modify: `apps/shopkeeper/app/reports/daily-summary.tsx`
++- Modify: `apps/shopkeeper/app/reports/outstanding.tsx`
++- Modify: `apps/shopkeeper/app/reports/customer-ltv.tsx`
++- Modify: `apps/shopkeeper/app/reports/loyalty-summary.tsx`
++- Modify: `apps/shopkeeper/app/reports/stock-aging.tsx`
++
++For each screen, add an import and place `<ExportButtons>` near the top of the rendered output (under the section header / date picker, before the data card).
++
++- [ ] **Step 1: Update `daily-summary.tsx`**
++
++Add import:
++```typescript
++import { ExportButtons } from '../../src/features/reports/components/ExportButtons';
++```
++
++Inside the `<ScrollView>`, after the date picker `</View>` and before `{isLoading && ...}`, add:
++```typescript
++<ExportButtons
++  reportType="daily-summary"
++  csvParams={{ date }}
++  pdfParams={{ date }}
++/>
++```
++
++- [ ] **Step 2: Update `outstanding.tsx`**
++
++Add the same import. Inside the main render, near the top (under any header content if present, before the list/loader):
++```typescript
++<ExportButtons reportType="outstanding" />
++```
++
++- [ ] **Step 3: Update `customer-ltv.tsx`**
++
++Add the import. Insert (adapt `limit` to the existing screen's local state, default 20):
++```typescript
++<ExportButtons
++  reportType="customer-ltv"
++  csvParams={{ limit }}
++  pdfParams={{ limit }}
++/>
++```
++
++- [ ] **Step 4: Update `loyalty-summary.tsx`**
++
++Add the import:
++```typescript
++<ExportButtons reportType="loyalty-summary" />
++```
++
++- [ ] **Step 5: Update `stock-aging.tsx`**
++
++Add the import. Insert above `<BucketCard>` row:
++```typescript
++<ExportButtons reportType="stock-aging" />
++```
++
++- [ ] **Step 6: Verify typecheck**
++
++```bash
++pnpm --filter @goldsmith/shopkeeper typecheck
++```
++
++Expected: PASS.
++
++- [ ] **Step 7: Commit**
++
++```bash
++git add apps/shopkeeper/app/reports/daily-summary.tsx apps/shopkeeper/app/reports/outstanding.tsx apps/shopkeeper/app/reports/customer-ltv.tsx apps/shopkeeper/app/reports/loyalty-summary.tsx apps/shopkeeper/app/reports/stock-aging.tsx
++git commit -m "feat(ws-3a): wire ExportButtons into 5 report screens"
++```
++
++---
++
++# Final verification (before push)
++
++After all 26 tasks complete:
++
++- [ ] **Run full API test suite**
++
++```bash
++pnpm --filter @goldsmith/api test
++pnpm --filter @goldsmith/api test:integration
++pnpm --filter @goldsmith/api test:e2e
++```
++
++Expected: all green.
++
++- [ ] **Run tenant-isolation walker**
++
++```bash
++pnpm test:tenant-isolation
++```
++
++Expected: `reports_pdf_exports` enumerated; cross-tenant denial confirmed.
++
++- [ ] **Run Semgrep**
++
++```bash
++pnpm semgrep
++```
++
++Expected: no new findings (the stock-aging SQL was deliberately written without `WHERE shop_id = $1` to satisfy `goldsmith.require-tenant-transaction`; CSV emitters use the existing escape pattern).
++
++- [ ] **Runtime smoke test**
++
++1. Start API: `C:\gs-api-start.cmd`
++2. Start Metro from `C:\gs\apps\shopkeeper`: `npx expo start --dev-client --clear --port 8081`
++3. ADB tunnel: `adb -s 192.168.1.80:5555 reverse tcp:8081 tcp:8081`
++4. On device:
++   - Reports tab → Stock Aging → screen loads, buckets render, no crash
++   - Reports tab → Daily Summary → CSV button downloads in browser → PDF button shows "तैयार हो रहा..." → PDF opens after ~5s
++   - Reports tab → Outstanding → CSV + PDF cycle works
++   - Reports tab → Customer LTV → CSV + PDF cycle works
++   - Reports tab → Loyalty Summary → CSV + PDF cycle works
++   - PDF text reads correctly in Devanagari (शीर्ष ग्राहक, etc.) — not boxes/glyph fallback
++
++- [ ] **Class B review gate (Codex limit substitute)**
++
++```bash
++/code-review
++/security-review
++```
++
++Expected: both write `.claude-review-passed` and `.security-review-passed` markers, no P0/P1 findings.
++
++- [ ] **Push**
++
++```bash
++git push -u origin feat/ws-3a-reports-completion
++```
++
++---
++
++## Out-of-scope reminder
++
++Per spec §15 — these are NOT in this story and should be opened as separate follow-ups:
++
++- GSTR PDF export
++- Customer-web report exports
++- Scheduled/recurring reports
++- Email/WhatsApp delivery of finished PDFs
++- Per-tenant logo upload UI
++- `products.cost_paise` backfill for legacy rows
++- Blob GC cron / Azure Blob lifecycle policy for `tenants/<shop>/reports/**`
++- Row-level GC of `reports_pdf_exports` past 90 days
+diff --git a/docs/superpowers/plans/2026-05-06-story-a1a3-storefront-schema.md b/docs/superpowers/plans/2026-05-06-story-a1a3-storefront-schema.md
+new file mode 100644
+index 0000000..fbce4d7
+--- /dev/null
++++ b/docs/superpowers/plans/2026-05-06-story-a1a3-storefront-schema.md
+@@ -0,0 +1,1189 @@
++# A1+A3 Products Storefront Schema — Implementation Plan
++
++> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
++
++**Goal:** Add 9 storefront columns to `products` (migration 0066) and a composite-FK-guarded `primary_image_id` column with a SECURITY INVOKER auto-maintain trigger (migration 0068), proven by all 6 mandatory spec tests.
++
++**Architecture:** Two independent SQL migrations applied in strict numeric sequence. All behaviour proven by Testcontainer integration tests following the exact pattern of `product-images-tenant-fk.integration.test.ts`. Drizzle schema updated to match DDL. No API or UI changes in this story — pure data layer.
++
++**Tech Stack:** PostgreSQL 15, Drizzle ORM 0.30 (`smallint`, `bigint`, `text().array()`), Vitest 1.x, `@testcontainers/postgresql`, `@goldsmith/db` (`runMigrations`, `createPool`, `withTenantTx`), `@goldsmith/tenant-context`.
++
++---
++
++## File Map
++
++| Action | Path | Purpose |
++|---|---|---|
++| Create | `packages/db/src/migrations/0066_products_storefront_columns.sql` | WS-A: 9 new columns + 7 indexes + pg_trgm |
++| Create | `packages/db/src/migrations/0068_products_primary_image.sql` | WS-B: composite FK + backfill + SECURITY INVOKER trigger |
++| Create | `apps/api/test/storefront-schema-0066.integration.spec.ts` | WS-E: T3-T6 + weight invariant tests |
++| Create | `apps/api/test/storefront-schema-0068.integration.spec.ts` | WS-C+D: T1 (FK cross-tenant) + T2 (trigger RLS) |
++| Modify | `packages/db/src/schema/products.ts` | WS-F: Drizzle column additions + `CATALOG_STYLES` export |
++
++**Migration constraint:** `0067` is reserved for the collections worktree (`C:\gs-stf-2`). Never create that file on this branch.
++
++---
++
++## Task 1 — [WS-E Red] Write failing 0066 behaviour tests
++
++**Files:**
++- Create: `apps/api/test/storefront-schema-0066.integration.spec.ts`
++
++**Context:** `runMigrations` applies every `.sql` file in `packages/db/src/migrations/` in alphabetical order. Until `0066_*.sql` exists, `products` has no `style`, `occasion`, `gift_persona`, etc. columns. Every test in this file will fail with `column "style" does not exist` (Postgres error 42703) — that IS the Red failure.
++
++- [ ] **Step 1: Create the test file**
++
++```typescript
++// apps/api/test/storefront-schema-0066.integration.spec.ts
++//
++// Mandatory spec tests T3–T6 + weight-column invariant.
++// UUID prefix cc4xxxxx — non-overlapping with other test files.
++
++import { describe, it, expect, beforeAll, afterAll } from 'vitest';
++import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
++import { Pool } from 'pg';
++import { resolve } from 'node:path';
++import { createPool, runMigrations, withTenantTx } from '@goldsmith/db';
++import { tenantContext, type Tenant, type UnauthenticatedTenantContext } from '@goldsmith/tenant-context';
++
++// ---------------------------------------------------------------------------
++// Fixture UUIDs — non-overlapping with other integration test files
++// ---------------------------------------------------------------------------
++const SHOP_A = 'cc400001-cc00-4000-cc00-000000000001';
++
++const tenantA: Tenant = { id: SHOP_A, slug: 'stf-0066-a', display_name: '0066 Shop A', status: 'ACTIVE' };
++const ctxA: UnauthenticatedTenantContext = { shopId: SHOP_A, tenant: tenantA, authenticated: false };
++
++let container: StartedPostgreSqlContainer;
++let pool: Pool;
++let userAId: string;
++let productAId: string;
++
++beforeAll(async () => {
++  container = await new PostgreSqlContainer('postgres:15.6').start();
++  pool = createPool({ connectionString: container.getConnectionUri() });
++  await runMigrations(pool, resolve(__dirname, '../../../packages/db/src/migrations'));
++
++  // Seed shop via raw connection (no RLS on shops table from admin path)
++  const c = await pool.connect();
++  try {
++    await c.query(
++      `INSERT INTO shops (id, slug, display_name, status) VALUES ($1, 'stf-0066-a', '0066 Shop A', 'ACTIVE')`,
++      [SHOP_A],
++    );
++  } finally {
++    c.release();
++  }
++
++  // Seed shop_admin user
++  userAId = await tenantContext.runWith(ctxA, () =>
++    withTenantTx(pool, async (tx) => {
++      const r = await tx.query<{ id: string }>(
++        `INSERT INTO shop_users (shop_id, phone, display_name, role, status)
++           VALUES ($1, '+919400000101', 'Owner 0066', 'shop_admin', 'ACTIVE') RETURNING id`,
++        [SHOP_A],
++      );
++      return r.rows[0]!.id;
++    }),
++  );
++
++  // Seed a published product for index smoke tests (partial indexes filter published_at IS NOT NULL)
++  productAId = await tenantContext.runWith(ctxA, () =>
++    withTenantTx(pool, async (tx) => {
++      const r = await tx.query<{ id: string }>(
++        `INSERT INTO products
++           (shop_id, sku, metal, purity, gross_weight_g, net_weight_g, stone_weight_g,
++            status, created_by_user_id, published_at, published_by_user_id)
++         VALUES
++           ($1, 'STF0066-001', 'GOLD', '22K', '10.0000', '9.0000', '0.0000',
++            'IN_STOCK', $2, NOW(), $2)
++         RETURNING id`,
++        [SHOP_A, userAId],
++      );
++      return r.rows[0]!.id;
++    }),
++  );
++}, 180_000);
++
++afterAll(async () => {
++  await pool?.end();
++  await container?.stop();
++});
++
++// ---------------------------------------------------------------------------
++// T3 — CHECK constraint blocks invalid style
++// ---------------------------------------------------------------------------
++describe('migration 0066: style CHECK constraint', () => {
++  it('rejects style = UNKNOWN with CHECK violation (23514)', async () => {
++    await expect(
++      tenantContext.runWith(ctxA, () =>
++        withTenantTx(pool, (tx) =>
++          tx.query(`UPDATE products SET style = 'UNKNOWN' WHERE id = $1`, [productAId]),
++        ),
++      ),
++    ).rejects.toMatchObject({ code: '23514' });
++  });
++
++  it('accepts every valid style value without error', async () => {
++    const validStyles = [
++      'ENGAGEMENT','COUPLE','DAILY_WEAR','JHUMKA','STUDS','HOOPS',
++      'DROP','STATEMENT','TEMPLE','BRIDAL','OFFICE','KIDS',
++    ];
++    for (const style of validStyles) {
++      await expect(
++        tenantContext.runWith(ctxA, () =>
++          withTenantTx(pool, (tx) =>
++            tx.query(`UPDATE products SET style = $1 WHERE id = $2`, [style, productAId]),
++          ),
++        ),
++      ).resolves.not.toThrow();
++    }
++  });
++
++  it('accepts NULL style (column is nullable)', async () => {
++    await expect(
++      tenantContext.runWith(ctxA, () =>
++        withTenantTx(pool, (tx) =>
++          tx.query(`UPDATE products SET style = NULL WHERE id = $1`, [productAId]),
++        ),
++      ),
++    ).resolves.not.toThrow();
++  });
++});
++
++// ---------------------------------------------------------------------------
++// Weight column invariant — must remain DECIMAL(12,4) after migration
++// ---------------------------------------------------------------------------
++describe('migration 0066: weight column types unchanged', () => {
++  it('gross_weight_g and net_weight_g remain numeric(12,4)', async () => {
++    const r = await pool.query<{
++      column_name: string;
++      data_type: string;
++      numeric_precision: number;
++      numeric_scale: number;
++    }>(
++      `SELECT column_name, data_type, numeric_precision, numeric_scale
++         FROM information_schema.columns
++        WHERE table_name = 'products'
++          AND column_name IN ('gross_weight_g', 'net_weight_g')
++        ORDER BY column_name`,
++    );
++    expect(r.rows).toHaveLength(2);
++    for (const row of r.rows) {
++      expect(row.data_type).toBe('numeric');
++      expect(row.numeric_precision).toBe(12);
++      expect(row.numeric_scale).toBe(4);
++    }
++  });
++});
++
++// ---------------------------------------------------------------------------
++// T4 — GIN occasion index used by ANY(...)
++// ---------------------------------------------------------------------------
++describe('migration 0066: GIN occasion index', () => {
++  it('planner uses products_occasion_gin_idx for ANY(occasion) filter', async () => {
++    const client = await pool.connect();
++    try {
++      await client.query('SET enable_seqscan = off');
++      const r = await client.query<{ 'QUERY PLAN': string }>(
++        `EXPLAIN SELECT id FROM products WHERE 'WEDDING' = ANY(occasion)`,
++      );
++      const plan = r.rows.map((row) => row['QUERY PLAN']).join('\n');
++      expect(plan).toContain('products_occasion_gin_idx');
++    } finally {
++      await client.query('RESET enable_seqscan');
++      client.release();
++    }
++  });
++});
++
++// ---------------------------------------------------------------------------
++// T5 — composite top-sellers index used by ORDER BY expression
++// ---------------------------------------------------------------------------
++describe('migration 0066: top-sellers expression index', () => {
++  it('planner uses products_top_sellers_idx for (sales*2+views) DESC ORDER BY', async () => {
++    const client = await pool.connect();
++    try {
++      await client.query('SET enable_seqscan = off');
++      const r = await client.query<{ 'QUERY PLAN': string }>(
++        `EXPLAIN SELECT id FROM products
++          WHERE shop_id = $1 AND published_at IS NOT NULL
++          ORDER BY (sales_count_30d * 2 + view_count_30d) DESC, published_at DESC`,
++        [SHOP_A],
++      );
++      const plan = r.rows.map((row) => row['QUERY PLAN']).join('\n');
++      expect(plan).toContain('products_top_sellers_idx');
++    } finally {
++      await client.query('RESET enable_seqscan');
++      client.release();
++    }
++  });
++});
++
++// ---------------------------------------------------------------------------
++// T6 — pg_trgm GIN index used by similarity search
++// ---------------------------------------------------------------------------
++describe('migration 0066: pg_trgm similarity index', () => {
++  it('planner uses products_search_trgm_idx for expression % similarity query', async () => {
++    const client = await pool.connect();
++    try {
++      await client.query('SET enable_seqscan = off');
++      // The index expression is: coalesce(sku,'') || ' ' || coalesce(metal,'') || ' ' || coalesce(purity,'')
++      // Query must match the exact expression to use the index.
++      const r = await client.query<{ 'QUERY PLAN': string }>(
++        `EXPLAIN SELECT id FROM products
++          WHERE (coalesce(sku, '') || ' ' || coalesce(metal, '') || ' ' || coalesce(purity, '')) % 'AB-1042'
++            AND published_at IS NOT NULL`,
++      );
++      const plan = r.rows.map((row) => row['QUERY PLAN']).join('\n');
++      expect(plan).toContain('products_search_trgm_idx');
++    } finally {
++      await client.query('RESET enable_seqscan');
++      client.release();
++    }
++  });
++});
++```
++
++- [ ] **Step 2: Run the tests to confirm Red failure**
++
++```bash
++cd apps/api && pnpm vitest run test/storefront-schema-0066.integration.spec.ts
++```
++
++Expected: **ALL tests fail**. The failure message for T3 will be `column "style" does not exist` (Postgres 42703), not the CHECK violation. That is correct Red behaviour — the column doesn't exist yet.
++
++Do NOT proceed to Task 2 unless you see test failures. If tests somehow pass, something is wrong — stop and investigate.
++
++---
++
++## Task 2 — [WS-A] Write migration 0066
++
++**Files:**
++- Create: `packages/db/src/migrations/0066_products_storefront_columns.sql`
++
++**Critical constraints:**
++- Do NOT touch `gross_weight_g` or `net_weight_g` column definitions.
++- Do NOT create any file named `0067_*` on this branch — that number is reserved for `gs-stf-2`.
++- `CREATE EXTENSION IF NOT EXISTS pg_trgm` must precede the trigram index.
++- Wrap in `BEGIN; ... COMMIT;` (DDL-only, no DML per `docs/db-workflow.md`).
++
++- [ ] **Step 1: Create the migration file**
++
++```sql
++-- packages/db/src/migrations/0066_products_storefront_columns.sql
++-- Story A1 — Storefront-specific columns on products for customer catalog.
++-- No backfill: all new columns have safe NULL / empty-array / 0 defaults.
++-- Rollback: see rollback DDL at bottom (comment block).
++
++BEGIN;
++
++-- pg_trgm required before trigram GIN index. Idempotent.
++CREATE EXTENSION IF NOT EXISTS pg_trgm;
++
++ALTER TABLE products
++  ADD COLUMN style                   TEXT
++    CONSTRAINT products_style_check CHECK (style IN (
++      'ENGAGEMENT','COUPLE','DAILY_WEAR','JHUMKA','STUDS','HOOPS',
++      'DROP','STATEMENT','TEMPLE','BRIDAL','OFFICE','KIDS'
++    )),
++  ADD COLUMN occasion                TEXT[]   NOT NULL DEFAULT '{}',
++  ADD COLUMN gift_persona            TEXT[]   NOT NULL DEFAULT '{}',
++  ADD COLUMN featured_score          SMALLINT NOT NULL DEFAULT 0
++    CONSTRAINT products_featured_score_check CHECK (featured_score BETWEEN 0 AND 100),
++  ADD COLUMN sales_count_30d         INTEGER  NOT NULL DEFAULT 0,
++  ADD COLUMN view_count_30d          INTEGER  NOT NULL DEFAULT 0,
++  ADD COLUMN price_snapshot_paise    BIGINT,
++  ADD COLUMN price_snapshot_at       TIMESTAMPTZ,
++  ADD COLUMN published_search_idx_at TIMESTAMPTZ;
++
++-- Style: partial BTree — used by /products?style=JHUMKA filter.
++CREATE INDEX products_style_idx
++  ON products (shop_id, style)
++  WHERE published_at IS NOT NULL;
++
++-- Occasion + gift_persona: GIN — used by ANY(occasion) / ANY(gift_persona) filters.
++CREATE INDEX products_occasion_gin_idx
++  ON products USING GIN (occasion);
++
++CREATE INDEX products_gift_persona_gin_idx
++  ON products USING GIN (gift_persona);
++
++-- Featured: partial BTree — used by /catalog/products/featured endpoint.
++CREATE INDEX products_featured_idx
++  ON products (shop_id, featured_score DESC)
++  WHERE published_at IS NOT NULL AND featured_score > 0;
++
++-- Price snapshot: partial BTree — used by priceMin/priceMax filter.
++CREATE INDEX products_price_snapshot_idx
++  ON products (shop_id, price_snapshot_paise)
++  WHERE price_snapshot_paise IS NOT NULL AND published_at IS NOT NULL;
++
++-- Top-sellers: expression BTree — ORDER BY (sales_count_30d * 2 + view_count_30d) DESC.
++CREATE INDEX products_top_sellers_idx
++  ON products (shop_id, (sales_count_30d * 2 + view_count_30d) DESC, published_at DESC)
++  WHERE published_at IS NOT NULL;
++
++-- Trigram search: GIN gin_trgm_ops — WHERE (...concatenation...) % 'query'.
++CREATE INDEX products_search_trgm_idx
++  ON products USING GIN (
++    (coalesce(sku, '') || ' ' || coalesce(metal, '') || ' ' || coalesce(purity, ''))
++    gin_trgm_ops
++  )
++  WHERE published_at IS NOT NULL;
++
++COMMIT;
++
++-- ---------------------------------------------------------------------------
++-- Rollback DDL (run on a scratch DB to validate before claiming Task 3 done)
++-- ---------------------------------------------------------------------------
++-- DROP INDEX IF EXISTS products_style_idx;
++-- DROP INDEX IF EXISTS products_occasion_gin_idx;
++-- DROP INDEX IF EXISTS products_gift_persona_gin_idx;
++-- DROP INDEX IF EXISTS products_featured_idx;
++-- DROP INDEX IF EXISTS products_price_snapshot_idx;
++-- DROP INDEX IF EXISTS products_top_sellers_idx;
++-- DROP INDEX IF EXISTS products_search_trgm_idx;
++-- ALTER TABLE products
++--   DROP COLUMN IF EXISTS style,
++--   DROP COLUMN IF EXISTS occasion,
++--   DROP COLUMN IF EXISTS gift_persona,
++--   DROP COLUMN IF EXISTS featured_score,
++--   DROP COLUMN IF EXISTS sales_count_30d,
++--   DROP COLUMN IF EXISTS view_count_30d,
++--   DROP COLUMN IF EXISTS price_snapshot_paise,
++--   DROP COLUMN IF EXISTS price_snapshot_at,
++--   DROP COLUMN IF EXISTS published_search_idx_at;
++-- (pg_trgm extension is NOT dropped — may be used by other indexes.)
++```
++
++- [ ] **Step 2: Verify rollback DDL is valid on a scratch DB**
++
++```bash
++# Option A: apply full migrations to a local dev Postgres, then run rollback
++psql $DATABASE_URL -f packages/db/src/migrations/0066_products_storefront_columns.sql
++# Extract and run only the rollback block (lines 43–56 of the file):
++psql $DATABASE_URL <<'SQL'
++DROP INDEX IF EXISTS products_style_idx;
++DROP INDEX IF EXISTS products_occasion_gin_idx;
++DROP INDEX IF EXISTS products_gift_persona_gin_idx;
++DROP INDEX IF EXISTS products_featured_idx;
++DROP INDEX IF EXISTS products_price_snapshot_idx;
++DROP INDEX IF EXISTS products_top_sellers_idx;
++DROP INDEX IF EXISTS products_search_trgm_idx;
++ALTER TABLE products
++  DROP COLUMN IF EXISTS style,
++  DROP COLUMN IF EXISTS occasion,
++  DROP COLUMN IF EXISTS gift_persona,
++  DROP COLUMN IF EXISTS featured_score,
++  DROP COLUMN IF EXISTS sales_count_30d,
++  DROP COLUMN IF EXISTS view_count_30d,
++  DROP COLUMN IF EXISTS price_snapshot_paise,
++  DROP COLUMN IF EXISTS price_snapshot_at,
++  DROP COLUMN IF EXISTS published_search_idx_at;
++SQL
++```
++
++Expected: no errors. If local Postgres is unavailable, skip this step and note it in the commit message — the integration tests exercise the migration forward path, which is the higher-risk direction.
++
++---
++
++## Task 3 — [WS-E Green] Run 0066 tests + commit
++
++**Files:**
++- No new files — migration now present; test expectations should be met.
++
++- [ ] **Step 1: Run the 0066 test suite**
++
++```bash
++cd apps/api && pnpm vitest run test/storefront-schema-0066.integration.spec.ts
++```
++
++Expected output (all 9 tests pass):
++```
++✓ migration 0066: style CHECK constraint > rejects style = UNKNOWN with CHECK violation (23514)
++✓ migration 0066: style CHECK constraint > accepts every valid style value without error
++✓ migration 0066: style CHECK constraint > accepts NULL style (column is nullable)
++✓ migration 0066: weight column types unchanged > gross_weight_g and net_weight_g remain numeric(12,4)
++✓ migration 0066: GIN occasion index > planner uses products_occasion_gin_idx for ANY(occasion) filter
++✓ migration 0066: top-sellers expression index > planner uses products_top_sellers_idx for (sales*2+views) DESC ORDER BY
++✓ migration 0066: pg_trgm similarity index > planner uses products_search_trgm_idx for expression % similarity query
++Test Files  1 passed (1)
++Tests       7 passed (7)
++```
++
++If any test fails, diagnose and fix the migration SQL before committing. Common causes:
++- Expression index text must exactly match the query expression (including `coalesce` case and spacing)
++- `enable_seqscan = off` must be set on the SAME connection as the EXPLAIN query
++- Partial index predicates must match the WHERE clause in the query
++
++- [ ] **Step 2: Commit**
++
++```bash
++git add \
++  packages/db/src/migrations/0066_products_storefront_columns.sql \
++  apps/api/test/storefront-schema-0066.integration.spec.ts
++git commit -m "$(cat <<'EOF'
++feat(db): add products storefront columns + indexes (migration 0066, story A1)
++
++Nine new columns: style (CHECK constraint), occasion[], gift_persona[],
++featured_score, sales_count_30d, view_count_30d, price_snapshot_paise,
++price_snapshot_at, published_search_idx_at. Seven indexes including two GIN
++arrays, pg_trgm expression, and expression top-sellers index. All 7 spec
++tests (T3-T6 + weight invariant) passing.
++
++Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
++EOF
++)"
++```
++
++---
++
++## Task 4 — [WS-C+D Red] Write failing 0068 trigger + cross-tenant FK tests
++
++**Files:**
++- Create: `apps/api/test/storefront-schema-0068.integration.spec.ts`
++
++**Context:** Until `0068_*.sql` exists, `products` has no `primary_image_id` column. Tests will fail with `column "primary_image_id" does not exist`. That is the Red failure.
++
++- [ ] **Step 1: Create the test file**
++
++```typescript
++// apps/api/test/storefront-schema-0068.integration.spec.ts
++//
++// Mandatory spec tests T1 (FK cross-tenant) and T2 (trigger SECURITY INVOKER).
++// UUID prefix dd5xxxxx / ee5xxxxx — non-overlapping with other test files.
++
++import { describe, it, expect, beforeAll, afterAll } from 'vitest';
++import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
++import { Pool } from 'pg';
++import { resolve } from 'node:path';
++import { createPool, runMigrations, withTenantTx } from '@goldsmith/db';
++import { tenantContext, type Tenant, type UnauthenticatedTenantContext } from '@goldsmith/tenant-context';
++
++// ---------------------------------------------------------------------------
++// Fixture UUIDs — non-overlapping with other integration test files
++// ---------------------------------------------------------------------------
++const SHOP_A = 'dd500001-dd00-4000-dd00-000000000001';
++const SHOP_B = 'ee500002-ee00-4000-ee00-000000000002';
++
++const tenantA: Tenant = { id: SHOP_A, slug: 'stf-0068-a', display_name: '0068 Shop A', status: 'ACTIVE' };
++const tenantB: Tenant = { id: SHOP_B, slug: 'stf-0068-b', display_name: '0068 Shop B', status: 'ACTIVE' };
++const ctxA: UnauthenticatedTenantContext = { shopId: SHOP_A, tenant: tenantA, authenticated: false };
++const ctxB: UnauthenticatedTenantContext = { shopId: SHOP_B, tenant: tenantB, authenticated: false };
++
++let container: StartedPostgreSqlContainer;
++let pool: Pool;
++let userAId: string;
++let userBId: string;
++let productAId: string;
++let productBId: string;
++
++// Inserts a product_images row in the given tenant context.
++const insertImage = (
++  shopId: string,
++  ctx: UnauthenticatedTenantContext,
++  productId: string,
++  uploaderId: string,
++  opts: { sortOrder?: number; scanStatus?: string } = {},
++) =>
++  tenantContext.runWith(ctx, () =>
++    withTenantTx(pool, async (tx) => {
++      const r = await tx.query<{ id: string }>(
++        `INSERT INTO product_images
++           (shop_id, product_id, storage_key, mime_type, byte_size, width, height,
++            exif_stripped_at, uploaded_by_user_id, scan_status, sort_order)
++         VALUES
++           ($1, $2, $3, 'image/jpeg', 1234, 800, 600,
++            NOW(), $4, $5, $6)
++         RETURNING id`,
++        [
++          shopId,
++          productId,
++          `tenant/${shopId}/products/${productId}/${Math.random().toString(36).slice(2)}.jpg`,
++          uploaderId,
++          opts.scanStatus ?? 'clean',
++          opts.sortOrder ?? 0,
++        ],
++      );
++      return r.rows[0]!.id;
++    }),
++  );
++
++beforeAll(async () => {
++  container = await new PostgreSqlContainer('postgres:15.6').start();
++  pool = createPool({ connectionString: container.getConnectionUri() });
++  await runMigrations(pool, resolve(__dirname, '../../../packages/db/src/migrations'));
++
++  // Seed shops via raw connection
++  const c = await pool.connect();
++  try {
++    await c.query(
++      `INSERT INTO shops (id, slug, display_name, status) VALUES
++        ($1, 'stf-0068-a', '0068 Shop A', 'ACTIVE'),
++        ($2, 'stf-0068-b', '0068 Shop B', 'ACTIVE')`,
++      [SHOP_A, SHOP_B],
++    );
++  } finally {
++    c.release();
++  }
++
++  // Seed users
++  userAId = await tenantContext.runWith(ctxA, () =>
++    withTenantTx(pool, async (tx) => {
++      const r = await tx.query<{ id: string }>(
++        `INSERT INTO shop_users (shop_id, phone, display_name, role, status)
++           VALUES ($1, '+919500000101', 'Owner 0068A', 'shop_admin', 'ACTIVE') RETURNING id`,
++        [SHOP_A],
++      );
++      return r.rows[0]!.id;
++    }),
++  );
++
++  userBId = await tenantContext.runWith(ctxB, () =>
++    withTenantTx(pool, async (tx) => {
++      const r = await tx.query<{ id: string }>(
++        `INSERT INTO shop_users (shop_id, phone, display_name, role, status)
++           VALUES ($1, '+919500000102', 'Owner 0068B', 'shop_admin', 'ACTIVE') RETURNING id`,
++        [SHOP_B],
++      );
++      return r.rows[0]!.id;
++    }),
++  );
++
++  // Seed products
++  productAId = await tenantContext.runWith(ctxA, () =>
++    withTenantTx(pool, async (tx) => {
++      const r = await tx.query<{ id: string }>(
++        `INSERT INTO products
++           (shop_id, sku, metal, purity, gross_weight_g, net_weight_g,
++            stone_weight_g, status, created_by_user_id)
++         VALUES ($1, 'STF0068-A-001', 'GOLD', '22K', '10.0000', '9.0000',
++                 '0.0000', 'IN_STOCK', $2)
++         RETURNING id`,
++        [SHOP_A, userAId],
++      );
++      return r.rows[0]!.id;
++    }),
++  );
++
++  productBId = await tenantContext.runWith(ctxB, () =>
++    withTenantTx(pool, async (tx) => {
++      const r = await tx.query<{ id: string }>(
++        `INSERT INTO products
++           (shop_id, sku, metal, purity, gross_weight_g, net_weight_g,
++            stone_weight_g, status, created_by_user_id)
++         VALUES ($1, 'STF0068-B-001', 'GOLD', '22K', '10.0000', '9.0000',
++                 '0.0000', 'IN_STOCK', $2)
++         RETURNING id`,
++        [SHOP_B, userBId],
++      );
++      return r.rows[0]!.id;
++    }),
++  );
++}, 180_000);
++
++afterAll(async () => {
++  await pool?.end();
++  await container?.stop();
++});
++
++// ---------------------------------------------------------------------------
++// Backfill verification — after migration, existing clean images populate primary_image_id
++// (The beforeAll seeds products THEN runMigrations already ran; backfill applies during
++// migration so products created BEFORE migration would be backfilled. In this test the
++// products are seeded AFTER migration, so backfill doesn't apply here. Test trigger instead.)
++// ---------------------------------------------------------------------------
++
++// ---------------------------------------------------------------------------
++// T1 — primary_image_id FK does not bypass RLS via cross-tenant image
++// ---------------------------------------------------------------------------
++describe('migration 0068: composite FK cross-tenant guard', () => {
++  it('rejects setting primary_image_id to a cross-tenant image (FK violation 23503)', async () => {
++    // Insert a valid image in Shop B for Shop B's product.
++    const imageBId = await insertImage(SHOP_B, ctxB, productBId, userBId);
++
++    // Attempt to point Shop A's product at Shop B's image.
++    // Composite FK (shop_id, primary_image_id) → product_images(shop_id, id) requires
++    // that (SHOP_A, imageBId) exists in product_images — it does not → 23503.
++    await expect(
++      tenantContext.runWith(ctxA, () =>
++        withTenantTx(pool, (tx) =>
++          tx.query(
++            `UPDATE products SET primary_image_id = $1 WHERE id = $2`,
++            [imageBId, productAId],
++          ),
++        ),
++      ),
++    ).rejects.toMatchObject({ code: '23503' });
++  });
++
++  it('allows same-tenant primary_image_id assignment (control)', async () => {
++    // Insert a clean image in Shop A for Shop A's product.
++    const imageAId = await insertImage(SHOP_A, ctxA, productAId, userAId);
++
++    // Same-tenant assignment must succeed.
++    await expect(
++      tenantContext.runWith(ctxA, () =>
++        withTenantTx(pool, (tx) =>
++          tx.query(
++            `UPDATE products SET primary_image_id = $1 WHERE id = $2`,
++            [imageAId, productAId],
++          ),
++        ),
++      ),
++    ).resolves.not.toThrow();
++  });
++});
++
++// ---------------------------------------------------------------------------
++// T2 — maintain trigger respects RLS under SECURITY INVOKER
++// ---------------------------------------------------------------------------
++describe('migration 0068: maintain trigger (SECURITY INVOKER)', () => {
++  it('trigger auto-sets primary_image_id on first clean image INSERT', async () => {
++    // Products start with NULL primary_image_id; inserting a clean image should trigger recompute.
++    const imageId = await insertImage(SHOP_A, ctxA, productAId, userAId, { sortOrder: 99 });
++
++    // The trigger should have set products.primary_image_id to this image.
++    // Use raw pool connection to bypass RLS for the assertion read.
++    const r = await pool.query<{ primary_image_id: string | null }>(
++      `SELECT primary_image_id FROM products WHERE id = $1`,
++      [productAId],
++    );
++    // primary_image_id must be some image belonging to productA (the one with lowest sort_order)
++    expect(r.rows[0]!.primary_image_id).toBeTruthy();
++  });
++
++  it('trigger NULLs primary_image_id when last clean image is deleted', async () => {
++    // Insert exactly one clean image in a fresh product to have a controlled state.
++    // Use a new product to avoid state from previous test.
++    const freshProductId = await tenantContext.runWith(ctxA, () =>
++      withTenantTx(pool, async (tx) => {
++        const r = await tx.query<{ id: string }>(
++          `INSERT INTO products
++             (shop_id, sku, metal, purity, gross_weight_g, net_weight_g,
++              stone_weight_g, status, created_by_user_id)
++           VALUES ($1, 'STF0068-A-002', 'GOLD', '22K', '10.0000', '9.0000',
++                   '0.0000', 'IN_STOCK', $2)
++           RETURNING id`,
++          [SHOP_A, userAId],
++        );
++        return r.rows[0]!.id;
++      }),
++    );
++
++    const onlyImageId = await insertImage(SHOP_A, ctxA, freshProductId, userAId, { sortOrder: 0 });
++
++    // Verify trigger set primary_image_id
++    const before = await pool.query<{ primary_image_id: string | null }>(
++      `SELECT primary_image_id FROM products WHERE id = $1`,
++      [freshProductId],
++    );
++    expect(before.rows[0]!.primary_image_id).toBe(onlyImageId);
++
++    // Delete the only clean image as Shop A user
++    await tenantContext.runWith(ctxA, () =>
++      withTenantTx(pool, (tx) =>
++        tx.query(`DELETE FROM product_images WHERE id = $1`, [onlyImageId]),
++      ),
++    );
++
++    // Trigger must have NULLed primary_image_id (no more clean images)
++    const after = await pool.query<{ primary_image_id: string | null }>(
++      `SELECT primary_image_id FROM products WHERE id = $1`,
++      [freshProductId],
++    );
++    expect(after.rows[0]!.primary_image_id).toBeNull();
++  });
++
++  it('trigger does not affect other tenant products (RLS under SECURITY INVOKER)', async () => {
++    // Record Shop B product primary_image_id before any Shop A operation
++    const beforeB = await pool.query<{ primary_image_id: string | null }>(
++      `SELECT primary_image_id FROM products WHERE id = $1`,
++      [productBId],
++    );
++    const bPrimaryBefore = beforeB.rows[0]!.primary_image_id;
++
++    // Insert a new image in Shop A (triggers recompute for Shop A's product only)
++    await insertImage(SHOP_A, ctxA, productAId, userAId, { sortOrder: 0 });
++
++    // Shop B's product primary_image_id must be unchanged
++    const afterB = await pool.query<{ primary_image_id: string | null }>(
++      `SELECT primary_image_id FROM products WHERE id = $1`,
++      [productBId],
++    );
++    expect(afterB.rows[0]!.primary_image_id).toBe(bPrimaryBefore);
++  });
++});
++```
++
++- [ ] **Step 2: Run the tests to confirm Red failure**
++
++```bash
++cd apps/api && pnpm vitest run test/storefront-schema-0068.integration.spec.ts
++```
++
++Expected: **ALL tests fail** with `column "primary_image_id" does not exist` (42703). That is the correct Red state.
++
++---
++
++## Task 5 — [WS-B] Write migration 0068
++
++**Files:**
++- Create: `packages/db/src/migrations/0068_products_primary_image.sql`
++
++**Critical constraints:**
++- `product_images_shop_id_id_uniq` UNIQUE must be added BEFORE the composite FK (FK target requires unique constraint).
++- Trigger MUST be `SECURITY INVOKER` — `SECURITY DEFINER` bypasses RLS and is banned.
++- Composite FK ON DELETE SET NULL: when an image is deleted, FK sets `primary_image_id = NULL` before the trigger fires (trigger then recomputes from remaining clean images, restoring to the next best image or NULL if none remain).
++- Do NOT create `0067_*` on this branch.
++
++- [ ] **Step 1: Create the migration file**
++
++```sql
++-- packages/db/src/migrations/0068_products_primary_image.sql
++-- Story A3 — products.primary_image_id with composite FK (mirrors 0058 pattern)
++-- and a SECURITY INVOKER trigger to auto-maintain the column.
++--
++-- Security rationale: a plain FK (primary_image_id → product_images.id) would allow
++-- a Tenant-A product to reference a Tenant-B image — the RLS policy on products
++-- filters rows but does NOT prevent FK references into other tenants' images.
++-- Composite FK (shop_id, primary_image_id) → product_images(shop_id, id) closes this
++-- at the schema layer, mirroring the 0058 pattern for product_images → products.
++
++BEGIN;
++
++-- Step 1: UNIQUE constraint on product_images(shop_id, id) as composite FK target.
++-- product_images.id is already a PRIMARY KEY (unique), but FKs can only reference
++-- UNIQUE or PRIMARY KEY constraints. Adding an explicit UNIQUE(shop_id, id) lets
++-- the composite FK reference (shop_id, id) while the primary key covers (id) alone.
++ALTER TABLE product_images
++  ADD CONSTRAINT product_images_shop_id_id_uniq UNIQUE (shop_id, id);
++
++-- Step 2: Add primary_image_id column (nullable — NULL = no clean image available).
++ALTER TABLE products
++  ADD COLUMN primary_image_id UUID;
++
++-- Step 3: Composite FK — blocks cross-tenant image association at the schema layer.
++-- ON DELETE SET NULL: when a product_image is deleted, Postgres first sets
++-- primary_image_id = NULL (FK action), then the trigger fires AFTER DELETE and
++-- recomputes primary_image_id from remaining clean images.
++ALTER TABLE products
++  ADD CONSTRAINT products_shop_primary_image_fkey
++  FOREIGN KEY (shop_id, primary_image_id)
++  REFERENCES product_images(shop_id, id)
++  ON DELETE SET NULL;
++
++-- Step 4: Backfill — set primary_image_id for products that already have clean images.
++-- Products with no clean images remain NULL (correct and safe).
++UPDATE products
++   SET primary_image_id = (
++     SELECT pi.id
++       FROM product_images pi
++      WHERE pi.product_id = products.id
++        AND pi.scan_status = 'clean'
++      ORDER BY pi.sort_order ASC, pi.created_at ASC
++      LIMIT 1
++   );
++
++-- Step 5: Trigger function. SECURITY INVOKER so RLS stays active during trigger
++-- execution — the trigger UPDATE runs under the session user's privileges, not
++-- a privileged role, preventing cross-tenant writes.
++CREATE OR REPLACE FUNCTION maintain_products_primary_image()
++RETURNS TRIGGER
++LANGUAGE plpgsql
++SECURITY INVOKER
++AS $$
++DECLARE
++  v_product_id UUID;
++BEGIN
++  -- COALESCE handles both DELETE (NEW is null) and INSERT/UPDATE (OLD may be null).
++  v_product_id := COALESCE(NEW.product_id, OLD.product_id);
++
++  UPDATE products
++     SET primary_image_id = (
++       SELECT pi.id
++         FROM product_images pi
++        WHERE pi.product_id = v_product_id
++          AND pi.scan_status = 'clean'
++        ORDER BY pi.sort_order ASC, pi.created_at ASC
++        LIMIT 1
++     )
++   WHERE id = v_product_id;
++
++  -- AFTER trigger return value is ignored by Postgres; RETURN NEW is conventional.
++  RETURN NEW;
++END;
++$$;
++
++-- Fires after any of the four mutation events that can change which image is "primary":
++--   INSERT      — new image added; may become primary if it has the lowest sort_order
++--   DELETE      — image removed; FK ON DELETE SET NULL fires first, then trigger recomputes
++--   UPDATE OF sort_order  — reorder can change which image is first
++--   UPDATE OF scan_status — an image becoming 'clean' or 'rejected' changes eligibility
++CREATE TRIGGER trg_maintain_products_primary_image
++AFTER INSERT OR DELETE OR UPDATE OF sort_order, scan_status
++ON product_images
++FOR EACH ROW
++EXECUTE FUNCTION maintain_products_primary_image();
++
++COMMIT;
++
++-- ---------------------------------------------------------------------------
++-- Rollback DDL (validate on scratch DB before claiming Task 6 done)
++-- ---------------------------------------------------------------------------
++-- DROP TRIGGER IF EXISTS trg_maintain_products_primary_image ON product_images;
++-- DROP FUNCTION IF EXISTS maintain_products_primary_image();
++-- ALTER TABLE products
++--   DROP CONSTRAINT IF EXISTS products_shop_primary_image_fkey,
++--   DROP COLUMN IF EXISTS primary_image_id;
++-- ALTER TABLE product_images
++--   DROP CONSTRAINT IF EXISTS product_images_shop_id_id_uniq;
++```
++
++- [ ] **Step 2: Validate rollback DDL on a scratch DB**
++
++```bash
++# Apply 0068 forward first (0066 must already be applied):
++psql $DATABASE_URL -f packages/db/src/migrations/0068_products_primary_image.sql
++# Run rollback block:
++psql $DATABASE_URL <<'SQL'
++DROP TRIGGER IF EXISTS trg_maintain_products_primary_image ON product_images;
++DROP FUNCTION IF EXISTS maintain_products_primary_image();
++ALTER TABLE products
++  DROP CONSTRAINT IF EXISTS products_shop_primary_image_fkey,
++  DROP COLUMN IF EXISTS primary_image_id;
++ALTER TABLE product_images
++  DROP CONSTRAINT IF EXISTS product_images_shop_id_id_uniq;
++SQL
++```
++
++Expected: no errors. If local Postgres is unavailable, the integration tests in Task 6 serve as the runtime verification — note in commit message.
++
++---
++
++## Task 6 — [WS-C+D Green] Run 0068 tests + commit
++
++**Files:**
++- No new files — migration now present; test expectations should be met.
++
++- [ ] **Step 1: Run the 0068 test suite**
++
++```bash
++cd apps/api && pnpm vitest run test/storefront-schema-0068.integration.spec.ts
++```
++
++Expected output (all 5 tests pass):
++```
++✓ migration 0068: composite FK cross-tenant guard > rejects setting primary_image_id to a cross-tenant image (FK violation 23503)
++✓ migration 0068: composite FK cross-tenant guard > allows same-tenant primary_image_id assignment (control)
++✓ migration 0068: maintain trigger (SECURITY INVOKER) > trigger auto-sets primary_image_id on first clean image INSERT
++✓ migration 0068: maintain trigger (SECURITY INVOKER) > trigger NULLs primary_image_id when last clean image is deleted
++✓ migration 0068: maintain trigger (SECURITY INVOKER) > trigger does not affect other tenant products (RLS under SECURITY INVOKER)
++Test Files  1 passed (1)
++Tests       5 passed (5)
++```
++
++If T1 (23503 test) fails with "resolved" instead of "rejected":
++- The `product_images_shop_id_id_uniq` constraint may be missing — verify `\d product_images` shows it.
++- The FK constraint `products_shop_primary_image_fkey` may reference the wrong columns.
++
++If T2 trigger tests fail with "primary_image_id is null" after INSERT:
++- Verify the trigger fires AFTER INSERT (not BEFORE).
++- Verify the trigger function computes correctly: `WHERE pi.product_id = v_product_id AND pi.scan_status = 'clean'`.
++
++- [ ] **Step 2: Run both integration test suites together**
++
++```bash
++cd apps/api && pnpm vitest run test/storefront-schema-0066.integration.spec.ts test/storefront-schema-0068.integration.spec.ts
++```
++
++Expected: 12 tests total pass across both files.
++
++- [ ] **Step 3: Commit**
++
++```bash
++git add \
++  packages/db/src/migrations/0068_products_primary_image.sql \
++  apps/api/test/storefront-schema-0068.integration.spec.ts
++git commit -m "$(cat <<'EOF'
++feat(db): add primary_image_id composite FK + SECURITY INVOKER trigger (migration 0068, story A3)
++
++Composite FK (shop_id, primary_image_id) → product_images(shop_id, id) closes
++cross-tenant image association loophole at schema layer, mirroring 0058 pattern.
++SECURITY INVOKER trigger auto-maintains primary_image_id on INSERT/DELETE/sort_order/
++scan_status changes. Backfill sets existing products from first clean image. All 5
++spec tests (T1 FK cross-tenant, T2 trigger RLS) passing.
++
++Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
++EOF
++)"
++```
++
++---
++
++## Task 7 — [WS-F] Update Drizzle schema
++
++**Files:**
++- Modify: `packages/db/src/schema/products.ts`
++
++**Context:** The Drizzle schema is used by Phase B `catalog.service.ts` queries. It must match the DDL or TypeScript types will be wrong. `smallint` IS exported from `drizzle-orm/pg-core` (confirmed from `pg-core/columns/smallint.d.ts`). For text array defaults, use the JS `[]` literal — Drizzle 0.30 serialises it to `'{}'::text[]` in generated DDL. `sql` template tag is NOT needed for the array default.
++
++- [ ] **Step 1: Update `packages/db/src/schema/products.ts`**
++
++Replace the file completely with:
++
++```typescript
++import { uuid, text, timestamp, decimal, integer, smallint, bigint, pgEnum } from 'drizzle-orm/pg-core';
++import { tenantScopedTable } from './_helpers/tenantScopedTable';
++import { productCategories } from './product-categories';
++
++export const huidExemptionCategoryEnum = pgEnum('huid_exemption_category', [
++  'none',
++  'kundan_polki_jadau',
++  'under_2g',
++]);
++
++export const CATALOG_STYLES = [
++  'ENGAGEMENT', 'COUPLE', 'DAILY_WEAR', 'JHUMKA', 'STUDS', 'HOOPS',
++  'DROP', 'STATEMENT', 'TEMPLE', 'BRIDAL', 'OFFICE', 'KIDS',
++] as const;
++export type CatalogStyle = typeof CATALOG_STYLES[number];
++
++export const products = tenantScopedTable('products', {
++  id:                         uuid('id').primaryKey().defaultRandom(),
++  category_id:                uuid('category_id').references(() => productCategories.id),
++  sku:                        text('sku').notNull(),
++  metal:                      text('metal').notNull(),
++  purity:                     text('purity').notNull(),
++  gross_weight_g:             decimal('gross_weight_g', { precision: 12, scale: 4 }).notNull(),
++  net_weight_g:               decimal('net_weight_g',   { precision: 12, scale: 4 }).notNull(),
++  stone_weight_g:             decimal('stone_weight_g', { precision: 12, scale: 4 }).default('0.0000').notNull(),
++  stone_details:              text('stone_details'),
++  making_charge_override_pct: decimal('making_charge_override_pct', { precision: 5, scale: 2 }),
++  huid:                       text('huid'),
++  huid_exemption_category:    huidExemptionCategoryEnum('huid_exemption_category').notNull().default('none'),
++  status:                     text('status').notNull().default('IN_STOCK'),
++  quantity:                   integer('quantity').notNull().default(1),
++  published_at:               timestamp('published_at', { withTimezone: true }),
++  published_by_user_id:       uuid('published_by_user_id'),
++  created_by_user_id:         uuid('created_by_user_id').notNull(),
++  created_at:                 timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
++  updated_at:                 timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
++  // -------------------------------------------------------------------------
++  // Storefront columns — added in migration 0066 (Story A1)
++  // -------------------------------------------------------------------------
++  style:                      text('style'),
++  occasion:                   text('occasion').array().notNull().default([]),
++  gift_persona:               text('gift_persona').array().notNull().default([]),
++  featured_score:             smallint('featured_score').notNull().default(0),
++  sales_count_30d:            integer('sales_count_30d').notNull().default(0),
++  view_count_30d:             integer('view_count_30d').notNull().default(0),
++  price_snapshot_paise:       bigint('price_snapshot_paise', { mode: 'bigint' }),
++  price_snapshot_at:          timestamp('price_snapshot_at', { withTimezone: true }),
++  published_search_idx_at:    timestamp('published_search_idx_at', { withTimezone: true }),
++  // -------------------------------------------------------------------------
++  // Primary image reference — added in migration 0068 (Story A3)
++  // Composite FK enforced at DDL layer (see migration 0068).
++  // Drizzle does not model composite FKs natively; constraint lives in SQL.
++  // -------------------------------------------------------------------------
++  primary_image_id:           uuid('primary_image_id'),
++});
++```
++
++- [ ] **Step 2: Build the db package**
++
++```bash
++pnpm --filter @goldsmith/db build
++```
++
++Expected: no errors. Exit code 0.
++
++- [ ] **Step 3: Typecheck the API**
++
++Because typecheck reads from the pre-built package declarations, rebuild the full graph first:
++
++```bash
++pnpm turbo build --filter="@goldsmith/*"
++pnpm --filter @goldsmith/api typecheck
++```
++
++Expected: no errors from `packages/db/src/schema/products.ts`. If you see errors about `smallint` not being a valid import, verify the import line matches exactly what's in Task 7 Step 1 — it must include `smallint` in the destructure from `'drizzle-orm/pg-core'`.
++
++- [ ] **Step 4: Commit**
++
++```bash
++git add packages/db/src/schema/products.ts
++git commit -m "$(cat <<'EOF'
++feat(db): update products Drizzle schema for storefront columns + primary_image_id
++
++Adds CATALOG_STYLES const + CatalogStyle type export for use in Phase B catalog
++service. Adds 10 new column definitions matching 0066+0068 DDL: style (text),
++occasion/gift_persona (text array), featured_score (smallint), sales_count_30d/
++view_count_30d (integer), price_snapshot_paise (bigint), timestamp fields,
++primary_image_id (uuid).
++
++Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
++EOF
++)"
++```
++
++---
++
++## Task 8 — Code-truth audit + full test run
++
++**Files:** None — verification only.
++
++- [ ] **Step 1: git grep for all 6 new column names across migration + schema + tests**
++
++Each command must return at least one hit. If any returns empty, the column is missing from that artifact.
++
++```bash
++# From C:\gs-stf-1 root
++git grep "style" packages/db/src/migrations/0066_products_storefront_columns.sql packages/db/src/schema/products.ts apps/api/test/storefront-schema-0066.integration.spec.ts
++git grep "occasion" packages/db/src/migrations/0066_products_storefront_columns.sql packages/db/src/schema/products.ts apps/api/test/storefront-schema-0066.integration.spec.ts
++git grep "gift_persona" packages/db/src/migrations/0066_products_storefront_columns.sql packages/db/src/schema/products.ts apps/api/test/storefront-schema-0066.integration.spec.ts
++git grep "price_snapshot_paise" packages/db/src/migrations/0066_products_storefront_columns.sql packages/db/src/schema/products.ts apps/api/test/storefront-schema-0066.integration.spec.ts
++git grep "primary_image_id" packages/db/src/migrations/0068_products_primary_image.sql packages/db/src/schema/products.ts apps/api/test/storefront-schema-0068.integration.spec.ts
++git grep "products_top_sellers_idx" packages/db/src/migrations/0066_products_storefront_columns.sql apps/api/test/storefront-schema-0066.integration.spec.ts
++```
++
++All six must produce hits. If any fails, fix the missing artifact before proceeding.
++
++- [ ] **Step 2: Verify 0067_*.sql does NOT exist on this branch**
++
++```bash
++ls packages/db/src/migrations/0067* 2>&1
++```
++
++Expected: `ls: cannot access '...' No such file or directory`. If a file named `0067_*` exists, it must be deleted — that number belongs to `gs-stf-2`.
++
++- [ ] **Step 3: Run full integration test suite**
++
++```bash
++cd apps/api && pnpm vitest run test/storefront-schema-0066.integration.spec.ts test/storefront-schema-0068.integration.spec.ts
++```
++
++Expected: 12 tests, all pass.
++
++- [ ] **Step 4: Run the full API unit test suite**
++
++```bash
++cd apps/api && pnpm vitest run src/
++```
++
++Expected: same pass count as before (no regressions from schema change). The new columns are additive; no existing unit tests reference the new column names in mocks, so no mock updates needed.
++
++---
++
++## Task 9 — [WS-E Gate] Review gate + push
++
++**Files:**
++- Create: `.codex-review-passed` (after Codex passes)
++- Create: `.security-review-passed` (after /security-review passes)
++
++- [ ] **Step 1: Final pre-flight**
++
++```bash
++pnpm turbo build --filter="@goldsmith/*"
++pnpm --filter @goldsmith/api typecheck
++pnpm --filter @goldsmith/api lint
++cd apps/api && pnpm vitest run
++```
++
++All must exit 0 before proceeding to review gates. Fix any issues before running Codex.
++
++- [ ] **Step 2: Codex review (from main repo — CLM workaround)**
++
++Per `memory/feedback_codex_worktree_clm.md`: Codex fails in Windows git worktrees due to PowerShell CLM. Run from the main repo path against this branch:
++
++```bash
++# In a terminal at C:\Alok\Business Projects\Goldsmith (NOT C:\gs-stf-1)
++git fetch origin feat/storefront-schema-a1a3
++codex review --base main origin/feat/storefront-schema-a1a3
++```
++
++If Codex CLI is truly unavailable this cycle (weekly limit), substitute:
++1. Run `/security-review` in this session (required regardless)
++2. Add note to commit message: `[Codex substituted: /security-review + Opus review chain]`
++
++- [ ] **Step 3: Write `.codex-review-passed` marker**
++
++```bash
++echo "codex review passed $(date -u +%Y-%m-%dT%H:%M:%SZ)" > .codex-review-passed
++git add .codex-review-passed
++git commit -m "chore: write codex-review-passed marker for A1+A3"
++```
++
++- [ ] **Step 4: Run /security-review in parallel with Codex**
++
++Invoke the `/security-review` skill in this session. It will check:
++- No `SECURITY DEFINER` on the maintain trigger
++- Composite FK closes cross-tenant loophole
++- RLS not bypassed by new columns
++- No float/real for any column
++
++After it completes and passes:
++
++```bash
++echo "security review passed $(date -u +%Y-%m-%dT%H:%M:%SZ)" > .security-review-passed
++git add .security-review-passed
++git commit -m "chore: write security-review-passed marker for A1+A3"
++```
++
++- [ ] **Step 5: Runtime smoke — apply both migrations to local Postgres**
++
++This is an API-only story (no Metro, no browser), so the runtime smoke is SQL-level:
++
++```bash
++# Requires a local Postgres instance (or Docker) at $DATABASE_URL
++psql $DATABASE_URL -f packages/db/src/migrations/0066_products_storefront_columns.sql
++psql $DATABASE_URL -f packages/db/src/migrations/0068_products_primary_image.sql
++
++# Verify new columns exist
++psql $DATABASE_URL -c "\d products" | grep -E "style|occasion|gift_persona|primary_image_id|featured_score|price_snapshot_paise"
++
++# Verify weight columns unchanged
++psql $DATABASE_URL -c "SELECT column_name, data_type, numeric_precision, numeric_scale FROM information_schema.columns WHERE table_name = 'products' AND column_name IN ('gross_weight_g', 'net_weight_g')"
++
++# Verify trigger exists
++psql $DATABASE_URL -c "\df maintain_products_primary_image"
++
++# Verify indexes exist
++psql $DATABASE_URL -c "\di products_*"
++```
++
++Expected: 7 new indexes listed (`products_style_idx`, `products_occasion_gin_idx`, `products_gift_persona_gin_idx`, `products_featured_idx`, `products_price_snapshot_idx`, `products_top_sellers_idx`, `products_search_trgm_idx`). Function `maintain_products_primary_image` listed.
++
++If local Postgres is unavailable, the Testcontainer test suite (Task 8 Step 3) is the runtime smoke — it applies migrations via `runMigrations` to a real Postgres 15.6 container. Mark smoke as complete if integration tests pass.
++
++- [ ] **Step 6: Push**
++
++```bash
++git push -u origin feat/storefront-schema-a1a3
++```
++
++---
++
++## Acceptance Criteria Traceability
++
++| Spec test | Task | Test file + describe block |
++|---|---|---|
++| T1: FK does not bypass RLS | Task 4 (Red) → Task 5 (Green) | `storefront-schema-0068.integration.spec.ts` > `composite FK cross-tenant guard` |
++| T2: trigger respects RLS (SECURITY INVOKER) | Task 4 (Red) → Task 5 (Green) | `storefront-schema-0068.integration.spec.ts` > `maintain trigger (SECURITY INVOKER)` |
++| T3: CHECK blocks invalid style | Task 1 (Red) → Task 2 (Green) | `storefront-schema-0066.integration.spec.ts` > `style CHECK constraint` |
++| T4: GIN occasion index | Task 1 (Red) → Task 2 (Green) | `storefront-schema-0066.integration.spec.ts` > `GIN occasion index` |
++| T5: top-sellers index | Task 1 (Red) → Task 2 (Green) | `storefront-schema-0066.integration.spec.ts` > `top-sellers expression index` |
++| T6: pg_trgm index | Task 1 (Red) → Task 2 (Green) | `storefront-schema-0066.integration.spec.ts` > `pg_trgm similarity index` |
++| Weight invariant | Task 1 (Red) → Task 2 (Green) | `storefront-schema-0066.integration.spec.ts` > `weight column types unchanged` |
++
++---
++
++## Non-negotiable floor (verify before Task 9)
++
++- [ ] `gross_weight_g` and `net_weight_g` remain `numeric(12,4)` — Task 8 Step 1 git grep + Task 8 Step 3 test asserts it
++- [ ] Every new index starts with `shop_id` (prevents cross-tenant full-table scans)
++- [ ] Trigger is `SECURITY INVOKER` — grep: `git grep "SECURITY DEFINER" packages/db/src/migrations/0068_*` must return empty
++- [ ] Composite FK on `primary_image_id` — not a plain FK
++- [ ] No file `packages/db/src/migrations/0067_*` on this branch
++- [ ] `.codex-review-passed` and `.security-review-passed` both committed before push
+diff --git a/docs/superpowers/specs/2026-05-05-ws-3a-reports-completion-design.md b/docs/superpowers/specs/2026-05-05-ws-3a-reports-completion-design.md
+new file mode 100644
+index 0000000..fb2cf21
+--- /dev/null
++++ b/docs/superpowers/specs/2026-05-05-ws-3a-reports-completion-design.md
+@@ -0,0 +1,290 @@
++# WS-3A — Reports Completion (FR117 + FR119)
++
++**Date:** 2026-05-05
++**Ceremony class:** B
++**Story type:** Feature completion (back-end-heavy + light shopkeeper UI)
++**Migration reserved:** 0072 (`reports_pdf_exports`)
++**Latest migration on main:** 0059
++**Plan source:** `C:\Users\alokt\.claude\plans\you-are-a-principal-distributed-alpaca.md` § WS-3A
++**Memory pointers:** `feedback_audit_pattern_pool_not_tx.md`, `feedback_tsx_inject_di.md`, `feedback_auto_accept_recommendations.md`
++
++---
++
++## 1. Problem
++
++Two PRD gaps in the reports module:
++
++- **FR117** — inventory aging report bucketed by `<30d / 30-60d / 60-90d / 90d+`. Distinct from the existing `InventoryDeadStockService`, which returns a flat list of products past `dead_stock_threshold_days` (no buckets, no in-stock items younger than threshold).
++- **FR119** — CSV **and** PDF export for every report. Today only GSTR has a CSV path (sync, plus a queued worker that uploads to storage). The four JSON-only reports (`daily-summary`, `outstanding`, `customer-ltv`, `loyalty-summary`) and the new `stock-aging` report have no export path at all.
++
++## 2. Decisions locked during brainstorming
++
++| # | Decision | Rationale |
++|---|---|---|
++| D1 | **PDFKit** for PDF rendering | Pure-JS, no Chromium dep, fits Azure Container Apps consumption tier and floor-cost MVP rule (CLAUDE.md). |
++| D2 | **CSV sync, PDF async** | Hybrid: CSV is small (≤ low-thousands of rows) and a CA wants it instantly; PDF rendering takes seconds and benefits from job audit + retry. |
++| D3 | **Stock-aging response = `{ buckets, items }`** | One round-trip serves both the dashboard tile (buckets) and the drill-down screen (items). |
++| D4 | **GSTR stays CSV-only this story** | Out of scope; existing CSV satisfies the workflow (Tally, GST portal). PDF is a binder-copy nice-to-have for a follow-up. |
++| D5 | **Blob retention = 7 days, row retention = 90 days** | URL is short-lived and **re-signed on every poll** (URL TTL is whatever the storage adapter defaults to — minutes, not days). The 7-day clock is the blob's GC deadline (`created_at + interval '7 days'`). After that, `regenerate` re-renders. |
++| D6 | **Polling readiness UX** | `GET /reports/exports/:id` every 2s. No notifications-module entanglement; mirrors GSTR job pattern. |
++| D7 | **Stock-aging is pure age data** | No `suggestedAction` field — that lives in `InventoryDeadStockService`. UI flags the 90d+ bucket visually. |
++| D8 | **Branding from `shops` columns** | `display_name`, `logo_url`, `address_json`, `gstin`, `contact_phone` already exist (migration 0006). No new branding columns. |
++| D9 | **RBAC = shop_admin + shop_manager** | Matches existing `/api/v1/reports/*` routes. |
++| D10 | **4 work streams** (TDD per WS) | Class B target ~2-3 hrs/story; WS-A (stock-aging) and WS-B (CSV) can run in parallel; WS-C (PDF pipeline) blocks WS-D (UI). |
++
++## 3. Architecture
++
++```
++HTTP                                  Worker (BullMQ)
++─────                                 ───────────────
++GET  /reports/stock-aging  ─┐
++GET  /reports/*.csv         ├─► ReportsService (sync)
++POST /reports/exports       ─┘
++                             │
++                             ▼
++                     reports_pdf_exports row (QUEUED)
++                             │
++                             ▼
++                     reports-pdf TenantQueue
++                             │
++                             ▼
++                  ReportsPdfProcessor.handle()
++                             │
++                             ├─► ReportsService.fetch<X>(params)
++                             ├─► PdfRenderer.render<X>(data, branding)
++                             ├─► STORAGE_PORT.uploadBuffer(key, pdf)
++                             ├─► getPresignedReadUrl(key)
++                             └─► UPDATE reports_pdf_exports SET status=READY...
++
++GET  /reports/exports/:id              ◄── client polls every 2s
++POST /reports/exports/:id/regenerate   ◄── re-sign or re-render
++```
++
++**Reused infrastructure** (all already on main):
++- `@goldsmith/queue` — `TenantQueue`, `createTenantWorker`
++- `@goldsmith/integrations-storage` — `STORAGE_PORT`, `uploadBuffer`, `getPresignedReadUrl`
++- `@goldsmith/db` — `withTenantTx`
++- `@goldsmith/tenant-context` — `tenantContext.runWith` for worker boundary (mirrors `gstr-export.processor.ts:38`)
++- `@goldsmith/audit` — `auditLog(this.pool, {...})` per `feedback_audit_pattern_pool_not_tx.md`
++
++## 4. Data model — migration 0072
++
++```sql
++CREATE TABLE reports_pdf_exports (
++  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
++  shop_id               UUID NOT NULL REFERENCES shops(id) ON DELETE RESTRICT,
++  report_type           TEXT NOT NULL CHECK (report_type IN
++                          ('daily-summary','outstanding','customer-ltv',
++                           'loyalty-summary','stock-aging')),
++  params                JSONB NOT NULL DEFAULT '{}'::jsonb,
++  status                TEXT NOT NULL DEFAULT 'QUEUED' CHECK (status IN
++                          ('QUEUED','RUNNING','READY','FAILED')),
++  storage_key           TEXT,
++  error_message         TEXT,
++  requested_by_user_id  UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
++  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
++  completed_at          TIMESTAMPTZ
++);
++
++CREATE INDEX reports_pdf_exports_shop_created_idx
++  ON reports_pdf_exports (shop_id, created_at DESC);
++
++ALTER TABLE reports_pdf_exports ENABLE ROW LEVEL SECURITY;
++ALTER TABLE reports_pdf_exports FORCE ROW LEVEL SECURITY;
++CREATE POLICY rls_reports_pdf_exports_tenant ON reports_pdf_exports
++  FOR ALL
++  USING      (shop_id = current_setting('app.current_shop_id')::uuid)
++  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
++
++GRANT SELECT, INSERT, UPDATE ON reports_pdf_exports TO app_user;
++```
++
++CSV exports do **not** insert a row — they are sync streams and leave no audit beyond `auditLog`.
++
++## 5. API surface
++
++All under `/api/v1/reports`. Roles: `shop_admin`, `shop_manager`.
++
++| Method | Path | Purpose |
++|---|---|---|
++| **GET** | `/stock-aging` | FR117 — `{ buckets, items }` JSON |
++| GET | `/daily-summary.csv?date=YYYY-MM-DD` | sync CSV |
++| GET | `/outstanding.csv` | sync CSV (full list, no pagination on CSV) |
++| GET | `/customer-ltv.csv?limit=N` | sync CSV |
++| GET | `/loyalty-summary.csv` | sync CSV |
++| GET | `/stock-aging.csv` | sync CSV (items array) |
++| **POST** | `/exports` | body `{reportType, params}` → `{id, status:'QUEUED'}` |
++| **GET** | `/exports/:id` | `{id, reportType, status, downloadUrl?, expiresAt?, errorMessage?}` |
++| **POST** | `/exports/:id/regenerate` | re-sign or re-render |
++
++CSV responses use `Content-Type: text/csv; charset=utf-8` + `Content-Disposition: attachment; filename="<report>-<date>.csv"`.
++
++## 6. Stock-aging contract (FR117)
++
++```typescript
++interface StockAgingBucket {
++  label: '<30d' | '30-60d' | '60-90d' | '90d+';
++  count: number;
++  totalWeightMg: string;   // bigint-as-text
++  totalCostPaise: string;  // bigint-as-text; null products excluded from sum
++}
++
++interface StockAgingItem {
++  id: string;
++  sku: string;
++  metal: 'GOLD' | 'SILVER' | 'PLATINUM' | string;
++  purity: string;
++  weightG: string;
++  daysInStock: number;
++  bucket: StockAgingBucket['label'];
++  costPaise: string | null;
++  firstListedAt: string;  // ISO
++}
++
++interface StockAgingResult {
++  buckets: StockAgingBucket[];
++  items: StockAgingItem[];
++}
++```
++
++**SQL outline** (run inside `withTenantTx` so RLS scopes by `app.current_shop_id`; do **not** add an explicit `shop_id = $1` filter — that would shadow the RLS predicate and is the anti-pattern flagged by `goldsmith.require-tenant-transaction` semgrep):
++```sql
++WITH aged AS (
++  SELECT id, sku, metal, purity,
++         gross_weight_g::text AS weight_g,
++         cost_paise::text     AS cost_paise,
++         created_at,
++         FLOOR(EXTRACT(EPOCH FROM (now() - created_at)) / 86400)::int AS days_in_stock
++  FROM products
++  WHERE status = 'IN_STOCK'
++)
++SELECT *,
++       CASE
++         WHEN days_in_stock <  30 THEN '<30d'
++         WHEN days_in_stock <  60 THEN '30-60d'
++         WHEN days_in_stock <  90 THEN '60-90d'
++         ELSE                          '90d+'
++       END AS bucket
++FROM aged
++ORDER BY days_in_stock DESC;
++```
++
++Buckets aggregated in TS (single pass over `items`); avoids a second SQL query and keeps SQL simple. `cost_paise` may be NULL for legacy products (Story 3.1 added it but didn't backfill); aggregation skips nulls.
++
++## 7. PDF rendering
++
++- **Module location:** `apps/api/src/modules/reports/pdf/`
++  - `renderer.ts` — exposes `PdfRenderer.render(reportType, data, branding) → Promise<Buffer>`
++  - `templates/daily-summary.ts`, `outstanding.ts`, `customer-ltv.ts`, `loyalty-summary.ts`, `stock-aging.ts`
++  - `branding.ts` — loads `shops.{display_name, logo_url, address_json, gstin, contact_phone}`
++  - `header.ts`, `footer.ts` — shared layout primitives
++- **Font:** Noto Sans Devanagari TTF committed at `packages/ui-tokens/fonts/NotoSansDevanagari-Regular.ttf` (and `-Bold.ttf`); registered via `doc.registerFont('Devanagari', ...)`. If not already in repo for RN, WS-C ships it.
++- **Layout pattern:**
++  - Header (every page): logo (40pt height; downloaded once per job, cached in closure) + display_name (Devanagari Bold 18pt) + report title (Devanagari 14pt) + generated_at (10pt right-aligned)
++  - Body: PDFKit tables drawn with `text()` + `moveTo/lineTo`. Column widths fixed per template.
++  - Footer (every page): `address_json.line1`, `address_json.line2`, `GSTIN: <gstin>`, `Page N of M` right-aligned.
++- **Logo fetch:** if `logo_url` is a tenant blob key (starts with `tenants/`), use `STORAGE_PORT.downloadBuffer`; else the PDF skips the logo (no external HTTP fetch from the worker — keeps the worker network-egress-bounded).
++
++## 8. CSV emission
++
++- **File:** `apps/api/src/modules/reports/reports.csv.ts`
++- One pure function per report: `toDailySummaryCsv(data) → string`, etc.
++- Reuses `escapeCsv` + `csvRow` shape from `gstr-export.service.ts:43-52`. **YAGNI:** duplicate locally for now; only extract to `packages/shared` if a third caller appears.
++- CSVs use `\r\n` line endings (matches GSTR export precedent for Excel compatibility) and a header row.
++
++## 9. Worker
++
++- **File:** `apps/api/src/workers/reports-pdf.processor.ts`
++- Mirrors `gstr-export.processor.ts` 1:1:
++  - `@Processor('reports-pdf')` + `extends WorkerHost`
++  - Constructor injects `ReportsService`, `PdfRenderer`, `STORAGE_PORT`, `'PG_POOL'`, `BrandingLoader`
++  - **Tenant boundary:** builds `TenantContext` from `job.data.shopId` + a `shops` lookup, then `tenantContext.runWith(ctx, ...)` wraps the service call. Same `eslint-disable goldsmith/no-raw-shop-id-param` comment, with the same justification copied from the GSTR processor.
++  - **Status transitions** in `withTenantTx`:
++    1. `UPDATE reports_pdf_exports SET status='RUNNING' WHERE id = $1 AND status = 'QUEUED'` (idempotent — if already RUNNING/READY, skip)
++    2. fetch + render + upload
++    3. `UPDATE ... SET status='READY', storage_key=$2, completed_at=now()`
++    4. on error: `UPDATE ... SET status='FAILED', error_message=$2, completed_at=now()`
++  - **Idempotency:** if the row is already `READY` on entry, the worker no-ops (BullMQ retry + at-least-once delivery safety).
++- **Bull queue name:** `reports-pdf`. Registered in `ReportsModule` via `BullModule.registerQueue({ name: 'reports-pdf' })` and processor in worker entry `apps/api/src/workers.ts` (verify exact bootstrap during impl).
++
++## 10. Polling + regenerate
++
++- `GET /reports/exports/:id` returns:
++  ```typescript
++  {
++    id, reportType, status,
++    downloadUrl?: string,    // freshly signed if status===READY and blob still within retention
++    blobExpiresAt?: string,  // created_at + interval '7 days' as ISO; null if blob unreachable
++    errorMessage?: string,
++  }
++  ```
++  Re-signs on every GET when `status===READY` and `now() < created_at + interval '7 days'` so the URL is fresh. If `now() >= created_at + interval '7 days'`, `downloadUrl` is omitted and the client should call `regenerate`.
++- `POST /reports/exports/:id/regenerate`:
++  - if blob is still within the 7-day window → just re-sign (returns `{downloadUrl, blobExpiresAt}` immediately)
++  - else → enqueue a fresh worker job against the same row (resets `status='QUEUED'`, clears `storage_key`, `error_message`, `completed_at`; bumps `created_at` so the new 7-day clock starts)
++- **Blob GC** is out of scope this story — Azure Blob lifecycle policy or a separate ops cron job will prune `tenants/<shop>/reports/**` blobs older than 7 days. Documented as a follow-up.
++
++## 11. Audit
++
++Every export operation calls `auditLog(this.pool, { action, subjectType: 'report', subjectId: id, actorUserId, after })`:
++
++- `REPORT_EXPORT_REQUESTED` on POST `/exports`
++- `REPORT_EXPORT_REGENERATED` on POST `/exports/:id/regenerate`
++- (Sync CSV downloads don't audit — high volume, low value, matches existing `/api/v1/reports/*` JSON pattern.)
++
++The exact `AuditAction` enum slot is verified during impl; if absent, WS-C adds the entries to `packages/audit/src/types.ts`.
++
++## 12. Error handling
++
++| Surface | Failure | Response |
++|---|---|---|
++| Validation | `date` not `YYYY-MM-DD`, unknown `reportType`, etc. | `400` with `{ code: 'reports.<x>.invalid_<y>' }` (matches `reports.service.ts:53`) |
++| Worker | render or upload throws | row `→ FAILED`, `error_message` set, BullMQ retries N=3 with backoff, then `OnWorkerEvent('failed')` logs |
++| Polling | export not found (cross-tenant attempt) | `404` (RLS filters it out) |
++| Regenerate | row in `QUEUED`/`RUNNING` | `409` `{ code: 'reports.export.busy' }` |
++| Regenerate | blob 404 | re-render path; row reset to `QUEUED` |
++
++## 13. Testing
++
++- **WS-A unit:** stock-aging boundary cases (29d, 30d, 89d, 90d), empty store, mixed metals, products with NULL `cost_paise`, products with multiple statuses
++- **WS-B unit:** CSV emission for each of 5 reports — header row, special-character escaping, empty result, large numerics (paise as bigint)
++- **WS-C integration:** queue → processor → row transitions; failure path with retry; idempotent retry on already-READY row; regenerate happy + blob-missing paths
++- **WS-C tenant isolation:** `pnpm test:tenant-isolation` walker hits `reports_pdf_exports` (RLS denial)
++- **WS-D UI:** export-button states (idle → queued → polling → ready → download-triggered); regenerate from ready row; error toast on FAILED
++- **PDF renderer:** snapshot-style buffer-length test (PDF binary diffs are noisy; assert non-empty + magic header `%PDF-`); template smoke for each report type
++
++## 14. Work streams
++
++| WS | Description | Key files |
++|---|---|---|
++| **WS-A — Stock-aging endpoint** | `getStockAging()` in `reports.service.ts`; new GET route in `reports.controller.ts`; unit tests | `apps/api/src/modules/reports/reports.service.ts`, `reports.controller.ts`, `reports.service.spec.ts` |
++| **WS-B — CSV sync exports** | `reports.csv.ts` with 5 emitters; 5 GET `.csv` routes; tests | `apps/api/src/modules/reports/reports.csv.ts`, `reports.controller.ts`, `reports.csv.spec.ts` |
++| **WS-C — PDF async pipeline** | Migration 0072; `reports-export.service.ts` (enqueue + polling + regenerate); `reports-pdf.processor.ts`; PDFKit renderer + 5 templates + branding loader + Devanagari font asset; controller routes for `/exports*` | `packages/db/src/migrations/0072_reports_pdf_exports.sql`, `apps/api/src/modules/reports/reports-export.service.ts`, `apps/api/src/workers/reports-pdf.processor.ts`, `apps/api/src/modules/reports/pdf/**`, `apps/api/src/modules/reports/reports.controller.ts`, `reports.module.ts`, `apps/api/src/workers.ts` (registration) |
++| **WS-D — Shopkeeper UI** | New `app/reports/stock-aging.tsx`; export buttons (CSV/PDF) on the 5 existing report screens; polling hook `useReportExport(exportId)`; regenerate sheet | `apps/shopkeeper/app/reports/stock-aging.tsx`, `apps/shopkeeper/app/reports/{daily-summary,outstanding,customer-ltv,loyalty-summary}.tsx`, `apps/shopkeeper/src/hooks/useReportExport.ts`, `apps/shopkeeper/app/reports/_layout.tsx` |
++
++WS-A and WS-B run in parallel. WS-C blocks WS-D. TDD inside each WS (red → green → refactor). No fresh sessions required (Class B; same-session default).
++
++## 15. Out of scope (explicit non-goals)
++
++- GSTR PDF export
++- Customer-web report exports (admin console only currently has tenant-overview reports — separate epic)
++- Scheduled/recurring reports (cron-driven daily emails)
++- Email/WhatsApp delivery of finished PDFs
++- Per-tenant logo upload UI (uses whatever is already in `shops.logo_url`; if null, branding falls back to text-only header)
++- Backfilling `products.cost_paise` for legacy rows (stock-aging tolerates nulls)
++- Blob GC cron / Azure Blob lifecycle policy for `tenants/<shop>/reports/**` (follow-up ops story; 7-day retention is documented but not enforced this story — manageable by hand for the anchor jeweller, formalised at scale)
++- Row-level GC of `reports_pdf_exports` past 90 days (same follow-up; table volume is bounded — at ~10 exports/day/shop × 90d = 900 rows/shop, no urgency)
++
++## 16. Review gate (Class B)
++
++Per CLAUDE.md ceremony tiering:
++
++1. TDD per work stream
++2. **Codex limit window — substitute gate:** `/code-review` + `/security-review` + CI pass
++3. Runtime smoke: shopkeeper app boots, stock-aging screen renders, CSV download succeeds, PDF queue → ready cycle succeeds (Metro on Moto G via `C:\gs-api-start.cmd`)
++4. `git push`
++5. Codex round when limit resets — fold any P1/P2 fixes into a follow-up commit, then merge
++
++## 17. Migration ordering
++
++Migration `0072_reports_pdf_exports.sql` is reserved by the architecture plan even though `0060–0071` are unused. Honouring the plan slot — landing as `0072` keeps the plan's reserved range coherent and lets the gap reflect future-reserved batches. **Action:** WS-C ships the file as `0072_reports_pdf_exports.sql`; do not renumber.
+diff --git a/docs/superpowers/specs/2026-05-06-story-a1a3-storefront-schema.md b/docs/superpowers/specs/2026-05-06-story-a1a3-storefront-schema.md
+new file mode 100644
+index 0000000..cbe5277
+--- /dev/null
++++ b/docs/superpowers/specs/2026-05-06-story-a1a3-storefront-schema.md
+@@ -0,0 +1,289 @@
++# Story A1+A3 — Products Storefront Schema
++
++Date: 2026-05-06  
++Branch: `feat/storefront-schema-a1a3`  
++Class: A (RLS-touching schema migration — fresh session, full ceremony)  
++Migrations: `0066_products_storefront_columns.sql` (A1), `0068_products_primary_image.sql` (A3)  
++Reserved: `0067` belongs to `feat/storefront-collections-a2` — **never consume in this branch**
++
++---
++
++## Context
++
++The customer storefront (Phase B onwards) needs server-side filter+sort on style, occasion, gift_persona, price, and featured score. The ProductCard needs a first-class `primary_image_id` on the product row so Phase B list queries can join a single image per product without a subquery per row. This story is the pure schema foundation — no API changes, no UI changes.
++
++---
++
++## Decisions locked
++
++### D1 — `style`: CHECK constraint, not PostgreSQL enum type
++
++PostgreSQL `ENUM` types require `ALTER TYPE ... ADD VALUE` (ShareRowExclusiveLock) to grow; CHECK constraints are altered without locks. The 12-value style list will grow (CHANDBALI, MAANG-TIKKA, etc.) as the product catalog expands — each addition should be a one-line migration, not a type migration.
++
++### D2 — `occasion` / `gift_persona`: TEXT[] with GIN, not lookup tables
++
++At anchor scale (≤ 5k SKU/tenant), a GIN-indexed `ANY(occasion)` query is sub-millisecond and requires zero JOINs. Lookup tables would add 2 new tables + RLS policies + grants each for no measurable benefit until the 10th tenant. TEXT[] values are validated at the application layer via `CATALOG_OCCASIONS` / `CATALOG_GIFT_PERSONAS` constant arrays in `@goldsmith/customer-shared` (Phase A4).
++
++### D3 — `primary_image_id` maintenance: trigger with SECURITY INVOKER
++
++A DB trigger is the only mechanism that covers all mutation paths: `ProductImagesService.upload()`, `delete()`, `reorder()`, direct-SQL seeds, admin scripts, migrations. App-level maintenance in the service would leave `primary_image_id` stale on any path that bypasses the service. `SECURITY INVOKER` keeps RLS in force during trigger execution — the trigger cannot reach across tenants. `SECURITY DEFINER` is explicitly banned on this trigger (brief non-negotiable).
++
++---
++
++## Migration 0066 — Products storefront columns
++
++### New columns
++
++| Column | Type | Nullable | Default | Constraint |
++|---|---|---|---|---|
++| `style` | TEXT | YES | — | CHECK in style enum below |
++| `occasion` | TEXT[] | NO | `'{}'` | — |
++| `gift_persona` | TEXT[] | NO | `'{}'` | — |
++| `featured_score` | SMALLINT | NO | `0` | CHECK 0 ≤ x ≤ 100 |
++| `sales_count_30d` | INT | NO | `0` | — |
++| `view_count_30d` | INT | NO | `0` | — |
++| `price_snapshot_paise` | BIGINT | YES | — | — |
++| `price_snapshot_at` | TIMESTAMPTZ | YES | — | — |
++| `published_search_idx_at` | TIMESTAMPTZ | YES | — | — |
++
++**Style CHECK values:** `ENGAGEMENT`, `COUPLE`, `DAILY_WEAR`, `JHUMKA`, `STUDS`, `HOOPS`, `DROP`, `STATEMENT`, `TEMPLE`, `BRIDAL`, `OFFICE`, `KIDS`
++
++### Indexes
++
++| Index name | Type | Columns | Predicate |
++|---|---|---|---|
++| `products_style_idx` | BTree | `(shop_id, style)` | `WHERE published_at IS NOT NULL` |
++| `products_occasion_gin_idx` | GIN | `(occasion)` | — |
++| `products_gift_persona_gin_idx` | GIN | `(gift_persona)` | — |
++| `products_featured_idx` | BTree | `(shop_id, featured_score DESC)` | `WHERE published_at IS NOT NULL AND featured_score > 0` |
++| `products_price_snapshot_idx` | BTree | `(shop_id, price_snapshot_paise)` | `WHERE price_snapshot_paise IS NOT NULL AND published_at IS NOT NULL` |
++| `products_top_sellers_idx` | BTree expression | `(shop_id, (sales_count_30d*2+view_count_30d) DESC, published_at DESC)` | `WHERE published_at IS NOT NULL` |
++| `products_search_trgm_idx` | GIN `gin_trgm_ops` | `(coalesce(sku,'')\|\|' '\|\|coalesce(metal,'')\|\|' '\|\|coalesce(purity,''))` | `WHERE published_at IS NOT NULL` |
++
++Extension: `CREATE EXTENSION IF NOT EXISTS pg_trgm;` — runs before the trigram index, idempotent.
++
++### Backfill
++
++None. All new columns have safe NULL / empty array / 0 defaults. No per-row UPDATE required.
++
++### Weight columns invariant
++
++Migration MUST NOT alter `gross_weight_g` or `net_weight_g`. Both must remain `DECIMAL(12,4)`. Plan tests verify `\d products` after migration shows the correct type.
++
++### Rollback DDL
++
++```sql
++DROP INDEX IF EXISTS products_style_idx;
++DROP INDEX IF EXISTS products_occasion_gin_idx;
++DROP INDEX IF EXISTS products_gift_persona_gin_idx;
++DROP INDEX IF EXISTS products_featured_idx;
++DROP INDEX IF EXISTS products_price_snapshot_idx;
++DROP INDEX IF EXISTS products_top_sellers_idx;
++DROP INDEX IF EXISTS products_search_trgm_idx;
++ALTER TABLE products
++  DROP COLUMN IF EXISTS style,
++  DROP COLUMN IF EXISTS occasion,
++  DROP COLUMN IF EXISTS gift_persona,
++  DROP COLUMN IF EXISTS featured_score,
++  DROP COLUMN IF EXISTS sales_count_30d,
++  DROP COLUMN IF EXISTS view_count_30d,
++  DROP COLUMN IF EXISTS price_snapshot_paise,
++  DROP COLUMN IF EXISTS price_snapshot_at,
++  DROP COLUMN IF EXISTS published_search_idx_at;
++-- pg_trgm extension NOT dropped (may be used elsewhere; idempotent to leave)
++```
++
++---
++
++## Migration 0068 — `products.primary_image_id` + maintain trigger
++
++### Column
++
++```sql
++ALTER TABLE products
++  ADD COLUMN primary_image_id UUID;
++```
++
++Plain FK added first (see composite FK step below for replacement).
++
++### Composite FK (closes cross-tenant loophole — mirrors 0058 pattern)
++
++Step 1 — add UNIQUE on `product_images(shop_id, id)` as composite FK target:
++```sql
++ALTER TABLE product_images
++  ADD CONSTRAINT product_images_shop_id_id_uniq UNIQUE (shop_id, id);
++```
++
++Step 2 — add composite FK on `products`:
++```sql
++ALTER TABLE products
++  ADD CONSTRAINT products_shop_primary_image_fkey
++  FOREIGN KEY (shop_id, primary_image_id)
++  REFERENCES product_images(shop_id, id)
++  ON DELETE SET NULL;
++```
++
++This means `UPDATE products SET primary_image_id = $b_image_id WHERE id = $a_product_id` fails at the DB layer (FK violation) when `shop_id` doesn't match — not just at the RLS layer. Double protection: RLS blocks the read; FK blocks the write.
++
++### Backfill
++
++```sql
++UPDATE products
++   SET primary_image_id = (
++     SELECT pi.id
++       FROM product_images pi
++      WHERE pi.product_id = products.id
++        AND pi.scan_status = 'clean'
++      ORDER BY pi.sort_order ASC
++      LIMIT 1
++   );
++```
++
++Products with no clean image remain NULL — correct and safe. The trigger will keep this current going forward.
++
++### Trigger function `maintain_products_primary_image()`
++
++```sql
++CREATE OR REPLACE FUNCTION maintain_products_primary_image()
++RETURNS TRIGGER
++LANGUAGE plpgsql
++SECURITY INVOKER  -- NEVER SECURITY DEFINER: must not bypass RLS
++AS $$
++DECLARE
++  v_product_id UUID;
++BEGIN
++  -- Determine affected product_id from NEW or OLD depending on operation
++  v_product_id := COALESCE(NEW.product_id, OLD.product_id);
++
++  UPDATE products
++     SET primary_image_id = (
++       SELECT pi.id
++         FROM product_images pi
++        WHERE pi.product_id = v_product_id
++          AND pi.scan_status = 'clean'
++        ORDER BY pi.sort_order ASC
++        LIMIT 1
++     )
++   WHERE id = v_product_id;
++
++  RETURN NEW;
++END;
++$$;
++
++CREATE TRIGGER trg_maintain_products_primary_image
++AFTER INSERT OR DELETE OR UPDATE OF sort_order, scan_status
++ON product_images
++FOR EACH ROW
++EXECUTE FUNCTION maintain_products_primary_image();
++```
++
++**Key invariants:**
++- `SECURITY INVOKER` — trigger runs with the session user's grants; RLS policy on `products` and `product_images` stays active
++- `FOR EACH ROW` — one UPDATE per modified image row; cannot cross tenant boundary under RLS
++- `COALESCE(NEW.product_id, OLD.product_id)` — handles DELETE (NEW is null) and INSERT/UPDATE (OLD may be null). AFTER trigger return value is ignored by Postgres; `RETURN NEW` is conventional.
++- UPDATE targets `products WHERE id = v_product_id` — scope is a single product row, well within RLS fence
++
++### Rollback DDL
++
++```sql
++DROP TRIGGER IF EXISTS trg_maintain_products_primary_image ON product_images;
++DROP FUNCTION IF EXISTS maintain_products_primary_image();
++ALTER TABLE products
++  DROP CONSTRAINT IF EXISTS products_shop_primary_image_fkey,
++  DROP COLUMN IF EXISTS primary_image_id;
++ALTER TABLE product_images
++  DROP CONSTRAINT IF EXISTS product_images_shop_id_id_uniq;
++```
++
++---
++
++## Drizzle schema (`packages/db/src/schema/products.ts`)
++
++New exports:
++
++```typescript
++export const CATALOG_STYLES = [
++  'ENGAGEMENT','COUPLE','DAILY_WEAR','JHUMKA','STUDS','HOOPS',
++  'DROP','STATEMENT','TEMPLE','BRIDAL','OFFICE','KIDS',
++] as const;
++export type CatalogStyle = typeof CATALOG_STYLES[number];
++```
++
++New columns added to `tenantScopedTable`:
++
++```typescript
++style:                   text('style'),                                    // nullable
++occasion:                text('occasion').array().notNull().default(sql`'{}'::text[]`),
++gift_persona:            text('gift_persona').array().notNull().default(sql`'{}'::text[]`),
++featured_score:          smallint('featured_score').notNull().default(0),
++sales_count_30d:         integer('sales_count_30d').notNull().default(0),
++view_count_30d:          integer('view_count_30d').notNull().default(0),
++price_snapshot_paise:    bigint('price_snapshot_paise', { mode: 'bigint' }),
++price_snapshot_at:       timestamp('price_snapshot_at', { withTimezone: true }),
++published_search_idx_at: timestamp('published_search_idx_at', { withTimezone: true }),
++primary_image_id:        uuid('primary_image_id'),
++```
++
++`bigint` mode `'bigint'` (native BigInt) for `price_snapshot_paise` — consistent with all other paise columns.
++
++---
++
++## Mandatory test assertions — all six must have explicit Red phases in the plan
++
++Per `feedback_spec_lessons_need_plan_assertions.md`: spec-level security lessons must appear as explicit failing test cases in the plan, not just design-decisions prose.
++
++| # | Test name | Assertion |
++|---|---|---|
++| T1 | `'primary_image_id FK does not bypass RLS via cross-tenant image'` | Set `app.current_shop_id = $shop_a`; execute `UPDATE products SET primary_image_id = $b_image_id WHERE id = $a_product_id`; expect FK constraint violation (`23503`) |
++| T2 | `'maintain trigger respects RLS under SECURITY INVOKER'` | As `app_user` with `$shop_a` context, delete an image owned by `$shop_a`; verify `products.primary_image_id` recomputed for `$shop_a.product` only; `$shop_b.products` unchanged |
++| T3 | `'CHECK constraint blocks invalid style'` | `INSERT INTO products (..., style) VALUES (..., 'UNKNOWN')` → expect `23514` (CHECK violation) |
++| T4 | `'GIN occasion index used by ANY(...)'` | `EXPLAIN (FORMAT JSON) SELECT id FROM products WHERE 'WEDDING' = ANY(occasion)` → plan JSON contains `products_occasion_gin_idx` and node type `Bitmap Index Scan` |
++| T5 | `'composite top-sellers index used by ORDER BY'` | `EXPLAIN (FORMAT JSON) SELECT id FROM products WHERE shop_id = $1 AND published_at IS NOT NULL ORDER BY (sales_count_30d*2+view_count_30d) DESC` → plan JSON contains `products_top_sellers_idx` |
++| T6 | `'pg_trgm index used by similarity'` | `EXPLAIN (FORMAT JSON) SELECT id FROM products WHERE (coalesce(sku,'')||' '||coalesce(metal,'')||' '||coalesce(purity,'')) % 'AB-1042'` → plan JSON contains `products_search_trgm_idx` |
++
++---
++
++## Work stream outline
++
++| WS | Scope | Notes |
++|---|---|---|
++| WS-A | Migration 0066 SQL + rollback DDL | Run in transaction; verify weight columns unchanged |
++| WS-B | Migration 0068 SQL (UNIQUE + composite FK + backfill + trigger) | After WS-A committed (UNIQUE on product_images required) |
++| WS-C | Trigger integration tests T1 + T2 (Red→Green) | Parallel with WS-D; uses tenant-isolation harness |
++| WS-D | RLS + cross-tenant safety direct-SQL tests (T1 cross-tenant FK) | Parallel with WS-C |
++| WS-E | Index EXPLAIN smoke tests T3–T6 (Red→Green with seeded data) | After WS-A+B applied to test DB |
++| WS-F | Drizzle schema updates + type exports | Parallel with WS-C/D; typecheck must pass |
++
++### Review gate
++
++Codex review run from `C:\Alok\Business Projects\Goldsmith` (not the worktree) per `feedback_codex_worktree_clm.md`. `/security-review` on HEAD in parallel. Both `.codex-review-passed` and `.security-review-passed` markers required before push.
++
++### Runtime smoke
++
++```bash
++psql $DATABASE_URL -f packages/db/src/migrations/0066_products_storefront_columns.sql
++psql $DATABASE_URL -f packages/db/src/migrations/0068_products_primary_image.sql
++pnpm --filter @goldsmith/api test:tenant-isolation
++```
++
++Rollback DDL validated on a scratch database before marking WS-B complete.
++
++---
++
++## Out of scope (deferred to Phase B)
++
++- `sales_count_30d` / `view_count_30d` population (BullMQ rollup job — B7)
++- `price_snapshot_paise` population (debounced rate-update job — B7)
++- `published_search_idx_at` updates (Meilisearch wiring — post-SOW)
++- Any API changes to `catalog.service.ts` or `CatalogController`
++- Drizzle migration runner wiring — migrations applied via `psql` for now
++
++---
++
++## Non-negotiable floor (verified at story close)
++
++- `gross_weight_g` and `net_weight_g` remain `DECIMAL(12,4)` — verified by `\d products` after migration
++- Every index on `products` is `(shop_id, ...)` composite — no cross-tenant full-table scan possible
++- `SECURITY INVOKER` on trigger — never `SECURITY DEFINER`
++- Composite FK on `primary_image_id` — plain FK alone is insufficient
++- `git grep` for all 6 new column names across migration + schema + tests before claiming complete
+diff --git a/packages/db/src/migrations/0066_products_storefront_columns.sql b/packages/db/src/migrations/0066_products_storefront_columns.sql
+new file mode 100644
+index 0000000..42ce431
+--- /dev/null
++++ b/packages/db/src/migrations/0066_products_storefront_columns.sql
+@@ -0,0 +1,85 @@
++-- packages/db/src/migrations/0066_products_storefront_columns.sql
++-- Story A1 — Storefront-specific columns on products for customer catalog.
++-- No backfill: all new columns have safe NULL / empty-array / 0 defaults.
++-- Rollback: see rollback DDL at bottom (comment block).
++
++BEGIN;
++
++-- pg_trgm required before trigram GIN index. Idempotent.
++CREATE EXTENSION IF NOT EXISTS pg_trgm;
++
++ALTER TABLE products
++  ADD COLUMN style                   TEXT
++    CONSTRAINT products_style_check CHECK (style IN (
++      'ENGAGEMENT','COUPLE','DAILY_WEAR','JHUMKA','STUDS','HOOPS',
++      'DROP','STATEMENT','TEMPLE','BRIDAL','OFFICE','KIDS'
++    )),
++  ADD COLUMN occasion                TEXT[]   NOT NULL DEFAULT '{}',
++  ADD COLUMN gift_persona            TEXT[]   NOT NULL DEFAULT '{}',
++  ADD COLUMN featured_score          SMALLINT NOT NULL DEFAULT 0
++    CONSTRAINT products_featured_score_check CHECK (featured_score BETWEEN 0 AND 100),
++  ADD COLUMN sales_count_30d         INTEGER  NOT NULL DEFAULT 0,
++  ADD COLUMN view_count_30d          INTEGER  NOT NULL DEFAULT 0,
++  ADD COLUMN price_snapshot_paise    BIGINT,
++  ADD COLUMN price_snapshot_at       TIMESTAMPTZ,
++  ADD COLUMN published_search_idx_at TIMESTAMPTZ;
++
++-- Style: partial BTree — used by /products?style=JHUMKA filter.
++CREATE INDEX products_style_idx
++  ON products (shop_id, style)
++  WHERE published_at IS NOT NULL;
++
++-- Occasion + gift_persona: GIN — used by ANY(occasion) / ANY(gift_persona) filters.
++CREATE INDEX products_occasion_gin_idx
++  ON products USING GIN (occasion);
++
++CREATE INDEX products_gift_persona_gin_idx
++  ON products USING GIN (gift_persona);
++
++-- Featured: partial BTree — used by /catalog/products/featured endpoint.
++CREATE INDEX products_featured_idx
++  ON products (shop_id, featured_score DESC)
++  WHERE published_at IS NOT NULL AND featured_score > 0;
++
++-- Price snapshot: partial BTree — used by priceMin/priceMax filter.
++CREATE INDEX products_price_snapshot_idx
++  ON products (shop_id, price_snapshot_paise)
++  WHERE price_snapshot_paise IS NOT NULL AND published_at IS NOT NULL;
++
++-- Top-sellers: expression BTree — ORDER BY (sales_count_30d * 2 + view_count_30d) DESC.
++CREATE INDEX products_top_sellers_idx
++  ON products (shop_id, (sales_count_30d * 2 + view_count_30d) DESC, published_at DESC)
++  WHERE published_at IS NOT NULL;
++
++-- Trigram search: GIN gin_trgm_ops — WHERE (...concatenation...) % 'query'.
++-- Non-partial so it is unambiguously chosen by the planner for trgm similarity
++-- queries regardless of other partial BTree indexes on this table.
++CREATE INDEX products_search_trgm_idx
++  ON products USING GIN (
++    (coalesce(sku, '') || ' ' || coalesce(metal, '') || ' ' || coalesce(purity, ''))
++    gin_trgm_ops
++  );
++
++COMMIT;
++
++-- ---------------------------------------------------------------------------
++-- Rollback DDL (run on a scratch DB to validate before claiming Task 3 done)
++-- ---------------------------------------------------------------------------
++-- DROP INDEX IF EXISTS products_style_idx;
++-- DROP INDEX IF EXISTS products_occasion_gin_idx;
++-- DROP INDEX IF EXISTS products_gift_persona_gin_idx;
++-- DROP INDEX IF EXISTS products_featured_idx;
++-- DROP INDEX IF EXISTS products_price_snapshot_idx;
++-- DROP INDEX IF EXISTS products_top_sellers_idx;
++-- DROP INDEX IF EXISTS products_search_trgm_idx;
++-- ALTER TABLE products
++--   DROP COLUMN IF EXISTS style,
++--   DROP COLUMN IF EXISTS occasion,
++--   DROP COLUMN IF EXISTS gift_persona,
++--   DROP COLUMN IF EXISTS featured_score,
++--   DROP COLUMN IF EXISTS sales_count_30d,
++--   DROP COLUMN IF EXISTS view_count_30d,
++--   DROP COLUMN IF EXISTS price_snapshot_paise,
++--   DROP COLUMN IF EXISTS price_snapshot_at,
++--   DROP COLUMN IF EXISTS published_search_idx_at;
++-- (pg_trgm extension is NOT dropped — may be used by other indexes.)
+diff --git a/packages/db/src/migrations/0068_products_primary_image.sql b/packages/db/src/migrations/0068_products_primary_image.sql
+new file mode 100644
+index 0000000..7eb2784
+--- /dev/null
++++ b/packages/db/src/migrations/0068_products_primary_image.sql
+@@ -0,0 +1,131 @@
++-- packages/db/src/migrations/0068_products_primary_image.sql
++-- Story A3 — products.primary_image_id with composite FK (mirrors 0058 pattern)
++-- and a SECURITY INVOKER trigger to auto-maintain the column.
++--
++-- Security rationale: a plain FK (primary_image_id → product_images.id) would allow
++-- a Tenant-A product to reference a Tenant-B image — the RLS policy on products
++-- filters rows but does NOT prevent FK references into other tenants' images.
++-- Composite FK (shop_id, primary_image_id) → product_images(shop_id, id) closes this
++-- at the schema layer, mirroring the 0058 pattern for product_images → products.
++
++BEGIN;
++
++-- Step 1: UNIQUE constraint on product_images(shop_id, id) as composite FK target.
++-- product_images.id is already a PRIMARY KEY (unique), but FKs can only reference
++-- UNIQUE or PRIMARY KEY constraints. Adding an explicit UNIQUE(shop_id, id) lets
++-- the composite FK reference (shop_id, id) while the primary key covers (id) alone.
++ALTER TABLE product_images
++  ADD CONSTRAINT product_images_shop_id_id_uniq UNIQUE (shop_id, id);
++
++-- Step 2: Add primary_image_id column (nullable — NULL = no clean image available).
++ALTER TABLE products
++  ADD COLUMN primary_image_id UUID;
++
++-- Step 3: Composite FK — blocks cross-tenant image association at the schema layer.
++-- NO ON DELETE action: we cannot use ON DELETE SET NULL on a composite FK that includes
++-- shop_id (NOT NULL) because Postgres would NULL all FK columns including shop_id.
++-- Instead, a BEFORE DELETE trigger (trg_clear_products_primary_image) clears
++-- primary_image_id before the image row is deleted, satisfying the FK. The AFTER DELETE
++-- trigger (trg_maintain_products_primary_image) then recomputes from remaining images.
++ALTER TABLE products
++  ADD CONSTRAINT products_shop_primary_image_fkey
++  FOREIGN KEY (shop_id, primary_image_id)
++  REFERENCES product_images(shop_id, id);
++
++-- Step 4: Backfill — set primary_image_id for products that already have clean images.
++-- Products with no clean images remain NULL (correct and safe).
++UPDATE products
++   SET primary_image_id = (
++     SELECT pi.id
++       FROM product_images pi
++      WHERE pi.product_id = products.id
++        AND pi.scan_status = 'clean'
++      ORDER BY pi.sort_order ASC, pi.created_at ASC
++      LIMIT 1
++   );
++
++-- Step 5a: BEFORE DELETE trigger function — clears primary_image_id on the product
++-- before the image row is removed so the composite FK constraint is satisfied.
++-- SECURITY INVOKER: runs under session user privileges; RLS on products must allow
++-- the UPDATE (withTenantTx sets the GUC that satisfies RLS for the owning tenant).
++CREATE OR REPLACE FUNCTION clear_products_primary_image()
++RETURNS TRIGGER
++LANGUAGE plpgsql
++SECURITY INVOKER
++AS $$
++BEGIN
++  -- Clear primary_image_id only when the product currently points at this image.
++  -- This avoids a spurious UPDATE when a non-primary image is deleted.
++  UPDATE products
++     SET primary_image_id = NULL
++   WHERE id = OLD.product_id
++     AND primary_image_id = OLD.id;
++
++  -- BEFORE trigger: return OLD to allow the delete to proceed.
++  RETURN OLD;
++END;
++$$;
++
++-- Fires BEFORE DELETE so the FK reference is cleared before the row is removed.
++CREATE TRIGGER trg_clear_products_primary_image
++BEFORE DELETE
++ON product_images
++FOR EACH ROW
++EXECUTE FUNCTION clear_products_primary_image();
++
++-- Step 5b: AFTER trigger function. SECURITY INVOKER so RLS stays active during trigger
++-- execution — the trigger UPDATE runs under the session user's privileges, not
++-- a privileged role, preventing cross-tenant writes.
++CREATE OR REPLACE FUNCTION maintain_products_primary_image()
++RETURNS TRIGGER
++LANGUAGE plpgsql
++SECURITY INVOKER
++AS $$
++DECLARE
++  v_product_id UUID;
++BEGIN
++  -- COALESCE handles both DELETE (NEW is null) and INSERT/UPDATE (OLD may be null).
++  v_product_id := COALESCE(NEW.product_id, OLD.product_id);
++
++  UPDATE products
++     SET primary_image_id = (
++       SELECT pi.id
++         FROM product_images pi
++        WHERE pi.product_id = v_product_id
++          AND pi.scan_status = 'clean'
++        ORDER BY pi.sort_order ASC, pi.created_at ASC
++        LIMIT 1
++     )
++   WHERE id = v_product_id;
++
++  -- AFTER trigger: return value is ignored by Postgres; RETURN NEW is conventional
++  -- (RETURN NULL would also work for AFTER triggers).
++  RETURN NEW;
++END;
++$$;
++
++-- Fires after any of the four mutation events that can change which image is "primary":
++--   INSERT      — new image added; may become primary if it has the lowest sort_order
++--   DELETE      — image removed; BEFORE trigger clears FK first, AFTER recomputes
++--   UPDATE OF sort_order  — reorder can change which image is first
++--   UPDATE OF scan_status — an image becoming 'clean' or 'rejected' changes eligibility
++CREATE TRIGGER trg_maintain_products_primary_image
++AFTER INSERT OR DELETE OR UPDATE OF sort_order, scan_status
++ON product_images
++FOR EACH ROW
++EXECUTE FUNCTION maintain_products_primary_image();
++
++COMMIT;
++
++-- ---------------------------------------------------------------------------
++-- Rollback DDL (validate on scratch DB before claiming Task 6 done)
++-- ---------------------------------------------------------------------------
++-- DROP TRIGGER IF EXISTS trg_maintain_products_primary_image ON product_images;
++-- DROP FUNCTION IF EXISTS maintain_products_primary_image();
++-- DROP TRIGGER IF EXISTS trg_clear_products_primary_image ON product_images;
++-- DROP FUNCTION IF EXISTS clear_products_primary_image();
++-- ALTER TABLE products
++--   DROP CONSTRAINT IF EXISTS products_shop_primary_image_fkey,
++--   DROP COLUMN IF EXISTS primary_image_id;
++-- ALTER TABLE product_images
++--   DROP CONSTRAINT IF EXISTS product_images_shop_id_id_uniq;
+diff --git a/packages/db/src/schema/products.ts b/packages/db/src/schema/products.ts
+index caf02d2..bba73b3 100644
+--- a/packages/db/src/schema/products.ts
++++ b/packages/db/src/schema/products.ts
+@@ -1,4 +1,4 @@
+-import { uuid, text, timestamp, decimal, integer, pgEnum } from 'drizzle-orm/pg-core';
++import { uuid, text, timestamp, decimal, integer, smallint, bigint, pgEnum } from 'drizzle-orm/pg-core';
+ import { tenantScopedTable } from './_helpers/tenantScopedTable';
+ import { productCategories } from './product-categories';
+ 
+@@ -8,6 +8,12 @@ export const huidExemptionCategoryEnum = pgEnum('huid_exemption_category', [
+   'under_2g',
+ ]);
+ 
++export const CATALOG_STYLES = [
++  'ENGAGEMENT', 'COUPLE', 'DAILY_WEAR', 'JHUMKA', 'STUDS', 'HOOPS',
++  'DROP', 'STATEMENT', 'TEMPLE', 'BRIDAL', 'OFFICE', 'KIDS',
++] as const;
++export type CatalogStyle = typeof CATALOG_STYLES[number];
++
+ export const products = tenantScopedTable('products', {
+   id:                         uuid('id').primaryKey().defaultRandom(),
+   category_id:                uuid('category_id').references(() => productCategories.id),
+@@ -28,4 +34,22 @@ export const products = tenantScopedTable('products', {
+   created_by_user_id:         uuid('created_by_user_id').notNull(),
+   created_at:                 timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+   updated_at:                 timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
++  // -------------------------------------------------------------------------
++  // Storefront columns — added in migration 0066 (Story A1)
++  // -------------------------------------------------------------------------
++  style:                      text('style'),
++  occasion:                   text('occasion').array().notNull().default([]),
++  gift_persona:               text('gift_persona').array().notNull().default([]),
++  featured_score:             smallint('featured_score').notNull().default(0),
++  sales_count_30d:            integer('sales_count_30d').notNull().default(0),
++  view_count_30d:             integer('view_count_30d').notNull().default(0),
++  price_snapshot_paise:       bigint('price_snapshot_paise', { mode: 'bigint' }),
++  price_snapshot_at:          timestamp('price_snapshot_at', { withTimezone: true }),
++  published_search_idx_at:    timestamp('published_search_idx_at', { withTimezone: true }),
++  // -------------------------------------------------------------------------
++  // Primary image reference — added in migration 0068 (Story A3)
++  // Composite FK enforced at DDL layer (see migration 0068).
++  // Drizzle does not model composite FKs natively; constraint lives in SQL.
++  // -------------------------------------------------------------------------
++  primary_image_id:           uuid('primary_image_id'),
+ });
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git status --short; Get-ChildItem -Name' in C:\gs-stf-1
+ succeeded in 1510ms:
+.github
+.serena
+apps
+docs
+node_modules
+ops
+packages
+scripts
+_bmad
+_bmad-output
+.bmad-readiness-passed
+.claude-review-passed
+.codex-review-passed
+.editorconfig
+.eslintrc.cjs
+.firebaserc
+.gitignore
+.node-version
+.npmrc
+.pnpmfile.cjs
+.prettierignore
+.prettierrc
+.security-review-passed
+CLAUDE.md
+firebase.json
+package.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
+STORY-A1A3-BRIEF.md
+tsconfig.base.json
+tsconfig.json
+turbo.json
+vitest.config.ts
+fatal: detected dubious ownership in repository at 'C:/gs-stf-1'
+'C:/gs-stf-1/.git' is owned by:
+	Home/alokt (S-1-5-21-1726265981-1318906982-882074505-1001)
+but the current user is:
+	Home/CodexSandboxOffline (S-1-5-21-1726265981-1318906982-882074505-1004)
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory C:/gs-stf-1
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem packages/db/src/migrations | Sort-Object Name | Select-Object -ExpandProperty Name | Select-Object -Last 20' in C:\gs-stf-1
+ succeeded in 1258ms:
+0037_viewing_consent.sql
+0038_loyalty.sql
+0039_tcs_on_invoices.sql
+0040_tenant_sync_cursors_rls.sql
+0041_huid_exemption_category.sql
+0042_estimates.sql
+0043_product_views.sql
+0044_custom_orders.sql
+0045_rate_lock_bookings.sql
+0046_try_at_home_bookings.sql
+0047_reviews_wishlist.sql
+0053_platform_subscriptions.sql
+0054_platform_audit_columns.sql
+0055_impersonation_sessions.sql
+0056_platform_audit_events_revoke_app_user_select.sql
+0057_product_images_pipeline.sql
+0058_product_images_tenant_fk.sql
+0059_reviews_wishlist_update_grant.sql
+0066_products_storefront_columns.sql
+0068_products_primary_image.sql
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content packages/db/src/migrations/0057_product_images_pipeline.sql; ''; Get-Content packages/db/src/migrations/0058_product_images_tenant_fk.sql; ''; Get-Content packages/db/src/migrations/0001* -ErrorAction SilentlyContinue | Select-String -Pattern 'CREATE TABLE products|CREATE TABLE product_images|ALTER TABLE products|ENABLE ROW' -Context 0,8" in C:\gs-stf-1
+ succeeded in 1515ms:
+-- packages/db/src/migrations/0057_product_images_pipeline.sql
+-- Story 17.1 â€” recreate product_images for the real upload pipeline.
+-- DDL-only (migrator role compatible). No DML inside .sql migrations
+-- per docs/db-workflow.md.
+
+BEGIN;
+
+-- Drop the original 0014 table (zero production data; no FK dependencies).
+-- CASCADE removes the policy + grants + indexes implicitly.
+DROP TABLE product_images CASCADE;
+
+-- Recreate with the full Story-17.1 schema.
+CREATE TABLE product_images (
+  shop_id              UUID        NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id           UUID        NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  storage_key          TEXT        NOT NULL,
+  alt_text             TEXT,
+  mime_type            TEXT        NOT NULL,
+  byte_size            BIGINT      NOT NULL,
+  width                INTEGER     NOT NULL,
+  height               INTEGER     NOT NULL,
+  exif_stripped_at     TIMESTAMPTZ NOT NULL,
+  uploaded_by_user_id  UUID        NOT NULL REFERENCES shop_users(id),
+  scan_status          TEXT        NOT NULL DEFAULT 'clean'
+    CHECK (scan_status IN ('pending', 'clean', 'rejected')),
+  sort_order           INTEGER     NOT NULL DEFAULT 0,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX product_images_shop_id_idx       ON product_images (shop_id);
+CREATE INDEX product_images_product_id_idx    ON product_images (product_id);
+CREATE INDEX product_images_product_sort_idx  ON product_images (product_id, sort_order);
+
+ALTER TABLE product_images ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_images FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS rls_product_images_tenant_isolation ON product_images;
+CREATE POLICY rls_product_images_tenant_isolation ON product_images
+  FOR ALL
+  USING       (shop_id = current_setting('app.current_shop_id', true)::uuid)
+  WITH CHECK  (shop_id = current_setting('app.current_shop_id', true)::uuid);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON product_images TO app_user;
+
+COMMIT;
+
+-- packages/db/src/migrations/0058_product_images_tenant_fk.sql
+-- Story 17.1 Codex round-1 follow-up â€” tenant-scoped composite FKs.
+-- DDL-only per docs/db-workflow.md.
+--
+-- Why: 0057 used plain FKs (product_id -> products(id), uploaded_by_user_id ->
+-- shop_users(id)). RLS filters on shop_id but does not enforce that the FK
+-- target belongs to the same tenant. An attacker (compromised tenant or API
+-- bug) could insert a product_images row pointing to another shop's product
+-- or user. Composite FKs close this loophole at the schema layer.
+
+BEGIN;
+
+-- Step 1: Add UNIQUE(shop_id, id) on parent tables â€” required as composite FK
+-- target. Both tables have shop_id NOT NULL today; pure metadata change.
+ALTER TABLE products
+  ADD CONSTRAINT products_shop_id_id_uniq UNIQUE (shop_id, id);
+
+ALTER TABLE shop_users
+  ADD CONSTRAINT shop_users_shop_id_id_uniq UNIQUE (shop_id, id);
+
+-- Step 2: Drop the plain FKs from 0057.
+ALTER TABLE product_images
+  DROP CONSTRAINT product_images_product_id_fkey;
+
+ALTER TABLE product_images
+  DROP CONSTRAINT product_images_uploaded_by_user_id_fkey;
+
+-- Step 3: Re-add as tenant-scoped composite FKs.
+ALTER TABLE product_images
+  ADD CONSTRAINT product_images_shop_product_fkey
+  FOREIGN KEY (shop_id, product_id)
+  REFERENCES products(shop_id, id)
+  ON DELETE CASCADE;
+
+ALTER TABLE product_images
+  ADD CONSTRAINT product_images_shop_uploader_fkey
+  FOREIGN KEY (shop_id, uploaded_by_user_id)
+  REFERENCES shop_users(shop_id, id);
+
+-- Step 4: F7 follow-on â€” idempotency key column + unique per-product constraint.
+-- This supports the service-layer idempotency check in Task 4.
+ALTER TABLE product_images
+  ADD COLUMN idempotency_key TEXT;
+
+CREATE UNIQUE INDEX product_images_idempotency_uniq
+  ON product_images (product_id, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+
+COMMIT;
+
+
+> ALTER TABLE shop_users ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE shop_users FORCE ROW LEVEL SECURITY;
+  DROP POLICY IF EXISTS rls_shop_users_tenant_isolation ON shop_users;
+  CREATE POLICY rls_shop_users_tenant_isolation ON shop_users
+    FOR ALL
+    USING (shop_id = current_setting('app.current_shop_id', true)::uuid)
+    WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  
+> ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE audit_events FORCE ROW LEVEL SECURITY;
+  DROP POLICY IF EXISTS rls_audit_events_tenant_isolation ON audit_events;
+  CREATE POLICY rls_audit_events_tenant_isolation ON audit_events
+    FOR ALL
+    USING (shop_id = current_setting('app.current_shop_id', true)::uuid)
+    WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+
+
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path packages/db/src/migrations/*.sql -Pattern 'CREATE TABLE products|ALTER TABLE products ENABLE ROW|rls_products|current_shop_id|CREATE TABLE shops|CREATE TABLE shop_users' -Context 0,20 | Select-Object -First 120 | ForEach-Object { "'$_.ToString() }' in C:\gs-stf-1
+ succeeded in 1475ms:
+> C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:12:CREATE TABLE shops (
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:13:  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:14:  slug          TEXT NOT NULL UNIQUE,
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:15:  display_name  TEXT NOT NULL,
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:16:  status        shop_status NOT NULL DEFAULT 'PROVISIONING',
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:17:  kek_key_arn   TEXT,
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:18:  config        JSONB NOT NULL DEFAULT '{}'::jsonb,
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:19:  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:20:  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:21:);
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:22:
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:23:-- shop_users (tenant-scoped; RLS enabled below)
+> C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:24:CREATE TABLE shop_users (
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:25:  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:26:  shop_id       UUID NOT NULL REFERENCES shops(id) ON DELETE RESTRICT,
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:27:  phone         TEXT NOT NULL,
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:28:  display_name  TEXT NOT NULL,
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:29:  role          shop_user_role NOT NULL,
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:30:  status        shop_user_status NOT NULL DEFAULT 'INVITED',
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:31:  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:32:  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:33:);
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:34:CREATE INDEX shop_users_shop_id_idx ON shop_users (shop_id);
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:35:CREATE UNIQUE INDEX shop_users_shop_id_phone_idx ON shop_users (shop_id, phone);
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:36:
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:37:-- audit_events (tenant-scoped, append-only; RLS enabled + DML locked down in 0002)
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:38:CREATE TABLE audit_events (
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:39:  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:40:  shop_id        UUID NOT NULL REFERENCES shops(id) ON DELETE RESTRICT,
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:41:  actor_user_id  UUID,
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:42:  action         TEXT NOT NULL,
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:43:  subject_type   TEXT NOT NULL,
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:44:  subject_id     TEXT,
+> C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:60:  USING (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:61:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:62:
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:63:ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:64:ALTER TABLE audit_events FORCE ROW LEVEL SECURITY;
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:65:DROP POLICY IF EXISTS rls_audit_events_tenant_isolation ON audit_events;
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:66:CREATE POLICY rls_audit_events_tenant_isolation ON audit_events
+  C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:67:  FOR ALL
+> C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:68:  USING (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0001_initial_schema.sql:69:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+> C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:3:-- app.current_shop_id` AND without the pool's poison-default raises
+> C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:4:-- "42704 unrecognized configuration parameter app.current_shop_id" rather than
+  C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:5:-- silently returning zero rows. Pair with packages/db/src/codegen/generate-rls.ts
+  C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:6:-- update so future tenantScopedTable usages emit this form automatically.
+  C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:7:
+  C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:8:DROP POLICY rls_shop_users_tenant_isolation ON shop_users;
+  C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:9:DROP POLICY rls_audit_events_tenant_isolation ON audit_events;
+  C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:10:
+  C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:11:CREATE POLICY rls_shop_users_tenant_isolation ON shop_users
+  C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:12:  FOR ALL
+> C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:13:  USING      (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:14:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:15:
+  C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:16:CREATE POLICY rls_audit_events_tenant_isolation ON audit_events
+  C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:17:  FOR ALL
+> C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:18:  USING      (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0004_rls_fail_loud.sql:19:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+> C:\gs-stf-1\packages\db\src\migrations\0006_shop_settings.sql:40:  USING      (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0006_shop_settings.sql:41:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0006_shop_settings.sql:42:
+  C:\gs-stf-1\packages\db\src\migrations\0006_shop_settings.sql:43:GRANT SELECT, INSERT, UPDATE ON shop_settings TO app_user;
+> C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:18:  USING      (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:19:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:20:
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:21:GRANT SELECT, INSERT, UPDATE ON role_permissions TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:22:
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:23:-- Seed shop_manager defaults for all existing shops
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:24:INSERT INTO role_permissions (shop_id, role, permission_key, is_enabled)
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:25:SELECT s.id, 'shop_manager', k.key, k.enabled
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:26:FROM shops s
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:27:CROSS JOIN (VALUES
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:28:  ('billing.create',  true),
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:29:  ('billing.void',    false),
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:30:  ('inventory.edit',  false),
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:31:  ('settings.edit',   false),
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:32:  ('reports.view',    true),
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:33:  ('analytics.view',  true)
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:34:) AS k(key, enabled)
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:35:ON CONFLICT (shop_id, role, permission_key) DO NOTHING;
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:36:
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:37:-- Seed shop_staff defaults for all existing shops
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:38:INSERT INTO role_permissions (shop_id, role, permission_key, is_enabled)
+  C:\gs-stf-1\packages\db\src\migrations\0008_role_permissions.sql:39:SELECT s.id, 'shop_staff', k.key, k.enabled
+> C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:5:-- only: app_user may only UPDATE the row whose id matches app.current_shop_id.
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:6:--
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:7:-- INSERT and DELETE remain superuser/platform_admin only.
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:8:-- SELECT remains unrestricted (platform-global read is intentional — auth
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:9:-- lookups need to read all shops).
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:10:
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:11:-- Column-level UPDATE on shops for app_user (shopkeeper profile edits only).
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:12:-- Sensitive columns (slug, status, kek_key_arn, config) are intentionally
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:13:-- excluded — only platform_admin can change those.
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:14:GRANT UPDATE (
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:15:  display_name, address_json, gstin, bis_registration, contact_phone,
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:16:  operating_hours_json, about_text, logo_url, years_in_business, updated_at
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:17:) ON shops TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:18:
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:19:-- Enable RLS on shops and force it even for table owners.
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:20:ALTER TABLE shops ENABLE ROW LEVEL SECURITY;
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:21:ALTER TABLE shops FORCE ROW LEVEL SECURITY;
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:22:
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:23:-- SELECT: platform-global — app_user can read any shop (auth lookups).
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:24:DROP POLICY IF EXISTS rls_shops_select ON shops;
+  C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:25:CREATE POLICY rls_shops_select ON shops
+> C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:33:  USING (id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0013_shops_revoke_app_user_write.sql:34:  WITH CHECK (id = current_setting('app.current_shop_id', true)::uuid);
+> C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:19:  USING  (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:20:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:21:
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:22:-- products (tenant-scoped)
+> C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:23:CREATE TABLE products (
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:24:  shop_id                    UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:25:  id                         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:26:  category_id                UUID REFERENCES product_categories(id),
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:27:  sku                        TEXT NOT NULL,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:28:  metal                      TEXT NOT NULL,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:29:  purity                     TEXT NOT NULL,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:30:  gross_weight_g             DECIMAL(12,4) NOT NULL,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:31:  net_weight_g               DECIMAL(12,4) NOT NULL,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:32:  stone_weight_g             DECIMAL(12,4) NOT NULL DEFAULT 0.0000,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:33:  stone_details              TEXT,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:34:  making_charge_override_pct DECIMAL(5,2),
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:35:  huid                       TEXT,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:36:  status                     TEXT NOT NULL DEFAULT 'IN_STOCK',
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:37:  published_at               TIMESTAMPTZ,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:38:  published_by_user_id       UUID,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:39:  created_by_user_id         UUID NOT NULL,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:40:  created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:41:  updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:42:  CONSTRAINT products_status_check        CHECK (status IN ('IN_STOCK','SOLD','RESERVED','ON_APPROVAL','WITH_KARIGAR')),
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:43:  CONSTRAINT products_metal_check         CHECK (metal  IN ('GOLD','SILVER','PLATINUM')),
+> C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:52:ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:53:ALTER TABLE products FORCE ROW LEVEL SECURITY;
+> C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:54:DROP POLICY IF EXISTS rls_products_tenant_isolation ON products;
+> C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:55:CREATE POLICY rls_products_tenant_isolation ON products
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:56:  FOR ALL
+> C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:57:  USING  (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:58:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:59:
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:60:-- product_images (tenant-scoped)
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:61:CREATE TABLE product_images (
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:62:  shop_id     UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:63:  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:64:  product_id  UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:65:  storage_key TEXT NOT NULL,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:66:  variant     TEXT NOT NULL DEFAULT 'original',
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:67:  sort_order  INTEGER NOT NULL DEFAULT 0,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:68:  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:69:);
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:70:CREATE INDEX product_images_shop_id_idx    ON product_images (shop_id);
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:71:CREATE INDEX product_images_product_id_idx ON product_images (product_id);
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:72:
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:73:ALTER TABLE product_images ENABLE ROW LEVEL SECURITY;
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:74:ALTER TABLE product_images FORCE ROW LEVEL SECURITY;
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:75:DROP POLICY IF EXISTS rls_product_images_tenant_isolation ON product_images;
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:76:CREATE POLICY rls_product_images_tenant_isolation ON product_images
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:77:  FOR ALL
+> C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:78:  USING  (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:79:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:80:
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:81:-- Explicit grants (default privileges from 0002 cover new tables,
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:82:-- but explicit grant matches the established per-story pattern).
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:83:GRANT SELECT, INSERT, UPDATE ON product_categories TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:84:GRANT SELECT, INSERT, UPDATE ON products           TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0014_inventory_base.sql:85:GRANT SELECT, INSERT, UPDATE, DELETE ON product_images TO app_user;
+> C:\gs-stf-1\packages\db\src\migrations\0017_rate_overrides.sql:23:  USING (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0017_rate_overrides.sql:24:
+  C:\gs-stf-1\packages\db\src\migrations\0017_rate_overrides.sql:25:GRANT SELECT, INSERT ON shop_rate_overrides TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0017_rate_overrides.sql:26:
+  C:\gs-stf-1\packages\db\src\migrations\0017_rate_overrides.sql:27:-- Partial index on now() not possible (STABLE, not IMMUTABLE); use full index + WHERE in queries
+  C:\gs-stf-1\packages\db\src\migrations\0017_rate_overrides.sql:28:CREATE INDEX idx_shop_rate_overrides_active
+  C:\gs-stf-1\packages\db\src\migrations\0017_rate_overrides.sql:29:  ON shop_rate_overrides(shop_id, purity, valid_until DESC);
+> C:\gs-stf-1\packages\db\src\migrations\0018_rate_overrides_with_check.sql:8:  USING  (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0018_rate_overrides_with_check.sql:9:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+> C:\gs-stf-1\packages\db\src\migrations\0019_sync_infrastructure.sql:40:  USING  (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0019_sync_infrastructure.sql:41:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0019_sync_infrastructure.sql:42:
+  C:\gs-stf-1\packages\db\src\migrations\0019_sync_infrastructure.sql:43:-- 3. Seed a cursor row for all existing shops
+  C:\gs-stf-1\packages\db\src\migrations\0019_sync_infrastructure.sql:44:INSERT INTO tenant_sync_cursors (shop_id, cursor)
+  C:\gs-stf-1\packages\db\src\migrations\0019_sync_infrastructure.sql:45:SELECT id, 0 FROM shops
+  C:\gs-stf-1\packages\db\src\migrations\0019_sync_infrastructure.sql:46:ON CONFLICT (shop_id) DO NOTHING;
+> C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:65:  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:66:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:67:
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:68:-- 6. Immutability trigger — DB-level rejection of UPDATE/DELETE.
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:69:-- This is the PMLA retention floor: even a buggy migration or a developer
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:70:-- with raw psql access cannot mutate or destroy a recorded movement.
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:71:CREATE OR REPLACE FUNCTION stock_movements_immutable()
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:72:  RETURNS trigger
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:73:  LANGUAGE plpgsql
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:74:  SECURITY DEFINER
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:75:  SET search_path = public, pg_temp
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:76:AS $$
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:77:BEGIN
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:78:  RAISE EXCEPTION 'stock_movements are immutable; use a compensating movement'
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:79:    USING ERRCODE = 'restrict_violation';
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:80:END;
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:81:$$;
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:82:
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:83:ALTER FUNCTION stock_movements_immutable() OWNER TO platform_admin;
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:84:
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:85:DROP TRIGGER IF EXISTS trg_stock_movements_immutable ON stock_movements;
+  C:\gs-stf-1\packages\db\src\migrations\0021_stock_movements.sql:86:CREATE TRIGGER trg_stock_movements_immutable
+> C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:85:  USING      (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:86:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:87:
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:88:CREATE POLICY rls_invoice_items_tenant_isolation ON invoice_items
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:89:  FOR ALL
+> C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:90:  USING      (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:91:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:92:
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:93:CREATE POLICY rls_payments_tenant_isolation ON payments
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:94:  FOR ALL
+> C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:95:  USING      (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:96:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:97:
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:98:-- 5. Grants — invoices is read/write; payments is read/write (5.7 will INSERT)
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:99:REVOKE ALL ON invoices       FROM app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:100:REVOKE ALL ON invoice_items  FROM app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:101:REVOKE ALL ON payments       FROM app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:102:GRANT  SELECT, INSERT, UPDATE ON invoices       TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:103:GRANT  SELECT, INSERT         ON invoice_items  TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:104:GRANT  SELECT, INSERT, UPDATE ON payments       TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:105:
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:106:-- 6. Uniqueness — one invoice per tenant idempotency-key, one number per tenant
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:107:CREATE UNIQUE INDEX uq_invoices_shop_idempotency
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:108:  ON invoices(shop_id, idempotency_key);
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:109:CREATE UNIQUE INDEX uq_invoices_shop_number
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:110:  ON invoices(shop_id, invoice_number);
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:111:
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:112:-- 7. Hot-path indexes — list by customer, list by date, items by invoice
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:113:CREATE INDEX idx_invoices_customer
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:114:  ON invoices(shop_id, customer_id, created_at DESC);
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:115:CREATE INDEX idx_invoices_created_at
+  C:\gs-stf-1\packages\db\src\migrations\0022_billing.sql:116:  ON invoices(shop_id, created_at DESC);
+> C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:29:  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:30:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:31:
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:32:GRANT SELECT, INSERT, UPDATE ON pmla_aggregates TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:33:
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:34:CREATE INDEX idx_pmla_aggregates_lookup
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:35:  ON pmla_aggregates(shop_id, aggregate_date, customer_id);
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:36:CREATE INDEX idx_pmla_aggregates_monthly
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:37:  ON pmla_aggregates(shop_id, aggregate_month, customer_id);
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:38:
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:39:-- 2. Store supervisor override metadata on the invoice when cash-cap is overridden.
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:40:ALTER TABLE invoices
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:41:  ADD COLUMN compliance_overrides_jsonb JSONB;
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:42:
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:43:-- 3. Add idempotency key to payments so cash-payment endpoint retries are safe.
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:44:--    Partial unique index: NULL keys (non-idempotent writes) are excluded.
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:45:ALTER TABLE payments ADD COLUMN idempotency_key TEXT;
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:46:CREATE UNIQUE INDEX uq_payments_shop_idempotency
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:47:  ON payments(shop_id, idempotency_key)
+  C:\gs-stf-1\packages\db\src\migrations\0024_pmla_aggregates.sql:48:  WHERE idempotency_key IS NOT NULL;
+> C:\gs-stf-1\packages\db\src\migrations\0026_invoice_void.sql:22:  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0026_invoice_void.sql:23:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0026_invoice_void.sql:24:
+  C:\gs-stf-1\packages\db\src\migrations\0026_invoice_void.sql:25:GRANT SELECT, INSERT ON credit_notes TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0026_invoice_void.sql:26:
+  C:\gs-stf-1\packages\db\src\migrations\0026_invoice_void.sql:27:CREATE UNIQUE INDEX idx_credit_notes_one_per_invoice
+  C:\gs-stf-1\packages\db\src\migrations\0026_invoice_void.sql:28:  ON credit_notes(shop_id, original_invoice_id);
+> C:\gs-stf-1\packages\db\src\migrations\0028_customers.sql:31:  USING      (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0028_customers.sql:32:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0028_customers.sql:33:
+  C:\gs-stf-1\packages\db\src\migrations\0028_customers.sql:34:GRANT SELECT, INSERT, UPDATE ON customers TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0028_customers.sql:35:
+  C:\gs-stf-1\packages\db\src\migrations\0028_customers.sql:36:CREATE UNIQUE INDEX idx_customers_shop_phone ON customers(shop_id, phone);
+  C:\gs-stf-1\packages\db\src\migrations\0028_customers.sql:37:CREATE INDEX idx_customers_shop_name        ON customers(shop_id, name);
+  C:\gs-stf-1\packages\db\src\migrations\0028_customers.sql:38:CREATE INDEX idx_customers_shop_created     ON customers(shop_id, created_at DESC);
+> C:\gs-stf-1\packages\db\src\migrations\0030_urd_purchases.sql:28:  USING (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0030_urd_purchases.sql:29:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0030_urd_purchases.sql:30:
+  C:\gs-stf-1\packages\db\src\migrations\0030_urd_purchases.sql:31:GRANT SELECT, INSERT, UPDATE ON urd_purchases TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0030_urd_purchases.sql:32:
+  C:\gs-stf-1\packages\db\src\migrations\0030_urd_purchases.sql:33:CREATE INDEX idx_urd_purchases_shop_created ON urd_purchases(shop_id, created_at DESC);
+  C:\gs-stf-1\packages\db\src\migrations\0030_urd_purchases.sql:34:CREATE INDEX idx_urd_purchases_customer ON urd_purchases(shop_id, customer_id) WHERE customer_id IS NOT NULL;
+> C:\gs-stf-1\packages\db\src\migrations\0031_family_members.sql:21:  USING (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0031_family_members.sql:22:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0031_family_members.sql:23:
+  C:\gs-stf-1\packages\db\src\migrations\0031_family_members.sql:24:GRANT SELECT, INSERT, DELETE ON family_members TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0031_family_members.sql:25:
+  C:\gs-stf-1\packages\db\src\migrations\0031_family_members.sql:26:CREATE UNIQUE INDEX idx_family_members_unique_edge
+  C:\gs-stf-1\packages\db\src\migrations\0031_family_members.sql:27:  ON family_members(shop_id, customer_id, related_customer_id);
+> C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:4:-- RLS enforced: app_user can only see/modify rows for current_setting('app.current_shop_id').
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:5:
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:6:CREATE TABLE customer_balances (
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:7:  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:8:  shop_id           UUID NOT NULL REFERENCES shops(id),
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:9:  customer_id       UUID NOT NULL REFERENCES customers(id),
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:10:  outstanding_paise BIGINT NOT NULL DEFAULT 0,
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:11:  advance_paise     BIGINT NOT NULL DEFAULT 0,
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:12:  last_updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:13:  CONSTRAINT customer_balances_unique UNIQUE (shop_id, customer_id)
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:14:);
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:15:
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:16:ALTER TABLE customer_balances ENABLE ROW LEVEL SECURITY;
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:17:ALTER TABLE customer_balances FORCE ROW LEVEL SECURITY;
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:18:
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:19:CREATE POLICY customer_balances_tenant ON customer_balances
+> C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:20:  USING (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:21:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:22:
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:23:GRANT SELECT, INSERT, UPDATE ON customer_balances TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:24:
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:25:CREATE INDEX idx_customer_balances_shop_customer
+  C:\gs-stf-1\packages\db\src\migrations\0032_customer_balances.sql:26:  ON customer_balances (shop_id, customer_id);
+> C:\gs-stf-1\packages\db\src\migrations\0033_customer_notes.sql:16:  USING (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0033_customer_notes.sql:17:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0033_customer_notes.sql:18:GRANT SELECT, INSERT, UPDATE ON customer_notes TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0033_customer_notes.sql:19:
+  C:\gs-stf-1\packages\db\src\migrations\0033_customer_notes.sql:20:CREATE INDEX idx_customer_notes_customer
+  C:\gs-stf-1\packages\db\src\migrations\0033_customer_notes.sql:21:  ON customer_notes(shop_id, customer_id, created_at DESC)
+  C:\gs-stf-1\packages\db\src\migrations\0033_customer_notes.sql:22:  WHERE deleted_at IS NULL;
+> C:\gs-stf-1\packages\db\src\migrations\0034_customer_occasions.sql:18:  USING (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0034_customer_occasions.sql:19:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0034_customer_occasions.sql:20:GRANT SELECT, INSERT, UPDATE, DELETE ON customer_occasions TO app_user;
+> C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:4:--   provider.ts sets `app.current_shop_id = '00000000-...'` on every new pool
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:5:--   connection (the "poison UUID" — see packages/db/src/provider.ts). Combined with
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:6:--   FORCE ROW LEVEL SECURITY on customer_occasions, a raw SELECT from app_user
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:7:--   would silently return zero rows, even though the worker's intent is a
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:8:--   platform-wide cross-tenant scan.
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:9:--
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:10:-- These functions run as platform_admin (BYPASSRLS — see migration 0003) so they
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:11:-- can read/write across tenants. EXECUTE is granted to app_user; the function
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:12:-- bodies themselves are the authorization boundary.
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:13:--
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:14:-- Worker usage:
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:15:--   SELECT * FROM get_due_occasions(today_ist);
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:16:--   SELECT advance_occasion_to_next_year(occasion_id);
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:17:
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:18:-- Read-side: returns occasions due today OR (today + reminder_days) across all tenants.
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:19:CREATE OR REPLACE FUNCTION get_due_occasions(check_date DATE)
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:20:RETURNS TABLE (
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:21:  id              UUID,
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:22:  shop_id         UUID,
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:23:  customer_id     UUID,
+  C:\gs-stf-1\packages\db\src\migrations\0035_occasion_reminder_fn.sql:24:  occasion_type   TEXT,
+> C:\gs-stf-1\packages\db\src\migrations\0037_viewing_consent.sql:24:  USING      (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0037_viewing_consent.sql:25:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0037_viewing_consent.sql:26:
+  C:\gs-stf-1\packages\db\src\migrations\0037_viewing_consent.sql:27:GRANT SELECT, INSERT, UPDATE ON viewing_consent TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0037_viewing_consent.sql:28:
+  C:\gs-stf-1\packages\db\src\migrations\0037_viewing_consent.sql:29:CREATE INDEX idx_viewing_consent_customer ON viewing_consent(shop_id, customer_id);
+> C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:52:  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:53:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:54:
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:55:-- Immutability trigger — DB-level rejection of UPDATE/DELETE/TRUNCATE.
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:56:-- Even a buggy migration or a developer with raw psql access cannot mutate
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:57:-- or destroy a recorded loyalty transaction.
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:58:CREATE OR REPLACE FUNCTION loyalty_transactions_immutable()
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:59:  RETURNS trigger
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:60:  LANGUAGE plpgsql
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:61:  SECURITY DEFINER
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:62:  SET search_path = public, pg_temp
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:63:AS $$
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:64:BEGIN
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:65:  RAISE EXCEPTION 'loyalty_transactions are immutable; insert a REVERSAL or ADJUSTMENT_OUT row instead'
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:66:    USING ERRCODE = 'restrict_violation';
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:67:END;
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:68:$$;
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:69:
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:70:ALTER FUNCTION loyalty_transactions_immutable() OWNER TO platform_admin;
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:71:
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:72:DROP TRIGGER IF EXISTS trg_loyalty_transactions_immutable ON loyalty_transactions;
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:73:CREATE TRIGGER trg_loyalty_transactions_immutable
+> C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:119:  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:120:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:121:
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:122:-- Grants — SELECT + INSERT + UPDATE (but no DELETE; soft-delete via app logic if ever needed)
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:123:REVOKE ALL ON customer_loyalty FROM app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:124:GRANT SELECT, INSERT, UPDATE ON customer_loyalty TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:125:
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:126:-- Index for fast tier-bucket counts (Story 8.2)
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:127:CREATE INDEX idx_customer_loyalty_tier
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:128:  ON customer_loyalty(shop_id, current_tier) WHERE current_tier IS NOT NULL;
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:129:
+  C:\gs-stf-1\packages\db\src\migrations\0038_loyalty.sql:130:COMMIT;
+> C:\gs-stf-1\packages\db\src\migrations\0040_tenant_sync_cursors_rls.sql:4:-- app.current_shop_id is not set, matching the pattern from 0004_rls_fail_loud.sql.
+  C:\gs-stf-1\packages\db\src\migrations\0040_tenant_sync_cursors_rls.sql:5:ALTER TABLE tenant_sync_cursors ENABLE ROW LEVEL SECURITY;
+  C:\gs-stf-1\packages\db\src\migrations\0040_tenant_sync_cursors_rls.sql:6:CREATE POLICY tenant_sync_cursors_isolation ON tenant_sync_cursors
+> C:\gs-stf-1\packages\db\src\migrations\0040_tenant_sync_cursors_rls.sql:7:  USING (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0040_tenant_sync_cursors_rls.sql:8:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+> C:\gs-stf-1\packages\db\src\migrations\0042_estimates.sql:31:  USING      (shop_id = current_setting('app.current_shop_id')::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0042_estimates.sql:32:  WITH CHECK (shop_id = current_setting('app.current_shop_id')::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0042_estimates.sql:33:
+  C:\gs-stf-1\packages\db\src\migrations\0042_estimates.sql:34:REVOKE ALL ON estimates FROM app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0042_estimates.sql:35:GRANT SELECT, INSERT, UPDATE ON estimates TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0042_estimates.sql:36:
+  C:\gs-stf-1\packages\db\src\migrations\0042_estimates.sql:37:CREATE INDEX idx_estimates_shop_status
+  C:\gs-stf-1\packages\db\src\migrations\0042_estimates.sql:38:  ON estimates(shop_id, status, created_at DESC);
+  C:\gs-stf-1\packages\db\src\migrations\0042_estimates.sql:39:CREATE INDEX idx_estimates_shop_customer
+  C:\gs-stf-1\packages\db\src\migrations\0042_estimates.sql:40:  ON estimates(shop_id, customer_id, created_at DESC);
+  C:\gs-stf-1\packages\db\src\migrations\0042_estimates.sql:41:
+  C:\gs-stf-1\packages\db\src\migrations\0042_estimates.sql:42:COMMIT;
+> C:\gs-stf-1\packages\db\src\migrations\0043_product_views.sql:21:  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0043_product_views.sql:22:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0043_product_views.sql:23:
+  C:\gs-stf-1\packages\db\src\migrations\0043_product_views.sql:24:REVOKE ALL ON product_views FROM app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0043_product_views.sql:25:GRANT SELECT, INSERT ON product_views TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0043_product_views.sql:26:
+  C:\gs-stf-1\packages\db\src\migrations\0043_product_views.sql:27:CREATE INDEX idx_product_views_product_time
+  C:\gs-stf-1\packages\db\src\migrations\0043_product_views.sql:28:  ON product_views (shop_id, product_id, viewed_at DESC);
+  C:\gs-stf-1\packages\db\src\migrations\0043_product_views.sql:29:
+  C:\gs-stf-1\packages\db\src\migrations\0043_product_views.sql:30:CREATE INDEX idx_product_views_session
+  C:\gs-stf-1\packages\db\src\migrations\0043_product_views.sql:31:  ON product_views (shop_id, session_id, product_id, viewed_at DESC);
+  C:\gs-stf-1\packages\db\src\migrations\0043_product_views.sql:32:
+  C:\gs-stf-1\packages\db\src\migrations\0043_product_views.sql:33:COMMIT;
+> C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:39:  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:40:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:41:
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:42:-- Grants: full CRUD for app_user (milestones may not be deleted; orders are soft-cancelled)
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:43:REVOKE ALL ON custom_orders FROM app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:44:GRANT SELECT, INSERT, UPDATE ON custom_orders TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:45:
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:46:-- Indexes
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:47:CREATE INDEX idx_custom_orders_shop_status
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:48:  ON custom_orders(shop_id, status, created_at DESC);
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:49:
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:50:CREATE INDEX idx_custom_orders_customer
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:51:  ON custom_orders(shop_id, customer_id)
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:52:  WHERE customer_id IS NOT NULL;
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:53:
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:54:-- ============================================================================
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:55:-- 2. custom_order_milestones — append-only work log
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:56:-- ============================================================================
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:57:
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:58:CREATE TABLE custom_order_milestones (
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:59:  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:60:  custom_order_id  UUID NOT NULL REFERENCES custom_orders(id),
+> C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:74:  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:75:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:76:
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:77:-- Milestones are append-only: INSERT + SELECT only for app_user.
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:78:REVOKE ALL ON custom_order_milestones FROM app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:79:GRANT SELECT, INSERT ON custom_order_milestones TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:80:
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:81:CREATE INDEX idx_custom_order_milestones_order
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:82:  ON custom_order_milestones(shop_id, custom_order_id, created_at DESC);
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:83:
+  C:\gs-stf-1\packages\db\src\migrations\0044_custom_orders.sql:84:COMMIT;
+> C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:29:  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:30:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:31:
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:32:REVOKE ALL ON rate_lock_bookings FROM app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:33:GRANT SELECT, INSERT, UPDATE ON rate_lock_bookings TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:34:
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:35:-- Honor lookup index
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:36:CREATE INDEX idx_rate_lock_bookings_honor
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:37:  ON rate_lock_bookings (customer_id, shop_id, expires_at)
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:38:  WHERE status = 'ACTIVE';
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:39:
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:40:-- Shopkeeper list view index
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:41:CREATE INDEX idx_rate_lock_bookings_shop_list
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:42:  ON rate_lock_bookings (shop_id, status, locked_at DESC);
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:43:
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:44:-- One active lock per customer+shop
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:45:CREATE UNIQUE INDEX uq_rate_lock_bookings_one_active
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:46:  ON rate_lock_bookings (customer_id, shop_id)
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:47:  WHERE status = 'ACTIVE';
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:48:
+  C:\gs-stf-1\packages\db\src\migrations\0045_rate_lock_bookings.sql:49:COMMIT;
+> C:\gs-stf-1\packages\db\src\migrations\0046_try_at_home_bookings.sql:29:  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0046_try_at_home_bookings.sql:30:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0046_try_at_home_bookings.sql:31:
+  C:\gs-stf-1\packages\db\src\migrations\0046_try_at_home_bookings.sql:32:REVOKE ALL ON try_at_home_bookings FROM app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0046_try_at_home_bookings.sql:33:GRANT SELECT, INSERT, UPDATE ON try_at_home_bookings TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0046_try_at_home_bookings.sql:34:
+  C:\gs-stf-1\packages\db\src\migrations\0046_try_at_home_bookings.sql:35:CREATE INDEX idx_try_at_home_bookings_shop_status
+  C:\gs-stf-1\packages\db\src\migrations\0046_try_at_home_bookings.sql:36:  ON try_at_home_bookings(shop_id, status, requested_at DESC);
+  C:\gs-stf-1\packages\db\src\migrations\0046_try_at_home_bookings.sql:37:
+  C:\gs-stf-1\packages\db\src\migrations\0046_try_at_home_bookings.sql:38:CREATE INDEX idx_try_at_home_bookings_customer
+  C:\gs-stf-1\packages\db\src\migrations\0046_try_at_home_bookings.sql:39:  ON try_at_home_bookings(shop_id, customer_id);
+  C:\gs-stf-1\packages\db\src\migrations\0046_try_at_home_bookings.sql:40:
+  C:\gs-stf-1\packages\db\src\migrations\0046_try_at_home_bookings.sql:41:COMMIT;
+> C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:32:  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:33:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:34:
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:35:REVOKE ALL ON product_reviews FROM app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:36:GRANT SELECT, INSERT ON product_reviews TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:37:
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:38:-- Fast lookup by product (review section on product detail)
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:39:CREATE INDEX idx_product_reviews_product
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:40:  ON product_reviews(shop_id, product_id, created_at DESC);
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:41:
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:42:-- ============================================================================
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:43:-- 2. wishlists
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:44:-- ============================================================================
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:45:
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:46:CREATE TABLE wishlists (
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:47:  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:48:  shop_id     UUID        NOT NULL REFERENCES shops(id),
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:49:  customer_id UUID        NOT NULL REFERENCES customers(id),
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:50:  product_id  UUID        NOT NULL REFERENCES products(id),
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:51:  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:52:  CONSTRAINT uq_wishlist_customer_product UNIQUE (shop_id, customer_id, product_id)
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:53:);
+> C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:61:  USING      (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:62:  WITH CHECK (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:63:
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:64:REVOKE ALL ON wishlists FROM app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:65:GRANT SELECT, INSERT, DELETE ON wishlists TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:66:
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:67:CREATE INDEX idx_wishlists_customer
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:68:  ON wishlists(shop_id, customer_id, created_at DESC);
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:69:
+  C:\gs-stf-1\packages\db\src\migrations\0047_reviews_wishlist.sql:70:COMMIT;
+> C:\gs-stf-1\packages\db\src\migrations\0057_product_images_pipeline.sql:41:  USING       (shop_id = current_setting('app.current_shop_id', true)::uuid)
+> C:\gs-stf-1\packages\db\src\migrations\0057_product_images_pipeline.sql:42:  WITH CHECK  (shop_id = current_setting('app.current_shop_id', true)::uuid);
+  C:\gs-stf-1\packages\db\src\migrations\0057_product_images_pipeline.sql:43:
+  C:\gs-stf-1\packages\db\src\migrations\0057_product_images_pipeline.sql:44:GRANT SELECT, INSERT, UPDATE, DELETE ON product_images TO app_user;
+  C:\gs-stf-1\packages\db\src\migrations\0057_product_images_pipeline.sql:45:
+  C:\gs-stf-1\packages\db\src\migrations\0057_product_images_pipeline.sql:46:COMMIT;
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'pnpm --filter @goldsmith/db build' in C:\gs-stf-1
+ succeeded in 7463ms:
+.                                        |  WARN  Unsupported engine: wanted: {"node":">=20.11.0 <21"} (current: {"node":"v24.13.1","pnpm":"9.12.0"})
+
+> @goldsmith/db@0.0.0 build C:\gs-stf-1\packages\db
+> tsc -p tsconfig.build.json
+
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem packages/db/src -Recurse -Filter *.ts | Select-String -Pattern 'function runMigrations|runMigrations' -Context 0,80" in C:\gs-stf-1
+ succeeded in 2089ms:
+
+> packages\db\src\index.ts:2:export { runMigrations } from './migrate';
+  packages\db\src\index.ts:3:export { withTenantTx, withShopTx } from './tx';
+  packages\db\src\index.ts:4:export { tableRegistry } from './schema';
+  packages\db\src\index.ts:5:export type { TableMeta, TableKind } from './schema';
+> packages\db\src\migrate.ts:6:export async function runMigrations(pool: Pool, dir: string): Promise<void> {
+  packages\db\src\migrate.ts:7:  const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+  packages\db\src\migrate.ts:8:  const c = await pool.connect();
+  packages\db\src\migrate.ts:9:  try {
+  packages\db\src\migrate.ts:10:    await c.query(`
+  packages\db\src\migrate.ts:11:      CREATE TABLE IF NOT EXISTS __migrations (
+  packages\db\src\migrate.ts:12:        filename TEXT PRIMARY KEY,
+  packages\db\src\migrate.ts:13:        applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  packages\db\src\migrate.ts:14:      );
+  packages\db\src\migrate.ts:15:    `);
+  packages\db\src\migrate.ts:16:    for (const f of files) {
+  packages\db\src\migrate.ts:17:      const applied = await c.query('SELECT 1 FROM __migrations WHERE filename=$1', 
+[f]);
+  packages\db\src\migrate.ts:18:      if (applied.rowCount && applied.rowCount > 0) continue;
+  packages\db\src\migrate.ts:19:      logger.info({ filename: f }, 'applying migration');
+  packages\db\src\migrate.ts:20:      await c.query(readFileSync(join(dir, f), 'utf8'));
+  packages\db\src\migrate.ts:21:      await c.query('INSERT INTO __migrations (filename) VALUES ($1)', [f]);
+  packages\db\src\migrate.ts:22:    }
+  packages\db\src\migrate.ts:23:  } finally {
+  packages\db\src\migrate.ts:24:    c.release();
+  packages\db\src\migrate.ts:25:  }
+  packages\db\src\migrate.ts:26:}
+  packages\db\src\migrate.ts:27:
+  packages\db\src\migrate.ts:28:// CLI entry point — Windows-safe argv check
+  packages\db\src\migrate.ts:29:const invoked = process.argv[1] ?? '';
+  packages\db\src\migrate.ts:30:if (invoked.endsWith('migrate.ts') || invoked.endsWith('migrate.js')) {
+  packages\db\src\migrate.ts:31:  const pool = new Pool({ connectionString: process.env['DATABASE_URL'] });
+> packages\db\src\migrate.ts:32:  runMigrations(pool, join(process.cwd(), 'packages/db/src/migrations'))
+  packages\db\src\migrate.ts:33:    .then(() => pool.end())
+  packages\db\src\migrate.ts:34:    .catch((e) => { logger.error({ err: e }, 'migration failed'); process.exit(1); });
+  packages\db\src\migrate.ts:35:}
+
+
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content packages/db/src/schema/_helpers/tenantScopedTable.ts; Get-Content packages/db/src/schema/product-images.ts -ErrorAction SilentlyContinue' in C:\gs-stf-1
+ succeeded in 2151ms:
+import { pgTable, uuid, index, type PgColumnBuilderBase } from 'drizzle-orm/pg-core';
+import { tableRegistry } from './registry';
+
+type ColumnBuilders = Record<string, PgColumnBuilderBase>;
+
+// Drizzle 0.30.x stores columns under a Symbol; expose them via `._` for
+// compatibility with the test accessor pattern `t._.columns`.
+const drizzleColumnsSymbol = Symbol.for('drizzle:Columns');
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+export function tenantScopedTable<N extends string, C extends ColumnBuilders>(
+  name: N,
+  columns: C,
+  opts: { encryptedColumns?: (keyof C & string)[] } = {},
+) {
+  tableRegistry.register({
+    name,
+    kind: 'tenant',
+    encryptedColumns: opts.encryptedColumns ?? [],
+  });
+
+  const table = pgTable(
+    name,
+    {
+      shop_id: uuid('shop_id').notNull(),
+      ...columns,
+    } as C & { shop_id: ReturnType<typeof uuid> },
+    (t) => ({
+      shopIdIdx: index(`${name}_shop_id_idx`).on((t as Record<string, unknown>).shop_id as never),
+    }),
+  );
+
+  // Attach `_` accessor so tests (and tooling) can reach `t._.columns`
+  const cols = (table as unknown as Record<symbol, Record<string, unknown>>)[drizzleColumnsSymbol]
+    ?? Object.fromEntries(Object.keys(table).map((k) => [k, (table as Record<string, unknown>)[k]]));
+
+  Object.defineProperty(table, '_', {
+    enumerable: false,
+    configurable: true,
+    value: { columns: cols },
+  });
+
+  return table;
+}
+import { uuid, text, timestamp, integer, bigint } from 'drizzle-orm/pg-core';
+import { tenantScopedTable } from './_helpers/tenantScopedTable';
+import { products } from './products';
+import { shopUsers } from './shop-users';
+
+export const productImages = tenantScopedTable('product_images', {
+  id:                   uuid('id').primaryKey().defaultRandom(),
+  product_id:           uuid('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+  storage_key:          text('storage_key').notNull(),
+  alt_text:             text('alt_text'),
+  mime_type:            text('mime_type').notNull(),
+  byte_size:            bigint('byte_size', { mode: 'number' }).notNull(),
+  width:                integer('width').notNull(),
+  height:               integer('height').notNull(),
+  exif_stripped_at:     timestamp('exif_stripped_at', { withTimezone: true }).notNull(),
+  uploaded_by_user_id:  uuid('uploaded_by_user_id').notNull().references(() => shopUsers.id),
+  scan_status:          text('scan_status').notNull().default('clean'),
+  sort_order:           integer('sort_order').notNull().default(0),
+  // Per migration 0058: nullable; partial UNIQUE(product_id, idempotency_key)
+  // when NOT NULL â€” supports F7 idempotent upload retries.
+  idempotency_key:      text('idempotency_key'),
+  created_at:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updated_at:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem apps/api/test | Select-Object -ExpandProperty Name | Select-Object -First 80; Get-Content apps/api/package.json | Select-String -Pattern 'test:integration|vitest' -Context 1,2; Get-Content apps/api/vitest.config.* -ErrorAction SilentlyContinue" in C:\gs-stf-1
+ succeeded in 2548ms:
+compliance-gates
+settings
+audit-immutability.integration.test.ts
+audit-log-read.integration.test.ts
+auth-duplicate-phone.integration.test.ts
+auth-link-migration.integration.test.ts
+auth-me.integration.test.ts
+auth-missing-phone.integration.test.ts
+auth-rate-limit.integration.test.ts
+auth-repository.integration.test.ts
+auth-session.integration.test.ts
+auth-staff.integration.spec.ts
+auth-uid-mismatch.integration.test.ts
+auth-uid-race.integration.test.ts
+billing.integration.test.ts
+claim-conflict.integration.test.ts
+crm-isolation.integration.test.ts
+dead-stock.integration.test.ts
+drizzle-tenant-lookup.integration.test.ts
+endpoint-walker.e2e.test.ts
+estimate.integration.test.ts
+exception-filter.integration.test.ts
+firebase-jwt-strategy.unit.test.ts
+health.e2e.test.ts
+inventory-isolation.integration.test.ts
+inventory-valuation.integration.test.ts
+logout-all.integration.test.ts
+loyalty.integration.test.ts
+product-images-tenant-fk.integration.test.ts
+product-images.concurrency.spec.ts
+product-images.integration.spec.ts
+product-images.public-catalog.spec.ts
+product-images.rls.spec.ts
+product-images.tenant-isolation.spec.ts
+publish-product.integration.test.ts
+rates-chaos.test.ts
+rates-refresh.integration.test.ts
+rls-fail-loud.integration.test.ts
+search.integration.test.ts
+stock-movements.integration.test.ts
+storefront-schema-0066.integration.spec.ts
+storefront-schema-0068.integration.spec.ts
+tenant-boot.integration.test.ts
+vitest.setup.ts
+_auth-test-setup.ts
+
+      "lint": "eslint src test",
+>     "test": "vitest run",
+>     "test:integration": "vitest run --dir test",
+>     "test:e2e": "vitest run test/endpoint-walker.e2e.test.ts",
+      "build": "tsc -p tsconfig.build.json",
+      "start": "node dist/main.js"
+      "typescript": "^5.4.0",
+>     "vitest": "^1.4.0",
+      "zod": "^3.23.0"
+    }
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    setupFiles: ['./test/vitest.setup.ts'],
+    // endpoint-walker.e2e.test.ts requires a fresh Firebase Auth emulator and must
+    // run in isolation (pnpm test:e2e). When run as part of the full suite, prior
+    // auth test files leave the emulator in a shared state that causes token
+    // verification to fail. The test is also skipped in CI (CI=true guard in the
+    // test file). Run it standalone: pnpm --filter @goldsmith/api test:e2e
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/endpoint-walker.e2e.test.ts',
+    ],
+  },
+});
+
+
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content packages/db/src/pool.ts; Get-Content packages/db/src/tx.ts' in C:\gs-stf-1
+ succeeded in 3830ms:
+import type { Pool, PoolClient } from 'pg';
+import { tenantContext } from '@goldsmith/tenant-context';
+import { POISON_UUID } from './provider';
+
+export async function withTenantTx<T>(
+  pool: Pool,
+  fn: (tx: PoolClient) => Promise<T>,
+): Promise<T> {
+  const ctx = tenantContext.current();
+  if (!ctx) throw new Error('tenant.context_not_set');
+  return withShopTx(pool, ctx.shopId, fn);
+}
+
+export async function withShopTx<T>(
+  pool: Pool,
+  shopId: string,
+  fn: (tx: PoolClient) => Promise<T>,
+): Promise<T> {
+  if (typeof (pool as { connect?: unknown }).connect !== 'function') {
+    return fn(pool as unknown as PoolClient);
+  }
+
+  const client = await pool.connect();
+  if (!client || typeof (client as { query?: unknown }).query !== 'function') {
+    return fn(pool as unknown as PoolClient);
+  }
+  try {
+    await client.query('BEGIN');
+    await client.query('SET LOCAL ROLE app_user');
+    await client.query(`SET LOCAL app.current_shop_id = '${shopId}'`);
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw err;
+  } finally {
+    // Reset session-level shop context to poison default before returning to pool.
+    // SET LOCAL is rolled back with the transaction, but any prior session-level
+    // SET (e.g. from seed scripts) persists. Explicitly re-poison here so that
+    // a recycled connection never leaks tenant state to the next caller.
+    await client.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
+    client.release();
+  }
+}
+Get-Content : Cannot find path 'C:\gs-stf-1\packages\db\src\pool.ts' because it does not exist.
+At line:2 char:1
++ Get-Content packages/db/src/pool.ts; Get-Content packages/db/src/tx.t ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (C:\gs-stf-1\packages\db\src\pool.ts:String) [Get-Content], ItemNotFound 
+   Exception
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem packages/db/src -Filter *.ts | Select-String -Pattern 'createPool|PG_POOL' -Context 0,50" in C:\gs-stf-1
+ succeeded in 5354ms:
+
+> packages\db\src\index.ts:1:export { createPool, POISON_UUID } from './provider';
+  packages\db\src\index.ts:2:export { runMigrations } from './migrate';
+  packages\db\src\index.ts:3:export { withTenantTx, withShopTx } from './tx';
+  packages\db\src\index.ts:4:export { tableRegistry } from './schema';
+  packages\db\src\index.ts:5:export type { TableMeta, TableKind } from './schema';
+> packages\db\src\provider.ts:6:export function createPool(config: PoolConfig): Pool {
+  packages\db\src\provider.ts:7:  const pool = new Pool({
+> packages\db\src\provider.ts:8:    max: Number(process.env['PG_POOL_MAX'] ?? '10'),
+  packages\db\src\provider.ts:9:    idleTimeoutMillis: 30_000,
+  packages\db\src\provider.ts:10:    connectionTimeoutMillis: 5_000,
+  packages\db\src\provider.ts:11:    ...config,
+  packages\db\src\provider.ts:12:  });
+  packages\db\src\provider.ts:13:
+  packages\db\src\provider.ts:14:  pool.on('connect', (client) => {
+  packages\db\src\provider.ts:15:    client.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch((err) => {
+  packages\db\src\provider.ts:16:      logger.error({ err }, 'failed to set poison default on new client');
+  packages\db\src\provider.ts:17:    });
+  packages\db\src\provider.ts:18:  });
+  packages\db\src\provider.ts:19:
+  packages\db\src\provider.ts:20:  pool.on('error', (err) => {
+  packages\db\src\provider.ts:21:    logger.error({ err }, 'unexpected pg pool error');
+  packages\db\src\provider.ts:22:  });
+  packages\db\src\provider.ts:23:
+  packages\db\src\provider.ts:24:  return pool;
+  packages\db\src\provider.ts:25:}
+
+
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content packages/db/src/provider.ts' in C:\gs-stf-1
+ succeeded in 1558ms:
+import { Pool, type PoolConfig } from 'pg';
+import { logger } from '@goldsmith/observability';
+
+export const POISON_UUID = '00000000-0000-0000-0000-000000000000';
+
+export function createPool(config: PoolConfig): Pool {
+  const pool = new Pool({
+    max: Number(process.env['PG_POOL_MAX'] ?? '10'),
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+    ...config,
+  });
+
+  pool.on('connect', (client) => {
+    client.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch((err) => {
+      logger.error({ err }, 'failed to set poison default on new client');
+    });
+  });
+
+  pool.on('error', (err) => {
+    logger.error({ err }, 'unexpected pg pool error');
+  });
+
+  return pool;
+}
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path packages/db/src/migrations/*.sql -Pattern 'REVOKE ALL ON products|GRANT .*ON products|REVOKE .*ON products' -Context 0,2" in C:\gs-stf-1
+ succeeded in 1788ms:
+
+> packages\db\src\migrations\0014_inventory_base.sql:84:GRANT SELECT, INSERT, UPDATE ON products           TO app_user;
+  packages\db\src\migrations\0014_inventory_base.sql:85:GRANT SELECT, INSERT, UPDATE, DELETE ON product_images TO 
+app_user;
+
+
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path packages/db/src/migrations/*.sql -Pattern 'CREATE EXTENSION'" in C:\gs-stf-1
+ succeeded in 2232ms:
+
+packages\db\src\migrations\0001_initial_schema.sql:5:CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+packages\db\src\migrations\0036_customer_dpdpa_deletion.sql:41:CREATE EXTENSION IF NOT EXISTS pgcrypto;
+packages\db\src\migrations\0066_products_storefront_columns.sql:9:CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'docker --version' in C:\gs-stf-1
+ succeeded in 1704ms:
+Docker version 29.2.1, build a5c7197
+WARNING: Error loading config file: open C:\Users\alokt\.docker\config.json: Access is denied.
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "docker images postgres:15.6 --format '{{.Repository}}:{{.Tag}} {{.ID}}'" in C:\gs-stf-1
+2026-05-06T18:43:38.310724Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.9 seconds
+Output:
+WARNING: Error loading config file: open C:\Users\alokt\.docker\config.json: Access is denied.
+permission denied while trying to connect to the docker API at npipe:////./pipe/docker_engine
+
+ exited 1 in 1935ms:
+WARNING: Error loading config file: open C:\Users\alokt\.docker\config.json: Access is denied.
+permission denied while trying to connect to the docker API at npipe:////./pipe/docker_engine
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path packages/db/src/migrations/*.sql -Pattern 'ALTER TABLE products|ADD COLUMN .*products|quantity|cost_paise|huid_exemption' -Context 0,5" in C:\gs-stf-1
+ succeeded in 1566ms:
+
+> packages\db\src\migrations\0014_inventory_base.sql:52:ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+> packages\db\src\migrations\0014_inventory_base.sql:53:ALTER TABLE products FORCE ROW LEVEL SECURITY;
+  packages\db\src\migrations\0014_inventory_base.sql:54:DROP POLICY IF EXISTS rls_products_tenant_isolation ON 
+products;
+  packages\db\src\migrations\0014_inventory_base.sql:55:CREATE POLICY rls_products_tenant_isolation ON products
+  packages\db\src\migrations\0014_inventory_base.sql:56:  FOR ALL
+  packages\db\src\migrations\0014_inventory_base.sql:57:  USING  (shop_id = current_setting('app.current_shop_id', 
+true)::uuid)
+  packages\db\src\migrations\0014_inventory_base.sql:58:  WITH CHECK (shop_id = current_setting('app.current_shop_id', 
+true)::uuid);
+> packages\db\src\migrations\0021_stock_movements.sql:2:-- Append-only ledger of stock changes. Drives 
+products.quantity.
+  packages\db\src\migrations\0021_stock_movements.sql:3:-- DB-enforced immutability via trigger; compensating 
+movements correct mistakes.
+  packages\db\src\migrations\0021_stock_movements.sql:4:-- PMLA 5-year retention enforced at two layers:
+  packages\db\src\migrations\0021_stock_movements.sql:5:--   1. Immutability trigger with SECURITY DEFINER (rejects 
+UPDATE/DELETE for ALL roles)
+  packages\db\src\migrations\0021_stock_movements.sql:6:--   2. app_user grant restricted to SELECT + INSERT (denies 
+privilege at role level)
+  packages\db\src\migrations\0021_stock_movements.sql:7:
+> packages\db\src\migrations\0021_stock_movements.sql:10:-- 1. products.quantity column (drives oversell guard; 
+backfill by status)
+  packages\db\src\migrations\0021_stock_movements.sql:11:-- 1a. Add the column nullable so we can set it per-row 
+before locking it down.
+> packages\db\src\migrations\0021_stock_movements.sql:12:ALTER TABLE products
+> packages\db\src\migrations\0021_stock_movements.sql:13:  ADD COLUMN IF NOT EXISTS quantity INTEGER;
+  packages\db\src\migrations\0021_stock_movements.sql:14:
+  packages\db\src\migrations\0021_stock_movements.sql:15:-- 1b. Backfill by status: SOLD products are out of stock 
+(0); everything else
+  packages\db\src\migrations\0021_stock_movements.sql:16:--     is one unit per row (the existing one-product-per-row 
+inventory model).
+> packages\db\src\migrations\0021_stock_movements.sql:17:UPDATE products SET quantity = CASE WHEN status = 'SOLD' THEN 
+0 ELSE 1 END
+> packages\db\src\migrations\0021_stock_movements.sql:18:  WHERE quantity IS NULL;
+  packages\db\src\migrations\0021_stock_movements.sql:19:
+  packages\db\src\migrations\0021_stock_movements.sql:20:-- 1c. Lock the column down: NOT NULL, default 1 for new 
+inserts, non-negative.
+> packages\db\src\migrations\0021_stock_movements.sql:21:ALTER TABLE products
+> packages\db\src\migrations\0021_stock_movements.sql:22:  ALTER COLUMN quantity SET NOT NULL,
+> packages\db\src\migrations\0021_stock_movements.sql:23:  ALTER COLUMN quantity SET DEFAULT 1,
+> packages\db\src\migrations\0021_stock_movements.sql:24:  ADD CONSTRAINT products_quantity_nonneg CHECK (quantity >= 
+0);
+  packages\db\src\migrations\0021_stock_movements.sql:25:
+  packages\db\src\migrations\0021_stock_movements.sql:26:-- 2. stock_movements append-only ledger
+  packages\db\src\migrations\0021_stock_movements.sql:27:CREATE TABLE stock_movements (
+  packages\db\src\migrations\0021_stock_movements.sql:28:  id                  UUID PRIMARY KEY DEFAULT 
+gen_random_uuid(),
+  packages\db\src\migrations\0021_stock_movements.sql:29:  shop_id             UUID NOT NULL REFERENCES shops(id),
+> packages\db\src\migrations\0021_stock_movements.sql:36:  quantity_delta      INTEGER NOT NULL CHECK (quantity_delta 
+!= 0),
+  packages\db\src\migrations\0021_stock_movements.sql:37:  balance_before      INTEGER NOT NULL CHECK (balance_before 
+>= 0),
+  packages\db\src\migrations\0021_stock_movements.sql:38:  balance_after       INTEGER NOT NULL CHECK (balance_after  
+>= 0),
+  packages\db\src\migrations\0021_stock_movements.sql:39:  source_name         TEXT,
+  packages\db\src\migrations\0021_stock_movements.sql:40:  source_id           UUID,
+  packages\db\src\migrations\0021_stock_movements.sql:41:  -- recorded_by_user_id intentionally has no FK: the value 
+must persist for 5 yr
+> packages\db\src\migrations\0021_stock_movements.sql:49:  (type IN ('PURCHASE','ADJUSTMENT_IN','TRANSFER_IN')   AND 
+quantity_delta > 0) OR
+> packages\db\src\migrations\0021_stock_movements.sql:50:  (type IN ('SALE','ADJUSTMENT_OUT','TRANSFER_OUT')     AND 
+quantity_delta < 0)
+  packages\db\src\migrations\0021_stock_movements.sql:51:);
+  packages\db\src\migrations\0021_stock_movements.sql:52:
+  packages\db\src\migrations\0021_stock_movements.sql:53:-- 4. Per-row balance invariant: balance_after must equal 
+balance_before + delta
+  packages\db\src\migrations\0021_stock_movements.sql:54:ALTER TABLE stock_movements ADD CONSTRAINT 
+stock_movements_balance_consistent CHECK (
+> packages\db\src\migrations\0021_stock_movements.sql:55:  balance_after = balance_before + quantity_delta
+  packages\db\src\migrations\0021_stock_movements.sql:56:);
+  packages\db\src\migrations\0021_stock_movements.sql:57:
+  packages\db\src\migrations\0021_stock_movements.sql:58:-- 5. RLS — same pattern as audit_events / sync_change_log
+  packages\db\src\migrations\0021_stock_movements.sql:59:ALTER TABLE stock_movements ENABLE ROW LEVEL SECURITY;
+  packages\db\src\migrations\0021_stock_movements.sql:60:ALTER TABLE stock_movements FORCE ROW LEVEL SECURITY;
+> packages\db\src\migrations\0041_huid_exemption_category.sql:5:CREATE TYPE huid_exemption_category AS ENUM ('none', 
+'kundan_polki_jadau', 'under_2g');
+  packages\db\src\migrations\0041_huid_exemption_category.sql:6:
+> packages\db\src\migrations\0041_huid_exemption_category.sql:7:ALTER TABLE products
+> packages\db\src\migrations\0041_huid_exemption_category.sql:8:  ADD COLUMN huid_exemption_category 
+huid_exemption_category NOT NULL DEFAULT 'none';
+> packages\db\src\migrations\0058_product_images_tenant_fk.sql:15:ALTER TABLE products
+  packages\db\src\migrations\0058_product_images_tenant_fk.sql:16:  ADD CONSTRAINT products_shop_id_id_uniq UNIQUE 
+(shop_id, id);
+  packages\db\src\migrations\0058_product_images_tenant_fk.sql:17:
+  packages\db\src\migrations\0058_product_images_tenant_fk.sql:18:ALTER TABLE shop_users
+  packages\db\src\migrations\0058_product_images_tenant_fk.sql:19:  ADD CONSTRAINT shop_users_shop_id_id_uniq UNIQUE 
+(shop_id, id);
+  packages\db\src\migrations\0058_product_images_tenant_fk.sql:20:
+> packages\db\src\migrations\0066_products_storefront_columns.sql:11:ALTER TABLE products
+  packages\db\src\migrations\0066_products_storefront_columns.sql:12:  ADD COLUMN style                   TEXT
+  packages\db\src\migrations\0066_products_storefront_columns.sql:13:    CONSTRAINT products_style_check CHECK (style 
+IN (
+  packages\db\src\migrations\0066_products_storefront_columns.sql:14:      
+'ENGAGEMENT','COUPLE','DAILY_WEAR','JHUMKA','STUDS','HOOPS',
+  packages\db\src\migrations\0066_products_storefront_columns.sql:15:      
+'DROP','STATEMENT','TEMPLE','BRIDAL','OFFICE','KIDS'
+  packages\db\src\migrations\0066_products_storefront_columns.sql:16:    )),
+> packages\db\src\migrations\0066_products_storefront_columns.sql:75:-- ALTER TABLE products
+  packages\db\src\migrations\0066_products_storefront_columns.sql:76:--   DROP COLUMN IF EXISTS style,
+  packages\db\src\migrations\0066_products_storefront_columns.sql:77:--   DROP COLUMN IF EXISTS occasion,
+  packages\db\src\migrations\0066_products_storefront_columns.sql:78:--   DROP COLUMN IF EXISTS gift_persona,
+  packages\db\src\migrations\0066_products_storefront_columns.sql:79:--   DROP COLUMN IF EXISTS featured_score,
+  packages\db\src\migrations\0066_products_storefront_columns.sql:80:--   DROP COLUMN IF EXISTS sales_count_30d,
+> packages\db\src\migrations\0068_products_primary_image.sql:21:ALTER TABLE products
+  packages\db\src\migrations\0068_products_primary_image.sql:22:  ADD COLUMN primary_image_id UUID;
+  packages\db\src\migrations\0068_products_primary_image.sql:23:
+  packages\db\src\migrations\0068_products_primary_image.sql:24:-- Step 3: Composite FK — blocks cross-tenant image 
+association at the schema layer.
+  packages\db\src\migrations\0068_products_primary_image.sql:25:-- NO ON DELETE action: we cannot use ON DELETE SET 
+NULL on a composite FK that includes
+  packages\db\src\migrations\0068_products_primary_image.sql:26:-- shop_id (NOT NULL) because Postgres would NULL all 
+FK columns including shop_id.
+> packages\db\src\migrations\0068_products_primary_image.sql:30:ALTER TABLE products
+  packages\db\src\migrations\0068_products_primary_image.sql:31:  ADD CONSTRAINT products_shop_primary_image_fkey
+  packages\db\src\migrations\0068_products_primary_image.sql:32:  FOREIGN KEY (shop_id, primary_image_id)
+  packages\db\src\migrations\0068_products_primary_image.sql:33:  REFERENCES product_images(shop_id, id);
+  packages\db\src\migrations\0068_products_primary_image.sql:34:
+  packages\db\src\migrations\0068_products_primary_image.sql:35:-- Step 4: Backfill — set primary_image_id for 
+products that already have clean images.
+> packages\db\src\migrations\0068_products_primary_image.sql:127:-- ALTER TABLE products
+  packages\db\src\migrations\0068_products_primary_image.sql:128:--   DROP CONSTRAINT IF EXISTS 
+products_shop_primary_image_fkey,
+  packages\db\src\migrations\0068_products_primary_image.sql:129:--   DROP COLUMN IF EXISTS primary_image_id;
+  packages\db\src\migrations\0068_products_primary_image.sql:130:-- ALTER TABLE product_images
+  packages\db\src\migrations\0068_products_primary_image.sql:131:--   DROP CONSTRAINT IF EXISTS 
+product_images_shop_id_id_uniq;
+
+
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'pnpm --filter @goldsmith/api lint' in C:\gs-stf-1
+ succeeded in 28148ms:
+.                                        |  WARN  Unsupported engine: wanted: {"node":">=20.11.0 <21"} (current: {"node":"v24.13.1","pnpm":"9.12.0"})
+
+> @goldsmith/api@0.0.0 lint C:\gs-stf-1\apps\api
+> eslint src test
+
+
+C:\gs-stf-1\apps\api\src\modules\auth\auth.controller.ts
+  21:34  warning  'C:\gs-stf-1\packages\tenant-context\dist\index.d.ts' imported multiple times  import/no-duplicates
+  22:31  warning  'C:\gs-stf-1\packages\tenant-context\dist\index.d.ts' imported multiple times  import/no-duplicates
+
+C:\gs-stf-1\apps\api\src\modules\billing\story-5.6-pmla-block-ctr.spec.ts
+  2:42  warning  'C:\gs-stf-1\packages\compliance\dist\index.d.ts' imported multiple times  import/no-duplicates
+  3:49  warning  'C:\gs-stf-1\packages\compliance\dist\index.d.ts' imported multiple times  import/no-duplicates
+
+C:\gs-stf-1\apps\api\src\modules\crm\crm-search.service.ts
+   2:29  warning  'C:\gs-stf-1\packages\integrations\search\dist\index.d.ts' imported multiple times  import/no-duplicates
+  10:45  warning  'C:\gs-stf-1\packages\integrations\search\dist\index.d.ts' imported multiple times  import/no-duplicates
+
+C:\gs-stf-1\apps\api\src\modules\crm\crm.controller.ts
+   1:163  warning  'C:\gs-stf-1\node_modules\.pnpm\@nestjs+common@10.4.22_reflect-metadata@0.2.2_rxjs@7.8.2\node_modules\@nestjs\common\index.d.ts' imported multiple times  import/no-duplicates
+  12:24   warning  'C:\gs-stf-1\node_modules\.pnpm\@nestjs+common@10.4.22_reflect-metadata@0.2.2_rxjs@7.8.2\node_modules\@nestjs\common\index.d.ts' imported multiple times  import/no-duplicates
+
+C:\gs-stf-1\apps\api\src\modules\customer\customer.controller.ts
+  17:8   warning  'C:\gs-stf-1\node_modules\.pnpm\@nestjs+common@10.4.22_reflect-metadata@0.2.2_rxjs@7.8.2\node_modules\@nestjs\common\index.d.ts' imported multiple times  import/no-duplicates
+  19:21  warning  'C:\gs-stf-1\node_modules\.pnpm\@nestjs+common@10.4.22_reflect-metadata@0.2.2_rxjs@7.8.2\node_modules\@nestjs\common\index.d.ts' imported multiple times  import/no-duplicates
+
+C:\gs-stf-1\apps\api\src\modules\inventory\inventory.controller.ts
+  17:112  warning  'C:\gs-stf-1\packages\shared\dist\index.d.ts' imported multiple times  import/no-duplicates
+  18:125  warning  'C:\gs-stf-1\packages\shared\dist\index.d.ts' imported multiple times  import/no-duplicates
+  29:42   warning  'C:\gs-stf-1\packages\shared\dist\index.d.ts' imported multiple times  import/no-duplicates
+  30:67   warning  'C:\gs-stf-1\packages\shared\dist\index.d.ts' imported multiple times  import/no-duplicates
+
+C:\gs-stf-1\apps\api\src\modules\inventory\inventory.module.ts
+  3:24  warning  'C:\gs-stf-1\packages\queue\src\index.ts' imported multiple times  import/no-duplicates
+  5:49  warning  'C:\gs-stf-1\packages\queue\src\index.ts' imported multiple times  import/no-duplicates
+
+C:\gs-stf-1\apps\api\src\modules\inventory\inventory.search.service.ts
+  2:29  warning  'C:\gs-stf-1\packages\integrations\search\dist\index.d.ts' imported multiple times  import/no-duplicates
+  4:45  warning  'C:\gs-stf-1\packages\integrations\search\dist\index.d.ts' imported multiple times  import/no-duplicates
+
+C:\gs-stf-1\apps\api\src\modules\platform-admin\impersonation-token.spec.ts
+  50:19  warning  Caution: `jwt` also has a named export `sign`. Check if you meant to write `import {sign} from 'jsonwebtoken'` instead  import/no-named-as-default-member
+
+C:\gs-stf-1\apps\api\src\modules\platform-admin\impersonation-token.ts
+  30:10  warning  Caution: `jwt` also has a named export `sign`. Check if you meant to write `import {sign} from 'jsonwebtoken'` instead      import/no-named-as-default-member
+  40:15  warning  Caution: `jwt` also has a named export `verify`. Check if you meant to write `import {verify} from 'jsonwebtoken'` instead  import/no-named-as-default-member
+
+C:\gs-stf-1\apps\api\src\modules\pricing\pricing.service.spec.ts
+  10:47  warning  'C:\gs-stf-1\packages\integrations\rates\dist\index.d.ts' imported multiple times  import/no-duplicates
+  13:36  warning  'C:\gs-stf-1\packages\integrations\rates\dist\index.d.ts' imported multiple times  import/no-duplicates
+
+C:\gs-stf-1\apps\api\test\compliance-gates\b2b-gst.test.ts
+  2:8  warning  Using exported name 'Decimal' as identifier for default import  import/no-named-as-default
+
+C:\gs-stf-1\apps\api\test\inventory-valuation.integration.test.ts
+   1:59  warning  'C:\gs-stf-1\node_modules\.pnpm\vitest@1.6.1_@types+node@22.19.17_jsdom@24.1.3_lightningcss@1.27.0_terser@5.46.1\node_modules\vitest\dist\index.d.ts' imported multiple times  import/no-duplicates
+  16:20  warning  'C:\gs-stf-1\node_modules\.pnpm\vitest@1.6.1_@types+node@22.19.17_jsdom@24.1.3_lightningcss@1.27.0_terser@5.46.1\node_modules\vitest\dist\index.d.ts' imported multiple times  import/no-duplicates
+
+C:\gs-stf-1\apps\api\test\product-images.concurrency.spec.ts
+  26:36  warning  'C:\gs-stf-1\packages\integrations\storage\dist\index.d.ts' imported multiple times  import/no-duplicates
+  27:40  warning  'C:\gs-stf-1\packages\integrations\storage\dist\index.d.ts' imported multiple times  import/no-duplicates
+  28:45  warning  'C:\gs-stf-1\packages\integrations\storage\dist\index.d.ts' imported multiple times  import/no-duplicates
+
+C:\gs-stf-1\apps\api\test\product-images.tenant-isolation.spec.ts
+  27:36  warning  'C:\gs-stf-1\packages\integrations\storage\dist\index.d.ts' imported multiple times  import/no-duplicates
+  28:40  warning  'C:\gs-stf-1\packages\integrations\storage\dist\index.d.ts' imported multiple times  import/no-duplicates
+  29:45  warning  'C:\gs-stf-1\packages\integrations\storage\dist\index.d.ts' imported multiple times  import/no-duplicates
+
+C:\gs-stf-1\apps\api\test\rates-chaos.test.ts
+  15:50  warning  'C:\gs-stf-1\node_modules\.pnpm\vitest@1.6.1_@types+node@22.19.17_jsdom@24.1.3_lightningcss@1.27.0_terser@5.46.1\node_modules\vitest\dist\index.d.ts' imported multiple times  import/no-duplicates
+  29:20  warning  'C:\gs-stf-1\node_modules\.pnpm\vitest@1.6.1_@types+node@22.19.17_jsdom@24.1.3_lightningcss@1.27.0_terser@5.46.1\node_modules\vitest\dist\index.d.ts' imported multiple times  import/no-duplicates
+
+✖ 34 problems (0 errors, 34 warnings)
+  0 errors and 14 warnings potentially fixable with the `--fix` option.
+
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'pnpm --filter @goldsmith/api typecheck' in C:\gs-stf-1
+ succeeded in 16931ms:
+.                                        |  WARN  Unsupported engine: wanted: {"node":">=20.11.0 <21"} (current: {"node":"v24.13.1","pnpm":"9.12.0"})
+
+> @goldsmith/api@0.0.0 typecheck C:\gs-stf-1\apps\api
+> tsc --noEmit
+
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem apps/api/src -Recurse -Filter '*product-images*' | ForEach-Object { "'$_.FullName }; Select-String -Path apps/api/src/**/*.ts,apps/api/test/*.ts -Pattern '"'scan_status|scanStatus|sort_order|product_images' -Context 0,3 | Select-Object -First 200 | ForEach-Object {"'$_.ToString()}' in C:\gs-stf-1
+ succeeded in 1408ms:
+C:\gs-stf-1\apps\api\src\modules\inventory\product-images.controller.ts
+C:\gs-stf-1\apps\api\src\modules\inventory\product-images.repository.spec.ts
+C:\gs-stf-1\apps\api\src\modules\inventory\product-images.repository.ts
+C:\gs-stf-1\apps\api\src\modules\inventory\product-images.service.spec.ts
+C:\gs-stf-1\apps\api\src\modules\inventory\product-images.service.ts
+> C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:91:        `INSERT INTO product_images
+  C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:92:           (shop_id, product_id, storage_key, mime_type, byte_size, width, height,
+> C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:93:            exif_stripped_at, uploaded_by_user_id, scan_status, sort_order, idempotency_key)
+  C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:94:         VALUES
+  C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:95:           ($1, $2, $3, 'image/jpeg', 1234, 800, 600,
+  C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:96:            NOW(), $4, 'clean', 0, $5)
+> C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:113:    // Tenant A inserts product_images pointing at B's product; FK target lookup
+  C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:114:    // is `(shop_id=A, product_id=B's-id)` against products(shop_id, id) — no match.
+  C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:115:    await expect(insertImage(SHOP_A, productBId, userAId)).rejects.toMatchObject({ code: '23503' });
+  C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:116:  });
+> C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:130:            `UPDATE product_images SET product_id = $1 WHERE id = $2`,
+  C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:131:            [productBId, imgId],
+  C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:132:          ),
+  C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:133:        ),
+> C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:145:        tx.query(`UPDATE product_images SET product_id = $1 WHERE id = $2`, [productAId2, imgId]),
+  C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:146:      ),
+  C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:147:    );
+  C:\gs-stf-1\apps\api\test\product-images-tenant-fk.integration.test.ts:148:  });
+> C:\gs-stf-1\apps\api\test\product-images.concurrency.spec.ts:79:          `INSERT INTO product_images
+  C:\gs-stf-1\apps\api\test\product-images.concurrency.spec.ts:80:             (shop_id, product_id, storage_key, mime_type, byte_size, width, height,
+> C:\gs-stf-1\apps\api\test\product-images.concurrency.spec.ts:81:              exif_stripped_at, uploaded_by_user_id, scan_status, sort_order, idempotency_key)
+  C:\gs-stf-1\apps\api\test\product-images.concurrency.spec.ts:82:           VALUES
+  C:\gs-stf-1\apps\api\test\product-images.concurrency.spec.ts:83:             ($1, $2, $3, 'image/jpeg', 5000, 400, 300, NOW(), $4, 'clean', $5, NULL)`,
+  C:\gs-stf-1\apps\api\test\product-images.concurrency.spec.ts:84:          [
+> C:\gs-stf-1\apps\api\test\product-images.concurrency.spec.ts:196:        `SELECT COUNT(*)::text AS count FROM product_images WHERE product_id = $1`,
+  C:\gs-stf-1\apps\api\test\product-images.concurrency.spec.ts:197:        [productId],
+  C:\gs-stf-1\apps\api\test\product-images.concurrency.spec.ts:198:      );
+  C:\gs-stf-1\apps\api\test\product-images.concurrency.spec.ts:199:      expect(parseInt(countRes.rows[0]!.count, 10)).toBe(10);
+> C:\gs-stf-1\apps\api\test\product-images.integration.spec.ts:9: *   1. upload() returns ImageRow with storage_key, scan_status='clean', thumbnail_url.
+  C:\gs-stf-1\apps\api\test\product-images.integration.spec.ts:10: *   2. listForProduct() after upload returns length 1 (the inserted image).
+  C:\gs-stf-1\apps\api\test\product-images.integration.spec.ts:11: *   3. CatalogService.listPublicImages() (with mocked pool) returns PublicImageRow[]
+  C:\gs-stf-1\apps\api\test\product-images.integration.spec.ts:12: *      WITHOUT storage_key, WITH srcset/default_url/placeholder_url.
+> C:\gs-stf-1\apps\api\test\product-images.integration.spec.ts:187:  it('upload() returns ImageRow with storage_key, scan_status=clean, thumbnail_url', async () => {
+  C:\gs-stf-1\apps\api\test\product-images.integration.spec.ts:188:    const jpegBuf = await fakeJpeg(800, 600);
+  C:\gs-stf-1\apps\api\test\product-images.integration.spec.ts:189:
+  C:\gs-stf-1\apps\api\test\product-images.integration.spec.ts:190:    const row = await tenantContext.runWith(ctxA, () =>
+> C:\gs-stf-1\apps\api\test\product-images.integration.spec.ts:201:    expect(row).toHaveProperty('scan_status', 'clean');
+  C:\gs-stf-1\apps\api\test\product-images.integration.spec.ts:202:    expect(row).toHaveProperty('thumbnail_url');
+  C:\gs-stf-1\apps\api\test\product-images.integration.spec.ts:203:    expect(row.thumbnail_url).toContain('w-200');
+  C:\gs-stf-1\apps\api\test\product-images.integration.spec.ts:204:    expect(row.thumbnail_url).toContain('mb-0.25');
+> C:\gs-stf-1\apps\api\test\product-images.public-catalog.spec.ts:34:  scan_status: 'clean' as const,
+> C:\gs-stf-1\apps\api\test\product-images.public-catalog.spec.ts:35:  sort_order: 0,
+  C:\gs-stf-1\apps\api\test\product-images.public-catalog.spec.ts:36:  idempotency_key: null,
+  C:\gs-stf-1\apps\api\test\product-images.public-catalog.spec.ts:37:  created_at: new Date().toISOString(),
+  C:\gs-stf-1\apps\api\test\product-images.public-catalog.spec.ts:38:  updated_at: new Date().toISOString(),
+> C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:96:        `INSERT INTO product_images
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:97:           (shop_id, product_id, storage_key, mime_type, byte_size, width, height,
+> C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:98:            exif_stripped_at, uploaded_by_user_id, scan_status, sort_order, idempotency_key)
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:99:         VALUES
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:100:           ($1, $2, $3, 'image/jpeg', 12345, 800, 600, NOW(), $4, 'clean', 0, NULL)`,
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:101:        [
+> C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:121:describe('product_images RLS', () => {
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:122:  it('Tenant-A withTenantTx SELECT sees 0 rows for Tenant-B images', async () => {
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:123:    // withTenantTx sets SET LOCAL app.current_shop_id = SHOP_A before the query.
+> C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:124:    // RLS policy on product_images filters WHERE shop_id = current_setting('app.current_shop_id').
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:125:    // Tenant-A's GUC must not match Tenant-B's shop_id, so 0 rows returned.
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:126:    const rows = await tenantContext.runWith(ctxA, () =>
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:127:      withTenantTx(pool, async (tx) => {
+> C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:129:          `SELECT id FROM product_images WHERE shop_id = $1`,
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:130:          [SHOP_B],
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:131:        );
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:132:        return r.rows;
+> C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:138:  it('Tenant-A withTenantTx SELECT * FROM product_images sees 0 rows (RLS hides all B rows)', async () => {
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:139:    // Without any shop_id filter, RLS should still hide Tenant-B's rows when
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:140:    // the GUC is set to SHOP_A.
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:141:    const rows = await tenantContext.runWith(ctxA, () =>
+> C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:144:          `SELECT id FROM product_images`,
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:145:        );
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:146:        return r.rows;
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:147:      }),
+> C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:157:          `SELECT id FROM product_images WHERE shop_id = $1`,
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:158:          [SHOP_B],
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:159:        );
+  C:\gs-stf-1\apps\api\test\product-images.rls.spec.ts:160:        return r.rows;
+> C:\gs-stf-1\apps\api\test\product-images.tenant-isolation.spec.ts:12: *   - Zero product_images rows exist for Tenant-B's product after the attempt.
+  C:\gs-stf-1\apps\api\test\product-images.tenant-isolation.spec.ts:13: */
+  C:\gs-stf-1\apps\api\test\product-images.tenant-isolation.spec.ts:14:
+  C:\gs-stf-1\apps\api\test\product-images.tenant-isolation.spec.ts:15:import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+> C:\gs-stf-1\apps\api\test\product-images.tenant-isolation.spec.ts:169:  it('zero product_images rows inserted in Tenant-B product after cross-tenant attempt', async () => {
+  C:\gs-stf-1\apps\api\test\product-images.tenant-isolation.spec.ts:170:    // Use a raw connection (bypasses RLS) to verify no row was sneaked in.
+  C:\gs-stf-1\apps\api\test\product-images.tenant-isolation.spec.ts:171:    const c = await pool.connect();
+  C:\gs-stf-1\apps\api\test\product-images.tenant-isolation.spec.ts:172:    try {
+> C:\gs-stf-1\apps\api\test\product-images.tenant-isolation.spec.ts:174:        `SELECT COUNT(*)::text AS count FROM product_images WHERE product_id = $1 AND shop_id = $2`,
+  C:\gs-stf-1\apps\api\test\product-images.tenant-isolation.spec.ts:175:        [productBId, SHOP_B],
+  C:\gs-stf-1\apps\api\test\product-images.tenant-isolation.spec.ts:176:      );
+  C:\gs-stf-1\apps\api\test\product-images.tenant-isolation.spec.ts:177:      expect(parseInt(r.rows[0]!.count, 10)).toBe(0);
+> C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:31:    // Story 17.1 — product_images now has a NOT NULL FK to shop_users(id),
+  C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:32:    // so we seed the user before inserting the image row.
+  C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:33:    await pool.query(
+  C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:34:      `INSERT INTO shop_users (id, shop_id, phone, display_name, role, status)
+> C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:54:    // Seed a product_images row directly — the legacy insertImageRecord
+  C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:55:    // helper has been retired (Story 17.1 retires the upload-url path).
+  C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:56:    // Direct DML is acceptable in test setup; production writes go through
+  C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:57:    // ProductImagesService.upload.
+> C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:59:      `INSERT INTO product_images (
+  C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:60:         shop_id, product_id, storage_key, mime_type, byte_size,
+  C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:61:         width, height, exif_stripped_at, uploaded_by_user_id
+  C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:62:       ) VALUES ($1, $2, $3, 'image/jpeg', 12345, 800, 600, now(), $4)`,
+> C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:98:  it('countImages returns > 0 when a product_images row exists', async () => {
+  C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:99:    const count = await tenantContext.runWith(ctx, () =>
+  C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:100:      repo.countImages(productId),
+  C:\gs-stf-1\apps\api\test\publish-product.integration.test.ts:101:    );
+> C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:31:// Inserts a product_images row in the given tenant context.
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:32:const insertImage = (
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:33:  shopId: string,
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:34:  ctx: UnauthenticatedTenantContext,
+> C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:37:  opts: { sortOrder?: number; scanStatus?: string } = {},
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:38:) =>
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:39:  tenantContext.runWith(ctx, () =>
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:40:    withTenantTx(pool, async (tx) => {
+> C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:42:        `INSERT INTO product_images
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:43:           (shop_id, product_id, storage_key, mime_type, byte_size, width, height,
+> C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:44:            exif_stripped_at, uploaded_by_user_id, scan_status, sort_order)
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:45:         VALUES
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:46:           ($1, $2, $3, 'image/jpeg', 1234, 800, 600,
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:47:            NOW(), $4, $5, $6)
+> C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:54:          opts.scanStatus ?? 'clean',
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:55:          opts.sortOrder ?? 0,
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:56:        ],
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:57:      );
+> C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:149:    // Composite FK (shop_id, primary_image_id) → product_images(shop_id, id) requires
+> C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:150:    // that (SHOP_A, imageBId) exists in product_images — it does not → 23503.
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:151:    await expect(
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:152:      tenantContext.runWith(ctxA, () =>
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:153:        withTenantTx(pool, (tx) =>
+> C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:195:    // primary_image_id must be some image belonging to productA (the one with lowest sort_order)
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:196:    expect(r.rows[0]!.primary_image_id).toBeTruthy();
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:197:  });
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:198:
+> C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:229:        tx.query(`DELETE FROM product_images WHERE id = $1`, [onlyImageId]),
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:230:      ),
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:231:    );
+  C:\gs-stf-1\apps\api\test\storefront-schema-0068.integration.spec.ts:232:
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content packages/db/src/migrations/0068_products_primary_image.sql | ForEach-Object { '"'{0,4}: {1}' -f "'$i, $_; $i++ } | Select-Object -Index 80..115' in C:\gs-stf-1
+2026-05-06T18:45:17.032594Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.4 seconds
+Output:
+Select-Object : Cannot bind parameter 'Index'. Cannot convert value "80..115" to type "System.Int32". Error: "Input 
+string was not in a correct format."
+At line:2 char:151
++ ... bject { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Index 80..115
++                                                                   ~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) [Select-Object], ParameterBindingException
+    + FullyQualifiedErrorId : CannotConvertArgumentNoMessage,Microsoft.PowerShell.Commands.SelectObjectCommand
+ 
+
+ exited 1 in 1412ms:
+Select-Object : Cannot bind parameter 'Index'. Cannot convert value "80..115" to type "System.Int32". Error: "Input 
+string was not in a correct format."
+At line:2 char:151
++ ... bject { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Index 80..115
++                                                                   ~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) [Select-Object], ParameterBindingException
+    + FullyQualifiedErrorId : CannotConvertArgumentNoMessage,Microsoft.PowerShell.Commands.SelectObjectCommand
+ 
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content packages/db/src/migrations/0068_products_primary_image.sql | ForEach-Object { '"'{0,4}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 80 -First 40' in C:\gs-stf-1
+ succeeded in 1309ms:
+  81: LANGUAGE plpgsql
+  82: SECURITY INVOKER
+  83: AS $$
+  84: DECLARE
+  85:   v_product_id UUID;
+  86: BEGIN
+  87:   -- COALESCE handles both DELETE (NEW is null) and INSERT/UPDATE (OLD may be null).
+  88:   v_product_id := COALESCE(NEW.product_id, OLD.product_id);
+  89: 
+  90:   UPDATE products
+  91:      SET primary_image_id = (
+  92:        SELECT pi.id
+  93:          FROM product_images pi
+  94:         WHERE pi.product_id = v_product_id
+  95:           AND pi.scan_status = 'clean'
+  96:         ORDER BY pi.sort_order ASC, pi.created_at ASC
+  97:         LIMIT 1
+  98:      )
+  99:    WHERE id = v_product_id;
+ 100: 
+ 101:   -- AFTER trigger: return value is ignored by Postgres; RETURN NEW is conventional
+ 102:   -- (RETURN NULL would also work for AFTER triggers).
+ 103:   RETURN NEW;
+ 104: END;
+ 105: $$;
+ 106: 
+ 107: -- Fires after any of the four mutation events that can change which image is "primary":
+ 108: --   INSERT      â€” new image added; may become primary if it has the lowest sort_order
+ 109: --   DELETE      â€” image removed; BEFORE trigger clears FK first, AFTER recomputes
+ 110: --   UPDATE OF sort_order  â€” reorder can change which image is first
+ 111: --   UPDATE OF scan_status â€” an image becoming 'clean' or 'rejected' changes eligibility
+ 112: CREATE TRIGGER trg_maintain_products_primary_image
+ 113: AFTER INSERT OR DELETE OR UPDATE OF sort_order, scan_status
+ 114: ON product_images
+ 115: FOR EACH ROW
+ 116: EXECUTE FUNCTION maintain_products_primary_image();
+ 117: 
+ 118: COMMIT;
+ 119: 
+ 120: -- ---------------------------------------------------------------------------
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content apps/api/test/product-images-tenant-fk.integration.test.ts | ForEach-Object { '"'{0,4}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 70 -First 90' in C:\gs-stf-1
+ succeeded in 2216ms:
+  71:         return r.rows[0]!.id;
+  72:       }),
+  73:     );
+  74:   productAId  = await seedProduct(SHOP_A, userAId, 'A-001');
+  75:   productAId2 = await seedProduct(SHOP_A, userAId, 'A-002');
+  76:   productBId  = await seedProduct(SHOP_B, userBId, 'B-001');
+  77: }, 180_000);
+  78: 
+  79: afterAll(async () => { await pool?.end(); await container?.stop(); });
+  80: 
+  81: const insertImage = (
+  82:   shopId: string,
+  83:   productId: string,
+  84:   uploaderId: string,
+  85:   opts: { idempotencyKey?: string | null; storageKey?: string } = {},
+  86: ) => {
+  87:   const ctx = ctxFor(shopId, `s-${shopId.slice(0, 4)}`, 'X');
+  88:   return tenantContext.runWith(ctx, () =>
+  89:     withTenantTx(pool, async (tx) => {
+  90:       const r = await tx.query<{ id: string }>(
+  91:         `INSERT INTO product_images
+  92:            (shop_id, product_id, storage_key, mime_type, byte_size, width, height,
+  93:             exif_stripped_at, uploaded_by_user_id, scan_status, sort_order, idempotency_key)
+  94:          VALUES
+  95:            ($1, $2, $3, 'image/jpeg', 1234, 800, 600,
+  96:             NOW(), $4, 'clean', 0, $5)
+  97:          RETURNING id`,
+  98:         [
+  99:           shopId,
+ 100:           productId,
+ 101:           opts.storageKey ?? `tenant/${shopId}/products/${productId}/${Math.random().toString(36).slice(2)}.jpg`,
+ 102:           uploaderId,
+ 103:           opts.idempotencyKey ?? null,
+ 104:         ],
+ 105:       );
+ 106:       return r.rows[0]!.id;
+ 107:     }),
+ 108:   );
+ 109: };
+ 110: 
+ 111: describe('migration 0058: composite tenant FK + idempotency UNIQUE', () => {
+ 112:   it('rejects cross-tenant INSERT â€” product_id belongs to another shop', async () => {
+ 113:     // Tenant A inserts product_images pointing at B's product; FK target lookup
+ 114:     // is `(shop_id=A, product_id=B's-id)` against products(shop_id, id) â€” no match.
+ 115:     await expect(insertImage(SHOP_A, productBId, userAId)).rejects.toMatchObject({ code: '23503' });
+ 116:   });
+ 117: 
+ 118:   it('rejects cross-tenant INSERT â€” uploaded_by_user_id belongs to another shop', async () => {
+ 119:     await expect(insertImage(SHOP_A, productAId, userBId)).rejects.toMatchObject({ code: '23503' });
+ 120:   });
+ 121: 
+ 122:   it('rejects cross-tenant UPDATE of product_id', async () => {
+ 123:     // Insert a valid same-tenant row first.
+ 124:     const imgId = await insertImage(SHOP_A, productAId, userAId);
+ 125:     const ctxA = ctxFor(SHOP_A, 's-aaaa', 'X');
+ 126:     await expect(
+ 127:       tenantContext.runWith(ctxA, () =>
+ 128:         withTenantTx(pool, (tx) =>
+ 129:           tx.query(
+ 130:             `UPDATE product_images SET product_id = $1 WHERE id = $2`,
+ 131:             [productBId, imgId],
+ 132:           ),
+ 133:         ),
+ 134:       ),
+ 135:     ).rejects.toMatchObject({ code: '23503' });
+ 136:   });
+ 137: 
+ 138:   it('allows same-tenant INSERT and UPDATE (control)', async () => {
+ 139:     const imgId = await insertImage(SHOP_A, productAId, userAId);
+ 140:     expect(imgId).toMatch(/[0-9a-f-]{36}/);
+ 141:     // Same-tenant move from productA â†’ productA2 must succeed.
+ 142:     const ctxA = ctxFor(SHOP_A, 's-aaaa', 'X');
+ 143:     await tenantContext.runWith(ctxA, () =>
+ 144:       withTenantTx(pool, (tx) =>
+ 145:         tx.query(`UPDATE product_images SET product_id = $1 WHERE id = $2`, [productAId2, imgId]),
+ 146:       ),
+ 147:     );
+ 148:   });
+ 149: 
+ 150:   it('rejects duplicate idempotency_key on same product (F7 DB layer)', async () => {
+ 151:     await insertImage(SHOP_A, productAId, userAId, { idempotencyKey: 'KEY-DUP-1' });
+ 152:     await expect(
+ 153:       insertImage(SHOP_A, productAId, userAId, { idempotencyKey: 'KEY-DUP-1' }),
+ 154:     ).rejects.toMatchObject({ code: '23505' });
+ 155:   });
+ 156: 
+ 157:   it('allows same idempotency_key on different products (F7 scoping)', async () => {
+ 158:     const id1 = await insertImage(SHOP_A, productAId,  userAId, { idempotencyKey: 'KEY-SCOPE-1' });
+ 159:     const id2 = await insertImage(SHOP_A, productAId2, userAId, { idempotencyKey: 'KEY-SCOPE-1' });
+ 160:     expect(id1).not.toBe(id2);
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content apps/api/test/publish-product.integration.test.ts | ForEach-Object { '"'{0,4}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 45 -First 35' in C:\gs-stf-1
+ succeeded in 856ms:
+  46:         purity: '22K',
+  47:         grossWeightG: '10.0000',
+  48:         netWeightG: '9.0000',
+  49:         status: 'IN_STOCK',
+  50:       }),
+  51:     );
+  52:     productId = row.id;
+  53: 
+  54:     // Seed a product_images row directly â€” the legacy insertImageRecord
+  55:     // helper has been retired (Story 17.1 retires the upload-url path).
+  56:     // Direct DML is acceptable in test setup; production writes go through
+  57:     // ProductImagesService.upload.
+  58:     await pool.query(
+  59:       `INSERT INTO product_images (
+  60:          shop_id, product_id, storage_key, mime_type, byte_size,
+  61:          width, height, exif_stripped_at, uploaded_by_user_id
+  62:        ) VALUES ($1, $2, $3, 'image/jpeg', 12345, 800, 600, now(), $4)`,
+  63:       [SHOP_ID, productId, `tenant/${SHOP_ID}/products/${productId}/img1.jpg`, USER_ID],
+  64:     );
+  65:   }, 120_000);
+  66: 
+  67:   afterAll(async () => {
+  68:     await pool?.end();
+  69:     await container?.stop();
+  70:   });
+  71: 
+  72:   it('publish: sets published_at and published_by_user_id in DB', async () => {
+  73:     const row = await tenantContext.runWith(ctx, () =>
+  74:       repo.publishProduct(productId, USER_ID),
+  75:     );
+  76:     expect(row).not.toBeNull();
+  77:     expect(row!.published_at).toBeInstanceOf(Date);
+  78:     expect(row!.published_by_user_id).toBe(USER_ID);
+  79:   });
+  80: 
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem apps -Recurse -Filter '*catalog*service*.ts' | Select-Object -ExpandProperty FullName; Get-ChildItem apps/api/src -Recurse -Filter '*catalog*' | Select-Object -ExpandProperty FullName" in C:\gs-stf-1
+ succeeded in 2128ms:
+C:\gs-stf-1\apps\api\dist\modules\catalog\catalog.service.d.ts
+C:\gs-stf-1\apps\api\dist\modules\catalog\catalog.service.spec.d.ts
+C:\gs-stf-1\apps\api\src\modules\catalog\catalog.service.spec.ts
+C:\gs-stf-1\apps\api\src\modules\catalog\catalog.service.ts
+C:\gs-stf-1\apps\api\src\modules\catalog
+C:\gs-stf-1\apps\api\src\modules\catalog\catalog.controller.spec.ts
+C:\gs-stf-1\apps\api\src\modules\catalog\catalog.controller.ts
+C:\gs-stf-1\apps\api\src\modules\catalog\catalog.module.ts
+C:\gs-stf-1\apps\api\src\modules\catalog\catalog.service.spec.ts
+C:\gs-stf-1\apps\api\src\modules\catalog\catalog.service.ts
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content apps/api/src/modules/catalog/catalog.service.ts | Select-String -Pattern 'products|occasion|gift|primary_image|published|search|ANY|@>' -Context 0,4" in C:\gs-stf-1
+ succeeded in 1521ms:
+
+>   publishedAt:           string;
+  }
+  
+> export interface CatalogProductsResponse {
+    items: CatalogProduct[];
+    total: number;
+    page:  number;
+  }
+> export interface GetProductsParams {
+    shopId:      string;
+    categoryId?: string;
+>   search?:     string;
+    metal?:      string;
+    page:        number;
+    limit:       number;
+  }
+>   published_at:              Date;
+    total_count:               string;
+  }
+  
+  // ---------------------------------------------------------------------------
+>   async getProducts(params: GetProductsParams): Promise<CatalogProductsResponse> {
+>     const { shopId, categoryId, search, metal, page, limit } = params;
+      const safePage  = Math.max(1, page);
+      const safeLimit = Math.min(50, Math.max(1, limit));
+      const offset    = (safePage - 1) * safeLimit;
+  
+>     if (search && search.trim().length > 0) {
+>       const term = `%${search.trim()}%`;
+        queryParams.push(term);
+        const idx = queryParams.length;
+        whereExtra += ` AND (p.sku ILIKE $${idx} OR p.metal ILIKE $${idx} OR p.purity ILIKE $${idx})`;
+      }
+>     // EXISTS guard: suspended/terminated tenants must not surface products via the public
+>     // catalog. Without this, anyone holding a (cached) shop_id can keep fetching after
+      // platform admin suspends the tenant.
+      const sql = `
+        SELECT p.id, p.sku, p.metal, p.purity, p.category_id,
+               pc.name AS category_name,
+>              p.huid, p.huid_exemption_category, p.quantity, p.published_at,
+               COUNT(*) OVER() AS total_count
+>         FROM products p
+          LEFT JOIN product_categories pc ON pc.id = p.category_id
+         WHERE p.shop_id = $1
+           AND EXISTS (SELECT 1 FROM shops WHERE id = $1 AND status = 'ACTIVE')
+>          AND p.published_at IS NOT NULL
+           ${whereExtra}
+>        ORDER BY p.published_at DESC
+         LIMIT $${limitIdx} OFFSET $${offsetIdx}
+      `;
+  
+      const [ratesResult, scopedResult] = await Promise.all([
+>         const [mcResult, productsResult] = await Promise.all([
+            tx.query<{ making_charges_json: MakingChargeConfig[] | null }>(
+              `SELECT making_charges_json FROM shop_settings WHERE shop_id = $1`,
+              [shopId],
+            ),
+>         return { mcResult, productsResult };
+        }),
+      ]);
+>     const { mcResult, productsResult } = scopedResult;
+  
+      const configs: MakingChargeConfig[] = mcResult.rows[0]?.making_charges_json ?? MAKING_CHARGE_DEFAULTS;
+      const mcMap = new Map<string, string>(configs.map((c) => [c.category, c.value]));
+  
+>     const total = productsResult.rows.length > 0 ? Number(productsResult.rows[0].total_count) : 0;
+  
+>     const items: CatalogProduct[] = productsResult.rows.map((row) =>
+        this.computeCatalogProduct(row, ratesResult, mcMap),
+      );
+  
+      return { items, total, page: safePage };
+>                     p.huid, p.huid_exemption_category, p.quantity, p.published_at,
+                      '1' AS total_count
+>                FROM products p
+                LEFT JOIN product_categories pc ON pc.id = p.category_id
+               WHERE p.id = $1 AND p.shop_id = $2
+                 AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
+>                AND p.published_at IS NOT NULL`,
+              [id, shopId],
+            ),
+          ]);
+          return { mcResult, productResult };
+>         `SELECT huid FROM products
+            WHERE id = $1 AND shop_id = $2
+              AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
+>             AND published_at IS NOT NULL`,
+          [productId, shopId],
+        ),
+      );
+      if (r.rows.length === 0) {
+>       publishedAt:           row.published_at.toISOString(),
+      };
+    }
+  
+    // ---------------------------------------------------------------------------
+>     // Only show images for published products of ACTIVE shops (security guard).
+>     // "Published" = products.published_at IS NOT NULL (set by publishProduct() in
+>     // inventory.service). The products.status column is independent of publish state
+      // and must not be used as the publish gate.
+      const r = await withShopTx(this.pool, shopId, async (tx) =>
+        tx.query<{
+          id: string; alt_text: string | null; width: number; height: number; storage_key: string;
+>            JOIN products p ON p.id = pi.product_id
+            WHERE pi.product_id = $1
+              AND pi.shop_id = $2
+>             AND p.published_at IS NOT NULL
+              AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
+            ORDER BY pi.sort_order ASC, pi.created_at ASC`,
+          [productId, shopId],
+        ),
+
+
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content apps/api/src/modules/inventory/product-images.repository.ts; Get-Content apps/api/src/modules/inventory/product-images.service.ts | Select-String -Pattern 'product_id|sort_order|scan_status|DELETE|UPDATE' -Context 1,3" in C:\gs-stf-1
+ succeeded in 3330ms:
+import { Inject, Injectable } from '@nestjs/common';
+import type { Pool, PoolClient } from 'pg';
+import { withTenantTx } from '@goldsmith/db';
+import { tenantContext } from '@goldsmith/tenant-context';
+
+type Tx = Pick<PoolClient, 'query'>;
+
+export type ImageRow = {
+  id: string;
+  shop_id: string;
+  product_id: string;
+  storage_key: string;
+  alt_text: string | null;
+  mime_type: string;
+  byte_size: number;
+  width: number;
+  height: number;
+  exif_stripped_at: string;
+  uploaded_by_user_id: string;
+  scan_status: 'pending' | 'clean' | 'rejected';
+  sort_order: number;
+  idempotency_key: string | null;
+  created_at: string;
+  updated_at: string;
+  /** F6-server (Codex P2): server-built thumbnail URL via ImageKit builder.
+   *  Mobile consumes this directly â€” no client-side URL construction. */
+  thumbnail_url: string;
+};
+
+export type InsertImageInput = {
+  productId: string;
+  storageKey: string;
+  mimeType: string;
+  byteSize: number;
+  width: number;
+  height: number;
+  sortOrder: number;
+  altText: string | null;
+  uploadedByUserId: string;
+  idempotencyKey: string | null;
+};
+
+const SELECT_COLS = `
+  id, shop_id, product_id, storage_key, alt_text, mime_type, byte_size,
+  width, height, exif_stripped_at, uploaded_by_user_id, scan_status,
+  sort_order, idempotency_key, created_at, updated_at
+`.trim();
+
+@Injectable()
+export class ProductImagesRepository {
+  constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
+
+  /**
+   * Tenant-scoped product existence check + pessimistic row lock.
+   * Returns null on miss (cross-tenant attempt OR not found).
+   *
+   * The FOR UPDATE lock serializes concurrent uploads for the same product,
+   * making the 10-image cap inviolable. The composite FK from migration 0058
+   * is the schema-layer defense; this method is the explicit serialization
+   * point inside the upload transaction.
+   *
+   * Per ADR-0005 the shop scope comes from `tenantContext`, not a parameter.
+   */
+  async lockProductForTenant(tx: Tx, productId: string): Promise<{ id: string } | null> {
+    const { shopId } = tenantContext.requireCurrent();
+    const r = await tx.query<{ id: string }>(
+      `SELECT id FROM products WHERE id = $1 AND shop_id = $2 FOR UPDATE`,
+      [productId, shopId],
+    );
+    return r.rows[0] ?? null;
+  }
+
+  async countImagesInTx(tx: Tx, productId: string): Promise<number> {
+    const r = await tx.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM product_images WHERE product_id = $1`,
+      [productId],
+    );
+    return parseInt(r.rows[0]?.count ?? '0', 10);
+  }
+
+  async nextSortOrderInTx(tx: Tx, productId: string): Promise<number> {
+    const r = await tx.query<{ next: number }>(
+      `SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM product_images WHERE product_id = $1`,
+      [productId],
+    );
+    return r.rows[0]?.next ?? 0;
+  }
+
+  /**
+   * F7 service-layer idempotency lookup. Caller (ProductImagesService.upload)
+   * runs this BEFORE attempting INSERT; if it finds a row, returns it as the
+   * replay. Partial UNIQUE index `product_images_idempotency_uniq` (migration
+   * 0058) is the race-loser backstop.
+   */
+  async findByIdempotencyKeyInTx(tx: Tx, productId: string, idempotencyKey: string): Promise<ImageRow | null> {
+    const r = await tx.query<ImageRow>(
+      `SELECT ${SELECT_COLS}
+         FROM product_images
+        WHERE product_id = $1 AND idempotency_key = $2
+        LIMIT 1`,
+      [productId, idempotencyKey],
+    );
+    return r.rows[0] ?? null;
+  }
+
+  async insertImageInTx(tx: Tx, input: InsertImageInput): Promise<ImageRow> {
+    const { shopId } = tenantContext.requireCurrent();
+    const r = await tx.query<ImageRow>(
+      `INSERT INTO product_images
+         (shop_id, product_id, storage_key, alt_text, mime_type, byte_size,
+          width, height, exif_stripped_at, uploaded_by_user_id, scan_status,
+          sort_order, idempotency_key)
+       VALUES
+         ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, 'clean', $10, $11)
+       RETURNING ${SELECT_COLS}`,
+      [
+        shopId, input.productId, input.storageKey, input.altText,
+        input.mimeType, input.byteSize, input.width, input.height,
+        input.uploadedByUserId, input.sortOrder, input.idempotencyKey,
+      ],
+    );
+    return r.rows[0]!;
+  }
+
+  /** Public read path. RLS scopes by shop_id via withTenantTx. */
+  async listForProduct(productId: string): Promise<ImageRow[]> {
+    return withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query<ImageRow>(
+        `SELECT ${SELECT_COLS}
+           FROM product_images
+          WHERE product_id = $1
+          ORDER BY sort_order ASC, created_at ASC`,
+        [productId],
+      );
+      return r.rows;
+    });
+  }
+
+  async deleteImage(productId: string, imageId: string): Promise<{ storageKey: string } | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query<{ storage_key: string }>(
+        `DELETE FROM product_images
+          WHERE id = $1 AND product_id = $2
+          RETURNING storage_key`,
+        [imageId, productId],
+      );
+      const row = r.rows[0];
+      return row ? { storageKey: row.storage_key } : null;
+    });
+  }
+
+  async setSortOrders(productId: string, orderedIds: string[]): Promise<ImageRow[]> {
+    return withTenantTx(this.pool, async (tx) => {
+      // Lock the product's images. The set must match exactly: every image of
+      // the product is in orderedIds and no extras. Mismatch â†’ return [] â†’
+      // service throws ORDER_LIST_MISMATCH (400).
+      const existing = await tx.query<{ id: string }>(
+        `SELECT id FROM product_images WHERE product_id = $1 FOR UPDATE`,
+        [productId],
+      );
+      const existingSet = new Set(existing.rows.map((r) => r.id));
+      const orderedSet = new Set(orderedIds);
+      if (existingSet.size !== orderedSet.size) return [];
+      for (const id of existingSet) if (!orderedSet.has(id)) return [];
+
+      // Atomic update: each row gets its new sort_order based on array index.
+      for (let i = 0; i < orderedIds.length; i++) {
+        await tx.query(
+          `UPDATE product_images
+              SET sort_order = $1, updated_at = NOW()
+            WHERE id = $2 AND product_id = $3`,
+          [i, orderedIds[i], productId],
+        );
+      }
+      const r = await tx.query<ImageRow>(
+        `SELECT ${SELECT_COLS}
+           FROM product_images
+          WHERE product_id = $1
+          ORDER BY sort_order ASC`,
+        [productId],
+      );
+      return r.rows;
+    });
+  }
+
+  async setAltText(productId: string, imageId: string, altText: string | null): Promise<ImageRow | null> {
+    return withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query<ImageRow>(
+        `UPDATE product_images
+            SET alt_text = $1, updated_at = NOW()
+          WHERE id = $2 AND product_id = $3
+          RETURNING ${SELECT_COLS}`,
+        [altText, imageId, productId],
+      );
+      return r.rows[0] ?? null;
+    });
+  }
+}
+
+                // stale (the winner's row references its own distinct key). Best-
+>               // effort delete; the outer try/catch only fires on thrown errors,
+                // so without this the loser's blob would leak. Detached promise on
+                // purpose â€” failures are non-blocking and a reconcile sweep can
+                // mop up persistent orphans.
+>               this.storage.deleteBlob(storageKey).catch(() => undefined);
+                return winner;
+              }
+            }
+        // Best-effort orphan cleanup. If the tx never committed, the storage blob
+>       // we uploaded above has no DB row â€” delete it.
+>       this.storage.deleteBlob(storageKey).catch(() => undefined);
+        throw err;
+      }
+    }
+  
+>   async delete(productId: string, imageId: string): Promise<void> {
+      const _ctx = tenantContext.requireCurrent();
+      const userId = _ctx.authenticated ? _ctx.userId : undefined;
+>     const result = await this.repo.deleteImage(productId, imageId);
+      if (!result) {
+        throw new NotFoundException({ code: 'IMAGE_NOT_FOUND' });
+      }
+      // would be worse â€” DB row is already gone before we try the blob.
+>     this.storage.deleteBlob(result.storageKey).catch(() => undefined);
+      void auditLog(this.pool, {
+>       action: AuditAction.PRODUCT_IMAGE_DELETED,
+        subjectType: 'product_image',
+        subjectId: imageId,
+        actorUserId: userId,
+      // The repo's set-equality check (size + membership) admits ['img-1','img-1']
+>     // for a single-image product, which would then UPDATE the same row twice
+>     // with conflicting sort_order values. Guard with Set comparison up front.
+      const unique = new Set(orderedIds);
+      if (unique.size !== orderedIds.length) {
+        throw new BadRequestException({ code: 'ORDER_LIST_DUPLICATES' });
+
+
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content packages/db/src/migrations/0013_shops_revoke_app_user_write.sql' in C:\gs-stf-1
+ succeeded in 1148ms:
+-- 0013_shops_revoke_app_user_write.sql
+-- The `shops` table is platform-global (SELECT only, no RLS) for reads, but
+-- shopkeepers must be able to UPDATE their own shop row (profile updates).
+-- To prevent cross-tenant UPDATE leakage we enable RLS on shops for UPDATE
+-- only: app_user may only UPDATE the row whose id matches app.current_shop_id.
+--
+-- INSERT and DELETE remain superuser/platform_admin only.
+-- SELECT remains unrestricted (platform-global read is intentional â€” auth
+-- lookups need to read all shops).
+
+-- Column-level UPDATE on shops for app_user (shopkeeper profile edits only).
+-- Sensitive columns (slug, status, kek_key_arn, config) are intentionally
+-- excluded â€” only platform_admin can change those.
+GRANT UPDATE (
+  display_name, address_json, gstin, bis_registration, contact_phone,
+  operating_hours_json, about_text, logo_url, years_in_business, updated_at
+) ON shops TO app_user;
+
+-- Enable RLS on shops and force it even for table owners.
+ALTER TABLE shops ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shops FORCE ROW LEVEL SECURITY;
+
+-- SELECT: platform-global â€” app_user can read any shop (auth lookups).
+DROP POLICY IF EXISTS rls_shops_select ON shops;
+CREATE POLICY rls_shops_select ON shops
+  FOR SELECT
+  USING (true);
+
+-- UPDATE: tenant-scoped â€” app_user may only UPDATE its own shop row.
+DROP POLICY IF EXISTS rls_shops_update ON shops;
+CREATE POLICY rls_shops_update ON shops
+  FOR UPDATE
+  USING (id = current_setting('app.current_shop_id', true)::uuid)
+  WITH CHECK (id = current_setting('app.current_shop_id', true)::uuid);
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content packages/db/src/migrations/0066_products_storefront_columns.sql | ForEach-Object { '"'{0,4}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 25 -First 35' in C:\gs-stf-1
+ succeeded in 3776ms:
+  26: 
+  27: -- Style: partial BTree â€” used by /products?style=JHUMKA filter.
+  28: CREATE INDEX products_style_idx
+  29:   ON products (shop_id, style)
+  30:   WHERE published_at IS NOT NULL;
+  31: 
+  32: -- Occasion + gift_persona: GIN â€” used by ANY(occasion) / ANY(gift_persona) filters.
+  33: CREATE INDEX products_occasion_gin_idx
+  34:   ON products USING GIN (occasion);
+  35: 
+  36: CREATE INDEX products_gift_persona_gin_idx
+  37:   ON products USING GIN (gift_persona);
+  38: 
+  39: -- Featured: partial BTree â€” used by /catalog/products/featured endpoint.
+  40: CREATE INDEX products_featured_idx
+  41:   ON products (shop_id, featured_score DESC)
+  42:   WHERE published_at IS NOT NULL AND featured_score > 0;
+  43: 
+  44: -- Price snapshot: partial BTree â€” used by priceMin/priceMax filter.
+  45: CREATE INDEX products_price_snapshot_idx
+  46:   ON products (shop_id, price_snapshot_paise)
+  47:   WHERE price_snapshot_paise IS NOT NULL AND published_at IS NOT NULL;
+  48: 
+  49: -- Top-sellers: expression BTree â€” ORDER BY (sales_count_30d * 2 + view_count_30d) DESC.
+  50: CREATE INDEX products_top_sellers_idx
+  51:   ON products (shop_id, (sales_count_30d * 2 + view_count_30d) DESC, published_at DESC)
+  52:   WHERE published_at IS NOT NULL;
+  53: 
+  54: -- Trigram search: GIN gin_trgm_ops â€” WHERE (...concatenation...) % 'query'.
+  55: -- Non-partial so it is unambiguously chosen by the planner for trgm similarity
+  56: -- queries regardless of other partial BTree indexes on this table.
+  57: CREATE INDEX products_search_trgm_idx
+  58:   ON products USING GIN (
+  59:     (coalesce(sku, '') || ' ' || coalesce(metal, '') || ' ' || coalesce(purity, ''))
+  60:     gin_trgm_ops
+
+codex
+The schema migration leaves `products.primary_image_id` stale for same-tenant image reparenting, an update path already allowed by existing product_images constraints/tests. This can make products display the wrong primary image and interfere with later image deletion.
+
+Review comment:
+
+- [P2] Recompute primary images when images move products — C:\gs-stf-1\packages\db\src\migrations\0068_products_primary_image.sql:112-114
+  When an existing clean image is reparented inside the same shop (which the current product-images FK tests allow via `UPDATE product_images SET product_id = ...`), the INSERT trigger has already made it the old product's primary. This trigger doesn't fire for `product_id` updates, so the old product keeps pointing at an image now owned by another product and later deletes can be blocked by the FK. Include `product_id` changes and recompute both OLD and NEW products.
+2026-05-06T18:49:26.471838Z ERROR codex_core::session: failed to record rollout items: thread 019dfe97-d31d-7a33-8c4c-16995fed6826 not found
+2026-05-06T18:49:26.696044Z ERROR codex_core::session: failed to record rollout items: thread 019dfe97-d288-7eb1-881b-289778a3c60d not found
+The schema migration leaves `products.primary_image_id` stale for same-tenant image reparenting, an update path already allowed by existing product_images constraints/tests. This can make products display the wrong primary image and interfere with later image deletion.
+
+Review comment:
+
+- [P2] Recompute primary images when images move products — C:\gs-stf-1\packages\db\src\migrations\0068_products_primary_image.sql:112-114
+  When an existing clean image is reparented inside the same shop (which the current product-images FK tests allow via `UPDATE product_images SET product_id = ...`), the INSERT trigger has already made it the old product's primary. This trigger doesn't fire for `product_id` updates, so the old product keeps pointing at an image now owned by another product and later deletes can be blocked by the FK. Include `product_id` changes and recompute both OLD and NEW products.

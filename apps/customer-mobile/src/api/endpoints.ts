@@ -1,6 +1,31 @@
 import axios from 'axios';
 import { api } from './client';
 import type { Tenant, TenantBranding } from '../stores/tenantStore';
+import type {
+  PublicRateEntry,
+  PublicRatesResponse,
+  EstimatedPrice,
+  CatalogProduct,
+  CatalogProductsResponse,
+  HuidVerifyResult,
+  ReviewItem,
+  ReviewsResponse,
+  PublicReviewsResponse,
+} from '@goldsmith/customer-shared';
+
+// CatalogEstimatedPrice was the mobile-side name for EstimatedPrice.
+// Re-export as alias to avoid breaking existing mobile code that references it.
+export type { EstimatedPrice as CatalogEstimatedPrice } from '@goldsmith/customer-shared';
+export type {
+  PublicRateEntry,
+  PublicRatesResponse,
+  CatalogProduct,
+  CatalogProductsResponse,
+  HuidVerifyResult,
+  ReviewItem,
+  ReviewsResponse,
+  PublicReviewsResponse,
+} from '@goldsmith/customer-shared';
 
 interface TenantBootApiResponse {
   id: string;
@@ -8,63 +33,9 @@ interface TenantBootApiResponse {
   config: Record<string, unknown> | null;
 }
 
-export interface PublicRateEntry {
-  perGramRupees: string;
-  formattedINR: string;
-  fetchedAt: string;
-}
-export interface PublicRatesResponse {
-  GOLD_24K: PublicRateEntry;
-  GOLD_22K: PublicRateEntry;
-  SILVER_999: PublicRateEntry;
-  stale: boolean;
-  source: string;
-  refreshedAt: string;
-}
-
 export interface PublicProduct {
   id: string;
   name: string;
-}
-
-export interface CatalogEstimatedPrice {
-  totalFormatted: string;
-  totalPaise:     string;
-  breakdown: {
-    goldValuePaise:    string;
-    makingChargePaise: string;
-    gstMetalPaise:     string;
-    gstMakingPaise:    string;
-  };
-}
-
-export interface CatalogProduct {
-  id:                    string;
-  sku:                   string;
-  metal:                 string;
-  purity:                string;
-  categoryId:            string | null;
-  categoryName:          string | null;
-  grossWeightG:          string;
-  netWeightG:            string;
-  huid:                  string | null;
-  huidExemptionCategory: string;
-  quantity:              number;
-  priceAvailable:        boolean;
-  estimatedPrice?:       CatalogEstimatedPrice;
-  publishedAt:           string;
-}
-
-export interface CatalogProductsResponse {
-  items: CatalogProduct[];
-  total: number;
-  page:  number;
-}
-
-export interface HuidVerifyResult {
-  verified:       boolean;
-  huid:           string;
-  certifyingBody: string;
 }
 
 export interface PublicProductsResponse {
@@ -133,19 +104,47 @@ export async function listPublicProducts(opts: { limit?: number } = {}): Promise
 }
 
 export async function getCatalogProducts(opts: {
-  metal?:      string;
-  search?:     string;
-  categoryId?: string;
-  page?:       number;
-  limit?:      number;
+  metal?:       string;
+  purity?:      string;
+  search?:      string;
+  categoryId?:  string;
+  priceMin?:    number;
+  priceMax?:    number;
+  inStockOnly?: boolean;
+  style?:       string;
+  occasion?:    string;
+  sort?:        string;
+  page?:        number;
+  limit?:       number;
 } = {}): Promise<CatalogProductsResponse> {
-  const params: Record<string, string | number> = {};
-  if (opts.metal)      params['metal']      = opts.metal;
-  if (opts.search)     params['search']     = opts.search;
-  if (opts.categoryId) params['categoryId'] = opts.categoryId;
-  if (opts.page)       params['page']       = opts.page;
-  if (opts.limit)      params['limit']      = opts.limit;
+  const params: Record<string, string | number | boolean> = {};
+  if (opts.metal)                    params['metal']       = opts.metal;
+  if (opts.purity)                   params['purity']      = opts.purity;
+  if (opts.search)                   params['search']      = opts.search;
+  if (opts.categoryId)               params['categoryId']  = opts.categoryId;
+  if (opts.priceMin !== undefined)   params['priceMin']    = opts.priceMin;
+  if (opts.priceMax !== undefined)   params['priceMax']    = opts.priceMax;
+  if (opts.inStockOnly)              params['inStockOnly'] = true;
+  if (opts.style)                    params['style']       = opts.style;
+  if (opts.occasion)                 params['occasion']    = opts.occasion;
+  if (opts.sort)                     params['sort']        = opts.sort;
+  if (opts.page)                     params['page']        = opts.page;
+  if (opts.limit)                    params['limit']       = opts.limit;
   const res = await api.get<CatalogProductsResponse>('/api/v1/catalog/products', { params });
+  return res.data;
+}
+
+export async function getProductRecommendations(productId: string): Promise<CatalogProductsResponse> {
+  const res = await api.get<CatalogProductsResponse>(
+    `/api/v1/catalog/products/${productId}/recommendations`,
+  );
+  return res.data;
+}
+
+export async function getCatalogProductReviews(productId: string): Promise<PublicReviewsResponse> {
+  const res = await api.get<PublicReviewsResponse>(
+    `/api/v1/catalog/products/${productId}/reviews`,
+  );
   return res.data;
 }
 
@@ -250,20 +249,6 @@ export interface WishlistItem {
   netWeightG:   string;
   huid:         string | null;
   addedAt:      string;
-}
-
-export interface ReviewItem {
-  id:                string;
-  rating:            number;
-  reviewText:        string | null;
-  customerFirstName: string | null;
-  createdAt:         string;
-}
-
-export interface ReviewsResponse {
-  reviews:       ReviewItem[];
-  averageRating: number | null;
-  total:         number;
 }
 
 export async function getProductReviews(productId: string): Promise<ReviewsResponse> {

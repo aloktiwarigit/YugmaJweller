@@ -1,6 +1,6 @@
 # Goldsmith — Claude Code Project Guide
 
-Project-level primer. Every Claude Code session should read this first. Updated 2026-04-18 (stack corrected to Azure + Firebase; startup-lean infra deferred — see ADR-0015).
+Project-level primer. Every Claude Code session should read this first. Updated 2026-05-04 (code-truth completion audit added; stack correction remains ADR-0015).
 
 ---
 
@@ -14,18 +14,31 @@ Project-level primer. Every Claude Code session should read this first. Updated 
 
 ## Where the authoritative context lives
 
-Always load these before making significant decisions. Do not re-derive what's already documented.
+These documents are requirement/context sources, not completion proof. For completion claims, code is the truth: verify current source, migrations, routes, UI reachability, tests, and CI gates. Do not use git logs or memory as proof that a story or FR is implemented.
 
 | Document | Path | What's in it |
 |----------|------|--------------|
+| Code-truth completion audit | `docs/code-truth-completion-audit-2026-05-04.md` | Current code-first completion gaps, evidence rules, and future agent-context plan |
 | PRD | `_bmad-output/planning-artifacts/prd.md` | 126 FRs + 70 NFRs + journeys + scoping (binding) |
+| Customer storefront addendum | `docs/prd-addendum-customer-storefront.md` | FR127-FR140 + customer storefront completion notes |
 | PRFAQ | `_bmad-output/planning-artifacts/prfaq-Goldsmith.md` | Vision, customer FAQs, verdict |
 | PRFAQ Distillate | `_bmad-output/planning-artifacts/prfaq-Goldsmith-distillate.md` | Token-efficient handoff pack |
 | Domain Research | `_bmad-output/planning-artifacts/research/domain-indian-jewelry-retail-research-2026-04-15.md` | Market, regulatory, tech, competitive (650 lines, 180+ sources) |
 | Market Research | `_bmad-output/planning-artifacts/research/market-customer-insights-research-2026-04-16.md` | Customer archetypes, pain quotes, journey maps |
 | Implementation Readiness | `_bmad-output/planning-artifacts/implementation-readiness-report-2026-04-16.md` | PRD readiness 9.2/10; flagged risks for UX/CA/CE |
 | Approved plan | `C:\Users\alokt\.claude\plans\tingly-weaving-frog.md` | Phased roadmap (v2 anchor-customer pivot) |
-| Memory | `C:\Users\alokt\.claude\projects\C--Alok-Business-Projects-Goldsmith\memory\MEMORY.md` | Project overview, feedback, decisions |
+| Memory | `C:\Users\alokt\.claude\projects\C--Alok-Business-Projects-Goldsmith\memory\MEMORY.md` | Prior-session context only; never implementation proof |
+
+## Code-truth audit rules
+
+- Start completion and gap-analysis sessions with `docs/code-truth-completion-audit-2026-05-04.md`.
+- Treat BMAD docs, PRD, addenda, plans, specs, and review files as requirements or historical context only.
+- Do not mark a story/FR complete unless current code, migrations, reachable routes/UI, tests, or CI provide evidence.
+- If code exists but is not wired into app navigation or public/API routes, mark the feature partial.
+- If tests exist but are not wired into Turbo/CI or a known runnable command, mark the proof incomplete.
+- Future broad-context work should create or update `docs/agent-context/` machine-readable docs before spending tokens on long Markdown plans/reviews.
+- Target agent-context files: `project.context.json`, `traceability.json`, `decision-index.json`, `task-routing.json`, `doc-index.json`, and `acceptance-evidence.json`.
+- Avoid default-reading memory, git history, long `docs/reviews/**`, BMAD research docs, and HTML prototypes unless the task specifically needs historical context.
 
 ## Tech stack (locked)
 
@@ -212,9 +225,31 @@ Everything in the original "Enterprise Floor" (Sentry + OTel + feature flags + S
 - No FLOAT for weights. No cross-tenant queries. No hardcoded per-tenant values. No Goldsmith-brand leakage to customer surfaces. No compliance rules configurable by shopkeeper.
 - Memory is at `C:\Users\alokt\.claude\projects\C--Alok-Business-Projects-Goldsmith\memory\MEMORY.md`. Read feedback files before making decisions that overlap prior user directives.
 
-## Ceremony tiering per story (A / B / C) — 2026-04-19
+## Delivery model — demo-first (locked 2026-05-05)
 
-The enterprise quality floor (TS strict, no FLOAT, no cross-tenant, Sentry, OTel, axe-core, threat model, ADRs, 48dp touch, Hindi-first, Codex green) applies to **every class**. Only the process ceremony above the floor scales with risk.
+Goldsmith ships on a **demo-first, customer-customize** model, not anchor-launch-prerequisite:
+
+1. **Demo-ready** — Hindi-first UI polished, all daily-ops flows reachable from main nav, compliance hard-blocks demonstrably firing, white-label proof, realistic seed data, regression net (Maestro E2E for golden paths). This is the platform you walk into a jeweler's shop and demo from a phone.
+2. **Outreach** — pitch 10-15 Hindi-belt jewelers in parallel; whoever signs first becomes the first deployed tenant. Don't gate on a specific anchor.
+3. **Per-customer customize + deploy** — white-label theme, app-store listing under their brand, their seed data, hand-holding through first 2 weeks. ~1 week per customer post-sign.
+4. **Productize from real feedback** — build features that paying customers ask for, not speculatively against PRD FR1-140.
+
+**What this means for engineering:**
+- Demo-readiness, not full-PRD checkbox completeness, is the current target.
+- Defer FR107-112 real notifications integration, FR127-140 storefront enrichment, sync expansion beyond products, tenant terminate/delete with recovery, and pentest-tier hardening until a paying customer drives the priority.
+- Backend stays unchanged across tenants; per-customer work is theme + brand + their data + targeted feature requests.
+- "Build for the anchor" reasoning in older BMAD docs is superseded by this model — read those docs for FR contract content, not for go-to-market sequencing.
+
+## Ceremony tiering per story (A / B / C) — updated 2026-05-05
+
+The enterprise quality floor (TS strict, no FLOAT, no cross-tenant, Sentry, OTel, axe-core, threat model, ADRs, 48dp touch, Hindi-first, code-truth audit, security review on new attack surfaces) applies to **every class**. Only the process ceremony above the floor scales with risk.
+
+Process changes 2026-05-05 (after WS-3A retrospective showed ~88% of per-task reviews returned zero signal):
+- DROP per-task spec compliance review (the plan IS the spec; typecheck + plan-match prove compliance).
+- Per-task code review ONLY on Class A subsurfaces inside a story; pure UI/copy/refactor skips per-task review and rides whole-branch review.
+- Class C goes straight to code; no brainstorm/spec/plan pipeline.
+- Worktree parallelism is the DEFAULT for 2-3 independent stories.
+- Recurring reviewer findings get codified as Semgrep/ESLint rules on first repeat.
 
 ### Class A — full ceremony
 Applies to: auth, money/weight columns, RLS/tenant-isolation, compliance hard-blocks (269ST/PMLA/GST/HUID/PAN), encryption, `platform_admin`, cross-tenant ops, migrations touching RLS/roles/SECURITY DEFINER, webhook handlers.
@@ -227,25 +262,42 @@ Protocol:
 5. Runtime smoke test on intended surface (see Non-negotiable floor below)
 6. `git push` only after 4 and 5 pass
 
-### Class B — compressed ceremony (updated 2026-04-19)
+### Class B — right-sized ceremony (updated 2026-05-05)
 Applies to: products, customers, dashboards, notification prefs, non-auth staff CRUD, settings UI not touching compliance, search, reports, debt/fix PRs.
 
 Protocol:
-1. `/superpowers:brainstorming` — same session (alignment is cheap; no fresh-session overhead for Class B)
-2. `/superpowers:writing-plans` → commit plan file — **3-5 work streams**, same session. No B-slots.
-3. Single-implementer execution, **same session** (default). Fresh session only if plan reveals a Class A surface mid-execution — triggers reclassification to A, not just a session reset.
-4. TDD per-commit discipline (kept)
-5. **Review gate: Codex CLI only.** Run `codex review --base main`, write `.codex-review-passed` marker. DROP all Claude-on-Claude layers (`/code-review`, `/security-review`, `/bmad-code-review`, `/superpowers:requesting-code-review`) — echo chamber with ~90% overlap and zero cross-model signal. CI is the second gate.
-6. **Runtime smoke test on intended surface** — mandatory before PR merge:
-   - Shopkeeper stories: emulator or device (Metro boot + golden-path flow)
-   - API-only stories: `curl` round-trip against running service
-   - Web stories: browser render + golden-path flow
-7. `git push`
+1. `/superpowers:brainstorming` — same session. **Skip if the story follows an established template** (e.g., "wire ExportButtons into another screen", "add another report screen following the existing pattern"). The brainstorming output is reusable across template-following stories.
+2. `/superpowers:writing-plans` → commit plan file — **3-5 work streams**, same session.
+3. **Default to worktree parallelism** when 2-3 stories don't share blast radius (different modules, no overlapping migration numbers, no overlapping mobile screens). `git worktree add C:/gs<N> feat/<story-id>` per stream. See "Worktree parallelism" subsection below.
+4. **TDD on business logic.** Render-plumbing/hook-wiring without business logic can rely on typecheck + smoke; tests required where there's behavior to verify.
+5. **Right-sized review gates within a story:**
+   - **Per-task code review ONLY on Class A subsurfaces** inside the story (lines that touch RLS, money/paise/weight, auth/JWT/Firebase, compliance hard-blocks, encryption, audit logs, BullMQ tenant boundary). Pure UI/copy/refactor lines skip per-task review.
+   - **Per-task spec compliance review is DROPPED.** The plan IS the spec; if code matches plan text and typecheck passes, compliance is by construction.
+   - **Whole-branch code review** before push — mandatory.
+   - **`/security-review`** before push — mandatory if the story adds a new attack surface (new endpoint, new file processor, new external integration, new SQL query, new auth path).
+   - **Re-review only if reviewer flagged a non-trivial issue.** Doc-only fix-ups (comment edits, test-name renames) do NOT need re-review.
+6. **Codex CLI cross-model review** when the weekly limit allows (memory `feedback_codex_limit_batch_strategy.md` for current state). When unavailable, the Claude `/security-review` + whole-branch review + CI is the documented substitute (note in commit).
+7. **Runtime smoke test on intended surface** — mandatory before PR merge:
+   - Shopkeeper stories: emulator or device (Metro boot + golden-path flow). Memory `feedback_drive_smoke_headless.md` for headless walk via adb screencap + input.
+   - API-only stories: `curl` round-trip against running service.
+   - Web stories: browser render + golden-path flow.
+8. **Code-truth audit before claiming complete.** Grep current code for the FR's expected route/migration/test. No completion claim without code evidence. Memory + git logs are NOT proof. Per `docs/code-truth-completion-audit-2026-05-04.md`.
+9. `git push`
 
-### Class C — minimal ceremony
-Applies to: copy tweaks, color/spacing, config toggles, doc-only, refactors < 50 LOC, dep bumps.
+**Cut from prior Class B ceremony (drop entirely, observed zero signal in WS-3A):**
+- Per-task spec compliance review
+- Per-task code review on pure UI/copy lines
+- Re-review of doc-only fix-ups
+- Brainstorm session for stories that follow a locked template
 
-Protocol: `/bmad-quick-dev` or inline, single session, **Codex-only review**, tests only where behavior changed. Runtime smoke test required **only if behavior changed** — doc-only and config-toggle-only changes are exempt (no runtime surface to test).
+**Codified recurring patterns are caught by Semgrep/ESLint, NOT manual review.** See `tools/semgrep/goldsmith-*.yml` (current set) and `.eslintrc.cjs` overrides. Every reviewer-caught pattern that recurs more than once gets codified before the next story. Manual reviewers must NOT spend time on patterns that have automated rules.
+
+### Class C — minimal ceremony (updated 2026-05-05)
+Applies to: copy tweaks, color/spacing, config toggles, doc-only, refactors < 50 LOC, dep bumps, **nav-edge wiring** (adding a `Stack.Screen` + main-tab link to existing surfaces), **seed-data scripts**, **Semgrep/ESLint rule additions**, **CLAUDE.md / agent-context doc updates**.
+
+Protocol: **Code straight to commit. No brainstorm/spec/plan pipeline.** Tests only where behavior changed (so a Semgrep rule addition needs a positive + negative test fixture; a CLAUDE.md edit needs none). Whole-branch review on the PR (NOT per-task review). Runtime smoke required only if a user-visible runtime surface changed; doc-only / config-toggle-only / lint-rule-only changes are exempt.
+
+**Class C is for a single small change, not a Class B in disguise.** If the work touches > 50 LOC, multiple modules, or new logic (vs nav/copy/config), it's actually Class B — reclassify.
 
 ### Reclassification rules
 - If mid-story a B/C task reveals a Class A surface (new API endpoint, money field, auth adjacency) → STOP, reclassify to A, add missing ceremony, then continue. Never merge a Class A touch under a B/C gate.
@@ -254,6 +306,37 @@ Protocol: `/bmad-quick-dev` or inline, single session, **Codex-only review**, te
 
 ### Non-negotiable floor (all classes)
 Story AC is not closed until the changed surface has been smoke-tested on its intended runtime — **unless the change has no runtime surface** (doc-only, config-toggle-only). A passing test suite + clean code review does not substitute for running the actual artifact the story promised. Layered code inspection catches surface bugs; runtime integration catches system bugs. Without the runtime gate, system bugs leak straight to the demo.
+
+### Worktree parallelism — default for independent stories (2026-05-05)
+
+When 2-3 stories don't share blast radius (different modules, no overlapping migration numbers, no overlapping mobile screens, no overlapping API routes), run them in parallel via separate worktrees:
+
+```
+git worktree add C:/gs<N> feat/<story-id>
+```
+
+Each worktree gets its own implementer + reviewer cycle. Merge order respects migration sequence (lowest first); other parallel work merges in PR-ready order. Memory `feedback_parallel_session_worktrees.md` has the operational pattern; memory `feedback_orchestrator_parallelization.md` has the orchestration model.
+
+**Anti-pattern:** running two implementers in the SAME working directory. Always different worktrees. The single-working-directory anti-pattern bit us in stories 5.7/5.9 and 6.9/8.1 (memory).
+
+**When NOT to parallelize:**
+- Stories that touch `apps/api/src/modules/billing/billing.service.ts` (it's a serialization choke point per memory `project_epic_completion_plan.md`)
+- Stories that share a migration sequence number (one must land first; the other rebases)
+- Stories that share a mobile screen file (e.g., two stories both editing `apps/shopkeeper/app/reports/daily-summary.tsx`)
+- Class A auth/RLS work — keep serial for context-quarantine reasons
+
+### Code-truth audit gate — no completion claim without code evidence (2026-05-05)
+
+Per `docs/code-truth-completion-audit-2026-05-04.md`, every claim that a story / FR / acceptance criterion is "complete" MUST be backed by a `git grep` or file-existence check against current code. Memory, prior session summaries, commit logs, and review markers are **not proof**.
+
+Before a story's commit message says "complete", run (or have an agent run) the audit checklist:
+- The expected route is registered (`grep '<route>' apps/api/src/...`)
+- The expected migration exists (`ls packages/db/src/migrations/<seq>*.sql`)
+- The expected test file exists and at least one test asserts new behavior
+- The expected mobile screen has a `Stack.Screen` entry in `_layout.tsx`
+- The story's FRs are reachable from main app navigation (not orphan routes)
+
+If any check fails, the story is NOT complete. Status downgrades to "partial" until the gap closes.
 
 ---
 

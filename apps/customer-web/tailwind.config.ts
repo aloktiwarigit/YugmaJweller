@@ -1,5 +1,5 @@
 import type { Config } from 'tailwindcss';
-import { colors } from '@goldsmith/ui-tokens';
+import { colors, radii } from '@goldsmith/ui-tokens';
 
 const config: Config = {
   content: [
@@ -10,17 +10,43 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        primary:  'var(--primary-color, #B58A3C)',
-        bg:       colors.bg,
-        ink:      colors.ink,
-        inkMute:  colors.inkMute,
-        border:   colors.border,
-        error:    colors.error,
-        white:    colors.white,
+        // Tenant-overridable via CSS var (set by buildThemeStyle)
+        primary:         'var(--color-primary, #B58A3C)',
+        primaryDeep:     colors.primaryDeep,
+        primaryWash:     colors.primaryWash,
+        accent:          'var(--color-accent, #D4745A)',
+        accentWash:      colors.accentWash,
+        bg:              colors.bg,
+        surface:         colors.surface,
+        surfaceElevated: colors.surfaceElevated,
+        surfaceRecessed: colors.surfaceRecessed,
+        ink:             colors.ink,
+        inkMute:         colors.inkMute,
+        inkSoft:         colors.inkSoft,
+        border:          colors.border,
+        borderSubtle:    colors.borderSubtle,
+        borderStrong:    colors.borderStrong,
+        error:           colors.error,
+        successJade:     colors.successJade,
+        successWash:     colors.successWash,
+        warningSaffron:  colors.warningSaffron,
+        warningWash:     colors.warningWash,
+        infoSky:         colors.infoSky,
+        white:           colors.white,
+      },
+      borderRadius: {
+        xs:   `${radii.xs}px`,
+        sm:   `${radii.sm}px`,
+        md:   `${radii.md}px`,
+        lg:   `${radii.lg}px`,
+        pill: `${radii.pill}px`,
       },
       fontFamily: {
         heading: ['var(--font-heading)', 'Georgia', 'serif'],
-        body:    ['var(--font-body)', 'system-ui', 'sans-serif'],
+        ui:      ['var(--font-ui)', 'system-ui', 'sans-serif'],
+        prose:   ['var(--font-prose)', 'system-ui', 'sans-serif'],
+        // legacy alias — keeps existing font-body usages working
+        body:    ['var(--font-ui)', 'system-ui', 'sans-serif'],
       },
     },
   },

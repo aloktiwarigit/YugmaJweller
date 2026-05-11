@@ -36,10 +36,16 @@ const mockTenantConfig: TenantConfigResponse = {
 };
 const mockProductsResponse: CatalogProductsResponse = { items: [], total: 0, page: 1 };
 const mockCatalogService = {
-  getTenantConfig: vi.fn().mockResolvedValue(mockTenantConfig),
-  getProducts:     vi.fn().mockResolvedValue(mockProductsResponse),
-  getProduct:      vi.fn().mockRejectedValue(new NotFoundException()),
-  verifyHuid:      vi.fn(),
+  getTenantConfig:         vi.fn().mockResolvedValue(mockTenantConfig),
+  getProducts:             vi.fn().mockResolvedValue(mockProductsResponse),
+  getProduct:              vi.fn().mockRejectedValue(new NotFoundException()),
+  verifyHuid:              vi.fn(),
+  getPublicProductReviews: vi.fn().mockResolvedValue({
+    items: [],
+    total: 0,
+    page: 1,
+    ratingBreakdown: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  }),
 };
 
 describe('CatalogController', () => {
@@ -73,6 +79,9 @@ describe('CatalogController', () => {
     mockCatalogService.getProducts.mockResolvedValue(mockProductsResponse);
     mockCatalogService.getProduct.mockRejectedValue(new NotFoundException());
     mockCatalogService.verifyHuid.mockResolvedValue({ verified: true, huid: 'AB1234', certifyingBody: 'BIS' });
+    mockCatalogService.getPublicProductReviews.mockResolvedValue({
+      items: [], total: 0, page: 1, ratingBreakdown: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    });
   });
 
   describe('getPublicRates() — unit', () => {
@@ -134,6 +143,28 @@ describe('CatalogController', () => {
       const res = await request(app.getHttpServer())
         .get('/api/v1/catalog/products').set('X-Tenant-Id', 'shop-uuid').expect(200);
       expect(res.body.items).toBeInstanceOf(Array);
+      // No filter params + page=1 → hot path: 5-minute TTL
+      expect(res.headers['cache-control']).toBe('public, max-age=300, stale-while-revalidate=900');
+    });
+    it('priceMin NaN → 400', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/catalog/products?priceMin=abc')
+        .set('X-Tenant-Id', 'shop-uuid')
+        .expect(400);
+      expect(res.body).toMatchObject({ code: 'catalog.invalid_price_min' });
+    });
+    it('priceMax NaN → 400', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/catalog/products?priceMax=xyz')
+        .set('X-Tenant-Id', 'shop-uuid')
+        .expect(400);
+      expect(res.body).toMatchObject({ code: 'catalog.invalid_price_max' });
+    });
+    it('filtered cache header when B1 filter param present', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/catalog/products?purity=GOLD_22K')
+        .set('X-Tenant-Id', 'shop-uuid')
+        .expect(200);
       expect(res.headers['cache-control']).toBe('public, max-age=30, stale-while-revalidate=60');
     });
   });
@@ -205,6 +236,68 @@ describe('CatalogController', () => {
         .expect(200);
       expect(mockCatalogService.verifyHuid).toHaveBeenCalledWith(
         PRODUCT_ID, 'shop-uuid', 'https://jewel.bis.gov.in/?huid=AB1234',
+      );
+    });
+  });
+
+  describe('GET /api/v1/catalog/products/:id/reviews', () => {
+    const PRODUCT_ID = '00000000-0000-0000-0000-000000000001';
+    const BASE       = `/api/v1/catalog/products/${PRODUCT_ID}/reviews`;
+
+    it('returns 400 when x-tenant-id header is missing', async () => {
+      await request(app.getHttpServer()).get(BASE).expect(400);
+    });
+
+    it('returns 400 for a non-UUID product id', async () => {
+      await request(app.getHttpServer())
+        .get('/api/v1/catalog/products/not-a-uuid/reviews')
+        .set('X-Tenant-Id', 'shop-uuid')
+        .expect(400);
+    });
+
+    it('returns 404 when service throws NotFoundException (product not found / wrong tenant)', async () => {
+      mockCatalogService.getPublicProductReviews.mockRejectedValueOnce(new NotFoundException());
+      await request(app.getHttpServer())
+        .get(BASE)
+        .set('X-Tenant-Id', 'shop-uuid')
+        .expect(404);
+    });
+
+    it('returns 200 with items array and correct cache header', async () => {
+      const res = await request(app.getHttpServer())
+        .get(BASE)
+        .set('X-Tenant-Id', 'shop-uuid')
+        .expect(200);
+      expect(res.body).toHaveProperty('items');
+      expect(res.body.items).toBeInstanceOf(Array);
+      expect(res.body).toHaveProperty('ratingBreakdown');
+      expect(res.headers['cache-control']).toBe('public, max-age=120, stale-while-revalidate=600');
+    });
+
+    it('caps limit at 50 when ?limit=200 is requested (assertion #8)', async () => {
+      await request(app.getHttpServer())
+        .get(`${BASE}?limit=200`)
+        .set('X-Tenant-Id', 'shop-uuid');
+      expect(mockCatalogService.getPublicProductReviews).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 50 }),
+      );
+    });
+
+    it('defaults limit to 10 when not specified', async () => {
+      await request(app.getHttpServer())
+        .get(BASE)
+        .set('X-Tenant-Id', 'shop-uuid');
+      expect(mockCatalogService.getPublicProductReviews).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 10 }),
+      );
+    });
+
+    it('passes page and shopId to service', async () => {
+      await request(app.getHttpServer())
+        .get(`${BASE}?page=3`)
+        .set('X-Tenant-Id', 'tenant-uuid-123');
+      expect(mockCatalogService.getPublicProductReviews).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 3, shopId: 'tenant-uuid-123' }),
       );
     });
   });
