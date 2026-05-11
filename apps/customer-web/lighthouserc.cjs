@@ -21,22 +21,24 @@ module.exports = {
       },
     },
     assert: {
-      // Performance budgets (Phase E spec)
+      // Phase E demo-readiness budgets.
+      //   perf  → warn  at 0.8 (CI throttling is unpredictable; do not block PRs)
+      //   a11y  → error at 0.9 (deterministic; fail fast on serious violations)
       assertions: {
-        'largest-contentful-paint': ['warn', { maxNumericValue: 2500 }],
-        'cumulative-layout-shift': ['warn', { maxNumericValue: 0.1 }],
-        'server-response-time': ['warn', { maxNumericValue: 500 }],
-        // Accessibility — Lighthouse uses axe-core internally
+        'categories:performance':   ['warn',  { minScore: 0.8 }],
         'categories:accessibility': ['error', { minScore: 0.9 }],
+        // Specific Core Web Vital signals
+        'largest-contentful-paint': ['warn', { maxNumericValue: 2500 }],
+        'cumulative-layout-shift':  ['warn', { maxNumericValue: 0.1 }],
+        'server-response-time':     ['warn', { maxNumericValue: 500 }],
+        'first-contentful-paint':   ['warn', { maxNumericValue: 1800 }],
         // No serious a11y violations
         'color-contrast': ['error', { minScore: 1 }],
-        'image-alt': ['error', { minScore: 1 }],
-        'label': ['error', { minScore: 1 }],
-        'link-name': ['error', { minScore: 1 }],
-        // Core Web Vitals
-        'first-contentful-paint': ['warn', { maxNumericValue: 1800 }],
+        'image-alt':      ['error', { minScore: 1 }],
+        'label':          ['error', { minScore: 1 }],
+        'link-name':      ['error', { minScore: 1 }],
         // Skip flaky audits in CI (network-dependent)
-        'uses-http2': 'off',
+        'uses-http2':         'off',
         'uses-long-cache-ttl': 'off',
       },
     },
