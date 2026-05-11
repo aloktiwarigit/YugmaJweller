@@ -3,28 +3,39 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-nati
 import { router } from 'expo-router';
 import { colors, spacing, typography } from '@goldsmith/ui-tokens';
 
-const items = [
+interface SettingsItem {
+  key:    string;
+  label:  string;
+  route:  string;
+  devOnly?: boolean;
+}
+
+const items: readonly SettingsItem[] = [
   { key: 'account', label: 'मेरा खाता', route: '/settings/account' },
   { key: 'shop_profile', label: 'शॉप प्रोफाइल', route: '/settings/shop-profile' },
   { key: 'staff', label: 'स्टाफ प्रबंधन', route: '/settings/staff' },
   { key: 'making_charges', label: 'मेकिंग चार्जेस', route: '/settings/making-charges' },
   { key: 'wastage', label: 'वेस्टेज', route: '/settings/wastage' },
-  { key: 'rate_lock', label: 'Rate Lock की अवधि', route: '/settings/rate-lock' },
-  { key: 'try_at_home', label: 'घर पर try करें', route: '/settings/try-at-home' },
-  { key: 'custom_order_policy', label: 'Custom Order Policy', route: '/settings/custom-order-policy' },
-  { key: 'return_policy', label: 'Return Policy', route: '/settings/return-policy' },
-  { key: 'notification_prefs', label: 'Notification Preferences', route: '/settings/notification-prefs' },
+  { key: 'rate_lock', label: 'दर-लॉक की अवधि', route: '/settings/rate-lock' },
+  { key: 'try_at_home', label: 'घर पर आज़माएँ', route: '/settings/try-at-home' },
+  { key: 'custom_order_policy', label: 'कस्टम ऑर्डर नीति', route: '/settings/custom-order-policy' },
+  { key: 'return_policy', label: 'वापसी नीति', route: '/settings/return-policy' },
+  { key: 'notification_prefs', label: 'सूचना प्राथमिकताएँ', route: '/settings/notification-prefs' },
   { key: 'loyalty', label: 'लॉयल्टी प्रोग्राम', route: '/settings/loyalty' },
   { key: 'billing', label: 'बिलिंग', route: '/settings/billing' },
   { key: 'reports', label: 'रिपोर्ट्स', route: '/settings/reports' },
   { key: 'audit_log', label: 'गतिविधि लॉग', route: '/settings/audit-log' },
-] as const;
+  // Dev-only: visible only in __DEV__ builds (filtered below).
+  { key: 'theme', label: 'थीम बदलें (Demo)', route: '/settings/theme', devOnly: true },
+];
 
 export default function SettingsScreen(): React.ReactElement {
+  const visible = items.filter((item) => !item.devOnly || __DEV__);
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>सेटिंग्स</Text>
-      {items.map((item) => (
+      {visible.map((item) => (
         <TouchableOpacity
           key={item.key}
           testID={`settings-item-${item.key}`}

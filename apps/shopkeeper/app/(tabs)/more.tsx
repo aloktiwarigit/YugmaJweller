@@ -2,8 +2,9 @@ import React from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { colors, typography, spacing } from '@goldsmith/ui-tokens';
+import { typography, spacing } from '@goldsmith/ui-tokens';
 import { useAuthStore } from '../../src/stores/authStore';
+import { useThemeTokens } from '../../src/hooks/useThemeTokens';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -22,25 +23,32 @@ const ROWS: MenuRow[] = [
 ];
 
 export default function MoreScreen(): React.ReactElement {
+  const colors      = useThemeTokens();
   const role        = useAuthStore((s) => s.user?.role);
   const isStaff     = role === 'shop_staff';
   const visibleRows = ROWS.filter((r) => !r.ownerOnly || !isStaff);
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.screen, { backgroundColor: colors.bg }]}
+      contentContainerStyle={styles.content}
+    >
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionLabel}>दैनिक संचालन</Text>
+        <Text style={[styles.sectionLabel, { color: colors.inkMute }]}>दैनिक संचालन</Text>
       </View>
       {visibleRows.map((row) => (
         <Pressable
           key={row.href}
           testID={`more-row-${row.href.replace('/', '')}`}
           onPress={() => router.push(row.href as never)}
-          style={styles.row}
+          style={[
+            styles.row,
+            { borderBottomColor: colors.border, backgroundColor: colors.primaryLight },
+          ]}
         >
           <View style={styles.rowLeft}>
             <Ionicons name={row.icon} size={24} color={colors.primary} />
-            <Text style={styles.rowLabel}>{row.label}</Text>
+            <Text style={[styles.rowLabel, { color: colors.ink }]}>{row.label}</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={colors.inkMute} />
         </Pressable>
@@ -50,7 +58,7 @@ export default function MoreScreen(): React.ReactElement {
 }
 
 const styles = StyleSheet.create({
-  screen:  { flex: 1, backgroundColor: colors.bg },
+  screen:  { flex: 1 },
   content: { paddingBottom: spacing.xl },
   sectionHeader: {
     paddingHorizontal: spacing.lg,
@@ -60,7 +68,6 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontFamily:    typography.body.family,
     fontSize:      13,
-    color:         colors.inkMute,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
@@ -72,8 +79,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical:   spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-    backgroundColor:   colors.white,
   },
   rowLeft: {
     flexDirection: 'row',
@@ -82,7 +87,6 @@ const styles = StyleSheet.create({
   rowLabel: {
     fontFamily: typography.body.family,
     fontSize:   18,
-    color:      colors.ink,
     marginLeft: spacing.md,
   },
 });

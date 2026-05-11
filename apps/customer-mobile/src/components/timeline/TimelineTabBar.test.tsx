@@ -4,7 +4,7 @@ import React from 'react';
 import { TimelineTabBar } from './TimelineTabBar';
 
 describe('TimelineTabBar', () => {
-  it('renders all 4 Hindi tab labels', () => {
+  it('renders all 5 Hindi tab labels', () => {
     const { container } = render(
       <TimelineTabBar activeTab="purchases" onTabChange={vi.fn()} />,
     );
@@ -12,6 +12,7 @@ describe('TimelineTabBar', () => {
     expect(container.textContent).toContain('कस्टम ऑर्डर');
     expect(container.textContent).toContain('दर-लॉक');
     expect(container.textContent).toContain('ट्राई-एट-होम');
+    expect(container.textContent).toContain('समीक्षा');
   });
 
   it('active tab has testID timeline-tab-active', () => {

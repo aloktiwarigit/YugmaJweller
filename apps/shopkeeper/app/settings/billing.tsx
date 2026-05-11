@@ -1,11 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, typography } from '@goldsmith/ui-tokens';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, typography, spacing } from '@goldsmith/ui-tokens';
 
-export default function BillingScreen(): React.ReactElement {
+export default function BillingSettingsScreen(): React.ReactElement {
   return (
-    <View style={styles.container} testID="billing-screen">
-      <Text style={styles.text}>बिलिंग — जल्द आ रहा है</Text>
+    <View style={styles.container} testID="billing-settings-screen">
+      <Ionicons name="receipt-outline" size={48} color={colors.inkMute} />
+      <Text style={styles.title}>बिलिंग सेटिंग्स</Text>
+      <Text style={styles.body}>यह जल्द उपलब्ध होगा।</Text>
     </View>
   );
 }
@@ -16,10 +19,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    gap: spacing.sm,
   },
-  text: {
-    fontSize: 18,
+  title: {
+    fontSize: 20,
+    fontFamily: typography.headingMid.family,
+    color: colors.ink,
+    marginTop: spacing.sm,
+  },
+  body: {
+    fontSize: 16,
     fontFamily: typography.body.family,
     color: colors.inkMute,
+    textAlign: 'center',
   },
 });
