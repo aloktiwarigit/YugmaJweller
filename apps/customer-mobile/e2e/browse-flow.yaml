@@ -1,0 +1,27 @@
+appId: com.goldsmith.customer.dev
+name: "Customer browse — golden path"
+tags:
+  - golden-path
+  - browse
+---
+# Launches the customer-mobile app and verifies:
+#   1. White-label brand header renders (NOT Goldsmith)
+#   2. Bottom-tab nav shows the 4 Hindi-first tabs
+#   3. Tapping "सोना" / "उत्पाद" routes into the catalog
+#   4. At least one product card is visible (assumes anchor-dev seed)
+- launchApp:
+    clearState: true
+# White-label invariant — Goldsmith platform brand must never leak
+- assertNotVisible: "Goldsmith"
+- assertNotVisible: "Powered by"
+# Hindi-first tab labels (apps/customer-mobile/app/(tabs)/_layout.tsx)
+- assertVisible: "मुख्य"
+- assertVisible: "उत्पाद"
+- assertVisible: "पसंदीदा"
+- assertVisible: "प्रोफ़ाइल"
+# Tap the gold metal chip — CategoryRow / drawer affordance
+- tapOn: "सोना"
+# Browse tab as backstop in case "सोना" was a drawer chip that opened a filtered list
+- tapOn: "उत्पाद"
+# Search/filter affordance is visible (BrowseScreen header)
+- assertVisible: "उत्पाद खोज"

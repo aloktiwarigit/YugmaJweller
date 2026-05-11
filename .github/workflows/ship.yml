@@ -195,8 +195,16 @@ jobs:
           # Maestro lacks a standalone `validate` for flow files, but `test --dry-run`
           # on a non-existent appId would fail regardless. A schema-level check is
           # sufficient for pre-EAS scaffolding — YAML parse + Maestro install.
-          test -f apps/shopkeeper/e2e/auth-flow.yaml
-          head -1 apps/shopkeeper/e2e/auth-flow.yaml | grep -q '^appId:'
+          for f in \
+            apps/shopkeeper/e2e/auth-flow.yaml \
+            apps/shopkeeper/e2e/inventory-flow.yaml \
+            apps/shopkeeper/e2e/invoice-flow.yaml \
+            apps/shopkeeper/e2e/customer-lookup-flow.yaml \
+            apps/customer-mobile/e2e/browse-flow.yaml ; do
+            test -f "$f" || { echo "missing $f"; exit 1; }
+            head -1 "$f" | grep -q '^appId:' || { echo "$f missing appId on line 1"; exit 1; }
+            echo "OK $f"
+          done
 
   lighthouse-ci:
     # Real Lighthouse CI run against the customer-web Next.js app — boots
