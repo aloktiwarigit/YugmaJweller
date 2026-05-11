@@ -24,11 +24,22 @@ import type {
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:3001';
 
+// Per-request timeout protects TTFB budget (<500ms) — slow API calls fall back
+// to graceful empty/unavailable states instead of blocking the page render.
+// Tuned to 1500ms: API p95 should be <300ms in prod; this leaves headroom
+// for cold starts without exceeding the LCP budget (<2500ms).
+const FETCH_TIMEOUT_MS = 1500;
+
+function withTimeout(): { signal: AbortSignal } {
+  return { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) };
+}
+
 export async function fetchTenantConfig(slug: string): Promise<TenantConfigResponse | null> {
   try {
     const res = await fetch(`${API_URL}/api/v1/catalog/tenant-config`, {
       headers: { 'X-Shop-Slug': slug },
       next: { revalidate: 3600 },
+      ...withTimeout(),
     });
     if (!res.ok) return null;
     return res.json() as Promise<TenantConfigResponse>;
@@ -41,6 +52,7 @@ export async function fetchPublicRates(): Promise<PublicRatesResponse | null> {
   try {
     const res = await fetch(`${API_URL}/api/v1/catalog/rates`, {
       next: { revalidate: 60 },
+      ...withTimeout(),
     });
     if (!res.ok) return null;
     return res.json() as Promise<PublicRatesResponse>;
@@ -90,6 +102,7 @@ export async function fetchProducts(
     const res = await fetch(`${API_URL}/api/v1/catalog/products?${qs.toString()}`, {
       headers: { 'X-Tenant-Id': shopId },
       next: { revalidate: 30 },
+      ...withTimeout(),
     });
     if (!res.ok) return null;
     return res.json() as Promise<CatalogProductsResponse>;
@@ -106,6 +119,7 @@ export async function fetchProduct(
     const res = await fetch(`${API_URL}/api/v1/catalog/products/${productId}`, {
       headers: { 'X-Tenant-Id': shopId },
       next: { revalidate: 30 },
+      ...withTimeout(),
     });
     if (!res.ok) return null;
     return res.json() as Promise<CatalogProduct>;
@@ -122,6 +136,7 @@ export async function fetchProductReviews(
     const res = await fetch(`${API_URL}/api/v1/reviews/products/${productId}`, {
       headers: { 'X-Tenant-Id': shopId },
       next: { revalidate: 60 },
+      ...withTimeout(),
     });
     if (!res.ok) return { reviews: [], averageRating: null, total: 0 };
     return res.json() as Promise<ReviewsResponse>;
@@ -138,6 +153,7 @@ export async function fetchProductImages(
     const res = await fetch(`${API_URL}/api/v1/catalog/products/${productId}/images`, {
       headers: { 'X-Tenant-Id': shopId },
       next: { revalidate: 60 },
+      ...withTimeout(),
     });
     if (!res.ok) return [];
     const data = await res.json() as { images: PublicImageItem[] };
@@ -154,7 +170,7 @@ export async function fetchRecommendations(
   try {
     const res = await fetch(
       `${API_URL}/api/v1/catalog/products/${productId}/recommendations`,
-      { headers: { 'X-Tenant-Id': shopId }, next: { revalidate: 300 } },
+      { headers: { 'X-Tenant-Id': shopId }, next: { revalidate: 300 }, ...withTimeout() },
     );
     if (!res.ok) return [];
     const data = await res.json() as { items?: CatalogProduct[] } | CatalogProduct[];
@@ -169,6 +185,7 @@ export async function fetchNewArrivals(shopId: string): Promise<CatalogProductsR
     const res = await fetch(`${API_URL}/api/v1/catalog/products/new-arrivals`, {
       headers: { 'X-Tenant-Id': shopId },
       next: { revalidate: 300 },
+      ...withTimeout(),
     });
     if (!res.ok) return null;
     return res.json() as Promise<CatalogProductsResponse>;
@@ -182,6 +199,7 @@ export async function fetchTopSellers(shopId: string): Promise<CatalogProductsRe
     const res = await fetch(`${API_URL}/api/v1/catalog/products/top-sellers`, {
       headers: { 'X-Tenant-Id': shopId },
       next: { revalidate: 600 },
+      ...withTimeout(),
     });
     if (!res.ok) return null;
     return res.json() as Promise<CatalogProductsResponse>;
@@ -195,6 +213,7 @@ export async function fetchFeaturedProducts(shopId: string): Promise<CatalogProd
     const res = await fetch(`${API_URL}/api/v1/catalog/products/featured`, {
       headers: { 'X-Tenant-Id': shopId },
       next: { revalidate: 300 },
+      ...withTimeout(),
     });
     if (!res.ok) return null;
     return res.json() as Promise<CatalogProductsResponse>;
@@ -208,6 +227,7 @@ export async function fetchReturnPolicy(shopId: string): Promise<string | null> 
     const res = await fetch(`${API_URL}/api/v1/catalog/return-policy`, {
       headers: { 'X-Tenant-Id': shopId },
       next: { revalidate: 300 },
+      ...withTimeout(),
     });
     if (!res.ok) return null;
     const data = await res.json() as { returnPolicyText: string | null };

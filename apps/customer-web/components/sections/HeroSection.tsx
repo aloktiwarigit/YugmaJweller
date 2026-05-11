@@ -66,6 +66,7 @@ export function HeroSection({ shopName, heroBanners }: HeroSectionProps) {
                     fill
                     className="object-cover"
                     sizes="50vw"
+                    priority={i === 0}
                   />
                 </div>
               ))

@@ -1,0 +1,21 @@
+rules:
+  - id: goldsmith.no-goldsmith-leakage
+    languages: [generic]
+    severity: ERROR
+    message: |
+      The word "Goldsmith" must not appear in customer-facing source files.
+      This is a white-label platform: the Goldsmith platform brand must NEVER be
+      visible to end customers. Replace with tenant-dynamic values (config.appName,
+      theme CSS vars, etc.) or the tenant's own brand name.
+      Admin paths (apps/customer-web/app/admin/) and test files are excluded.
+    pattern: Goldsmith
+    paths:
+      include:
+        - "apps/customer-web/**"
+        - "apps/customer-mobile/**"
+      exclude:
+        - "apps/customer-web/app/admin/**"
+        - "**/*.test.tsx"
+        - "**/*.test.ts"
+        - "**/*.spec.tsx"
+        - "**/*.spec.ts"
