@@ -15,6 +15,7 @@ export default function ReportsLayout(): React.ReactElement {
       <Stack.Screen name="outstanding"       options={{ title: 'बकाया भुगतान' }} />
       <Stack.Screen name="customer-ltv"      options={{ title: 'शीर्ष ग्राहक' }} />
       <Stack.Screen name="loyalty-summary"   options={{ title: 'लॉयल्टी कार्यक्रम' }} />
+      <Stack.Screen name="stock-aging"       options={{ title: 'पुराना स्टॉक' }} />
     </Stack>
   );
 }

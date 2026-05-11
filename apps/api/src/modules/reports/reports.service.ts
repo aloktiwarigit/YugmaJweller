@@ -42,6 +42,34 @@ export interface LoyaltySummaryResult {
   members_by_tier: { tier: string | null; count: number }[];
 }
 
+export type StockAgingBucketLabel = '<30d' | '30-60d' | '60-90d' | '90d+';
+
+export interface StockAgingBucket {
+  label: StockAgingBucketLabel;
+  count: number;
+  totalWeightMg: string;
+  totalCostPaise: string;
+}
+
+export interface StockAgingItem {
+  id: string;
+  sku: string;
+  metal: string;
+  purity: string;
+  weightG: string;
+  daysInStock: number;
+  bucket: StockAgingBucketLabel;
+  costPaise: string | null;
+  firstListedAt: string;
+}
+
+export interface StockAgingResult {
+  buckets: StockAgingBucket[];
+  items: StockAgingItem[];
+}
+
+const BUCKET_ORDER: StockAgingBucketLabel[] = ['<30d', '30-60d', '60-90d', '90d+'];
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 @Injectable()
@@ -174,6 +202,81 @@ export class ReportsService {
     });
   }
 
+  /**
+   * Like getOutstanding but bypasses the 100-row HTTP cap, capped instead at a
+   * higher PDF-export ceiling. Use only from the BullMQ PDF worker — never from
+   * an HTTP route (large unbounded JSON arrays would explode response times).
+   *
+   * Anchor jeweller's outstanding list typically has < 100 entries; the 5000-row
+   * ceiling is paranoia headroom for wholesale-heavy shops.
+   */
+  async getAllOutstanding(): Promise<OutstandingResult> {
+    const HARD_CAP = 5000;
+    return withTenantTx(this.pool, async (tx) => {
+      const countRes = await tx.query<{ total: string }>(
+        // nosemgrep: goldsmith.require-tenant-transaction
+        `SELECT COUNT(*)::text AS total
+         FROM invoices i
+         WHERE i.status = 'ISSUED'
+           AND i.total_paise - COALESCE(
+             (SELECT SUM(p.amount_paise)
+              FROM payments p
+              WHERE p.invoice_id = i.id AND p.status = 'CONFIRMED'), 0
+           ) > 0`,
+        [],
+      );
+
+      const itemsRes = await tx.query<{
+        id:               string;
+        invoice_number:   string;
+        customer_name:    string;
+        customer_phone:   string | null;
+        total_paise:      string;
+        balance_due_paise: string;
+        issued_at:        Date | null;
+      }>(
+        // nosemgrep: goldsmith.require-tenant-transaction
+        `SELECT
+           i.id,
+           i.invoice_number,
+           i.customer_name,
+           i.customer_phone,
+           i.total_paise::text,
+           (i.total_paise - COALESCE(
+             (SELECT SUM(p.amount_paise)
+              FROM payments p
+              WHERE p.invoice_id = i.id AND p.status = 'CONFIRMED'), 0
+           ))::text AS balance_due_paise,
+           i.issued_at
+         FROM invoices i
+         WHERE i.status = 'ISSUED'
+           AND i.total_paise - COALESCE(
+             (SELECT SUM(p.amount_paise)
+              FROM payments p
+              WHERE p.invoice_id = i.id AND p.status = 'CONFIRMED'), 0
+           ) > 0
+         ORDER BY i.issued_at DESC
+         LIMIT $1`,
+        [HARD_CAP],
+      );
+
+      return {
+        items: itemsRes.rows.map((row) => ({
+          id:               row.id,
+          invoice_number:   row.invoice_number,
+          customer_name:    row.customer_name,
+          customer_phone:   row.customer_phone,
+          total_paise:      row.total_paise,
+          balance_due_paise: row.balance_due_paise,
+          issued_at:        row.issued_at?.toISOString() ?? null,
+        })),
+        total: parseInt(countRes.rows[0]!.total, 10),
+        page:  1,
+        limit: HARD_CAP,
+      };
+    });
+  }
+
   async getCustomerLtv(limit: number): Promise<CustomerLtvItem[]> {
     const safeLimit = Math.min(Math.max(1, limit), 50);
 
@@ -230,6 +333,84 @@ export class ReportsService {
           count: parseInt(r.count, 10),
         })),
       };
+    });
+  }
+
+  async getStockAging(): Promise<StockAgingResult> {
+    return withTenantTx(this.pool, async (tx) => {
+      const r = await tx.query<{
+        id: string;
+        sku: string;
+        metal: string;
+        purity: string;
+        weight_g: string;
+        cost_paise: string | null;
+        created_at: Date;
+        days_in_stock: number;
+        bucket: StockAgingBucketLabel;
+      }>(
+        // RLS scopes by app.current_shop_id; do NOT add WHERE shop_id = $1
+        // (would shadow RLS predicate; flagged by goldsmith.require-tenant-transaction).
+        `WITH aged AS (
+           SELECT id, sku, metal, purity,
+                  gross_weight_g::text AS weight_g,
+                  cost_paise::text     AS cost_paise,
+                  created_at,
+                  FLOOR(EXTRACT(EPOCH FROM (now() - created_at)) / 86400)::int AS days_in_stock
+           FROM products
+           WHERE status = 'IN_STOCK'
+         )
+         SELECT *,
+                CASE
+                  WHEN days_in_stock <  30 THEN '<30d'
+                  WHEN days_in_stock <  60 THEN '30-60d'
+                  WHEN days_in_stock <  90 THEN '60-90d'
+                  ELSE                          '90d+'
+                END AS bucket
+         FROM aged
+         ORDER BY days_in_stock DESC`,
+        [],
+      );
+
+      const items: StockAgingItem[] = r.rows.map((row) => ({
+        id:             row.id,
+        sku:            row.sku,
+        metal:          row.metal,
+        purity:         row.purity,
+        weightG:        row.weight_g,
+        daysInStock:    row.days_in_stock,
+        bucket:         row.bucket,
+        costPaise:      row.cost_paise,
+        firstListedAt:  row.created_at.toISOString(),
+      }));
+
+      const agg = new Map<StockAgingBucketLabel, { count: number; weightMg: bigint; costPaise: bigint }>();
+      for (const label of BUCKET_ORDER) {
+        agg.set(label, { count: 0, weightMg: 0n, costPaise: 0n });
+      }
+      for (const item of items) {
+        const bucket = agg.get(item.bucket)!;
+        bucket.count += 1;
+        // gross_weight_g is DECIMAL(12,4); aggregating to milligrams (3 decimals).
+        // The 4th decimal (0.1 mg) is truncated — acceptable for an aging report
+        // (totals are dashboard-precision); never use this code path for billing.
+        const [whole, frac = '000'] = item.weightG.split('.');
+        const mg = BigInt(whole!) * 1000n + BigInt(frac.padEnd(3, '0').slice(0, 3));
+        bucket.weightMg += mg;
+        if (item.costPaise !== null) bucket.costPaise += BigInt(item.costPaise);
+      }
+
+      const buckets: StockAgingBucket[] = BUCKET_ORDER.map((label) => {
+        const a = agg.get(label)!;
+        return {
+          label,
+          count:          a.count,
+          totalWeightMg:  a.weightMg.toString(),
+          totalCostPaise: a.costPaise.toString(),
+        };
+      });
+
+      return { buckets, items };
     });
   }
 }

@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { colors, spacing } from '@goldsmith/ui-tokens';
 import { useDailySummary, formatPaise, formatWeightMg } from '../../src/features/reports/useReports';
+import { ExportButtons } from '../../src/features/reports/components/ExportButtons';
 
 const GOLD = '#B58A3C';
 
@@ -65,6 +66,12 @@ export default function DailySummaryScreen(): React.ReactElement {
           <Text style={[styles.arrowText, !canGoForward && styles.arrowTextDisabled]}>{'›'}</Text>
         </Pressable>
       </View>
+
+      <ExportButtons
+        reportType="daily-summary"
+        csvParams={{ date }}
+        pdfParams={{ date }}
+      />
 
       {isLoading && (
         <ActivityIndicator color={GOLD} size="large" style={{ marginTop: 40 }} />

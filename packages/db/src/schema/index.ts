@@ -19,6 +19,7 @@ export * from './invoices';
 export * from './invoice-items';
 export * from './payments';
 export * from './pmla-aggregates';
+export * from './reports-pdf-exports';
 export * from './credit-notes';
 export * from './customers';
 export * from './urd-purchases';

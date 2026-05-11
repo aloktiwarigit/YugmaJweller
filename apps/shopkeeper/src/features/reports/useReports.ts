@@ -92,6 +92,41 @@ export function useLoyaltySummary(): UseQueryResult<LoyaltySummaryData> {
   });
 }
 
+export interface StockAgingBucket {
+  label: '<30d' | '30-60d' | '60-90d' | '90d+';
+  count: number;
+  totalWeightMg: string;
+  totalCostPaise: string;
+}
+
+export interface StockAgingItem {
+  id: string;
+  sku: string;
+  metal: string;
+  purity: string;
+  weightG: string;
+  daysInStock: number;
+  bucket: StockAgingBucket['label'];
+  costPaise: string | null;
+  firstListedAt: string;
+}
+
+export interface StockAgingData {
+  buckets: StockAgingBucket[];
+  items: StockAgingItem[];
+}
+
+export function useStockAging(): UseQueryResult<StockAgingData> {
+  return useQuery({
+    queryKey: ['reports', 'stock-aging'],
+    queryFn: async () => {
+      const res = await api.get<StockAgingData>(`/api/v1/reports/stock-aging`);
+      return res.data;
+    },
+    staleTime: 300_000,
+  });
+}
+
 export function formatPaise(paise: string): string {
   const rupees = Math.round(parseInt(paise, 10) / 100);
   return new Intl.NumberFormat('hi-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(rupees);

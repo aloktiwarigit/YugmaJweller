@@ -95,6 +95,10 @@ module.exports = {
         '**/apps/api/src/modules/crm/dpdpa-deletion.service.ts',
         'apps/api/src/modules/rate-lock-bookings/rate-lock-bookings.module.ts',
         '**/apps/api/src/modules/rate-lock-bookings/rate-lock-bookings.module.ts',
+        'apps/api/src/modules/reports/reports.module.ts',
+        '**/apps/api/src/modules/reports/reports.module.ts',
+        'apps/api/src/modules/reports/reports-export.service.ts',
+        '**/apps/api/src/modules/reports/reports-export.service.ts',
       ],
       rules: {
         'no-restricted-imports': ['error', {

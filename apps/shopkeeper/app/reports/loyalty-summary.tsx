@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { colors, spacing } from '@goldsmith/ui-tokens';
 import { useLoyaltySummary } from '../../src/features/reports/useReports';
+import { ExportButtons } from '../../src/features/reports/components/ExportButtons';
 
 const GOLD = '#B58A3C';
 
@@ -53,6 +54,8 @@ export default function LoyaltySummaryScreen(): React.ReactElement {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ExportButtons reportType="loyalty-summary" />
+
       {/* Hero: total members */}
       <View style={styles.heroCard}>
         <Text style={styles.heroValue}>{totalMembers}</Text>

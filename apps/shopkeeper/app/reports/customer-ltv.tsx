@@ -5,6 +5,7 @@ import {
 import { colors, spacing } from '@goldsmith/ui-tokens';
 import { useCustomerLtv, formatPaise } from '../../src/features/reports/useReports';
 import type { CustomerLtvItem } from '../../src/features/reports/useReports';
+import { ExportButtons } from '../../src/features/reports/components/ExportButtons';
 
 const GOLD = '#B58A3C';
 
@@ -68,6 +69,8 @@ export default function CustomerLtvScreen(): React.ReactElement {
 
   return (
     <View style={styles.container}>
+      <ExportButtons reportType="customer-ltv" csvParams={{}} pdfParams={{}} />
+
       <View style={styles.headerRow}>
         <Text style={styles.headerLabel}>शीर्ष {data.length} ग्राहक — कुल खरीद के आधार पर</Text>
       </View>
