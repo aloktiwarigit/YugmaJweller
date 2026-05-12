@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-04T22:25:48.550Z",
+  "generated": "2026-05-12T03:43:42.812Z",
   "docs": [
     {
       "path": "_bmad-output/planning-artifacts/adr/0001-auth-provider-supabase.md",
@@ -290,6 +290,14 @@
       "supersededBy": null
     },
     {
+      "path": "docs/AGENT-START-HERE.md",
+      "kind": "other",
+      "estimatedTokens": 480,
+      "readWhen": "reference only",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
       "path": "docs/adr/0001-auth-provider-supabase.md",
       "kind": "adr",
       "estimatedTokens": 680,
@@ -418,6 +426,14 @@
       "supersededBy": null
     },
     {
+      "path": "docs/adr/0017-customer-storefront-architecture.md",
+      "kind": "adr",
+      "estimatedTokens": 1590,
+      "readWhen": "checking architecture decisions",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
       "path": "docs/adr/README.md",
       "kind": "adr",
       "estimatedTokens": 290,
@@ -426,10 +442,18 @@
       "supersededBy": null
     },
     {
-      "path": "docs/code-truth-completion-audit-2026-05-04.md",
-      "kind": "audit",
-      "estimatedTokens": 2670,
-      "readWhen": "gap analysis or completion assessment",
+      "path": "docs/agent-context/README.md",
+      "kind": "other",
+      "estimatedTokens": 300,
+      "readWhen": "reference only",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/current-implementation-status.md",
+      "kind": "other",
+      "estimatedTokens": 720,
+      "readWhen": "reference only",
       "avoidByDefault": false,
       "supersededBy": null
     },
@@ -437,6 +461,14 @@
       "path": "docs/customer-storefront-gap-analysis-2026-05-01.md",
       "kind": "other",
       "estimatedTokens": 4410,
+      "readWhen": "reference only",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/customer-web-aspirational-storefront-spec-2026-05-06.md",
+      "kind": "other",
+      "estimatedTokens": 4630,
       "readWhen": "reference only",
       "avoidByDefault": false,
       "supersededBy": null
@@ -498,6 +530,46 @@
       "supersededBy": null
     },
     {
+      "path": "docs/reviews/archived-story-briefs/STORY-A1A3-BRIEF.md",
+      "kind": "review",
+      "estimatedTokens": 1400,
+      "readWhen": "historical context only — not for completion proof",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/reviews/archived-story-briefs/STORY-A2-BRIEF.md",
+      "kind": "review",
+      "estimatedTokens": 1580,
+      "readWhen": "historical context only — not for completion proof",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/reviews/archived-story-briefs/STORY-A4-BRIEF.md",
+      "kind": "review",
+      "estimatedTokens": 2400,
+      "readWhen": "historical context only — not for completion proof",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/reviews/archived-story-briefs/STORY-A5A6-BRIEF.md",
+      "kind": "review",
+      "estimatedTokens": 1510,
+      "readWhen": "historical context only — not for completion proof",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/reviews/archived-story-briefs/codex-review-a1a3.md",
+      "kind": "review",
+      "estimatedTokens": 77690,
+      "readWhen": "historical context only — not for completion proof",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
       "path": "docs/reviews/codex-2026-04-20-story-2.5-manual.md",
       "kind": "review",
       "estimatedTokens": 390,
@@ -549,6 +621,22 @@
       "path": "docs/reviews/codex-pr1.md",
       "kind": "review",
       "estimatedTokens": 167810,
+      "readWhen": "historical context only — not for completion proof",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/reviews/codex-review-a1a3-full.md",
+      "kind": "review",
+      "estimatedTokens": 83460,
+      "readWhen": "historical context only — not for completion proof",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/reviews/codex-review-a1a3-mainrepo.md",
+      "kind": "review",
+      "estimatedTokens": 68290,
       "readWhen": "historical context only — not for completion proof",
       "avoidByDefault": true,
       "supersededBy": null
@@ -970,6 +1058,70 @@
       "supersededBy": null
     },
     {
+      "path": "docs/superpowers/plans/2026-05-04-ws2b-profile-timeline.md",
+      "kind": "plan",
+      "estimatedTokens": 22500,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/plans/2026-05-05-ws-3a-reports-completion-plan.md",
+      "kind": "plan",
+      "estimatedTokens": 36860,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/plans/2026-05-05-ws2a-shopkeeper-nav.md",
+      "kind": "plan",
+      "estimatedTokens": 10630,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/plans/2026-05-06-story-a1a3-storefront-schema.md",
+      "kind": "plan",
+      "estimatedTokens": 11900,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/plans/2026-05-06-story-a2-collections.md",
+      "kind": "plan",
+      "estimatedTokens": 6380,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/plans/2026-05-06-story-a5a6-storefront-config-reviews-visibility.md",
+      "kind": "plan",
+      "estimatedTokens": 10070,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/plans/2026-05-07-story-a4-customer-shared.md",
+      "kind": "plan",
+      "estimatedTokens": 14800,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/plans/2026-05-07-story-b4-public-reviews.md",
+      "kind": "plan",
+      "estimatedTokens": 9820,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
       "path": "docs/superpowers/plans/_TEMPLATE-work-stream.md",
       "kind": "plan",
       "estimatedTokens": 1400,
@@ -1122,9 +1274,73 @@
       "supersededBy": null
     },
     {
+      "path": "docs/superpowers/specs/2026-05-04-ws2b-profile-timeline-design.md",
+      "kind": "spec",
+      "estimatedTokens": 2590,
+      "readWhen": "implementing or reviewing a specific story",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-05-ws-3a-reports-completion-design.md",
+      "kind": "spec",
+      "estimatedTokens": 2910,
+      "readWhen": "implementing or reviewing a specific story",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-05-ws2a-shopkeeper-nav-design.md",
+      "kind": "spec",
+      "estimatedTokens": 2220,
+      "readWhen": "implementing or reviewing a specific story",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-06-story-a1a3-storefront-schema.md",
+      "kind": "spec",
+      "estimatedTokens": 2900,
+      "readWhen": "implementing or reviewing a specific story",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-06-story-a2-collections-design.md",
+      "kind": "spec",
+      "estimatedTokens": 3150,
+      "readWhen": "implementing or reviewing a specific story",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-06-story-a5a6-storefront-config-reviews-visibility.md",
+      "kind": "spec",
+      "estimatedTokens": 3350,
+      "readWhen": "implementing or reviewing a specific story",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-07-story-b4-public-reviews.md",
+      "kind": "spec",
+      "estimatedTokens": 2610,
+      "readWhen": "implementing or reviewing a specific story",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
       "path": "docs/threat-model.md",
       "kind": "other",
       "estimatedTokens": 3660,
+      "readWhen": "reference only",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/verification/local-qa-checklist.md",
+      "kind": "other",
+      "estimatedTokens": 1110,
       "readWhen": "reference only",
       "avoidByDefault": false,
       "supersededBy": null

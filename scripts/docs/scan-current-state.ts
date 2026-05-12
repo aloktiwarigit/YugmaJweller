@@ -1,0 +1,181 @@
+import { writeFileSync } from 'fs';
+import { join, resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+type Status = 'implemented' | 'partial' | 'missing' | 'deferred';
+
+interface AreaState {
+  area: string;
+  status: Status;
+  sourcePaths: string[];
+  tests: string[];
+  notes: string[];
+  gaps: string[];
+}
+
+const areas: AreaState[] = [
+  {
+    area: 'tenant-isolation-and-rls',
+    status: 'implemented',
+    sourcePaths: ['packages/db/src/migrations', 'packages/tenant-context/src', 'packages/testing/tenant-isolation/src'],
+    tests: ['packages/testing/tenant-isolation/test', 'apps/api/test/tenant-boot.integration.test.ts'],
+    notes: ['Tenant context is injected by NestJS interceptor and enforced through RLS-aware DB helpers.'],
+    gaps: ['Endpoint walker exists but is not a full blocking E2E proof.'],
+  },
+  {
+    area: 'auth-rbac-staff-audit',
+    status: 'implemented',
+    sourcePaths: ['apps/api/src/modules/auth', 'packages/auth-client/src', 'apps/shopkeeper/app/(auth)'],
+    tests: ['apps/api/src/modules/auth', 'apps/shopkeeper/test/AuthProvider.test.tsx', 'apps/shopkeeper/test/phone.screen.test.tsx', 'apps/shopkeeper/test/otp.screen.test.tsx'],
+    notes: ['Firebase Auth phone OTP, staff invite/revoke, role/policy guards, audit log, and logout-all are present. Shopkeeper OTP login and session restore are Motorola-device verified for the anchor dev account.'],
+    gaps: [],
+  },
+  {
+    area: 'shop-settings',
+    status: 'implemented',
+    sourcePaths: ['apps/api/src/modules/settings', 'apps/shopkeeper/app/settings', 'packages/shared/src/schemas'],
+    tests: ['apps/api/src/modules/settings', 'apps/shopkeeper/test/MakingChargeRow.test.tsx', 'apps/shopkeeper/test/WastageRow.test.tsx', 'apps/shopkeeper/test/RateLockDurationPicker.test.tsx'],
+    notes: ['Shop profile, making charges, wastage, loyalty, rate-lock duration, try-at-home, policies, notification preferences, and feature flags are wired.'],
+    gaps: [],
+  },
+  {
+    area: 'inventory-catalog-images',
+    status: 'implemented',
+    sourcePaths: ['apps/api/src/modules/inventory', 'apps/api/src/modules/catalog', 'apps/shopkeeper/app/inventory', 'apps/customer-web/app/products', 'apps/customer-mobile/app/browse'],
+    tests: ['apps/api/src/modules/inventory', 'apps/api/src/modules/catalog', 'apps/shopkeeper/test/inventory-quick-actions.test.tsx'],
+    notes: ['Product CRUD/search, barcode labels, CSV import, state machine, publish/unpublish, valuation, dead stock, stock movements, product images, and customer catalog are present.'],
+    gaps: ['Storefront payment gateway, live inventory reservation, CMS management, and full SEO/marketing operations remain deferred.'],
+  },
+  {
+    area: 'pricing-rates',
+    status: 'implemented',
+    sourcePaths: ['apps/api/src/modules/pricing', 'packages/integrations/rates', 'packages/money/src'],
+    tests: ['apps/api/src/modules/pricing', 'packages/money/test'],
+    notes: ['Current rates, rate history, manual override, provider adapters, and decimal pricing primitives are present.'],
+    gaps: [],
+  },
+  {
+    area: 'billing-compliance-payments',
+    status: 'partial',
+    sourcePaths: ['apps/api/src/modules/billing', 'packages/compliance/src', 'apps/shopkeeper/app/billing'],
+    tests: ['apps/api/src/modules/billing', 'apps/api/test/estimate.integration.test.ts'],
+    notes: ['Invoices, estimates, GST/PAN/269ST/PMLA/HUID gates, void/credit note, payment recording, URD purchase, GSTR CSV, invoice share URL, and compliance report templates are present.'],
+    gaps: ['Invoice PDF service still returns an HTML-backed public URL placeholder.', 'Provider-backed WhatsApp sending is not implemented.'],
+  },
+  {
+    area: 'crm-customer-data',
+    status: 'implemented',
+    sourcePaths: ['apps/api/src/modules/crm', 'apps/shopkeeper/app/customers'],
+    tests: ['apps/api/src/modules/crm'],
+    notes: ['Customers, family, notes, occasions, history, balance, consent, search, and DPDPA deletion workflows are present.'],
+    gaps: ['Customer browsing history from FR67 is not a complete CRM surface.'],
+  },
+  {
+    area: 'loyalty',
+    status: 'implemented',
+    sourcePaths: ['apps/api/src/modules/loyalty', 'apps/customer-mobile/app/loyalty', 'apps/customer-web/app/loyalty'],
+    tests: ['apps/api/src/modules/loyalty', 'apps/api/src/modules/settings/settings.service.loyalty.test.ts'],
+    notes: ['Loyalty config, customer loyalty read APIs, adjustments, accrual event listener, and summary reporting are present.'],
+    gaps: ['Referral-code loyalty bonuses FR140 are not implemented.'],
+  },
+  {
+    area: 'rate-lock-custom-orders-try-at-home',
+    status: 'partial',
+    sourcePaths: ['apps/api/src/modules/rate-lock-bookings', 'apps/api/src/modules/custom-orders', 'apps/api/src/modules/try-at-home-bookings', 'apps/shopkeeper/app/rate-lock', 'apps/shopkeeper/app/custom-orders', 'apps/shopkeeper/app/try-at-home', 'apps/customer-mobile/app/rate-lock', 'apps/customer-mobile/app/try-at-home'],
+    tests: ['apps/api/src/modules/rate-lock-bookings', 'apps/api/src/modules/custom-orders', 'apps/api/src/modules/try-at-home-bookings'],
+    notes: ['Shopkeeper management routes and customer-mobile booking/progress surfaces exist. Profile timeline reads purchases, custom orders, rate locks, and try-at-home.'],
+    gaps: ['Custom order modification requests and real outbound progress notifications are not implemented.'],
+  },
+  {
+    area: 'reports-analytics',
+    status: 'partial',
+    sourcePaths: ['apps/api/src/modules/reports', 'apps/api/src/modules/analytics', 'apps/shopkeeper/app/reports', 'apps/shopkeeper/app/inventory/dead-stock.tsx'],
+    tests: ['apps/api/src/modules/reports', 'apps/api/src/modules/analytics'],
+    notes: ['Daily summary, outstanding, customer LTV, loyalty summary, GSTR CSV, product view capture, and dead-stock inventory screen are present.'],
+    gaps: ['FR119 broad CSV/PDF export for every report is not complete.', 'Hot/cold dashboards and per-customer browsing history are incomplete.'],
+  },
+  {
+    area: 'customer-web-storefront',
+    status: 'partial',
+    sourcePaths: ['apps/customer-web/app', 'apps/customer-web/components', 'apps/customer-web/lib'],
+    tests: ['apps/customer-web/lib/tenant-slug.test.ts'],
+    notes: ['Home, product list, PDP, wishlist UI, reviews, size guide, return policy, contact, rate-lock info, try-at-home info, loyalty, admin console, FAQ, shipping/cancellation/privacy/terms, buying guides, sitemap, trust strips, PDP sharing, EMI calculator, related products, and structured data exist. Localhost defaults to the anchor-dev tenant for dev storefront boot.'],
+    gaps: ['Wishlist is localStorage-backed.', 'Payment gateway, live inventory reservation, CMS management, and full SEO/marketing operations remain deferred.'],
+  },
+  {
+    area: 'customer-mobile',
+    status: 'partial',
+    sourcePaths: ['apps/customer-mobile/app', 'apps/customer-mobile/src'],
+    tests: ['apps/customer-mobile/test', 'apps/customer-mobile/src'],
+    notes: ['Auth gate, home, browse, wishlist, profile, loyalty, PDP, policy, size guide, rate-lock, try-at-home, profile timeline, address-book entry point, and referral entry point are present. Duplicate PDP route has been removed. Android pnpm Gradle prebuild and debug assemble/install are verified from a short Windows path.'],
+    gaps: ['Persisted customer address and referral backend APIs are deferred.'],
+  },
+  {
+    area: 'shopkeeper-mobile-ui',
+    status: 'partial',
+    sourcePaths: ['apps/shopkeeper/app', 'apps/shopkeeper/src'],
+    tests: ['apps/shopkeeper/test'],
+    notes: ['Main tabs, More tab, inventory quick actions, billing hub, reports, settings, CRM, rate-lock, custom-orders, and try-at-home route groups are reachable. Android pnpm Gradle resolution, React Navigation alignment, Hindi tab labels, OTP login, and API session restore are device verified on Motorola.'],
+    gaps: ['Dashboard still has stub CTAs and a flag-gated KPI card.'],
+  },
+  {
+    area: 'platform-admin',
+    status: 'partial',
+    sourcePaths: ['apps/api/src/modules/platform-admin', 'apps/customer-web/app/admin'],
+    tests: ['apps/api/src/modules/platform-admin'],
+    notes: ['Tenant create/list/update/suspend/unsuspend/export, subscriptions, metrics, impersonation, admin login, and tenant table UI are present.'],
+    gaps: ['Full tenant terminate/delete with 30-day recovery and global platform settings UI are not evidenced.'],
+  },
+  {
+    area: 'notifications',
+    status: 'deferred',
+    sourcePaths: ['apps/api/src/modules/settings', 'packages/queue/src', 'packages/integrations'],
+    tests: [],
+    notes: ['Notification preferences exist. Invoice share builds a WhatsApp deep link.'],
+    gaps: ['No NotificationsModule, outbox, AiSensy adapter, FCM push pipeline, broadcast flow, or quota log exists.'],
+  },
+  {
+    area: 'sync-offline',
+    status: 'partial',
+    sourcePaths: ['packages/sync/src', 'apps/api/src/modules/sync', 'apps/shopkeeper/src/db'],
+    tests: ['apps/api/src/modules/sync', 'packages/sync/test'],
+    notes: ['Sync pull/push protocol and WatermelonDB scaffolding exist.'],
+    gaps: ['Push path is scoped mostly to products; customers/settings sync expansion is deferred.'],
+  },
+];
+
+export async function generate(): Promise<Record<string, unknown>> {
+  return {
+    generated: new Date().toISOString(),
+    verifiedDate: '2026-05-06',
+    authority: 'Current source, migrations, reachable app routes, tests, and CI gates. BMAD docs are requirements, not completion proof.',
+    deliveryTarget: 'demo-ready, customer-customize, then deploy for the first paying jeweller',
+    supersedes: ['docs/code-truth-completion-audit-2026-05-04.md'],
+    statusLegend: {
+      implemented: 'Substantial code, route/API reachability, and some test evidence exist.',
+      partial: 'Useful implementation exists but requirement coverage or proof is incomplete.',
+      missing: 'No meaningful current-code evidence found.',
+      deferred: 'Intentionally out of current demo-ready scope unless a paying customer drives it.',
+    },
+    areas,
+    highRiskGaps: [
+      'Provider-backed notifications FR107-FR112 are deferred.',
+      'Storefront payment gateway, live inventory reservation, CMS management, and full SEO/marketing operations remain deferred.',
+      'Report export coverage FR119 is incomplete.',
+      'Persisted customer address book FR139 and referral FR140 backend contracts are deferred.',
+      'Tenant terminate/delete with recovery and global platform settings are incomplete.',
+    ],
+  };
+}
+
+if (process.argv[1]?.toLowerCase() === __filename.toLowerCase()) {
+  const repoRoot = resolve(__dirname, '../..');
+  const outPath = join(repoRoot, 'docs/agent-context/current-state.json');
+  generate().then((result) => {
+    writeFileSync(outPath, JSON.stringify(result, null, 2) + '\n');
+    console.log('current-state.json written');
+  }).catch((err) => { console.error(err); process.exit(1); });
+}

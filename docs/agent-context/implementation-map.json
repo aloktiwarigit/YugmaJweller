@@ -1,0 +1,1678 @@
+{
+  "generated": "2026-05-12T03:43:43.813Z",
+  "apps": [
+    {
+      "name": "@goldsmith/api",
+      "path": "apps/api",
+      "scripts": [
+        "build",
+        "lint",
+        "start",
+        "test",
+        "test:e2e",
+        "test:integration",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/customer-mobile",
+      "path": "apps/customer-mobile",
+      "scripts": [
+        "android",
+        "export",
+        "ios",
+        "lint",
+        "start",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/customer-web",
+      "path": "apps/customer-web",
+      "scripts": [
+        "build",
+        "dev",
+        "lint",
+        "start",
+        "test",
+        "test:axe",
+        "test:lighthouse-ci",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/shopkeeper",
+      "path": "apps/shopkeeper",
+      "scripts": [
+        "android",
+        "export",
+        "ios",
+        "lint",
+        "start",
+        "test",
+        "typecheck"
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "name": "eslint-plugin-goldsmith",
+      "path": "ops/eslint-rules/goldsmith",
+      "scripts": [
+        "test"
+      ]
+    },
+    {
+      "name": "@goldsmith/audit",
+      "path": "packages/audit",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "test:integration",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/auth-client",
+      "path": "packages/auth-client",
+      "scripts": [
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/cache",
+      "path": "packages/cache",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/compliance",
+      "path": "packages/compliance",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "test:unit",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/crypto-envelope",
+      "path": "packages/crypto-envelope",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/customer-shared",
+      "path": "packages/customer-shared",
+      "scripts": [
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/db",
+      "path": "packages/db",
+      "scripts": [
+        "build",
+        "db:assert-marked",
+        "lint",
+        "test",
+        "test:integration",
+        "test:unit",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/i18n",
+      "path": "packages/i18n",
+      "scripts": [
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/integrations-payments",
+      "path": "packages/integrations/payments",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/rates",
+      "path": "packages/integrations/rates",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/integrations-search",
+      "path": "packages/integrations/search",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/integrations-storage",
+      "path": "packages/integrations/storage",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/money",
+      "path": "packages/money",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "test:unit",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/observability",
+      "path": "packages/observability",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "test:unit",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/queue",
+      "path": "packages/queue",
+      "scripts": [
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/secrets",
+      "path": "packages/secrets",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "test:unit",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/shared",
+      "path": "packages/shared",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/sync",
+      "path": "packages/sync",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "test:integration",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/tenant-config",
+      "path": "packages/tenant-config",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/tenant-context",
+      "path": "packages/tenant-context",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "test:integration",
+        "test:unit",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/testing-tenant-isolation",
+      "path": "packages/testing/tenant-isolation",
+      "scripts": [
+        "lint",
+        "test",
+        "test:tenant-isolation",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/testing-weight-precision",
+      "path": "packages/testing/weight-precision",
+      "scripts": [
+        "lint",
+        "test",
+        "test:unit",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/ui-mobile",
+      "path": "packages/ui-mobile",
+      "scripts": [
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/ui-tokens",
+      "path": "packages/ui-tokens",
+      "scripts": [
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/ui-web",
+      "path": "packages/ui-web",
+      "scripts": [
+        "lint",
+        "typecheck"
+      ]
+    }
+  ],
+  "apiControllers": [
+    {
+      "module": "analytics",
+      "file": "apps/api/src/modules/analytics/analytics.controller.ts",
+      "basePath": "/api/v1/analytics",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/v1/analytics/products/:id/views"
+        }
+      ]
+    },
+    {
+      "module": "auth",
+      "file": "apps/api/src/modules/auth/auth-compatibility.controller.ts",
+      "basePath": "/auth",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/auth/session"
+        },
+        {
+          "method": "GET",
+          "path": "/auth/me"
+        }
+      ]
+    },
+    {
+      "module": "auth",
+      "file": "apps/api/src/modules/auth/auth.controller.ts",
+      "basePath": "/api/v1/auth",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/v1/auth/session"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/auth/me"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/auth/invite"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/auth/users"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/auth/roles/:role/permissions"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/auth/audit-log"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/auth/audit-log/export"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/auth/logout/all"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/v1/auth/staff/:userId"
+        }
+      ]
+    },
+    {
+      "module": "billing",
+      "file": "apps/api/src/modules/billing/billing.controller.ts",
+      "basePath": "/api/v1/billing",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/v1/billing/invoices"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/billing/invoices"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/billing/invoices/:id"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/billing/invoices/:id/payments/cash"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/billing/invoices/:id/pan-decrypt"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/billing/invoices/:id/void"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/billing/invoices/:id/credit-note"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/billing/invoices/:id/share/whatsapp"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/billing/estimates"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/billing/estimates"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/billing/estimates/:id"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/billing/estimates/:id/convert"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/billing/compliance/gstr"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/billing/invoices/:id/payments/upi"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/billing/invoices/:id/payments/manual"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/billing/invoices/:id/payments"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/billing/urd-purchases"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/billing/urd-purchases"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/billing/invoices/:id/urd-apply/:purchaseId"
+        }
+      ]
+    },
+    {
+      "module": "billing",
+      "file": "apps/api/src/modules/billing/compliance-reports.controller.ts",
+      "basePath": "/api/v1/billing",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/v1/billing/compliance/ctr"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/billing/compliance/str-template"
+        }
+      ]
+    },
+    {
+      "module": "catalog",
+      "file": "apps/api/src/modules/catalog/catalog.controller.ts",
+      "basePath": "/api/v1/catalog",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/tenant-config"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/products"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/products/featured"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/products/new-arrivals"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/products/top-sellers"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/products/:id"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/products/:id/verify-huid"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/products/:id/images"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/products/:id/reviews"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/products/:id/recommendations"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/categories"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/collections"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/collections/:slug"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/storefront-config"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/rates"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/catalog/products/:id/view"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/return-policy"
+        }
+      ]
+    },
+    {
+      "module": "crm",
+      "file": "apps/api/src/modules/crm/crm.controller.ts",
+      "basePath": "/api/v1/crm",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/v1/crm/customers"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/crm/customers"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/crm/customers/search"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/crm/customers/:id"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/crm/customers/:id"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/crm/customers/:id/family"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/v1/crm/customers/:id/family/:linkId"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/crm/customers/:id/family"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/crm/customers/:id/notes"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/crm/customers/:id/notes"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/v1/crm/customers/:id/notes/:noteId"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/crm/customers/:id/occasions"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/crm/customers/:id/occasions"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/v1/crm/customers/:id/occasions/:occId"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/crm/customers/:id/history"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/crm/customers/:id/balance"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/crm/customers/:id/request-deletion"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/crm/customers/:id/restore-deletion"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/v1/crm/customer/me"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/crm/customers/:id/consent/viewing"
+        }
+      ]
+    },
+    {
+      "module": "custom-orders",
+      "file": "apps/api/src/modules/custom-orders/custom-orders.controller.ts",
+      "basePath": "/api/v1/custom-orders",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/v1/custom-orders"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/custom-orders"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/custom-orders/:id"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/custom-orders/:id/deposit"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/custom-orders/:id/deposit/cash"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/custom-orders/:id/milestones"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/custom-orders/:id/ready"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/custom-orders/:id/convert-to-invoice"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/custom-orders/:id/presign-upload"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/custom-orders/webhook/razorpay"
+        }
+      ]
+    },
+    {
+      "module": "customer",
+      "file": "apps/api/src/modules/customer/customer.controller.ts",
+      "basePath": "/api/v1/customer",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/v1/customer/loyalty"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/customer/rate-lock/bookings"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/customer/try-at-home/bookings"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/customer/purchases"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/customer/custom-orders"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/customer/rate-lock/bookings"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/customer/try-at-home/bookings"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/customer/rate-lock/bookings/:id/payment-page"
+        }
+      ]
+    },
+    {
+      "module": "inventory",
+      "file": "apps/api/src/modules/inventory/inventory.controller.ts",
+      "basePath": "/api/v1/inventory",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/v1/inventory/valuation"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/inventory/search"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/inventory/dead-stock"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/inventory/products"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/inventory/products"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/inventory/products/:id"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/inventory/products/:id"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/inventory/products/:id/status"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/inventory/products/:id/publish"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/inventory/products/:id/unpublish"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/inventory/products/barcodes"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/inventory/bulk-import"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/inventory/bulk-import/:jobId/trigger"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/inventory/bulk-import/:jobId"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/inventory/products/:id/movements"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/inventory/products/:id/movements"
+        }
+      ]
+    },
+    {
+      "module": "inventory",
+      "file": "apps/api/src/modules/inventory/product-images.controller.ts",
+      "basePath": "/api/v1/products/:productId/images",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/v1/products/:productId/images"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/products/:productId/images"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/v1/products/:productId/images/:imageId"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/products/:productId/images/order"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/products/:productId/images/:imageId"
+        }
+      ]
+    },
+    {
+      "module": "loyalty",
+      "file": "apps/api/src/modules/loyalty/loyalty.controller.ts",
+      "basePath": "/api/v1/loyalty",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/v1/loyalty/customers/:id"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/loyalty/customers/:id/transactions"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/loyalty/customers/:id/adjust"
+        }
+      ]
+    },
+    {
+      "module": "platform-admin",
+      "file": "apps/api/src/modules/platform-admin/platform-admin.controller.ts",
+      "basePath": "/platform/admin",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/platform/admin/tenants"
+        },
+        {
+          "method": "GET",
+          "path": "/platform/admin/tenants"
+        },
+        {
+          "method": "POST",
+          "path": "/platform/admin/tenants/:id"
+        },
+        {
+          "method": "POST",
+          "path": "/platform/admin/tenants/:id/suspend"
+        },
+        {
+          "method": "POST",
+          "path": "/platform/admin/tenants/:id/unsuspend"
+        },
+        {
+          "method": "GET",
+          "path": "/platform/admin/tenants/:id/export"
+        },
+        {
+          "method": "POST",
+          "path": "/platform/admin/subscriptions"
+        },
+        {
+          "method": "GET",
+          "path": "/platform/admin/subscriptions"
+        },
+        {
+          "method": "GET",
+          "path": "/platform/admin/metrics"
+        },
+        {
+          "method": "POST",
+          "path": "/platform/admin/impersonate"
+        },
+        {
+          "method": "DELETE",
+          "path": "/platform/admin/impersonate/:sessionId"
+        }
+      ]
+    },
+    {
+      "module": "pricing",
+      "file": "apps/api/src/modules/pricing/pricing.controller.ts",
+      "basePath": "/api/v1/rates",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/v1/rates/current"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/rates/history"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/rates/override"
+        }
+      ]
+    },
+    {
+      "module": "rate-lock-bookings",
+      "file": "apps/api/src/modules/rate-lock-bookings/rate-lock-bookings.controller.ts",
+      "basePath": "/api/v1/rate-lock/bookings",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/v1/rate-lock/bookings"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/rate-lock/bookings"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/rate-lock/bookings/:id"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/rate-lock/bookings/webhook/razorpay"
+        }
+      ]
+    },
+    {
+      "module": "reports",
+      "file": "apps/api/src/modules/reports/reports.controller.ts",
+      "basePath": "/api/v1/reports",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/v1/reports/daily-summary"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/reports/outstanding"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/reports/customer-ltv"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/reports/loyalty-summary"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/reports/stock-aging"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/reports/daily-summary.csv"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/reports/outstanding.csv"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/reports/customer-ltv.csv"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/reports/loyalty-summary.csv"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/reports/stock-aging.csv"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/reports/exports"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/reports/exports/:id"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/reports/exports/:id/regenerate"
+        }
+      ]
+    },
+    {
+      "module": "reviews",
+      "file": "apps/api/src/modules/reviews/reviews.controller.ts",
+      "basePath": "/api/v1/reviews",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/v1/reviews"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/reviews/products/:productId"
+        }
+      ]
+    },
+    {
+      "module": "settings",
+      "file": "apps/api/src/modules/settings/settings.controller.ts",
+      "basePath": "/api/v1/settings",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/v1/settings/profile"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/settings/profile"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/settings/profile/logo-upload-url"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/settings/making-charges"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/settings/making-charges"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/settings/wastage"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/settings/wastage"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/settings/rate-lock"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/settings/rate-lock"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/settings/loyalty"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/settings/loyalty"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/settings/try-at-home"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/settings/try-at-home"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/settings/custom-order-policy"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/settings/custom-order-policy"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/settings/return-policy"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/settings/return-policy"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/settings/notification-prefs"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/settings/notification-prefs"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/settings/feature-flags"
+        }
+      ]
+    },
+    {
+      "module": "sync",
+      "file": "apps/api/src/modules/sync/sync.controller.ts",
+      "basePath": "/api/v1/sync",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/v1/sync/pull"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/sync/push"
+        }
+      ]
+    },
+    {
+      "module": "tenant-boot",
+      "file": "apps/api/src/modules/tenant-boot/tenant-boot.controller.ts",
+      "basePath": "/api/v1/tenant",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/v1/tenant/boot"
+        }
+      ]
+    },
+    {
+      "module": "try-at-home-bookings",
+      "file": "apps/api/src/modules/try-at-home-bookings/try-at-home-bookings.controller.ts",
+      "basePath": "/api/v1/try-at-home/bookings",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/v1/try-at-home/bookings"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/try-at-home/bookings"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/try-at-home/bookings/:id"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/try-at-home/bookings/:id/dispatch"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/try-at-home/bookings/:id/record-return"
+        }
+      ]
+    },
+    {
+      "module": "webhooks",
+      "file": "apps/api/src/modules/webhooks/razorpay.controller.ts",
+      "basePath": "/webhooks/razorpay",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/webhooks/razorpay"
+        }
+      ]
+    },
+    {
+      "module": "wishlist",
+      "file": "apps/api/src/modules/wishlist/wishlist.controller.ts",
+      "basePath": "/api/v1/wishlist",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/v1/wishlist"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/v1/wishlist/:productId"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/wishlist"
+        }
+      ]
+    }
+  ],
+  "uiRoutes": {
+    "shopkeeper": [
+      {
+        "file": "apps/shopkeeper/app/(auth)/_layout.tsx",
+        "route": "/_layout"
+      },
+      {
+        "file": "apps/shopkeeper/app/(auth)/otp.tsx",
+        "route": "/otp"
+      },
+      {
+        "file": "apps/shopkeeper/app/(auth)/phone.tsx",
+        "route": "/phone"
+      },
+      {
+        "file": "apps/shopkeeper/app/(tabs)/_layout.tsx",
+        "route": "/_layout"
+      },
+      {
+        "file": "apps/shopkeeper/app/(tabs)/billing.tsx",
+        "route": "/billing"
+      },
+      {
+        "file": "apps/shopkeeper/app/(tabs)/index.tsx",
+        "route": "/(tabs)"
+      },
+      {
+        "file": "apps/shopkeeper/app/(tabs)/inventory.tsx",
+        "route": "/inventory"
+      },
+      {
+        "file": "apps/shopkeeper/app/(tabs)/more.tsx",
+        "route": "/more"
+      },
+      {
+        "file": "apps/shopkeeper/app/(tabs)/reports.tsx",
+        "route": "/reports"
+      },
+      {
+        "file": "apps/shopkeeper/app/_layout.tsx",
+        "route": "/_layout"
+      },
+      {
+        "file": "apps/shopkeeper/app/billing/[id].tsx",
+        "route": "/billing/[id]"
+      },
+      {
+        "file": "apps/shopkeeper/app/billing/_layout.tsx",
+        "route": "/billing/_layout"
+      },
+      {
+        "file": "apps/shopkeeper/app/billing/estimate/[id].tsx",
+        "route": "/billing/estimate/[id]"
+      },
+      {
+        "file": "apps/shopkeeper/app/billing/estimate/index.tsx",
+        "route": "/billing/estimate"
+      },
+      {
+        "file": "apps/shopkeeper/app/billing/estimate/new.tsx",
+        "route": "/billing/estimate/new"
+      },
+      {
+        "file": "apps/shopkeeper/app/billing/new.tsx",
+        "route": "/billing/new"
+      },
+      {
+        "file": "apps/shopkeeper/app/billing/scan.tsx",
+        "route": "/billing/scan"
+      },
+      {
+        "file": "apps/shopkeeper/app/billing/urd-exchange.tsx",
+        "route": "/billing/urd-exchange"
+      },
+      {
+        "file": "apps/shopkeeper/app/custom-orders/[id].tsx",
+        "route": "/custom-orders/[id]"
+      },
+      {
+        "file": "apps/shopkeeper/app/custom-orders/_layout.tsx",
+        "route": "/custom-orders/_layout"
+      },
+      {
+        "file": "apps/shopkeeper/app/custom-orders/index.tsx",
+        "route": "/custom-orders"
+      },
+      {
+        "file": "apps/shopkeeper/app/custom-orders/new.tsx",
+        "route": "/custom-orders/new"
+      },
+      {
+        "file": "apps/shopkeeper/app/customers/[id].tsx",
+        "route": "/customers/[id]"
+      },
+      {
+        "file": "apps/shopkeeper/app/customers/_layout.tsx",
+        "route": "/customers/_layout"
+      },
+      {
+        "file": "apps/shopkeeper/app/customers/index.tsx",
+        "route": "/customers"
+      },
+      {
+        "file": "apps/shopkeeper/app/customers/new.tsx",
+        "route": "/customers/new"
+      },
+      {
+        "file": "apps/shopkeeper/app/index.tsx",
+        "route": "/"
+      },
+      {
+        "file": "apps/shopkeeper/app/inventory/[id]/analytics.tsx",
+        "route": "/inventory/[id]/analytics"
+      },
+      {
+        "file": "apps/shopkeeper/app/inventory/[id]/edit.tsx",
+        "route": "/inventory/[id]/edit"
+      },
+      {
+        "file": "apps/shopkeeper/app/inventory/[id]/images.tsx",
+        "route": "/inventory/[id]/images"
+      },
+      {
+        "file": "apps/shopkeeper/app/inventory/[id]/movements.tsx",
+        "route": "/inventory/[id]/movements"
+      },
+      {
+        "file": "apps/shopkeeper/app/inventory/_layout.tsx",
+        "route": "/inventory/_layout"
+      },
+      {
+        "file": "apps/shopkeeper/app/inventory/bulk-import.tsx",
+        "route": "/inventory/bulk-import"
+      },
+      {
+        "file": "apps/shopkeeper/app/inventory/dead-stock.tsx",
+        "route": "/inventory/dead-stock"
+      },
+      {
+        "file": "apps/shopkeeper/app/inventory/index.tsx",
+        "route": "/inventory"
+      },
+      {
+        "file": "apps/shopkeeper/app/inventory/new.tsx",
+        "route": "/inventory/new"
+      },
+      {
+        "file": "apps/shopkeeper/app/inventory/print-labels.tsx",
+        "route": "/inventory/print-labels"
+      },
+      {
+        "file": "apps/shopkeeper/app/inventory/valuation.tsx",
+        "route": "/inventory/valuation"
+      },
+      {
+        "file": "apps/shopkeeper/app/rate-lock/[id].tsx",
+        "route": "/rate-lock/[id]"
+      },
+      {
+        "file": "apps/shopkeeper/app/rate-lock/_layout.tsx",
+        "route": "/rate-lock/_layout"
+      },
+      {
+        "file": "apps/shopkeeper/app/rate-lock/index.tsx",
+        "route": "/rate-lock"
+      },
+      {
+        "file": "apps/shopkeeper/app/rates/_layout.tsx",
+        "route": "/rates/_layout"
+      },
+      {
+        "file": "apps/shopkeeper/app/rates/history.tsx",
+        "route": "/rates/history"
+      },
+      {
+        "file": "apps/shopkeeper/app/rates/override.tsx",
+        "route": "/rates/override"
+      },
+      {
+        "file": "apps/shopkeeper/app/reports/_layout.tsx",
+        "route": "/reports/_layout"
+      },
+      {
+        "file": "apps/shopkeeper/app/reports/customer-ltv.tsx",
+        "route": "/reports/customer-ltv"
+      },
+      {
+        "file": "apps/shopkeeper/app/reports/daily-summary.tsx",
+        "route": "/reports/daily-summary"
+      },
+      {
+        "file": "apps/shopkeeper/app/reports/gstr-export.tsx",
+        "route": "/reports/gstr-export"
+      },
+      {
+        "file": "apps/shopkeeper/app/reports/loyalty-summary.tsx",
+        "route": "/reports/loyalty-summary"
+      },
+      {
+        "file": "apps/shopkeeper/app/reports/outstanding.tsx",
+        "route": "/reports/outstanding"
+      },
+      {
+        "file": "apps/shopkeeper/app/reports/stock-aging.tsx",
+        "route": "/reports/stock-aging"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/_layout.tsx",
+        "route": "/settings/_layout"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/account.tsx",
+        "route": "/settings/account"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/audit-log.tsx",
+        "route": "/settings/audit-log"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/billing.tsx",
+        "route": "/settings/billing"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/custom-order-policy.tsx",
+        "route": "/settings/custom-order-policy"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/index.tsx",
+        "route": "/settings"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/loyalty.tsx",
+        "route": "/settings/loyalty"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/making-charges.tsx",
+        "route": "/settings/making-charges"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/notification-prefs.tsx",
+        "route": "/settings/notification-prefs"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/rate-lock.tsx",
+        "route": "/settings/rate-lock"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/reports.tsx",
+        "route": "/settings/reports"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/return-policy.tsx",
+        "route": "/settings/return-policy"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/shop-profile.tsx",
+        "route": "/settings/shop-profile"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/staff.tsx",
+        "route": "/settings/staff"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/theme.tsx",
+        "route": "/settings/theme"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/try-at-home.tsx",
+        "route": "/settings/try-at-home"
+      },
+      {
+        "file": "apps/shopkeeper/app/settings/wastage.tsx",
+        "route": "/settings/wastage"
+      },
+      {
+        "file": "apps/shopkeeper/app/try-at-home/[id].tsx",
+        "route": "/try-at-home/[id]"
+      },
+      {
+        "file": "apps/shopkeeper/app/try-at-home/_layout.tsx",
+        "route": "/try-at-home/_layout"
+      },
+      {
+        "file": "apps/shopkeeper/app/try-at-home/index.tsx",
+        "route": "/try-at-home"
+      },
+      {
+        "file": "apps/shopkeeper/app/try-at-home/new.tsx",
+        "route": "/try-at-home/new"
+      }
+    ],
+    "customerMobile": [
+      {
+        "file": "apps/customer-mobile/app/(auth)/_layout.tsx",
+        "route": "/_layout"
+      },
+      {
+        "file": "apps/customer-mobile/app/(auth)/welcome.tsx",
+        "route": "/welcome"
+      },
+      {
+        "file": "apps/customer-mobile/app/(tabs)/_layout.tsx",
+        "route": "/_layout"
+      },
+      {
+        "file": "apps/customer-mobile/app/(tabs)/browse.tsx",
+        "route": "/browse"
+      },
+      {
+        "file": "apps/customer-mobile/app/(tabs)/index.tsx",
+        "route": "/(tabs)"
+      },
+      {
+        "file": "apps/customer-mobile/app/(tabs)/profile.tsx",
+        "route": "/profile"
+      },
+      {
+        "file": "apps/customer-mobile/app/(tabs)/wishlist.tsx",
+        "route": "/wishlist"
+      },
+      {
+        "file": "apps/customer-mobile/app/_layout.tsx",
+        "route": "/_layout"
+      },
+      {
+        "file": "apps/customer-mobile/app/browse/[id].tsx",
+        "route": "/browse/[id]"
+      },
+      {
+        "file": "apps/customer-mobile/app/browse/policy.tsx",
+        "route": "/browse/policy"
+      },
+      {
+        "file": "apps/customer-mobile/app/browse/size-guide.tsx",
+        "route": "/browse/size-guide"
+      },
+      {
+        "file": "apps/customer-mobile/app/index.tsx",
+        "route": "/"
+      },
+      {
+        "file": "apps/customer-mobile/app/loyalty/index.tsx",
+        "route": "/loyalty"
+      },
+      {
+        "file": "apps/customer-mobile/app/profile/addresses.tsx",
+        "route": "/profile/addresses"
+      },
+      {
+        "file": "apps/customer-mobile/app/profile/referral.tsx",
+        "route": "/profile/referral"
+      },
+      {
+        "file": "apps/customer-mobile/app/rate-lock/index.tsx",
+        "route": "/rate-lock"
+      },
+      {
+        "file": "apps/customer-mobile/app/try-at-home/index.tsx",
+        "route": "/try-at-home"
+      }
+    ],
+    "customerWeb": [
+      {
+        "file": "apps/customer-web/app/admin/login/page.tsx",
+        "route": "/admin/login"
+      },
+      {
+        "file": "apps/customer-web/app/admin/page.tsx",
+        "route": "/admin"
+      },
+      {
+        "file": "apps/customer-web/app/buying-guide/[metal]/page.tsx",
+        "route": "/buying-guide/[metal]"
+      },
+      {
+        "file": "apps/customer-web/app/cancellation-policy/page.tsx",
+        "route": "/cancellation-policy"
+      },
+      {
+        "file": "apps/customer-web/app/contact/page.tsx",
+        "route": "/contact"
+      },
+      {
+        "file": "apps/customer-web/app/faq/page.tsx",
+        "route": "/faq"
+      },
+      {
+        "file": "apps/customer-web/app/loyalty/page.tsx",
+        "route": "/loyalty"
+      },
+      {
+        "file": "apps/customer-web/app/page.tsx",
+        "route": "/"
+      },
+      {
+        "file": "apps/customer-web/app/privacy/page.tsx",
+        "route": "/privacy"
+      },
+      {
+        "file": "apps/customer-web/app/products/[id]/page.tsx",
+        "route": "/products/[id]"
+      },
+      {
+        "file": "apps/customer-web/app/products/page.tsx",
+        "route": "/products"
+      },
+      {
+        "file": "apps/customer-web/app/rate-lock/page.tsx",
+        "route": "/rate-lock"
+      },
+      {
+        "file": "apps/customer-web/app/return-policy/page.tsx",
+        "route": "/return-policy"
+      },
+      {
+        "file": "apps/customer-web/app/shipping-policy/page.tsx",
+        "route": "/shipping-policy"
+      },
+      {
+        "file": "apps/customer-web/app/size-guide/[category]/page.tsx",
+        "route": "/size-guide/[category]"
+      },
+      {
+        "file": "apps/customer-web/app/terms/page.tsx",
+        "route": "/terms"
+      },
+      {
+        "file": "apps/customer-web/app/try-at-home/page.tsx",
+        "route": "/try-at-home"
+      },
+      {
+        "file": "apps/customer-web/app/wishlist/page.tsx",
+        "route": "/wishlist"
+      }
+    ]
+  },
+  "migrations": {
+    "count": 63,
+    "current": "0073",
+    "latest": "packages/db/src/migrations/0073_security_definer_schema_resolution.sql",
+    "recent": [
+      "packages/db/src/migrations/0058_product_images_tenant_fk.sql",
+      "packages/db/src/migrations/0059_reviews_wishlist_update_grant.sql",
+      "packages/db/src/migrations/0060_products_cost_paise.sql",
+      "packages/db/src/migrations/0066_products_storefront_columns.sql",
+      "packages/db/src/migrations/0067_collections.sql",
+      "packages/db/src/migrations/0068_products_primary_image.sql",
+      "packages/db/src/migrations/0069_shop_storefront_config.sql",
+      "packages/db/src/migrations/0070_product_reviews_visibility.sql",
+      "packages/db/src/migrations/0072_reports_pdf_exports.sql",
+      "packages/db/src/migrations/0073_security_definer_schema_resolution.sql"
+    ]
+  },
+  "rootScripts": {
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:integration": "turbo run test:integration",
+    "test:tenant-isolation": "turbo run test:tenant-isolation",
+    "build": "turbo run build",
+    "db:reset": "bash scripts/db-reset.sh",
+    "db:generate-rls": "tsx packages/db/src/codegen/generate-rls.ts",
+    "db:assert-marked": "tsx packages/db/src/codegen/assert-all-tables-marked.ts",
+    "semgrep": "semgrep --config ops/semgrep/ --error",
+    "seed:anchor": "tsx scripts/seed-anchor.ts",
+    "seed:anchor-dev-2": "tsx scripts/seed-anchor-dev-2.ts",
+    "seed:demo": "tsx scripts/seed/demo-tenant.ts",
+    "docs:context": "tsx scripts/docs/scan-repo-context.ts && tsx scripts/docs/extract-adrs.ts && tsx scripts/docs/extract-bmad-trace.ts && tsx scripts/docs/scan-docs.ts && tsx scripts/docs/extract-acceptance.ts && tsx scripts/docs/scan-current-state.ts && tsx scripts/docs/scan-implementation-map.ts",
+    "docs:validate": "tsx scripts/docs/validate-agent-context.ts",
+    "test:ci": "pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:integration && pnpm test:tenant-isolation && pnpm semgrep && pnpm docs:validate"
+  },
+  "ciJobs": [
+    "a11y-shopkeeper",
+    "build",
+    "build-shopkeeper",
+    "docs-validate",
+    "e2e-shopkeeper",
+    "install",
+    "integration",
+    "lighthouse-ci",
+    "lint",
+    "semgrep",
+    "tenant-isolation",
+    "typecheck",
+    "unit"
+  ]
+}

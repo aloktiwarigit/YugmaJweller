@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-04T22:25:47.967Z",
+  "generated": "2026-05-12T03:43:41.726Z",
   "adrs": [
     {
       "id": "ADR-0001",
@@ -329,6 +329,15 @@
       "supersededBy": null,
       "rules": [],
       "path": "docs/adr/0016-firebase-auth-id-token-direct.md"
+    },
+    {
+      "id": "ADR-0017",
+      "title": "Customer Storefront Architecture (Phase A–E uplift)",
+      "status": "accepted",
+      "supersedes": null,
+      "supersededBy": null,
+      "rules": [],
+      "path": "docs/adr/0017-customer-storefront-architecture.md"
     }
   ]
 }

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-04T22:25:47.739Z",
+  "generated": "2026-05-12T03:43:41.326Z",
   "repo": "Goldsmith",
   "description": "Multi-tenant white-label jewellery platform for local Indian jewellers",
   "stack": {
@@ -49,6 +49,10 @@
     {
       "name": "@goldsmith/crypto-envelope",
       "path": "packages/crypto-envelope"
+    },
+    {
+      "name": "@goldsmith/customer-shared",
+      "path": "packages/customer-shared"
     },
     {
       "name": "@goldsmith/db",
@@ -206,7 +210,7 @@
     ]
   },
   "migrations": {
-    "current": "0059",
+    "current": "0073",
     "reserved": "0060-0085",
     "pattern": "packages/db/src/migrations/{seq}_{slug}.sql"
   }
