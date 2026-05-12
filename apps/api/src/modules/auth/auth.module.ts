@@ -4,6 +4,7 @@ import { Redis } from '@goldsmith/cache';
 import { createPool } from '@goldsmith/db';
 import { PermissionsCache } from '@goldsmith/tenant-config';
 import { AuthController } from './auth.controller';
+import { AuthCompatibilityController } from './auth-compatibility.controller';
 import { AuthService } from './auth.service';
 import { AuthRepository } from './auth.repository';
 import { AuditLogRepository } from './audit-log.repository';
@@ -16,7 +17,7 @@ import { SMS_ADAPTER } from './sms/sms-adapter.interface';
 
 @Module({
   imports: [PassportModule],
-  controllers: [AuthController],
+  controllers: [AuthController, AuthCompatibilityController],
   providers: [
     {
       provide: 'PG_POOL',
