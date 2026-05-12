@@ -56,3 +56,14 @@ apps/customer-web/.next/
 
 # StubStorageAdapter scratch dir (created by API boot in dev/smoke mode)
 apps/api/tmp/
+
+# TypeScript build outputs leaked into package src/test (emit belongs in dist/)
+packages/*/src/**/*.js
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.js.map
+packages/*/test/**/*.js
+packages/*/test/**/*.d.ts
+packages/*/test/**/*.js.map
+
+# Playwright MCP local cache
+.playwright-mcp/
