@@ -32,7 +32,6 @@ export function ProductCard({ product }: { product: CatalogProductCard }) {
             // Category-aware illustrated fallback (ring / earring / pendant / bangle / necklace / silver).
             // Uses an SVG string from @goldsmith/customer-shared, served via a data: URI so it works
             // identically across SSR, edge runtime, and client bundle without bundler-specific imports.
-            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={`data:image/svg+xml;utf8,${encodeURIComponent(categoryToFallbackSvg(product.categoryName))}`}
               alt={product.categoryName ?? label}

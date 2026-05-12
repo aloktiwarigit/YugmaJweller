@@ -17,7 +17,7 @@ export type PublicImageRow = {
 const SIZES = '(max-width: 768px) 100vw, (max-width: 1280px) 60vw, 800px';
 
 function altFor(image: PublicImageRow, productName: string, index: number): string {
-  return image.alt_text ?? `${productName} – तस्वीर ${index + 1}`;
+  return image.alt_text ?? `${productName} - तस्वीर ${index + 1}`;
 }
 
 export function ProductGallery({
@@ -31,12 +31,9 @@ export function ProductGallery({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  // Drive native <dialog> via showModal()/close() so the dialog enters the top
-  // layer, traps focus, and surfaces backdrop click + Escape natively. The
-  // declarative `open` attribute (without showModal) renders the dialog as a
-  // regular block element — no top-layer, no auto-focus, no focus trap, and
-  // keyboard events fire only when something inside has focus. WCAG 2.1 AA
-  // requires Escape to be reachable; showModal() is the supported path.
+  const hero = images[activeIndex] ?? null;
+  const heroAlt = hero ? altFor(hero, productName, activeIndex) : `${productName} की तस्वीर`;
+
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -47,38 +44,34 @@ export function ProductGallery({
     }
   }, [lightboxOpen]);
 
-  if (images.length === 0) {
-    return <GoldTexturePlaceholder />;
-  }
-
-  const hero = images[activeIndex]!;
-
   return (
     <>
       <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
-        {/* Hero */}
         <button
           type="button"
           onClick={() => setLightboxOpen(true)}
           className="relative w-full overflow-hidden rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-          aria-label={`${altFor(hero, productName, activeIndex)} (बड़ा देखने के लिए क्लिक करें)`}
+          aria-label={`${heroAlt} (बड़ा देखने के लिए क्लिक करें)`}
         >
-          <ResponsiveImage
-            src={hero.default_url}
-            srcset={hero.srcset}
-            sizes={SIZES}
-            alt={altFor(hero, productName, activeIndex)}
-            width={hero.width}
-            height={hero.height}
-            loading="eager"
-            className="w-full h-auto"
-          />
+          {hero ? (
+            <ResponsiveImage
+              src={hero.default_url}
+              srcset={hero.srcset}
+              sizes={SIZES}
+              alt={heroAlt}
+              width={hero.width}
+              height={hero.height}
+              loading="eager"
+              className="h-auto w-full"
+            />
+          ) : (
+            <GoldTexturePlaceholder className="h-auto w-full" />
+          )}
         </button>
 
-        {/* Thumb strip — only when more than one image */}
         {images.length > 1 && (
           <div
-            className="flex gap-2 lg:flex-col overflow-x-auto lg:overflow-x-visible lg:max-h-[600px] lg:overflow-y-auto"
+            className="flex gap-2 overflow-x-auto lg:max-h-[600px] lg:flex-col lg:overflow-x-visible lg:overflow-y-auto"
             role="tablist"
             aria-label="उत्पाद की तस्वीरें"
           >
@@ -100,7 +93,7 @@ export function ProductGallery({
                   alt={altFor(img, productName, i)}
                   width={80}
                   height={80}
-                  className="w-20 h-20 object-cover rounded"
+                  className="h-20 w-20 rounded object-cover"
                 />
               </button>
             ))}
@@ -108,45 +101,48 @@ export function ProductGallery({
         )}
       </div>
 
-      {/* Lightbox — always mounted; visibility driven by showModal()/close() in useEffect. */}
       <dialog
         ref={dialogRef}
-        // close event fires on ESC or programmatic close — sync state back.
         onClose={() => setLightboxOpen(false)}
-        // Keep keyboard nav (arrows) — Escape is handled by the native dialog.
         onKeyDown={(e) => {
-          if (e.key === 'ArrowRight')
+          if (images.length < 2) return;
+          if (e.key === 'ArrowRight') {
             setActiveIndex((i) => Math.min(i + 1, images.length - 1));
-          if (e.key === 'ArrowLeft') setActiveIndex((i) => Math.max(i - 1, 0));
+          }
+          if (e.key === 'ArrowLeft') {
+            setActiveIndex((i) => Math.max(i - 1, 0));
+          }
         }}
-        // Backdrop click closes — clicking the dialog element itself (vs its
-        // children) means the click landed on the ::backdrop pseudo or the
-        // dialog's own padding region. Children's clicks bubble through `e.target
-        // !== e.currentTarget`, so they don't trigger close.
         onClick={(e) => {
           if (e.target === e.currentTarget) setLightboxOpen(false);
         }}
-        className="fixed inset-0 w-screen h-screen bg-black/90 z-50 m-0 p-0 max-w-none max-h-none border-0 backdrop:bg-black/90"
+        className="fixed inset-0 z-50 m-0 h-screen max-h-none w-screen max-w-none border-0 bg-black/90 p-0 backdrop:bg-black/90"
         aria-label="तस्वीर बड़ी करें"
       >
         <button
           type="button"
           onClick={() => setLightboxOpen(false)}
-          className="absolute top-4 right-4 text-white text-2xl leading-none w-10 h-10 flex items-center justify-center rounded-full bg-black/40 hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white"
+          className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-2xl leading-none text-white hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white"
           aria-label="बंद करें"
         >
-          ✕
+          ×
         </button>
-        <div className="flex items-center justify-center h-full p-8">
-          <ResponsiveImage
-            src={hero.default_url}
-            srcset={hero.srcset}
-            sizes="(max-width: 1280px) 100vw, 1280px"
-            alt={altFor(hero, productName, activeIndex)}
-            width={hero.width}
-            height={hero.height}
-            className="max-w-full max-h-full object-contain"
-          />
+        <div className="flex h-full items-center justify-center p-8">
+          {hero ? (
+            <ResponsiveImage
+              src={hero.default_url}
+              srcset={hero.srcset}
+              sizes="(max-width: 1280px) 100vw, 1280px"
+              alt={heroAlt}
+              width={hero.width}
+              height={hero.height}
+              className="max-h-full max-w-full object-contain"
+            />
+          ) : (
+            <div className="w-full max-w-xl rounded-lg bg-bg">
+              <GoldTexturePlaceholder className="h-auto w-full" />
+            </div>
+          )}
         </div>
       </dialog>
     </>
