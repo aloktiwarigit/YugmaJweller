@@ -1,0 +1,20 @@
+appId: com.goldsmith.shopkeeper.dev
+name: "Shopkeeper customers — search + add golden path"
+tags:
+  - golden-path
+  - customers
+---
+# Navigates to the customers tab from the home dashboard and asserts the
+# core CRM affordances are visible: search input, recent-customers list
+# header, and the "+ new customer" action. Mirrors copy in
+# apps/shopkeeper/app/customers/index.tsx.
+- launchApp
+- tapOn: "ग्राहक"
+- assertVisible: "नया ग्राहक"
+- assertVisible: "हाल के ग्राहक"
+# CustomerSearch is the primary lookup affordance — accessibilityLabel "ग्राहक खोजें"
+- tapOn:
+    id: "customer-search-input"
+- inputText: "राम"
+# Backend may be cold — proof of route is that the search input accepted text
+# without crashing. Result-list assertions live in unit/integration tests.

@@ -1,8 +1,8 @@
 import Image from 'next/image';
-import { GoldTexturePlaceholder } from './GoldTexturePlaceholder';
 import { HuidBadge } from './HuidBadge';
 import { EstimatedPriceBadge } from './EstimatedPriceBadge';
 import { purityLabel } from '@/lib/theme';
+import { categoryToFallbackSvg } from '@goldsmith/customer-shared';
 import type { CatalogProductCard } from '@goldsmith/customer-shared';
 
 // Accepts both CatalogProduct (Phase 1) and CatalogProductCard (Phase B)
@@ -29,7 +29,15 @@ export function ProductCard({ product }: { product: CatalogProductCard }) {
               blurDataURL={product.primaryImage.placeholderUrl || undefined}
             />
           ) : (
-            <GoldTexturePlaceholder className="w-full h-full group-hover:scale-105 transition-transform duration-300" />
+            // Category-aware illustrated fallback (ring / earring / pendant / bangle / necklace / silver).
+            // Uses an SVG string from @goldsmith/customer-shared, served via a data: URI so it works
+            // identically across SSR, edge runtime, and client bundle without bundler-specific imports.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`data:image/svg+xml;utf8,${encodeURIComponent(categoryToFallbackSvg(product.categoryName))}`}
+              alt={product.categoryName ?? label}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
           )}
         </div>
         {isUnavailable && (

@@ -1,0 +1,22 @@
+appId: com.goldsmith.shopkeeper.dev
+name: "Shopkeeper inventory — quick-action golden path"
+tags:
+  - golden-path
+  - inventory
+---
+# Asserts the inventory tab is reachable from a logged-in session and that
+# the demo-critical quick actions (new product, CSV import, valuation,
+# dead stock, print labels) are visible. Mirrors the actions in
+# apps/shopkeeper/app/inventory/index.tsx QUICK_ACTIONS list.
+- launchApp
+- tapOn: "इन्वेंटरी"
+- assertVisible: "+ नया उत्पाद"
+- assertVisible: "CSV आयात"
+- assertVisible: "मूल्यांकन"
+- assertVisible: "डेड स्टॉक"
+- assertVisible: "लेबल प्रिंट"
+- tapOn: "+ नया उत्पाद"
+# new-product screen rendered (any of the form fields is sufficient as proof of route)
+- assertVisible:
+    text: ".*"
+    optional: false

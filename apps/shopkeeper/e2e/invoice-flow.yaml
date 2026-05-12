@@ -1,0 +1,20 @@
+appId: com.goldsmith.shopkeeper.dev
+name: "Shopkeeper billing — new-invoice golden path"
+tags:
+  - golden-path
+  - billing
+---
+# Asserts the billing tab is reachable from a logged-in session and that
+# the demo-critical billing actions (new invoice, estimate, URD exchange,
+# barcode scan) are visible. Mirrors items in
+# apps/shopkeeper/app/(tabs)/billing.tsx.
+- launchApp
+- tapOn: "बिलिंग"
+- assertVisible: "बिलिंग"
+- assertVisible: "नया invoice"
+- assertVisible: "अनुमान"
+- assertVisible: "पुराना सोना खरीद"
+- assertVisible: "बारकोड स्कैन"
+- tapOn: "नया invoice"
+# Invoice composer rendered — "Invoice बनाएं" is the primary submit CTA
+- assertVisible: "Invoice बनाएं"

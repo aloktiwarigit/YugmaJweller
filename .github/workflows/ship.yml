@@ -195,14 +195,22 @@ jobs:
           # Maestro lacks a standalone `validate` for flow files, but `test --dry-run`
           # on a non-existent appId would fail regardless. A schema-level check is
           # sufficient for pre-EAS scaffolding — YAML parse + Maestro install.
-          test -f apps/shopkeeper/e2e/auth-flow.yaml
-          head -1 apps/shopkeeper/e2e/auth-flow.yaml | grep -q '^appId:'
+          for f in \
+            apps/shopkeeper/e2e/auth-flow.yaml \
+            apps/shopkeeper/e2e/inventory-flow.yaml \
+            apps/shopkeeper/e2e/invoice-flow.yaml \
+            apps/shopkeeper/e2e/customer-lookup-flow.yaml \
+            apps/customer-mobile/e2e/browse-flow.yaml ; do
+            test -f "$f" || { echo "missing $f"; exit 1; }
+            head -1 "$f" | grep -q '^appId:' || { echo "$f missing appId on line 1"; exit 1; }
+            echo "OK $f"
+          done
 
-  lighthouse:
-    # Runs Lighthouse CI against the customer-web Next.js app.
+  lighthouse-ci:
+    # Real Lighthouse CI run against the customer-web Next.js app — boots
+    # Next.js on port 3000 via lighthouserc.cjs's startServerCommand, then
+    # asserts performance (warn 0.8) + accessibility (error 0.9) categories.
     # Lighthouse uses axe-core internally for the accessibility category.
-    # Performance assertions are warn (CI env throttling is unpredictable);
-    # a11y assertions are error (deterministic, fail-fast on serious violations).
     needs: install
     runs-on: ubuntu-latest
     steps:
@@ -242,7 +250,7 @@ jobs:
         run: pnpm docs:validate
 
   build:
-    needs: [typecheck, lint, unit, integration, tenant-isolation, semgrep, build-shopkeeper, a11y-shopkeeper, e2e-shopkeeper, lighthouse]
+    needs: [typecheck, lint, unit, integration, tenant-isolation, semgrep, build-shopkeeper, a11y-shopkeeper, e2e-shopkeeper, lighthouse-ci]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
