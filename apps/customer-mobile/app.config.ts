@@ -28,6 +28,7 @@ const config: ExpoConfig = {
     'expo-font',
     'expo-router',
     'expo-secure-store',
+    './plugins/with-pnpm-gradle-plugin-paths',
   ],
   // White-label: package / bundleIdentifier MUST differ per tenant build
   // — app stores and devices identify apps by these values, so two tenant

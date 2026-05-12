@@ -16,6 +16,7 @@ const config: ExpoConfig = {
     'expo-dev-client',
     'expo-font',
     'expo-router',
+    './plugins/with-pnpm-gradle-plugin-paths',
   ],
   android: {
     package: 'com.goldsmith.shopkeeper.dev',

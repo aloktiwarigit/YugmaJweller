@@ -67,3 +67,9 @@ packages/*/test/**/*.js.map
 
 # Playwright MCP local cache
 .playwright-mcp/
+
+# Local QA / demo capture outputs (dev-server logs, device screenshots,
+# Playwright trace dumps) — never source. artifacts/ is the canonical
+# capture dir; loose PNGs at repo root are typically demo screenshots.
+artifacts/
+/*.png
