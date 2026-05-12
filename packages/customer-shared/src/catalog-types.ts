@@ -9,6 +9,38 @@ export interface TenantConfigResponse {
   logoUrl:         string | null;
   appName:         string;
   defaultLanguage: string;
+
+  // Optional storefront fields populated by the Phase B tenant-config merge
+  // (catalog.service.getStorefrontConfig). The backend currently only emits
+  // the five required fields above; everything below is undefined until
+  // shop_settings.storefront_config_json is read + merged with defaults.
+  // Helpers in apps/customer-web/lib/storefront.ts handle missing values
+  // with Hindi-fallback strings; do not introduce non-null usage.
+  // Both camelCase and snake_case are declared so the customer-web/mobile
+  // helpers can accept either shape from a future backend revision.
+  address?:                   string | null;
+  shopAddress?:               string | null;
+  shop_address?:              string | null;
+  contactPhone?:              string | null;
+  contact_phone?:             string | null;
+  contactWhatsApp?:           string | null;
+  contact_whatsapp?:          string | null;
+  whatsappNumber?:            string | null;
+  whatsapp_number?:           string | null;
+  appDownloadUrl?:            string | null;
+  app_download_url?:          string | null;
+  instagramUrl?:              string | null;
+  instagram_url?:             string | null;
+  facebookUrl?:               string | null;
+  facebook_url?:              string | null;
+  youtubeUrl?:                string | null;
+  youtube_url?:               string | null;
+  shippingPolicyText?:        string | null;
+  shipping_policy_text?:      string | null;
+  cancellationPolicyText?:    string | null;
+  cancellation_policy_text?:  string | null;
+  faqMarkdown?:               string | null;
+  faq_markdown?:              string | null;
 }
 
 export interface EstimatedPrice {
