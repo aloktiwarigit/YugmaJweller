@@ -5,6 +5,7 @@ import './globals.css';
 import { fetchTenantConfig } from '@/lib/api';
 import { buildThemeStyle } from '@/lib/theme';
 import StorefrontHeader from '@/components/StorefrontHeader';
+import { StorefrontFooter } from '@/components/StorefrontFooter';
 
 const yatraOne = Yatra_One({
   weight: '400',
@@ -92,6 +93,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </a>
         <StorefrontHeader shopName={config.appName} logoUrl={safeLogoUrl} />
         <main id="main-content">{children}</main>
+        <StorefrontFooter config={config} />
       </body>
     </html>
   );

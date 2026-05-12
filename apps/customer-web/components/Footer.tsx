@@ -12,10 +12,10 @@ const FOOTER_COLS = [
   {
     headingHi: 'गाइड',
     links: [
-      { labelHi: 'धातु गाइड',    href: '/size-guide'     },
-      { labelHi: 'HUID क्या है?', href: '/size-guide'     },
-      { labelHi: 'कैरट गाइड',   href: '/size-guide'      },
-      { labelHi: 'ज्वेलरी केयर', href: '/size-guide'      },
+      { labelHi: 'धातु गाइड',    href: '/buying-guide/gold' },
+      { labelHi: 'HUID क्या है?', href: '/faq#huid' },
+      { labelHi: 'कैरट गाइड',   href: '/buying-guide/gold' },
+      { labelHi: 'साइज़ गाइड', href: '/size-guide/rings' },
     ],
   },
   {

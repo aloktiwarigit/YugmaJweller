@@ -80,8 +80,20 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
-      <h1 className="font-heading text-2xl md:text-3xl text-ink mb-4">आभूषण संग्रह</h1>
+    <div className="max-w-6xl mx-auto px-4 py-6 md:py-8">
+      {/* Editorial header — kicker numbering, serif headline, hairline divider */}
+      <header className="border-b border-borderSubtle pb-6 mb-6">
+        <p className="font-prose text-[11px] uppercase tracking-[0.28em] text-inkMute">
+          ०१ · संग्रह
+        </p>
+        <h1 className="font-heading text-3xl md:text-[2.25rem] leading-tight text-ink mt-2">
+          आभूषण संग्रह
+        </h1>
+        <p className="font-prose text-sm md:text-[15px] text-inkMute mt-3 max-w-xl leading-relaxed">
+          BIS हॉलमार्क और HUID सत्यापित आभूषणों का चयन। आज की दर पर अनुमानित मूल्य —
+          अंतिम मूल्य की पुष्टि दुकान पर।
+        </p>
+      </header>
 
       {/* Search bar */}
       <form role="search" aria-label="उत्पाद खोजें" method="get" action="/products" className="mb-4 flex gap-2">
@@ -105,8 +117,16 @@ export default async function ProductsPage({ searchParams }: PageProps) {
       <FilterControls filters={activeFilters} totalCount={total} />
 
       {/* Result count */}
-      <p className="mt-2 mb-3 font-ui text-xs text-inkMute" aria-live="polite" aria-atomic="true">
-        {total} उत्पाद मिले
+      <p
+        className="mt-2 mb-4 font-prose text-xs tracking-wide text-inkMute"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {total === 0
+          ? '— इस फ़िल्टर में अभी कुछ नहीं'
+          : total === 1
+            ? '१ आभूषण मिला'
+            : `${total} आभूषण मिले`}
       </p>
 
       {/* Main two-column layout: sidebar (desktop) + products */}

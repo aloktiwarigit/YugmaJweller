@@ -18,7 +18,6 @@ import { EverydayCollectionSection } from '@/components/sections/EverydayCollect
 import { PremiumCollectionSection }  from '@/components/sections/PremiumCollectionSection';
 import { RecommendedSection }        from '@/components/sections/RecommendedSection';
 import { PromiseSection }            from '@/components/sections/PromiseSection';
-import { Footer }                    from '@/components/Footer';
 
 function resolveSlug(): string | null {
   const h = headers();
@@ -98,9 +97,6 @@ export default async function HomePage() {
 
       {/* 11. Promise pillars */}
       <PromiseSection />
-
-      {/* 12. Footer */}
-      <Footer shopName={config.appName} />
     </>
   );
 }
