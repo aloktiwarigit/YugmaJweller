@@ -1,14 +1,10 @@
 import { headers } from 'next/headers';
+import { resolveShopSlug } from '@/lib/tenant-slug';
 import { fetchTenantConfig, fetchProducts } from '@/lib/api';
 import { ProductGrid } from '@/components/ProductGrid';
 import { FilterSidebar, FilterControls, type ActiveFilters } from '@/components/FilterPanel';
 import type { CatalogSort } from '@goldsmith/customer-shared';
 import { NoResults } from '@/components/NoResults';
-
-function resolveSlug(): string | null {
-  const h = headers();
-  return h.get('x-shop-slug') ?? process.env['NEXT_PUBLIC_SHOP_SLUG'] ?? null;
-}
 
 interface PageProps {
   searchParams: {
@@ -27,8 +23,40 @@ interface PageProps {
   };
 }
 
+function catalogHeading(params: { search?: string; metal?: string; collection?: string }): string {
+  if (params.search) return `"${params.search}" के परिणाम`;
+
+  switch (params.metal?.toUpperCase()) {
+    case 'GOLD':
+      return 'सोना संग्रह';
+    case 'SILVER':
+      return 'चाँदी संग्रह';
+    case 'DIAMOND':
+      return 'हीरा संग्रह';
+    default:
+      break;
+  }
+
+  if (params.collection) {
+    return params.collection
+      .split('-')
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  }
+
+  return 'आभूषण संग्रह';
+}
+
+function catalogEyebrow(params: { metal?: string; search?: string; collection?: string }): string {
+  if (params.search) return 'खोज परिणाम';
+  if (params.collection) return 'क्यूरेटेड कलेक्शन';
+  if (params.metal?.toUpperCase() === 'DIAMOND') return 'डायमंड ज्वेलरी';
+  return 'कलेक्शन';
+}
+
 export default async function ProductsPage({ searchParams }: PageProps) {
-  const slug = resolveSlug();
+  const slug = resolveShopSlug(headers());
   if (!slug) return <p className="p-8 font-ui text-inkMute text-center">दुकान नहीं मिली।</p>;
 
   const config = await fetchTenantConfig(slug);
@@ -62,6 +90,8 @@ export default async function ProductsPage({ searchParams }: PageProps) {
     inStockOnly, style, occasion,
     sort: sort as CatalogSort | undefined,
   };
+  const heading = catalogHeading({ search, metal, collection });
+  const eyebrow = catalogEyebrow({ search, metal, collection });
 
   function buildPageHref(p: number) {
     const params = new URLSearchParams();
@@ -81,13 +111,13 @@ export default async function ProductsPage({ searchParams }: PageProps) {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 md:py-8">
-      {/* Editorial header — kicker numbering, serif headline, hairline divider */}
+      {/* Editorial header — filter-aware headline, hairline divider */}
       <header className="border-b border-borderSubtle pb-6 mb-6">
         <p className="font-prose text-[11px] uppercase tracking-[0.28em] text-inkMute">
-          ०१ · संग्रह
+          {eyebrow}
         </p>
         <h1 className="font-heading text-3xl md:text-[2.25rem] leading-tight text-ink mt-2">
-          आभूषण संग्रह
+          {heading}
         </h1>
         <p className="font-prose text-sm md:text-[15px] text-inkMute mt-3 max-w-xl leading-relaxed">
           BIS हॉलमार्क और HUID सत्यापित आभूषणों का चयन। आज की दर पर अनुमानित मूल्य —

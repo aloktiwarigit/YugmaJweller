@@ -1,30 +1,17 @@
-import { headers } from 'next/headers';
 import { fetchTenantConfig } from '@/lib/api';
 
-function resolveSlug(): string | null {
-  const h = headers();
-  return h.get('x-shop-slug') ?? process.env['NEXT_PUBLIC_SHOP_SLUG'] ?? null;
-}
+// searchParams are not available in static export server components.
+// The interest label derived from searchParams is cosmetic-only so we omit it
+// in the static pre-render; the contact info is always correct.
+export const dynamic = 'force-static';
 
-interface PageProps {
-  searchParams: {
-    interest?: string;
-    product?:  string;
-  };
-}
+// force-static pages cannot call headers() — use build-time env var.
+// middleware.ts stamps x-shop-slug on all non-static requests; only dynamic
+// pages can benefit from that header via resolveShopSlug(headers()).
+const SHOP_SLUG = process.env.NEXT_PUBLIC_SHOP_SLUG ?? null;
 
-const INTEREST_LABELS: Record<string, string> = {
-  'try-at-home': 'घर पर आभूषण कोशिश (Try at Home)',
-  'rate-lock':   'दर-लॉक बुकिंग (Rate Lock)',
-};
-
-export default async function ContactPage({ searchParams }: PageProps) {
-  const slug = resolveSlug();
-  const config = slug ? await fetchTenantConfig(slug) : null;
-
-  const interestLabel = searchParams.interest
-    ? (INTEREST_LABELS[searchParams.interest] ?? searchParams.interest)
-    : null;
+export default async function ContactPage() {
+  const config = SHOP_SLUG ? await fetchTenantConfig(SHOP_SLUG) : null;
 
   return (
     <div className="max-w-xl mx-auto px-4 py-12">
@@ -37,12 +24,6 @@ export default async function ContactPage({ searchParams }: PageProps) {
       </a>
 
       <h1 className="font-heading text-3xl text-ink mb-2">दुकान से संपर्क करें</h1>
-
-      {interestLabel && (
-        <p className="font-body text-sm text-inkMute mb-6">
-          आप <strong className="text-ink">{interestLabel}</strong> में रुचि रखते हैं।
-        </p>
-      )}
 
       <div className="rounded-lg border border-border bg-white p-6 flex flex-col gap-4">
         <p className="font-body text-sm text-ink">

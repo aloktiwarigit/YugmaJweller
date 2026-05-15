@@ -1,4 +1,7 @@
 {
+  "apphosting": {
+    "backendId": "goldsmith-customer-web"
+  },
   "emulators": {
     "auth": {
       "port": 9099

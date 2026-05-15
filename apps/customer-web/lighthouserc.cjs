@@ -2,14 +2,15 @@
 module.exports = {
   ci: {
     collect: {
-      // Next.js start command — build must run first
-      startServerCommand: 'pnpm start',
-      startServerReadyPattern: 'started server on',
-      startServerReadyTimeout: 30000,
+      // Static export mode: use 'serve' to host the out/ directory locally.
+      // Run 'pnpm build' before 'pnpm test:lighthouse-ci'.
+      // 'next start' is not valid for output: 'export'.
+      staticDistDir: './out',
       url: [
         'http://localhost:3000/',
         'http://localhost:3000/products',
-        'http://localhost:3000/products/00000000-0000-0000-0000-000000000001',
+        // Note: product detail pages are now pre-rendered from API at build time.
+        // Use /products/_placeholder which always renders a 404 (tests error handling).
       ],
       numberOfRuns: 1,
       settings: {

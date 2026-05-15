@@ -1,0 +1,48 @@
+# Firebase App Hosting source upload exclusions.
+# Only the customer-web app and its workspace package dependencies are needed.
+# Everything else is excluded to keep the zip under GCS upload limits.
+
+# Git internals
+.git/
+.github/
+
+# Other apps — not needed to build customer-web
+apps/shopkeeper/
+apps/api/
+apps/customer-mobile/
+apps/admin-web/
+
+# Build outputs — rebuilt on Firebase's build servers
+apps/customer-web/.next/
+apps/customer-web/out/
+apps/*/dist/
+packages/*/dist/
+
+# Planning / documentation artifacts
+docs/
+_bmad-output/
+artifacts/
+tools/
+
+# Dev tooling
+.playwright-mcp/
+.claude/
+.remember/
+.serena/
+
+# pnpm virtual store (large, rebuilt during firebase build via pnpm install)
+node_modules/
+.pnpm-store/
+
+# Test / coverage outputs
+coverage/
+*.tsbuildinfo
+
+# Local env (never ship)
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db

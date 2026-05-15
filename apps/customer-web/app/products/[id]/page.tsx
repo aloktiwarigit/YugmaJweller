@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
+import { resolveShopSlug } from '@/lib/tenant-slug';
 import { fetchTenantConfig, fetchProduct, fetchProductReviews, fetchProductImages } from '@/lib/api';
 import { HuidBadge } from '@/components/HuidBadge';
 import { WishlistButton } from '@/components/WishlistButton';
@@ -12,17 +13,21 @@ import { CompleteTheLook } from '@/components/pdp/CompleteTheLook';
 import { ActionRow } from '@/components/pdp/ActionRow';
 import { purityLabel, metalLabel } from '@/lib/theme';
 
-function resolveSlug(): string | null {
-  const h = headers();
-  return h.get('x-shop-slug') ?? process.env['NEXT_PUBLIC_SHOP_SLUG'] ?? null;
-}
-
 interface PageProps {
   params: { id: string };
 }
 
+function computeAverageRating(
+  breakdown: { 1: number; 2: number; 3: number; 4: number; 5: number },
+): number | null {
+  const total = breakdown[1] + breakdown[2] + breakdown[3] + breakdown[4] + breakdown[5];
+  if (total === 0) return null;
+  const sum = 1 * breakdown[1] + 2 * breakdown[2] + 3 * breakdown[3] + 4 * breakdown[4] + 5 * breakdown[5];
+  return Math.round((sum / total) * 10) / 10;
+}
+
 export default async function ProductDetailPage({ params }: PageProps) {
-  const slug = resolveSlug();
+  const slug = resolveShopSlug(headers());
   if (!slug) notFound();
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const config = await fetchTenantConfig(slug!);
@@ -35,8 +40,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
   ]);
   if (!product) notFound();
 
+  const averageRating = computeAverageRating(reviewsData.ratingBreakdown);
   const isUnavailable  = product.quantity === 0;
-  const displayPurity  = purityLabel(product.purity);
+  const displayPurity  = purityLabel(product.purity, product.metal);
   const displayMetal   = metalLabel(product.metal);
   const totalFormatted = product.estimatedPrice?.totalFormatted;
 
@@ -116,18 +122,18 @@ export default async function ProductDetailPage({ params }: PageProps) {
             </div>
 
             {/* Average rating */}
-            {reviewsData.total > 0 && reviewsData.averageRating !== null && (
+            {reviewsData.total > 0 && averageRating !== null && (
               <div className="flex items-center gap-2">
                 <span
                   className="text-warningSaffron text-lg"
                   role="img"
-                  aria-label={`5 में से ${reviewsData.averageRating} तारे`}
+                  aria-label={`5 में से ${averageRating} तारे`}
                 >
-                  {'★'.repeat(Math.round(reviewsData.averageRating))}
-                  <span className="text-borderSubtle">{'★'.repeat(5 - Math.round(reviewsData.averageRating))}</span>
+                  {'★'.repeat(Math.round(averageRating))}
+                  <span className="text-borderSubtle">{'★'.repeat(5 - Math.round(averageRating))}</span>
                 </span>
                 <span className="font-ui text-sm text-inkMute">
-                  {reviewsData.averageRating} ({reviewsData.total} समीक्षाएं)
+                  {averageRating} ({reviewsData.total} समीक्षाएं)
                 </span>
               </div>
             )}
@@ -191,8 +197,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
         <ReviewSection
           productId={product.id}
           shopId={config.shopId}
-          reviews={reviewsData.reviews}
-          averageRating={reviewsData.averageRating}
+          reviews={reviewsData.items}
+          averageRating={averageRating}
           total={reviewsData.total}
         />
       </div>

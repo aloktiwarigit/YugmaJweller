@@ -1,13 +1,9 @@
 import { headers } from 'next/headers';
+import { resolveShopSlug } from '@/lib/tenant-slug';
 import { fetchTenantConfig } from '@/lib/api';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'वफ़ादारी कार्यक्रम' };
-
-function resolveSlug(): string | null {
-  const h = headers();
-  return h.get('x-shop-slug') ?? process.env['NEXT_PUBLIC_SHOP_SLUG'] ?? null;
-}
 
 const TIER_INFO = [
   { tier: 'रजत', points: '0–499', color: '#9CA3AF', benefit: '₹500 की खरीद पर 5 अंक' },
@@ -16,7 +12,7 @@ const TIER_INFO = [
 ];
 
 export default async function LoyaltyPage(): Promise<JSX.Element> {
-  const slug   = resolveSlug();
+  const slug = resolveShopSlug(headers());
   const config = slug ? await fetchTenantConfig(slug) : null;
   const shopName = config?.appName ?? 'हमारी दुकान';
 

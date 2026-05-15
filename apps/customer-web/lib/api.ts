@@ -8,9 +8,11 @@ export type {
   CatalogProductsResponse,
   PublicRateEntry,
   PublicRatesResponse,
-  ReviewItem,
-  ReviewsResponse,
+  PublicReviewsResponse,
+  PublicReviewItem,
   PublicImageItem,
+  StorefrontConfig,
+  Collection,
 } from '@goldsmith/customer-shared';
 
 import type {
@@ -18,11 +20,21 @@ import type {
   CatalogProduct,
   CatalogProductsResponse,
   PublicRatesResponse,
-  ReviewsResponse,
+  PublicReviewsResponse,
   PublicImageItem,
+  StorefrontConfig,
+  Collection,
 } from '@goldsmith/customer-shared';
 
-const API_URL = process.env['API_URL'] ?? 'http://localhost:3001';
+// Isomorphic base URL:
+//   Server (SSG build): API_URL is an internal/private URL (server-to-server).
+//   Browser (client component): API_URL is undefined (Next.js strips non-public vars
+//   from client bundles), so we fall through to NEXT_PUBLIC_API_BASE which is inlined
+//   at build time and safe to expose to the browser.
+const API_URL =
+  process.env['API_URL'] ??
+  process.env.NEXT_PUBLIC_API_BASE ??
+  'http://localhost:3001';
 
 // Per-request timeout protects TTFB budget (<500ms) — slow API calls fall back
 // to graceful empty/unavailable states instead of blocking the page render.
@@ -45,6 +57,35 @@ export async function fetchTenantConfig(slug: string): Promise<TenantConfigRespo
     return res.json() as Promise<TenantConfigResponse>;
   } catch {
     return null;
+  }
+}
+
+export async function fetchStorefrontConfig(shopId: string): Promise<StorefrontConfig | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/catalog/storefront-config`, {
+      headers: { 'X-Tenant-Id': shopId },
+      cache: 'no-store',
+      ...withTimeout(),
+    });
+    if (!res.ok) return null;
+    return res.json() as Promise<StorefrontConfig>;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchCollections(shopId: string): Promise<Collection[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/catalog/collections`, {
+      headers: { 'X-Tenant-Id': shopId },
+      next: { revalidate: 300 },
+      ...withTimeout(),
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as { items?: Collection[] };
+    return data.items ?? [];
+  } catch {
+    return [];
   }
 }
 
@@ -101,7 +142,7 @@ export async function fetchProducts(
   try {
     const res = await fetch(`${API_URL}/api/v1/catalog/products?${qs.toString()}`, {
       headers: { 'X-Tenant-Id': shopId },
-      next: { revalidate: 30 },
+      cache: 'no-store',
       ...withTimeout(),
     });
     if (!res.ok) return null;
@@ -131,17 +172,18 @@ export async function fetchProduct(
 export async function fetchProductReviews(
   productId: string,
   shopId: string,
-): Promise<ReviewsResponse> {
+): Promise<PublicReviewsResponse> {
+  const empty: PublicReviewsResponse = { items: [], total: 0, page: 1, ratingBreakdown: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
   try {
-    const res = await fetch(`${API_URL}/api/v1/reviews/products/${productId}`, {
+    const res = await fetch(`${API_URL}/api/v1/catalog/products/${productId}/reviews`, {
       headers: { 'X-Tenant-Id': shopId },
       next: { revalidate: 60 },
       ...withTimeout(),
     });
-    if (!res.ok) return { reviews: [], averageRating: null, total: 0 };
-    return res.json() as Promise<ReviewsResponse>;
+    if (!res.ok) return empty;
+    return res.json() as Promise<PublicReviewsResponse>;
   } catch {
-    return { reviews: [], averageRating: null, total: 0 };
+    return empty;
   }
 }
 

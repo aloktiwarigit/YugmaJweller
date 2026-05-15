@@ -10,7 +10,8 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:lighthouse-ci": "lhci autorun",
-    "test:axe": "lhci autorun --config=lighthouserc.cjs --collect.settings.onlyCategories=accessibility"
+    "test:axe": "lhci autorun --config=lighthouserc.cjs --collect.settings.onlyCategories=accessibility",
+    "deploy": "firebase apphosting:backends:deploy goldsmith-customer-web --project goldsmith-dev"
   },
   "dependencies": {
     "@goldsmith/auth-client": "workspace:*",

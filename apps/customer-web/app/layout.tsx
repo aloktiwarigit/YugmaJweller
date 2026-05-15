@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
+import { type ReactNode } from 'react';
 import { headers } from 'next/headers';
 import { Yatra_One, Mukta, Hind } from 'next/font/google';
 import './globals.css';
 import { fetchTenantConfig } from '@/lib/api';
-import { buildThemeStyle } from '@/lib/theme';
-import StorefrontHeader from '@/components/StorefrontHeader';
-import { StorefrontFooter } from '@/components/StorefrontFooter';
+import { resolveShopSlug } from '@/lib/tenant-slug';
+import { TenantProvider } from './TenantContext';
+import { StorefrontWrapper } from './StorefrontWrapper';
 
 const yatraOne = Yatra_One({
   weight: '400',
@@ -28,13 +29,10 @@ const hind = Hind({
   display: 'swap',
 });
 
-function resolveSlug(): string | null {
-  const headersList = headers();
-  return headersList.get('x-shop-slug') ?? process.env['NEXT_PUBLIC_SHOP_SLUG'] ?? null;
-}
+const fontClasses = `${yatraOne.variable} ${mukta.variable} ${hind.variable}`;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const slug = resolveSlug();
+  const slug = resolveShopSlug(headers());
   if (!slug) return { title: 'आभूषण' };
   const config = await fetchTenantConfig(slug);
   return {
@@ -43,57 +41,17 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-const fontClasses = `${yatraOne.variable} ${mukta.variable} ${hind.variable}`;
-
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const headersList = headers();
-  const pathname = headersList.get('x-pathname') ?? '';
-
-  if (pathname.startsWith('/admin')) {
-    return (
-      <html lang="en" className={fontClasses}>
-        <body>{children}</body>
-      </html>
-    );
-  }
-
-  const slug = resolveSlug();
-
-  const unavailablePage = (
-    <html lang="hi" className={fontClasses}>
-      <body>
-        <main className="flex min-h-screen items-center justify-center bg-bg p-8">
-          <p className="font-ui text-ink text-lg">यह दुकान उपलब्ध नहीं है।</p>
-        </main>
-      </body>
-    </html>
-  );
-
-  if (!slug) return unavailablePage;
-
-  const config = await fetchTenantConfig(slug);
-  if (!config) return unavailablePage;
-
-  // XSS guard: only allow https:// logo URLs
-  const safeLogoUrl =
-    config.logoUrl && config.logoUrl.startsWith('https://') ? config.logoUrl : null;
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const slug   = resolveShopSlug(headers());
+  const config = slug ? await fetchTenantConfig(slug) : null;
+  const lang = config?.defaultLanguage ?? 'hi';
 
   return (
-    <html
-      lang={config.defaultLanguage}
-      className={fontClasses}
-      style={buildThemeStyle(config.primaryColor)}
-    >
-      <body className="bg-bg text-ink min-h-screen font-ui">
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 bg-primary text-white px-4 py-2 rounded z-50"
-        >
-          मुख्य सामग्री पर जाएं
-        </a>
-        <StorefrontHeader shopName={config.appName} logoUrl={safeLogoUrl} />
-        <main id="main-content">{children}</main>
-        <StorefrontFooter config={config} />
+    <html lang={lang} className={fontClasses}>
+      <body>
+        <TenantProvider value={config}>
+          <StorefrontWrapper config={config}>{children}</StorefrontWrapper>
+        </TenantProvider>
       </body>
     </html>
   );

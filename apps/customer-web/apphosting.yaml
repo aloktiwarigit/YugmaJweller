@@ -1,0 +1,47 @@
+# Firebase App Hosting backend config for customer-web (Next.js SSR).
+# Backend: goldsmith-customer-web  Region: asia-east1
+# Docs: https://firebase.google.com/docs/app-hosting/configure
+#
+# REMAINING SETUP (one-time, before demo):
+#   1. Set API_URL + NEXT_PUBLIC_API_BASE once the NestJS API is deployed:
+#      firebase apphosting:backends:update goldsmith-customer-web \
+#        --project goldsmith-dev \
+#        (or set in Console → App Hosting → goldsmith-customer-web → Environment)
+#   2. NEXT_PUBLIC_SITE_URL: set to the Firebase-assigned domain or custom domain
+#   3. Connect GitHub for auto-deploy on push (Console → App Hosting → backend → Source)
+
+runConfig:
+  minInstances: 0      # scale to zero — ~$0 cost at demo-stage traffic
+  maxInstances: 10
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+env:
+  - variable: NODE_ENV
+    value: production
+  - variable: NEXT_TELEMETRY_DISABLED
+    value: "1"
+
+  # Tenant identity — anchor dev shop for initial demo deploy
+  - variable: NEXT_PUBLIC_SHOP_SLUG
+    value: anchor-dev
+
+  # Firebase Web SDK — public keys, safe to commit (restricted by security rules)
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyCSuP5JgfjJlXryqBFyPcJ645_Y2WdA5jI
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: goldsmith-dev.firebaseapp.com
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: goldsmith-dev
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:528920018833:web:e8d084284d9bd363e3e430"
+
+  # API endpoints — SET THESE before the storefront shows real data.
+  # Until set, pages gracefully show empty/unavailable states.
+  # - variable: API_URL
+  #   value: https://api.goldsmith-dev.example.com
+  # - variable: NEXT_PUBLIC_API_BASE
+  #   value: https://api.goldsmith-dev.example.com
+  # - variable: NEXT_PUBLIC_SITE_URL
+  #   value: https://goldsmith-dev.web.app

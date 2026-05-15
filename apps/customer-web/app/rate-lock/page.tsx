@@ -1,18 +1,12 @@
-import { headers } from 'next/headers';
 import { fetchTenantConfig, fetchPublicRates } from '@/lib/api';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'दर-लॉक बुकिंग' };
-export const revalidate = 60;
 
-function resolveSlug(): string | null {
-  const h = headers();
-  return h.get('x-shop-slug') ?? process.env['NEXT_PUBLIC_SHOP_SLUG'] ?? null;
-}
+const SHOP_SLUG = process.env.NEXT_PUBLIC_SHOP_SLUG ?? null;
 
 export default async function RateLockPage(): Promise<JSX.Element> {
-  const slug   = resolveSlug();
-  const config = slug ? await fetchTenantConfig(slug) : null;
+  const config = SHOP_SLUG ? await fetchTenantConfig(SHOP_SLUG) : null;
 
   const rates      = await fetchPublicRates();
   const gold24kRup = rates?.GOLD_24K?.perGramRupees

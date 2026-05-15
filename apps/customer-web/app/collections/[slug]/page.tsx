@@ -9,5 +9,5 @@ const COLLECTION_FILTERS: Record<string, string> = {
 };
 
 export default function CollectionSlugPage({ params }: { params: { slug: string } }) {
-  redirect(COLLECTION_FILTERS[params.slug] ?? '/collections');
+  redirect(COLLECTION_FILTERS[params.slug] ?? `/products?collection=${encodeURIComponent(params.slug)}`);
 }

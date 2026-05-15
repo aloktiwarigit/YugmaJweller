@@ -1,17 +1,13 @@
 import { headers } from 'next/headers';
+import { resolveShopSlug } from '@/lib/tenant-slug';
 import { fetchTenantConfig, fetchProducts } from '@/lib/api';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'घर पर आज़माएं' };
 export const revalidate = 30;
 
-function resolveSlug(): string | null {
-  const h = headers();
-  return h.get('x-shop-slug') ?? process.env['NEXT_PUBLIC_SHOP_SLUG'] ?? null;
-}
-
 export default async function TryAtHomePage(): Promise<JSX.Element> {
-  const slug   = resolveSlug();
+  const slug = resolveShopSlug(headers());
   const config = slug ? await fetchTenantConfig(slug) : null;
   const shopName = config?.appName ?? 'हमारी दुकान';
 
