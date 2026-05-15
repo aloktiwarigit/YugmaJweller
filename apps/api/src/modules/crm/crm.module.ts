@@ -54,9 +54,14 @@ const DPDPA_SWEEP_CRON       = '30 20 * * *';
       provide: 'KMS_ADAPTER',
       useFactory: () => {
         const secret = process.env['KMS_MASTER_SECRET'];
-        if (process.env['NODE_ENV'] === 'production' && !process.env['AZURE_KEY_VAULT_URL']) {
+        const isProduction = process.env['NODE_ENV'] === 'production';
+        const hasAzureKv = Boolean(process.env['AZURE_KEY_VAULT_URL']);
+        // In production: require Azure Key Vault (preferred) OR an explicit KMS_MASTER_SECRET
+        // (demo/GCP deployments before Azure is provisioned — data is encrypted at rest but
+        // key material lives in Cloud Run env, not a HSM; acceptable until anchor SOW signs).
+        if (isProduction && !hasAzureKv && !secret) {
           throw new Error(
-            'Production requires AZURE_KEY_VAULT_URL. ' +
+            'Production requires AZURE_KEY_VAULT_URL or KMS_MASTER_SECRET. ' +
             'LocalKMS is ephemeral and must not run in production.',
           );
         }

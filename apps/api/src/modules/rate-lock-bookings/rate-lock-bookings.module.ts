@@ -30,10 +30,11 @@ import { RateLockExpiryProcessor, RATE_LOCK_EXPIRY_QUEUE } from '../../workers/r
     {
       provide: 'RATE_LOCK_PAYMENTS_ADAPTER',
       useFactory: () => {
-        const adapter = process.env['PAYMENTS_ADAPTER'] ?? 'stub';
+        const adapter = process.env['PAYMENTS_ADAPTER'] ?? '';
         if (adapter === 'razorpay') return new RazorpayAdapter();
+        if (adapter === 'stub') return new StubPaymentsAdapter();
         if (process.env['NODE_ENV'] === 'production') {
-          throw new Error('PAYMENTS_ADAPTER must be set to "razorpay" in production.');
+          throw new Error('PAYMENTS_ADAPTER must be "razorpay" or "stub" in production.');
         }
         return new StubPaymentsAdapter();
       },
@@ -54,10 +55,16 @@ export class RateLockBookingsModule implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.expiryQueue.add(
-      'expire-stale',
-      {},
-      { repeat: { every: 15 * 60 * 1000 }, jobId: 'rate-lock-expiry-sweep' },
-    );
+    try {
+      await this.expiryQueue.add(
+        'expire-stale',
+        {},
+        { repeat: { every: 15 * 60 * 1000 }, jobId: 'rate-lock-expiry-sweep' },
+      );
+    } catch (err) {
+      new (await import('@nestjs/common')).Logger(RateLockBookingsModule.name).warn(
+        `Rate-lock expiry sweep job could not be scheduled at boot — will retry on restart: ${String(err)}`,
+      );
+    }
   }
 }

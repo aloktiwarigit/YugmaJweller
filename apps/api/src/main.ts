@@ -15,7 +15,9 @@ async function bootstrap(): Promise<void> {
   // platform admin UI in customer-web /admin runs in the browser and DOES need it.
   // Tenant routes are server-rendered (mobile apps and SSR), so the allowlist is small.
   // Set ADMIN_WEB_ORIGIN to a comma-separated list in production (e.g. "https://admin.goldsmith.example").
-  const adminOriginsRaw = process.env['ADMIN_WEB_ORIGIN'] ?? 'http://localhost:3000';
+  const adminOriginsRaw =
+    process.env['ADMIN_WEB_ORIGIN'] ??
+    'http://localhost:3000,http://localhost:4173,http://127.0.0.1:4173';
   const adminOrigins = adminOriginsRaw.split(',').map((s) => s.trim()).filter(Boolean);
   app.enableCors({
     origin: adminOrigins,
@@ -36,6 +38,9 @@ async function bootstrap(): Promise<void> {
 }
 
 bootstrap().catch((err) => {
+  // Write to stderr first (unbuffered on Linux) to guarantee capture in Cloud Logging
+  // before process.exit(1) closes the stdout buffer.
+  process.stderr.write('FATAL bootstrap failed: ' + (err?.message ?? '') + '\n' + (err?.stack ?? '') + '\n');
   logger.error({ err }, 'bootstrap failed');
   process.exit(1);
 });

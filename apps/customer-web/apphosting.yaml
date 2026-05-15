@@ -37,11 +37,10 @@ env:
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
     value: "1:528920018833:web:e8d084284d9bd363e3e430"
 
-  # API endpoints — SET THESE before the storefront shows real data.
-  # Until set, pages gracefully show empty/unavailable states.
-  # - variable: API_URL
-  #   value: https://api.goldsmith-dev.example.com
-  # - variable: NEXT_PUBLIC_API_BASE
-  #   value: https://api.goldsmith-dev.example.com
-  # - variable: NEXT_PUBLIC_SITE_URL
-  #   value: https://goldsmith-dev.web.app
+  # API endpoints
+  - variable: API_URL
+    value: https://goldsmith-api-528920018833.asia-east1.run.app
+  - variable: NEXT_PUBLIC_API_BASE
+    value: https://goldsmith-api-528920018833.asia-east1.run.app
+  - variable: NEXT_PUBLIC_SITE_URL
+    value: https://goldsmith-customer-web--goldsmith-dev.asia-east1.hosted.app
