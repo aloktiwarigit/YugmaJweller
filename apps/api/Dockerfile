@@ -11,16 +11,20 @@ RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 FROM base AS builder
 WORKDIR /repo
 
-# Workspace root manifests — changing these invalidates the install cache layer.
+# Workspace root manifests + TypeScript base config.
+# tsconfig.base.json is extended by apps/api/tsconfig.json via ../../tsconfig.base.json.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json turbo.json .npmrc* ./
+COPY tsconfig.base.json tsconfig.json* ./
 
 # Workspace package manifests (all needed for pnpm workspace resolution).
 # Source + committed dist/ of each package are copied in the next step.
 COPY packages/ packages/
 COPY apps/api/ apps/api/
 
-# Install all deps (dev included — needed for tsc).
-RUN pnpm install --ignore-scripts
+# Hoist all packages in the Docker build context so tsc can resolve types
+# across workspace boundaries (e.g. @sentry/node via @goldsmith/observability).
+# This only affects the Docker build — not the repo's shared .npmrc.
+RUN echo "public-hoist-pattern[]=*" >> .npmrc && pnpm install --ignore-scripts
 
 # Compile the API. Workspace package dist/ files are already present (committed),
 # so only apps/api/src needs to be compiled by tsc.

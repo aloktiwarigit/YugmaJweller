@@ -1,1 +1,7 @@
-{ "extends": "./tsconfig.json", "exclude": ["**/*.test.ts", "**/*.e2e.test.ts", "test/**/*"] }
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "exclude": ["**/*.test.ts", "**/*.spec.ts", "**/*.e2e.test.ts", "test/**/*"]
+}
