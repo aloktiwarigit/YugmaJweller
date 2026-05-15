@@ -1,36 +1,35 @@
-# Firebase App Hosting source upload exclusions.
-# Only the customer-web app and its workspace package dependencies are needed.
-# Everything else is excluded to keep the zip under GCS upload limits.
+# gcloudignore for Cloud Build API docker builds (submitted from repo root).
+# Firebase App Hosting now uses GitHub integration (not local gcloud upload),
+# so this file is optimised for the API build context only.
+#
+# Include: apps/api/, packages/ (source + compiled dist/), workspace manifests
+# Exclude: other apps, node_modules (rebuilt in Docker), dev artifacts
 
 # Git internals
 .git/
 .github/
 
-# Other apps — not needed to build customer-web
+# Other apps — not needed to build the API Docker image
 apps/shopkeeper/
-apps/api/
+apps/customer-web/
 apps/customer-mobile/
 apps/admin-web/
 
-# Build outputs — rebuilt on Firebase's build servers
+# Next.js build outputs (not needed for API)
 apps/customer-web/.next/
 apps/customer-web/out/
-apps/*/dist/
-packages/*/dist/
 
-# Planning / documentation artifacts
+# Dev tooling and local artifacts
+.playwright-mcp/
+.claude/
+.remember/
+.serena/
 docs/
 _bmad-output/
 artifacts/
 tools/
 
-# Dev tooling
-.playwright-mcp/
-.claude/
-.remember/
-.serena/
-
-# pnpm virtual store (large, rebuilt during firebase build via pnpm install)
+# pnpm virtual store — rebuilt inside Docker via pnpm install
 node_modules/
 .pnpm-store/
 
@@ -38,10 +37,11 @@ node_modules/
 coverage/
 *.tsbuildinfo
 
-# Local env (never ship)
+# Local env secrets
 .env
 .env.*
 !.env.example
+!.env.*.example
 
 # OS
 .DS_Store

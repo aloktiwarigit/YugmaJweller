@@ -1,0 +1,26 @@
+# Cloud Build config for the Goldsmith NestJS API.
+# Local submit: gcloud builds submit --config cloudbuild.yaml --project goldsmith-dev .
+# GitHub-triggered: $COMMIT_SHA is available; for local runs $BUILD_ID is used.
+# The .gcloudignore at repo root keeps the upload small (excludes other apps + node_modules).
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-api
+    env:
+      - DOCKER_BUILDKIT=1
+    args:
+      - build
+      - --file=apps/api/Dockerfile
+      - --tag=asia-east1-docker.pkg.dev/goldsmith-dev/goldsmith-api/api:$BUILD_ID
+      - --tag=asia-east1-docker.pkg.dev/goldsmith-dev/goldsmith-api/api:latest
+      - --cache-from=asia-east1-docker.pkg.dev/goldsmith-dev/goldsmith-api/api:latest
+      - .
+
+images:
+  - asia-east1-docker.pkg.dev/goldsmith-dev/goldsmith-api/api:$BUILD_ID
+  - asia-east1-docker.pkg.dev/goldsmith-dev/goldsmith-api/api:latest
+
+options:
+  machineType: E2_HIGHCPU_8
+  diskSizeGb: 50
+  logging: CLOUD_LOGGING_ONLY

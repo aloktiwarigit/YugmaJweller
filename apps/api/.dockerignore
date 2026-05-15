@@ -1,0 +1,38 @@
+# Exclude everything not needed to build the API image.
+# Docker context is sent from the REPO ROOT, so this lives at apps/api/.dockerignore
+# but is applied relative to the build context (repo root).
+
+.git
+.github
+.claude
+.remember
+.playwright-mcp
+.serena
+
+# Other apps — not needed for the API build
+apps/shopkeeper
+apps/customer-web
+apps/customer-mobile
+apps/admin-web
+
+# Build outputs that get rebuilt inside Docker
+apps/api/dist
+apps/api/node_modules
+node_modules
+
+# Documentation / planning artifacts
+docs
+_bmad-output
+artifacts
+tools
+
+# Local env secrets
+.env
+.env.*
+.secrets
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea
+.vscode
