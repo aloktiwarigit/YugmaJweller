@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
-import { colors } from '@goldsmith/ui-tokens';
+import { colors, typography } from '@goldsmith/ui-tokens';
 import { TenantBrandHeader } from '../../src/components/TenantBrandHeader';
 import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import { getWishlist, removeFromWishlist } from '../../src/api/endpoints';
@@ -97,8 +97,8 @@ export default function Wishlist(): React.ReactElement {
 const styles = StyleSheet.create({
   root:        { flex: 1, backgroundColor: colors.bg },
   center:      { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  empty:       { fontSize: 18, color: colors.ink, fontWeight: '500', textAlign: 'center' },
-  emptySub:    { fontSize: 14, color: colors.inkMute, marginTop: 8, textAlign: 'center' },
+  empty:       { fontFamily: typography.headingMid.family, fontSize: 18, color: colors.ink, fontWeight: '500', textAlign: 'center' },
+  emptySub:    { fontFamily: typography.body.family, fontSize: 14, color: colors.inkMute, marginTop: 8, textAlign: 'center' },
   list:        { padding: 16, gap: 12 },
   card:        {
     flexDirection: 'row',
@@ -112,8 +112,8 @@ const styles = StyleSheet.create({
     minHeight: 72,
   },
   cardInfo:    { flex: 1 },
-  cardTitle:   { fontSize: 16, color: colors.ink, fontWeight: '600' },
-  cardSub:     { fontSize: 13, color: colors.inkMute, marginTop: 2 },
+  cardTitle:   { fontFamily: typography.headingMid.family, fontSize: 16, color: colors.ink, fontWeight: '600' },
+  cardSub:     { fontFamily: typography.body.family, fontSize: 13, color: colors.inkMute, marginTop: 2 },
   removeBtn:   { marginLeft: 12, minWidth: 88, alignItems: 'center' },
-  removeBtnText: { fontSize: 13, color: colors.error },
+  removeBtnText: { fontFamily: typography.body.family, fontSize: 13, color: colors.error },
 });
