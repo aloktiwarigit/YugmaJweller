@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { resolveShopSlug } from '@/lib/tenant-slug';
@@ -12,9 +13,41 @@ import { TrustStrip } from '@/components/pdp/TrustStrip';
 import { CompleteTheLook } from '@/components/pdp/CompleteTheLook';
 import { ActionRow } from '@/components/pdp/ActionRow';
 import { purityLabel, metalLabel } from '@/lib/theme';
+import { jsonLd } from '@/lib/storefront';
 
 interface PageProps {
   params: { id: string };
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const slug = resolveShopSlug(headers());
+  if (!slug) return { title: 'उत्पाद उपलब्ध नहीं' };
+
+  const config = await fetchTenantConfig(slug);
+  if (!config) return { title: 'उत्पाद उपलब्ध नहीं' };
+
+  const product = await fetchProduct(params.id, config.shopId);
+  if (!product) return { title: 'उत्पाद उपलब्ध नहीं' };
+
+  const displayName = purityLabel(product.purity);
+  const displayMetal = metalLabel(product.metal);
+  const title = `${displayName} | ${config.appName}`;
+  const description = `${displayName} — ${displayMetal}`.trim();
+  const ogImages = product.primaryImage?.url ? [{ url: product.primaryImage.url }] : [];
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      images: ogImages,
+      type: 'website',
+    },
+    alternates: {
+      canonical: `/products/${params.id}`,
+    },
+  };
 }
 
 function computeAverageRating(
@@ -46,8 +79,38 @@ export default async function ProductDetailPage({ params }: PageProps) {
   const displayMetal   = metalLabel(product.metal);
   const totalFormatted = product.estimatedPrice?.totalFormatted;
 
+  // Build Product JSON-LD. Only include `offers` when we have a real numeric price
+  // from the catalog API — never fabricate price data.
+  const totalPaiseRaw = product.estimatedPrice?.totalPaise;
+  const totalPaise = totalPaiseRaw ? Number.parseInt(totalPaiseRaw, 10) : NaN;
+  const hasPrice = Number.isFinite(totalPaise) && totalPaise > 0;
+
+  const productSchema: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: displayPurity,
+    image: product.primaryImage?.url ? [product.primaryImage.url] : [],
+    description: `${displayPurity} — ${displayMetal}`.trim(),
+    brand: { '@type': 'Brand', name: config.appName },
+    sku: product.sku ?? params.id,
+  };
+  if (hasPrice) {
+    productSchema['offers'] = {
+      '@type': 'Offer',
+      priceCurrency: 'INR',
+      price: (totalPaise / 100).toFixed(2),
+      availability: isUnavailable
+        ? 'https://schema.org/OutOfStock'
+        : 'https://schema.org/InStock',
+    };
+  }
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLd(productSchema) }}
+      />
       {/* Sticky bottom CTA — appears after user scrolls past hero */}
       <StickyCTABar
         productId={product.id}
