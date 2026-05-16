@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   ActivityIndicator, Modal, Alert, TextInput,
   SafeAreaView, Share,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
+import { categoryToFallbackSvg } from '@goldsmith/customer-shared';
 import {
   getCatalogProduct,
   verifyHuid,
@@ -79,6 +81,11 @@ function StarRow({ rating }: { rating: number }): React.ReactElement {
 // ---------------------------------------------------------------------------
 
 function CompactProductCard({ product }: { product: CatalogProduct }): React.ReactElement {
+  const fallbackUri = useMemo(
+    () => `data:image/svg+xml;utf8,${encodeURIComponent(categoryToFallbackSvg(product.categoryName))}`,
+    [product.categoryName],
+  );
+  const displayName = purityLabel(product.purity);
   return (
     <TouchableOpacity
       onPress={() => router.push(`/browse/${product.id}`)}
@@ -91,10 +98,26 @@ function CompactProductCard({ product }: { product: CatalogProduct }): React.Rea
         overflow: 'hidden',
         marginRight: spacing.sm,
       }}
-      accessibilityLabel={`${purityLabel(product.purity)} — ${product.sku}`}
+      accessibilityLabel={`${displayName} — ${product.sku}`}
       accessibilityRole="button"
     >
-      <View style={{ width: 120, height: 150, backgroundColor: colors.border }} />
+      {product.primaryImage ? (
+        <Image
+          source={{ uri: product.primaryImage.url }}
+          placeholder={{ uri: product.primaryImage.placeholderUrl }}
+          transition={250}
+          contentFit="cover"
+          style={{ width: 120, height: 150 }}
+          accessibilityLabel={product.primaryImage.alt ?? displayName ?? 'अनुशंसित आभूषण'}
+        />
+      ) : (
+        <Image
+          source={{ uri: fallbackUri }}
+          contentFit="cover"
+          style={{ width: 120, height: 150 }}
+          accessibilityLabel={displayName ?? 'अनुशंसित आभूषण'}
+        />
+      )}
       <View style={{ padding: spacing.xs }}>
         <Text
           style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.ink, fontWeight: '600' }}
