@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-16T15:55:31.571Z",
+  "generated": "2026-05-17T09:34:14.531Z",
   "apps": [
     {
       "name": "@goldsmith/api",
@@ -1353,10 +1353,6 @@
         "route": "/inventory/dead-stock"
       },
       {
-        "file": "apps/shopkeeper/app/inventory/index.tsx",
-        "route": "/inventory"
-      },
-      {
         "file": "apps/shopkeeper/app/inventory/new.tsx",
         "route": "/inventory/new"
       },
@@ -1551,6 +1547,10 @@
         "route": "/browse/size-guide"
       },
       {
+        "file": "apps/customer-mobile/app/browse/support.tsx",
+        "route": "/browse/support"
+      },
+      {
         "file": "apps/customer-mobile/app/index.tsx",
         "route": "/"
       },
@@ -1703,6 +1703,8 @@
     "a11y-shopkeeper",
     "build",
     "build-customer-mobile",
+    "build-customer-mobile-prod",
+    "build-customer-web",
     "build-shopkeeper",
     "docs-validate",
     "e2e-shopkeeper",

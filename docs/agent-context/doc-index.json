@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-16T15:55:30.494Z",
+  "generated": "2026-05-17T09:34:13.370Z",
   "docs": [
     {
       "path": "_bmad-output/planning-artifacts/adr/0001-auth-provider-supabase.md",
@@ -173,6 +173,14 @@
       "path": "_bmad-output/planning-artifacts/epics-E17-E18.md",
       "kind": "requirements",
       "estimatedTokens": 10430,
+      "readWhen": "story decomposition and epic scoping",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
+      "path": "_bmad-output/planning-artifacts/epics-E19.md",
+      "kind": "requirements",
+      "estimatedTokens": 10020,
       "readWhen": "story decomposition and epic scoping",
       "avoidByDefault": false,
       "supersededBy": null
@@ -764,7 +772,7 @@
     {
       "path": "docs/runbook.md",
       "kind": "other",
-      "estimatedTokens": 6840,
+      "estimatedTokens": 10490,
       "readWhen": "reference only",
       "avoidByDefault": false,
       "supersededBy": null
