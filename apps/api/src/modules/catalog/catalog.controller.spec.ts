@@ -141,7 +141,7 @@ describe('CatalogController', () => {
     });
     it('returns listing + cache header', async () => {
       const res = await request(app.getHttpServer())
-        .get('/api/v1/catalog/products').set('X-Tenant-Id', 'shop-uuid').expect(200);
+        .get('/api/v1/catalog/products').set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111').expect(200);
       expect(res.body.items).toBeInstanceOf(Array);
       // No filter params + page=1 → hot path: 5-minute TTL
       expect(res.headers['cache-control']).toBe('public, max-age=300, stale-while-revalidate=900');
@@ -149,21 +149,21 @@ describe('CatalogController', () => {
     it('priceMin NaN → 400', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/v1/catalog/products?priceMin=abc')
-        .set('X-Tenant-Id', 'shop-uuid')
+        .set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111')
         .expect(400);
       expect(res.body).toMatchObject({ code: 'catalog.invalid_price_min' });
     });
     it('priceMax NaN → 400', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/v1/catalog/products?priceMax=xyz')
-        .set('X-Tenant-Id', 'shop-uuid')
+        .set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111')
         .expect(400);
       expect(res.body).toMatchObject({ code: 'catalog.invalid_price_max' });
     });
     it('filtered cache header when B1 filter param present', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/v1/catalog/products?purity=GOLD_22K')
-        .set('X-Tenant-Id', 'shop-uuid')
+        .set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111')
         .expect(200);
       expect(res.headers['cache-control']).toBe('public, max-age=30, stale-while-revalidate=60');
     });
@@ -177,7 +177,7 @@ describe('CatalogController', () => {
     it('returns 404 for unknown product', async () => {
       await request(app.getHttpServer())
         .get('/api/v1/catalog/products/00000000-0000-0000-0000-000000000001')
-        .set('X-Tenant-Id', 'shop-uuid').expect(404);
+        .set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111').expect(404);
     });
   });
 
@@ -192,7 +192,7 @@ describe('CatalogController', () => {
 
     it('returns 400 when payload param missing', async () => {
       await request(app.getHttpServer())
-        .get(BASE_URL).set('X-Tenant-Id', 'shop-uuid').expect(400);
+        .get(BASE_URL).set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111').expect(400);
     });
 
     it('returns verified=true when HUID matches', async () => {
@@ -201,7 +201,7 @@ describe('CatalogController', () => {
       });
       const res = await request(app.getHttpServer())
         .get(`${BASE_URL}?payload=AB1234`)
-        .set('X-Tenant-Id', 'shop-uuid')
+        .set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111')
         .expect(200);
       expect(res.body).toMatchObject({ verified: true, huid: 'AB1234', certifyingBody: 'BIS' });
     });
@@ -212,7 +212,7 @@ describe('CatalogController', () => {
       });
       const res = await request(app.getHttpServer())
         .get(`${BASE_URL}?payload=ZZ9999`)
-        .set('X-Tenant-Id', 'shop-uuid')
+        .set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111')
         .expect(200);
       expect(res.body.verified).toBe(false);
     });
@@ -220,7 +220,7 @@ describe('CatalogController', () => {
     it('has Cache-Control: no-store', async () => {
       const res = await request(app.getHttpServer())
         .get(`${BASE_URL}?payload=AB1234`)
-        .set('X-Tenant-Id', 'shop-uuid')
+        .set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111')
         .expect(200);
       expect(res.headers['cache-control']).toBe('no-store');
     });
@@ -232,10 +232,10 @@ describe('CatalogController', () => {
       const payload = encodeURIComponent('https://jewel.bis.gov.in/?huid=AB1234');
       await request(app.getHttpServer())
         .get(`${BASE_URL}?payload=${payload}`)
-        .set('X-Tenant-Id', 'shop-uuid')
+        .set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111')
         .expect(200);
       expect(mockCatalogService.verifyHuid).toHaveBeenCalledWith(
-        PRODUCT_ID, 'shop-uuid', 'https://jewel.bis.gov.in/?huid=AB1234',
+        PRODUCT_ID, '11111111-1111-1111-1111-111111111111', 'https://jewel.bis.gov.in/?huid=AB1234',
       );
     });
   });
@@ -251,7 +251,7 @@ describe('CatalogController', () => {
     it('returns 400 for a non-UUID product id', async () => {
       await request(app.getHttpServer())
         .get('/api/v1/catalog/products/not-a-uuid/reviews')
-        .set('X-Tenant-Id', 'shop-uuid')
+        .set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111')
         .expect(400);
     });
 
@@ -259,14 +259,14 @@ describe('CatalogController', () => {
       mockCatalogService.getPublicProductReviews.mockRejectedValueOnce(new NotFoundException());
       await request(app.getHttpServer())
         .get(BASE)
-        .set('X-Tenant-Id', 'shop-uuid')
+        .set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111')
         .expect(404);
     });
 
     it('returns 200 with items array and correct cache header', async () => {
       const res = await request(app.getHttpServer())
         .get(BASE)
-        .set('X-Tenant-Id', 'shop-uuid')
+        .set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111')
         .expect(200);
       expect(res.body).toHaveProperty('items');
       expect(res.body.items).toBeInstanceOf(Array);
@@ -277,7 +277,7 @@ describe('CatalogController', () => {
     it('caps limit at 50 when ?limit=200 is requested (assertion #8)', async () => {
       await request(app.getHttpServer())
         .get(`${BASE}?limit=200`)
-        .set('X-Tenant-Id', 'shop-uuid');
+        .set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111');
       expect(mockCatalogService.getPublicProductReviews).toHaveBeenCalledWith(
         expect.objectContaining({ limit: 50 }),
       );
@@ -286,7 +286,7 @@ describe('CatalogController', () => {
     it('defaults limit to 10 when not specified', async () => {
       await request(app.getHttpServer())
         .get(BASE)
-        .set('X-Tenant-Id', 'shop-uuid');
+        .set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111');
       expect(mockCatalogService.getPublicProductReviews).toHaveBeenCalledWith(
         expect.objectContaining({ limit: 10 }),
       );
@@ -295,9 +295,9 @@ describe('CatalogController', () => {
     it('passes page and shopId to service', async () => {
       await request(app.getHttpServer())
         .get(`${BASE}?page=3`)
-        .set('X-Tenant-Id', 'tenant-uuid-123');
+        .set('X-Tenant-Id', '22222222-2222-2222-2222-222222222222');
       expect(mockCatalogService.getPublicProductReviews).toHaveBeenCalledWith(
-        expect.objectContaining({ page: 3, shopId: 'tenant-uuid-123' }),
+        expect.objectContaining({ page: 3, shopId: '22222222-2222-2222-2222-222222222222' }),
       );
     });
   });

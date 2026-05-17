@@ -27,7 +27,9 @@ export async function withShopTx<T>(
   try {
     await client.query('BEGIN');
     await client.query('SET LOCAL ROLE app_user');
-    await client.query(`SET LOCAL app.current_shop_id = '${shopId}'`);
+    // Parameter-bound via set_config() — never string-interpolate shopId into SQL.
+    // is_local=true makes this equivalent to SET LOCAL (rolled back at COMMIT/ROLLBACK).
+    await client.query('SELECT set_config($1, $2, true)', ['app.current_shop_id', shopId]);
     const result = await fn(client);
     await client.query('COMMIT');
     return result;
@@ -39,7 +41,11 @@ export async function withShopTx<T>(
     // SET LOCAL is rolled back with the transaction, but any prior session-level
     // SET (e.g. from seed scripts) persists. Explicitly re-poison here so that
     // a recycled connection never leaks tenant state to the next caller.
-    await client.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
+    // is_local=false → equivalent to plain SET (session-scoped, persists across txns
+    // on this connection until next set_config or pool release).
+    await client
+      .query('SELECT set_config($1, $2, false)', ['app.current_shop_id', POISON_UUID])
+      .catch(() => undefined);
     client.release();
   }
 }

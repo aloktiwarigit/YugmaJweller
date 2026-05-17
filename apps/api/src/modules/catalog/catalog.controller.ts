@@ -8,6 +8,7 @@ import type { Response } from 'express';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { SkipAuth } from '../../common/decorators/skip-auth.decorator';
 import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
+import { assertPublicTenantHeader, isUuidShape } from '../../common/validators/tenant-header';
 import { PricingService } from '../pricing/pricing.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { CatalogService } from './catalog.service';
@@ -103,7 +104,7 @@ export class CatalogController {
     @Query('limit')       limit = '12',
     @Res({ passthrough: true }) res?: Response,
   ): Promise<CatalogProductsResponse> {
-    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    shopId = assertPublicTenantHeader(shopId);
 
     let priceMin: number | undefined;
     let priceMax: number | undefined;
@@ -167,7 +168,7 @@ export class CatalogController {
     @Headers('x-tenant-id') shopId: string,
     @Query('limit') limitRaw = '12',
   ): Promise<{ items: CatalogProduct[] }> {
-    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    shopId = assertPublicTenantHeader(shopId);
     const limit = Math.min(20, Math.max(1, parseInt(limitRaw, 10) || 12));
     return this.catalogService.getFeatured(shopId, limit);
   }
@@ -184,7 +185,7 @@ export class CatalogController {
     @Headers('x-tenant-id') shopId: string,
     @Query('limit') limitRaw = '12',
   ): Promise<{ items: CatalogProduct[] }> {
-    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    shopId = assertPublicTenantHeader(shopId);
     const limit = Math.min(20, Math.max(1, parseInt(limitRaw, 10) || 12));
     return this.catalogService.getNewArrivals(shopId, limit);
   }
@@ -201,7 +202,7 @@ export class CatalogController {
     @Headers('x-tenant-id') shopId: string,
     @Query('limit') limitRaw = '12',
   ): Promise<{ items: CatalogProduct[] }> {
-    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    shopId = assertPublicTenantHeader(shopId);
     const limit = Math.min(20, Math.max(1, parseInt(limitRaw, 10) || 12));
     return this.catalogService.getTopSellers(shopId, limit);
   }
@@ -218,7 +219,7 @@ export class CatalogController {
     @Param('id', new ParseUUIDPipe()) productId: string,
     @Headers('x-tenant-id') shopId: string,
   ): Promise<CatalogProduct> {
-    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    shopId = assertPublicTenantHeader(shopId);
     return this.catalogService.getProduct(productId, shopId);
   }
 
@@ -235,7 +236,7 @@ export class CatalogController {
     @Headers('x-tenant-id') shopId: string,
     @Query('payload') payload: string,
   ): Promise<HuidVerifyResult> {
-    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    shopId = assertPublicTenantHeader(shopId);
     if (!payload) throw new BadRequestException({ code: 'catalog.huid_payload_required' });
     return this.catalogService.verifyHuid(productId, shopId, payload);
   }
@@ -254,7 +255,7 @@ export class CatalogController {
     @Param('id', new ParseUUIDPipe()) productId: string,
     @Headers('x-tenant-id') shopId: string,
   ): Promise<{ images: PublicImageRow[] }> {
-    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    shopId = assertPublicTenantHeader(shopId);
     const images = await this.catalogService.listPublicImages(productId, shopId);
     return { images };
   }
@@ -273,7 +274,7 @@ export class CatalogController {
     @Query('page') page = '1',
     @Query('limit') limit = '10',
   ): Promise<PublicReviewsResponse> {
-    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    shopId = assertPublicTenantHeader(shopId);
     return this.catalogService.getPublicProductReviews({
       shopId,
       productId,
@@ -294,7 +295,7 @@ export class CatalogController {
     @Param('id', new ParseUUIDPipe()) productId: string,
     @Headers('x-tenant-id') shopId: string,
   ): Promise<{ items: CatalogProduct[] }> {
-    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    shopId = assertPublicTenantHeader(shopId);
     return this.catalogService.getRecommendations(productId, shopId);
   }
 
@@ -309,7 +310,7 @@ export class CatalogController {
   async getCategories(
     @Headers('x-tenant-id') shopId: string,
   ): Promise<{ categories: CategoryNode[] }> {
-    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    shopId = assertPublicTenantHeader(shopId);
     return this.catalogService.getCategories(shopId);
   }
 
@@ -324,7 +325,7 @@ export class CatalogController {
   async getCollections(
     @Headers('x-tenant-id') shopId: string,
   ): Promise<{ items: Collection[] }> {
-    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    shopId = assertPublicTenantHeader(shopId);
     return this.catalogService.getCollections(shopId);
   }
 
@@ -342,7 +343,7 @@ export class CatalogController {
     @Query('page') page = '1',
     @Query('limit') limit = '12',
   ): Promise<{ collection: Collection; products: CatalogProductsResponse }> {
-    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    shopId = assertPublicTenantHeader(shopId);
     if (!slug) throw new BadRequestException({ code: 'catalog.slug_required' });
     return this.catalogService.getCollection(
       slug,
@@ -363,7 +364,7 @@ export class CatalogController {
   async getStorefrontConfig(
     @Headers('x-tenant-id') shopId: string,
   ): Promise<StorefrontConfig> {
-    if (!shopId) throw new BadRequestException({ code: 'catalog.tenant_id_required' });
+    shopId = assertPublicTenantHeader(shopId);
     return this.catalogService.getStorefrontConfig(shopId);
   }
 
@@ -411,7 +412,10 @@ export class CatalogController {
     @Ip() ip: string,
     @Body() body: { sessionId?: string; customerId?: string; durationSeconds?: number },
   ): Promise<void> {
-    if (!shopId || !body.sessionId) return;
+    // Best-effort analytics — drop silently on missing/malformed input rather than
+    // surfacing 4xx. Validates UUID shape before passing to analyticsService (which
+    // calls withShopTx); never let a raw header value reach set_config().
+    if (!shopId || !body.sessionId || !isUuidShape(shopId)) return;
 
     const rateCacheKey = `${ip}:${productId}`;
     if (this.viewRateCache.has(rateCacheKey)) return;
