@@ -181,6 +181,26 @@ describe('endpoints', () => {
       status: 422,
     });
   });
+
+  it('customerSelfDelete sends reason in body when provided', async () => {
+    let captured: unknown;
+    mock.onDelete('/api/v1/crm/customer/me').reply((config) => {
+      captured = config.data ? JSON.parse(config.data as string) : null;
+      return [202, { scheduledAt: 'x', hardDeleteAt: 'y' }];
+    });
+    await customerSelfDelete({ reason: 'privacy', reasonText: 'क्योंकि' });
+    expect(captured).toEqual({ reason: 'privacy', reasonText: 'क्योंकि' });
+  });
+
+  it('customerSelfDelete sends empty body when no options provided', async () => {
+    let captured: unknown = 'unset';
+    mock.onDelete('/api/v1/crm/customer/me').reply((config) => {
+      captured = config.data ?? null;
+      return [202, { scheduledAt: 'x', hardDeleteAt: 'y' }];
+    });
+    await customerSelfDelete();
+    expect(captured === null || captured === undefined || captured === '').toBe(true);
+  });
 });
 
 describe('new-arrivals and top-sellers endpoints', () => {

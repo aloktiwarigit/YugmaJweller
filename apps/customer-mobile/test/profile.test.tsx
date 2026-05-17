@@ -4,8 +4,13 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mocks = vi.hoisted(() => ({
-  customerSelfDelete: vi.fn(),
+  routerPush: vi.fn(),
   signOut: vi.fn(),
+}));
+
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: mocks.routerPush, back: vi.fn(), replace: vi.fn() }),
+  Stack:     { Screen: () => null },
 }));
 
 // Mock all network calls
@@ -14,7 +19,7 @@ vi.mock('../src/api/endpoints', () => ({
   getCustomOrders:       vi.fn().mockResolvedValue({ orders: [], total: 0 }),
   getRateLockBookings:   vi.fn().mockResolvedValue({ bookings: [], total: 0 }),
   getTryAtHomeBookings:  vi.fn().mockResolvedValue({ bookings: [], total: 0 }),
-  customerSelfDelete:    mocks.customerSelfDelete,
+  customerSelfDelete:    vi.fn(),
 }));
 
 vi.mock('../src/hooks/useCustomerSession', () => ({
@@ -42,7 +47,6 @@ function wrapper({ children }: { children: React.ReactNode }) {
 describe('Profile screen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.customerSelfDelete.mockResolvedValue(undefined);
     mocks.signOut.mockResolvedValue(undefined);
   });
 
@@ -72,31 +76,9 @@ describe('Profile screen', () => {
     expect(getByTestId('profile-signout-button')).toBeTruthy();
   });
 
-  it('requires confirmation before requesting self-deletion and signs out after success', async () => {
+  it('navigates to /profile/delete-account when delete button is tapped', () => {
     const { getByTestId } = render(<Profile />, { wrapper });
-
     fireEvent.click(getByTestId('profile-delete-button'));
-    expect(mocks.customerSelfDelete).not.toHaveBeenCalled();
-
-    fireEvent.click(getByTestId('profile-delete-button'));
-
-    await waitFor(() => expect(mocks.customerSelfDelete).toHaveBeenCalledOnce());
-    expect(mocks.signOut).toHaveBeenCalledOnce();
-  });
-
-  it('keeps the customer signed in and shows an error when deletion is blocked', async () => {
-    mocks.customerSelfDelete.mockRejectedValueOnce(Object.assign(new Error('blocked'), {
-      code: 'crm.deletion.open_invoices',
-      status: 422,
-    }));
-    const { container, getByTestId } = render(<Profile />, { wrapper });
-
-    fireEvent.click(getByTestId('profile-delete-button'));
-    fireEvent.click(getByTestId('profile-delete-button'));
-
-    await waitFor(() => {
-      expect(container.textContent).toContain('खुले बिल होने के कारण');
-    });
-    expect(mocks.signOut).not.toHaveBeenCalled();
+    expect(mocks.routerPush).toHaveBeenCalledWith('/profile/delete-account');
   });
 });

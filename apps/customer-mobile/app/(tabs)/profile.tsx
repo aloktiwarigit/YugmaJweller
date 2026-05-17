@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
+import { useRouter } from 'expo-router';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 import { TenantBrandHeader } from '../../src/components/TenantBrandHeader';
 import { LoyaltyPointsCard } from '../../src/components/LoyaltyPointsCard';
@@ -11,51 +12,17 @@ import { TimelineTryAtHome } from '../../src/components/timeline/TimelineTryAtHo
 import { TimelineReviews } from '../../src/components/timeline/TimelineReviews';
 import type { TimelineTab } from '../../src/components/timeline/TimelineTabBar';
 import { useCustomerSession } from '../../src/hooks/useCustomerSession';
-import { customerSelfDelete, type TypedApiError } from '../../src/api/endpoints';
-
-type DeleteStep = 'idle' | 'confirm' | 'submitting';
-
-function getDeletionErrorMessage(error: unknown): string {
-  const code = (error as Partial<TypedApiError> | undefined)?.code;
-  if (code === 'crm.deletion.open_invoices') {
-    return 'खुले बिल होने के कारण हटाने का अनुरोध अभी नहीं हो सकता। कृपया दुकान से संपर्क करें।';
-  }
-  if (code === 'crm.deletion.already_requested') {
-    return 'हटाने का अनुरोध पहले से चल रहा है। कृपया लॉग आउट करके बाद में देखें।';
-  }
-  return 'हटाने का अनुरोध नहीं हो सका। कृपया फिर कोशिश करें या दुकान से संपर्क करें।';
-}
 
 export default function Profile(): React.ReactElement {
   const { customer, signOut } = useCustomerSession();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TimelineTab>('purchases');
-  const [deleteStep, setDeleteStep] = useState<DeleteStep>('idle');
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Lazy-mount: each tab renders only after first activation, then stays mounted.
   const activated = useRef<Set<TimelineTab>>(new Set(['purchases']));
   const handleTabChange = (tab: TimelineTab): void => {
     activated.current.add(tab);
     setActiveTab(tab);
-  };
-
-  const onRequestDeletion = async (): Promise<void> => {
-    if (deleteStep === 'submitting') return;
-    if (deleteStep !== 'confirm') {
-      setDeleteError(null);
-      setDeleteStep('confirm');
-      return;
-    }
-
-    setDeleteError(null);
-    setDeleteStep('submitting');
-    try {
-      await customerSelfDelete();
-      await signOut();
-    } catch (error) {
-      setDeleteError(getDeletionErrorMessage(error));
-      setDeleteStep('confirm');
-    }
   };
 
   return (
@@ -111,33 +78,26 @@ export default function Profile(): React.ReactElement {
           <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
             <Pressable
               testID="profile-delete-button"
-              onPress={onRequestDeletion}
-              disabled={deleteStep === 'submitting'}
+              onPress={() => router.push('/profile/delete-account')}
               style={{
-                backgroundColor: colors.white,
-                borderRadius:    radii.md,
-                paddingVertical: spacing.md,
+                backgroundColor:   colors.white,
+                borderRadius:      radii.md,
+                paddingVertical:   spacing.md,
                 paddingHorizontal: spacing.md,
-                borderWidth:     1,
-                borderColor:     colors.border,
-                minHeight:       48,
-                justifyContent:  'center',
+                borderWidth:       1,
+                borderColor:       colors.border,
+                minHeight:         48,
+                justifyContent:    'center',
               }}
               accessibilityRole="button"
-              accessibilityLabel={deleteStep === 'confirm' ? 'डेटा हटाने का अनुरोध पुष्टि करें' : 'डेटा हटाने का अनुरोध करें'}
+              accessibilityLabel="डेटा हटाने का अनुरोध करें"
             >
               <Text style={{ fontFamily: typography.body.family, fontSize: 16, color: '#8C2A1E', textAlign: 'center' }}>
-                {deleteStep === 'submitting'
-                  ? 'अनुरोध भेजा जा रहा है...'
-                  : deleteStep === 'confirm'
-                    ? 'डेटा हटाने की पुष्टि करें'
-                    : 'डेटा हटाने का अनुरोध करें'}
+                डेटा हटाएँ
               </Text>
             </Pressable>
             <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.inkMute, textAlign: 'center', marginTop: spacing.xs }}>
-              {deleteError ?? (deleteStep === 'confirm'
-                ? 'प्रोफ़ाइल डेटा अभी हटाया जाएगा और अंतिम हटाने की प्रक्रिया तय होगी।'
-                : 'अनुरोध स्वीकार होने के बाद आपका खाता लॉग आउट हो जाएगा।')}
+              खाता हटाने की प्रक्रिया अगले स्क्रीन पर समझाई गई है।
             </Text>
           </View>
           <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg }}>
