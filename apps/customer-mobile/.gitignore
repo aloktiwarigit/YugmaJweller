@@ -13,3 +13,18 @@ expo-env.d.ts
 # Firebase app config is tenant/build specific.
 google-services.json
 GoogleService-Info.plist
+
+# Android keystores + iOS credentials — uploaded to EAS Vault, never committed.
+*.keystore
+*.p12
+*.mobileprovision
+
+# Populated EAS credentials file (credentials.example.json is the safe template).
+credentials.json
+
+# Populated production env file (only .env.production.example is committed).
+.env.production
+
+# Play Store submission service account key.
+*-play-store*.json
+play-store-service-account.json

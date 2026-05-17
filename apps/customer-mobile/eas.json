@@ -1,54 +1,78 @@
 {
-    "cli":  {
-                "version":  "\u003e= 18.0.0",
-                "appVersionSource":  "local"
-            },
-    "build":  {
-                  "development":  {
-                                      "developmentClient":  true,
-                                      "distribution":  "internal",
-                                      "android":  {
-                                                      "buildType":  "apk",
-                                                      "gradleCommand":  ":app:assembleDebug"
-                                                  },
-                                      "env":  {
-                                                  "APP_ENV":  "development",
-                                                  "EXPO_PUBLIC_DEV_AUTH":  "1",
-                                                  "EXPO_PUBLIC_API_BASE_URL":  "https://goldsmith-api-s5yuu4e4ra-el.a.run.app",
-                                                  "EXPO_PUBLIC_SHOP_SLUG":  "anchor-dev",
-                                                  "EXPO_PUBLIC_ANDROID_PACKAGE":  "com.goldsmith.customer.dev",
-                                                  "EXPO_PUBLIC_IOS_BUNDLE_ID":  "com.goldsmith.customer.dev",
-                                                  "EXPO_PUBLIC_FIREBASE_PROJECT_ID":  "goldsmith-dev",
-                                                  "EXPO_PUBLIC_APP_NAME":  "श्री राम ज्वैलर्स"
-                                              }
-                                  },
-                  "preview":  {
-                                  "distribution":  "internal",
-                                  "android":  {
-                                                  "buildType":  "apk"
-                                              },
-                                  "env":  {
-                                              "APP_ENV":  "preview",
-                                              "EXPO_PUBLIC_API_BASE_URL":  "https://goldsmith-api-s5yuu4e4ra-el.a.run.app",
-                                              "EXPO_PUBLIC_SHOP_SLUG":  "anchor-dev",
-                                              "EXPO_PUBLIC_ANDROID_PACKAGE":  "com.goldsmith.customer.dev",
-                                              "EXPO_PUBLIC_IOS_BUNDLE_ID":  "com.goldsmith.customer.dev",
-                                              "EXPO_PUBLIC_FIREBASE_PROJECT_ID":  "goldsmith-dev",
-                                              "EXPO_PUBLIC_APP_NAME":  "श्री राम ज्वैलर्स"
-                                          }
-                              },
-                  "production":  {
-                                     "android":  {
-                                                     "buildType":  "app-bundle"
-                                                 },
-                                     "env":  {
-                                                 "APP_ENV":  "production"
-                                             }
-                                 }
-              },
-    "submit":  {
-                   "production":  {
-
-                                  }
-               }
+  "_comment": "EAS build configuration. See docs/runbook.md §20 for first-build steps and value-population guide. REPLACE_WITH_* placeholders must be filled in before running `eas build --profile production`. Development + preview profiles already point to the anchor-dev Cloud Run API for the demo flow.",
+  "cli": {
+    "version": ">= 18.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "env": {
+        "APP_ENV": "development",
+        "EXPO_PUBLIC_DEV_AUTH": "1",
+        "EXPO_PUBLIC_API_BASE_URL": "https://goldsmith-api-s5yuu4e4ra-el.a.run.app",
+        "EXPO_PUBLIC_SHOP_SLUG": "anchor-dev",
+        "EXPO_PUBLIC_ANDROID_PACKAGE": "com.goldsmith.customer.dev",
+        "EXPO_PUBLIC_IOS_BUNDLE_ID": "com.goldsmith.customer.dev",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "goldsmith-dev",
+        "EXPO_PUBLIC_APP_NAME": "श्री राम ज्वैलर्स"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_ENV": "preview",
+        "EXPO_PUBLIC_API_BASE_URL": "https://goldsmith-api-s5yuu4e4ra-el.a.run.app",
+        "EXPO_PUBLIC_SHOP_SLUG": "anchor-dev",
+        "EXPO_PUBLIC_ANDROID_PACKAGE": "com.goldsmith.customer.dev",
+        "EXPO_PUBLIC_IOS_BUNDLE_ID": "com.goldsmith.customer.dev",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "goldsmith-dev",
+        "EXPO_PUBLIC_APP_NAME": "श्री राम ज्वैलर्स"
+      }
+    },
+    "production": {
+      "_comment": "WHITE-LABEL NOTE: Every tenant gets a SEPARATE production build with their own package name, bundle ID, app name, and Firebase project. Do NOT share one production APK/IPA across tenants. See docs/runbook.md §20.",
+      "distribution": "store",
+      "channel": "production",
+      "credentialsSource": "remote",
+      "android": {
+        "buildType": "app-bundle",
+        "package": "REPLACE_WITH_TENANT_ANDROID_PACKAGE"
+      },
+      "ios": {
+        "bundleIdentifier": "REPLACE_WITH_TENANT_IOS_BUNDLE_ID"
+      },
+      "env": {
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_API_BASE_URL": "REPLACE_WITH_PRODUCTION_HTTPS_API_URL",
+        "EXPO_PUBLIC_SHOP_SLUG": "REPLACE_WITH_TENANT_SLUG",
+        "EXPO_PUBLIC_DEV_AUTH": "0",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "REPLACE_WITH_PRODUCTION_FIREBASE_PROJECT_ID",
+        "EXPO_PUBLIC_APP_NAME": "REPLACE_WITH_TENANT_APP_NAME_IN_HINDI",
+        "EXPO_PUBLIC_ANDROID_PACKAGE": "REPLACE_WITH_TENANT_ANDROID_PACKAGE",
+        "EXPO_PUBLIC_IOS_BUNDLE_ID": "REPLACE_WITH_TENANT_IOS_BUNDLE_ID"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "_comment": "Populate after Play Store / App Store developer accounts are created. See docs/runbook.md §20.",
+      "android": {
+        "serviceAccountKeyPath": "REPLACE_WITH_PATH_TO_PLAY_STORE_SERVICE_ACCOUNT_JSON",
+        "track": "internal"
+      },
+      "ios": {
+        "_comment": "iOS submission deferred. Apple Developer Program enrollment required per tenant. See docs/runbook.md §20.",
+        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID"
+      }
+    }
+  }
 }

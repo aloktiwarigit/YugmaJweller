@@ -41,6 +41,7 @@ mvpScope: >
 | [§17 Cloud Run deploys](#17-cloud-run-deploys-api--goldsmith-dev-asia-south1) | API build + deploy + rollback on GCP Cloud Run |
 | [§18 App Hosting deploys](#18-app-hosting-deploys-firebase-app-hosting--customer-web) | customer-web first deploy, env-var matrix, rollback, error triage |
 | [§19 Tenant onboarding — App Hosting backend per tenant](#19-tenant-onboarding--app-hosting-backend-per-tenant) | Manual per-tenant deploy steps until automation story lands |
+| [§20 EAS production builds](#20-eas-production-builds-customer-mobile) | customer-mobile first-build, env-var matrix, credentials, store submission, rollback |
 
 ---
 
@@ -938,5 +939,110 @@ Each jeweller tenant gets their own `apphosting.yaml` values and their own Fireb
 Estimated elapsed time for steps 3–6: ~1 hour per tenant (primarily wait time for Cloud Build).
 
 ---
+
+## 20. EAS production builds (customer-mobile)
+
+> Added 2026-05-16. Covers first-build steps, env-var matrix, credentials setup, store submission, and rollback.
+
+### 20.1 White-label build model
+
+Each tenant gets a **separate** EAS build with their own:
+- Android package name (`com.<tenant>.customer` — NOT `com.goldsmith.customer`)
+- iOS bundle identifier (`com.<tenant>.customer`)
+- Firebase project (separate `google-services.json` / `GoogleService-Info.plist`)
+- App name in Hindi (shown in the OS app drawer)
+
+The Goldsmith platform brand MUST NOT appear on any customer-facing surface. The Goldsmith `com.goldsmith.customer` package name is for dev builds only.
+
+### 20.2 Pre-build checklist
+
+- [ ] EAS account created: `eas login`
+- [ ] EAS project initialised for this tenant: `eas project:init` (run from `apps/customer-mobile`)
+- [ ] EAS project ID written into `app.config.ts` `extra.eas.projectId`
+- [ ] Tenant values populated in `apps/customer-mobile/eas.json` production profile (all `REPLACE_WITH_*` placeholders replaced)
+- [ ] Android keystore generated and uploaded to EAS Vault: `eas credentials --platform android`
+- [ ] `google-services.json` for the tenant's Firebase project placed at `apps/customer-mobile/google-services.json` (gitignored)
+- [ ] `EXPO_PUBLIC_API_BASE_URL` starts with `https://` — build fails if not
+- [ ] `EXPO_PUBLIC_ANDROID_PACKAGE` does NOT end with `.dev` — build fails if not
+- [ ] iOS: deferred until Apple Developer Program membership confirmed — see §17.7
+
+### 20.3 Env-var matrix
+
+| Variable | Purpose | Where to source |
+|---|---|---|
+| `EXPO_PUBLIC_API_BASE_URL` | Production API base URL | Azure Container Apps FQDN after deploy |
+| `EXPO_PUBLIC_SHOP_SLUG` | Tenant slug for `/tenant/boot` | `shops.slug` column in production DB |
+| `EXPO_PUBLIC_APP_NAME` | App display name (Hindi) | Tenant branding brief |
+| `EXPO_PUBLIC_ANDROID_PACKAGE` | Play Store package name | Convention: `com.<tenant>.customer` |
+| `EXPO_PUBLIC_IOS_BUNDLE_ID` | App Store bundle ID | Convention: `com.<tenant>.customer` |
+| `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | Firebase project ID | Firebase Console → Project settings |
+| `EXPO_PUBLIC_DEV_AUTH` | Dev bypass flag | MUST be `0` in production |
+
+See `apps/customer-mobile/.env.production.example` for comments on each variable.
+
+### 20.4 First Android build
+
+```bash
+# From the repo root
+cd apps/customer-mobile
+
+# 1. Confirm EAS CLI is installed and authenticated
+eas whoami
+
+# 2. Upload keystore if not already in EAS Vault
+eas credentials --platform android
+
+# 3. Push production secrets to EAS (env vars the build needs)
+eas secret:push --scope project --env-file .env.production
+#    .env.production is gitignored; populate from .env.production.example
+
+# 4. Trigger the production build (non-interactive for CI compatibility)
+eas build --profile production --platform android --non-interactive
+
+# 5. Wait for build to complete; download the AAB
+eas build:list --status finished --limit 1
+```
+
+### 20.5 Play Store submission (manual first time)
+
+1. Create the app listing in Google Play Console for this tenant.
+2. Download the AAB from EAS: `eas build:download --id <build-id>`.
+3. Upload the AAB to the Internal testing track via Play Console.
+4. Promote through Closed → Open → Production tracks after QA sign-off.
+5. For subsequent automated submissions: populate `eas.json` `submit.production.android.serviceAccountKeyPath` and run `eas submit --platform android --latest`.
+
+### 20.6 Version bump conventions
+
+- `version` in `apps/customer-mobile/package.json` follows SemVer (`MAJOR.MINOR.PATCH`).
+- `expo.android.versionCode` auto-increments via EAS (`autoIncrement: true` can be added to `eas.json` build profile).
+- Tag each production build in git: `git tag customer-mobile/v<version>-<tenant-slug>`.
+
+### 20.7 iOS submission (deferred)
+
+iOS requires an Apple Developer Program membership per tenant (or a shared platform account). Steps are deferred until the first iOS build request. When unblocked:
+
+1. Enroll the tenant (or platform) in Apple Developer Program.
+2. `eas credentials --platform ios` — EAS can generate certificates and provisioning profiles automatically.
+3. `eas build --profile production --platform ios --non-interactive`
+4. `eas submit --platform ios --latest`
+
+### 20.8 Rollback
+
+There is no in-place rollback for store builds once promoted to production. Play Store rollback:
+
+1. Open Google Play Console → Production track → Releases.
+2. Find the previous release version.
+3. Click "Re-publish" (or "Rollback release" if available in your Play Console version).
+4. Play Store will serve the previous APK to users within 1–2 hours.
+
+If the issue is in the API (not the app), API rollback (§2.3) is faster and preferred over a Play Store rollback.
+
+### 20.9 Production build guard verification
+
+The CI `build-customer-mobile` job automatically verifies:
+- The config evaluates cleanly in dev mode (guards bypass).
+- The guards correctly reject an `http://` API URL and `.dev` bundle IDs.
+
+Unit tests in `apps/customer-mobile/test/build-validation.test.ts` cover all guard rules. Run locally: `pnpm --filter @goldsmith/customer-mobile test`.
 
 _Runbook entries must stay actionable. If a section becomes prose rather than steps, split it or move it to architecture.md._

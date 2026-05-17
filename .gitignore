@@ -31,6 +31,20 @@ firebase-admin-sdk-*.json
 google-services.json
 GoogleService-Info.plist
 
+# Android keystores + iOS distribution credentials (per-tenant, never shared).
+# Upload via `eas credentials` to EAS Vault; never commit.
+*.keystore
+*.p12
+*.mobileprovision
+
+# EAS credentials.json (populated copy with real keystore paths/passwords).
+# The checked-in credentials.example.json is the safe reference template.
+credentials.json
+
+# Play Store service account JSON (used by eas submit --platform android).
+*-play-store*.json
+play-store-service-account.json
+
 # Editor + OS
 .DS_Store
 Thumbs.db

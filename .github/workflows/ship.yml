@@ -140,6 +140,69 @@ jobs:
   # Run `codex review --diff HEAD~1` (or the `codex-review-gate` Claude Code plugin)
   # before opening / merging a PR. CI handles the objective gates only.
 
+  build-customer-mobile:
+    # Combined Story 19.2 + Story 19.4: validates Sentry env vars (19.2),
+    # Expo config + production build guards (19.4).
+    # Real EAS builds happen outside CI (post-tenant-SOW); this job only
+    # validates that Sentry secrets are configured, the config is syntactically
+    # valid, and the production guard logic (HTTPS URL, no .dev bundle IDs) is
+    # wired correctly.
+    # Pre-resolved merge conflict: 19.4 is a superset of 19.2's steps so
+    # 19.2 merges first then 19.4 merges cleanly.
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: "${{ env.PNPM_VERSION }}" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: "pnpm" }
+      - run: pnpm install --frozen-lockfile
+      - name: Validate Sentry env vars are present
+        # Fail fast with a clear message if secrets are not configured.
+        # SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT must all be set for
+        # source-map upload to work in EAS builds. EXPO_PUBLIC_SENTRY_DSN must
+        # be set for events to be transmitted at runtime.
+        # In PR runs the secrets may not be available — the check uses
+        # SENTRY_REQUIRED=true to opt in (set on main-branch deploys only).
+        run: |
+          if [ "${SENTRY_REQUIRED:-false}" = "true" ]; then
+            : "${SENTRY_AUTH_TOKEN:?SENTRY_AUTH_TOKEN required for source-map upload}"
+            : "${SENTRY_ORG:?SENTRY_ORG required for source-map upload}"
+            : "${SENTRY_PROJECT:?SENTRY_PROJECT required for source-map upload}"
+            : "${EXPO_PUBLIC_SENTRY_DSN:?EXPO_PUBLIC_SENTRY_DSN required for Sentry event transmission}"
+            echo "All Sentry env vars present."
+          else
+            echo "SENTRY_REQUIRED not set — skipping secret presence check (PR build)."
+          fi
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
+      - name: Validate Expo config (dev profile — guards bypass for dev)
+        working-directory: apps/customer-mobile
+        env:
+          EXPO_PUBLIC_DEV_AUTH: "1"
+          EXPO_PUBLIC_API_BASE_URL: "http://10.0.2.2:3001"
+          EXPO_PUBLIC_SHOP_SLUG: "anchor-dev"
+          EXPO_PUBLIC_APP_NAME: "Goldsmith Dev"
+          EXPO_PUBLIC_ANDROID_PACKAGE: "com.goldsmith.customer.dev"
+          EXPO_PUBLIC_IOS_BUNDLE_ID: "com.goldsmith.customer.dev"
+          EXPO_PUBLIC_FIREBASE_PROJECT_ID: "goldsmith-dev"
+        run: pnpm exec expo config --type public > /dev/null
+      - name: Assert production guards (vitest build-validation suite)
+        # Runs the unit tests in test/build-validation.test.ts which verify:
+        #   - http:// URL is rejected in production builds
+        #   - .dev bundle IDs are rejected in production builds
+        #   - dev builds (EXPO_PUBLIC_DEV_AUTH=1) bypass both guards
+        # This catches regressions in src/build-validation.ts before a bad
+        # build reaches the store.
+        working-directory: apps/customer-mobile
+        run: pnpm exec vitest run test/build-validation.test.ts
+      - name: Typecheck customer-mobile
+        run: pnpm exec turbo run typecheck --filter=@goldsmith/customer-mobile
+
   build-shopkeeper:
     # Validates Expo config + plugin resolution without running the full web
     # export. Real mobile builds happen via EAS post-anchor-SOW (same deferral
