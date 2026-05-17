@@ -31,14 +31,14 @@ function errorMessage(code: string | undefined): string {
     case 'crm.deletion.open_invoices':
       return 'खुले बिल होने के कारण अभी हटाने का अनुरोध नहीं हो सकता। कृपया दुकान से संपर्क करें।';
     case 'crm.deletion.already_requested':
-      return 'हटाने का अनुरोध पहले से चल रहा है।';
+      return 'हटाने का अनुरोध पहले से चल रहा है। कृपया लॉग आउट करके बाद में देखें।';
     case 'crm.deletion.try_at_home_in_flight':
       return 'घर पर ट्राय का सामान अभी आपके पास है — पहले लौटाएँ।';
     case 'customer.token_invalid':
     case 'customer.auth_missing':
       return 'कृपया फिर से OTP से साइन इन करें।';
     default:
-      return 'हटाने का अनुरोध नहीं हो सका। कृपया फिर कोशिश करें।';
+      return 'हटाने का अनुरोध नहीं हो सका। कृपया फिर कोशिश करें या दुकान से संपर्क करें।';
   }
 }
 
@@ -69,6 +69,14 @@ export function DeleteAccountPageClient({ resolvedShopId }: PageProps): React.Re
   useEffect(() => {
     if (stage !== 'otp' || verifierRef.current !== null || recaptchaRef.current === null) return;
     verifierRef.current = createInvisibleRecaptcha(recaptchaRef.current);
+    // Documented Firebase teardown: clear the widget when leaving the OTP stage
+    // or when the component unmounts. Without this, the injected reCAPTCHA iframe
+    // and event listeners leak, and re-mount (back nav, hot reload) errors with
+    // "reCAPTCHA has already been rendered in this element".
+    return () => {
+      verifierRef.current?.clear?.();
+      verifierRef.current = null;
+    };
   }, [stage]);
 
   const handleSendOtp = async (): Promise<void> => {
@@ -123,6 +131,7 @@ export function DeleteAccountPageClient({ resolvedShopId }: PageProps): React.Re
       const apiBase = process.env.NEXT_PUBLIC_API_BASE ?? '';
       const res = await fetch(`${apiBase}/api/v1/crm/customer/me`, {
         method: 'DELETE',
+        signal:  AbortSignal.timeout(15_000),  // Match customer-mobile axios 15s timeout
         headers: {
           'Content-Type':  'application/json',
           'Authorization': `Bearer ${idToken}`,
@@ -201,6 +210,18 @@ export function DeleteAccountPageClient({ resolvedShopId }: PageProps): React.Re
               className="mt-4 w-full rounded-md bg-primary text-white px-4 py-3 font-semibold min-h-[48px] disabled:opacity-50"
             >
               {otpBusy ? 'जाँचा जा रहा है...' : 'पुष्टि करें'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmation(null);
+                setCode('');
+                setOtpError(null);
+              }}
+              disabled={otpBusy}
+              className="mt-3 w-full rounded-md border border-borderSubtle text-ink px-4 py-3 min-h-[48px] disabled:opacity-50"
+            >
+              नया OTP भेजें
             </button>
           </>
         )}
