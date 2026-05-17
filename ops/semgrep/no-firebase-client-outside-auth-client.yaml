@@ -3,10 +3,19 @@ rules:
     languages: [typescript]
     severity: ERROR
     message: |
-      Direct import of @react-native-firebase/* or firebase/* (client SDK) is
-      forbidden outside packages/auth-client. Use the sendOtp/verifyOtp/getIdToken
-      wrappers exported from @goldsmith/auth-client (lands in PR 1.1b).
-    pattern-regex: "^import\\s+(\\w+|\\{[^}]+\\}|\\*\\s+as\\s+\\w+)\\s+from\\s+['\"](@react-native-firebase/auth|firebase/auth)['\"]"
+      Direct import of the web `firebase/auth` SDK is forbidden outside the
+      packages/auth-client wrapper and the per-app auth modules that act as the
+      wrapper for that app. Use the sendOtp/verifyOtp/getIdToken wrappers exported
+      from @goldsmith/auth-client where available.
+
+      Note: `@react-native-firebase/auth` (the React Native native SDK) is NOT
+      matched by this rule — it is the standard RN integration and is used
+      freely throughout customer-mobile/shopkeeper.
+    pattern-regex: "^import\\s+(\\w+|\\{[^}]+\\}|\\*\\s+as\\s+\\w+)\\s+from\\s+['\"]firebase/auth['\"]"
     paths:
       exclude:
         - "packages/auth-client/**"
+        # Per-app firebase web-SDK auth wrapper modules. These ARE the auth
+        # clients for their respective apps; the rule's "outside auth-client"
+        # rule fires on the wrapper itself otherwise.
+        - "apps/shopkeeper/src/auth/**"

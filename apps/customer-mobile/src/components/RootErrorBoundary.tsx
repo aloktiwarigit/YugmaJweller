@@ -12,7 +12,7 @@
  * Design notes:
  *  - Warm cream background matches Direction 05 Hindi-First Editorial palette
  *  - Yatra One / MuktaVaani fonts per the locked UX direction
- *  - No Goldsmith branding visible (white-label rule)
+ *  - No platform-brand text visible (white-label rule — tenant brand only)
  */
 
 import React from 'react';

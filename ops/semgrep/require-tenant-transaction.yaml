@@ -15,6 +15,7 @@ rules:
         - "apps/api/src/modules/auth/**"        # pre-tenant: auth lookup + rate-limit (see ADR-0016)
         - "apps/api/src/modules/tenant-boot/**" # pre-tenant: slug→tenant bootstrap
         - "apps/api/src/drizzle-tenant-lookup.ts" # pre-tenant: resolves tenant from shop_id before ctx exists
+        - "apps/api/src/health.controller.ts"     # platform-global: /health DB probe runs SELECT 1 outside any tenant ctx
         - "packages/audit/src/platform-audit-log.ts" # platform-global: writes to platform_audit_events (no tenant ctx)
         - "apps/api/src/modules/pricing/pricing.service.ts" # platform-global: ibja_rate_snapshots + platform_audit_events reads/writes
         - "apps/api/src/workers/rates-refresh.processor.ts" # platform-global: platform_audit_events write in fallback handler

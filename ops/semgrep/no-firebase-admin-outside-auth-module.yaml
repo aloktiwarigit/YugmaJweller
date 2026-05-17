@@ -10,7 +10,9 @@ rules:
     paths:
       exclude:
         - "apps/api/src/modules/auth/**"
-        - "scripts/seed-anchor.ts"
+        # Seed/dev scripts run as superuser with their own firebase-admin
+        # bootstrap; not in the request-path flow that the rule targets.
+        - "scripts/**"
         - "ops/semgrep/tests/**"
         - "apps/api/test/**"
         - "packages/testing/tenant-isolation/fixtures/firebase-emulator.ts"

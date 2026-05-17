@@ -1,5 +1,5 @@
 /**
- * sentry.ts — Goldsmith customer-mobile Sentry integration
+ * sentry.ts — customer-mobile Sentry integration
  *
  * Responsibilities:
  *  1. Provide `initSentry()` called once at app boot from _layout.tsx

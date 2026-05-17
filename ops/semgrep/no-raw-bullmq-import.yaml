@@ -11,6 +11,11 @@ rules:
           - pattern: import { Worker } from 'bullmq'
           - pattern: import { QueueEvents } from 'bullmq'
           - pattern: require('bullmq')
+      # `import type` is erased at compile time — pure TypeScript annotation,
+      # no runtime Queue instantiation. The rule targets RUNTIME use only.
+      - pattern-not: import type { Queue } from 'bullmq'
+      - pattern-not: import type { Worker } from 'bullmq'
+      - pattern-not: import type { QueueEvents } from 'bullmq'
     paths:
       exclude:
         - "packages/queue/**"

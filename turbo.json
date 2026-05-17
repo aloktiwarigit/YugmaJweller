@@ -1,6 +1,13 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["tsconfig.base.json", ".eslintrc.cjs"],
+  "globalEnv": [
+    "NODE_ENV",
+    "CI",
+    "SKIP_ENV_VALIDATION",
+    "NEXT_PHASE",
+    "npm_lifecycle_event"
+  ],
   "tasks": {
     "typecheck":            { "dependsOn": ["^build", "^typecheck"], "outputs": [] },
     "lint":                 { "dependsOn": ["^build"], "outputs": [] },
@@ -8,7 +15,37 @@
     "test:unit":            { "dependsOn": [], "outputs": [] },
     "test:integration":     { "dependsOn": ["^build"], "outputs": [] },
     "test:tenant-isolation": { "dependsOn": ["^build"], "outputs": [] },
-    "build":                { "dependsOn": ["^build"], "outputs": ["dist/**"] },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "env": [
+        "API_URL",
+        "API_PUBLIC_URL",
+        "NEXT_PUBLIC_SHOP_SLUG",
+        "NEXT_PUBLIC_API_BASE",
+        "NEXT_PUBLIC_SITE_URL",
+        "NEXT_PUBLIC_FIREBASE_API_KEY",
+        "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+        "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+        "NEXT_PUBLIC_FIREBASE_APP_ID",
+        "NEXT_PUBLIC_SENTRY_DSN",
+        "SENTRY_AUTH_TOKEN",
+        "SENTRY_ORG",
+        "SENTRY_PROJECT",
+        "EXPO_PUBLIC_API_BASE_URL",
+        "EXPO_PUBLIC_SHOP_SLUG",
+        "EXPO_PUBLIC_APP_NAME",
+        "EXPO_PUBLIC_ANDROID_PACKAGE",
+        "EXPO_PUBLIC_IOS_BUNDLE_ID",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID",
+        "EXPO_PUBLIC_EAS_PROJECT_ID",
+        "EXPO_PUBLIC_DEV_AUTH",
+        "EXPO_PUBLIC_SENTRY_DSN",
+        "GOOGLE_SERVICES_JSON",
+        "GOOGLE_SERVICES_PLIST",
+        "APP_ENV"
+      ]
+    },
     "dev":                  { "cache": false, "persistent": true }
   }
 }

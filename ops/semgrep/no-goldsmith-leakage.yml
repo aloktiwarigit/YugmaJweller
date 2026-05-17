@@ -19,3 +19,13 @@ rules:
         - "**/*.test.ts"
         - "**/*.spec.tsx"
         - "**/*.spec.ts"
+        # Non-customer-facing files: build/CI artefacts, docs, env templates, Maestro
+        # flows, Dockerfiles. The rule's intent is "the word Goldsmith must not
+        # appear in customer-visible strings"; comments + config + flows are not
+        # user-visible.
+        - "**/*.example"
+        - "**/*.example.*"
+        - "**/README.md"
+        - "**/Dockerfile"
+        - "**/*.yaml"
+        - "**/*.yml"
