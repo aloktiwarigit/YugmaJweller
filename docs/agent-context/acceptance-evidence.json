@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-17T09:34:13.742Z",
+  "generated": "2026-05-17T12:29:40.923Z",
   "summary": {
     "total": 23,
     "implemented": 14,
@@ -21,6 +21,7 @@
       ],
       "specFile": "docs/superpowers/specs/2026-04-18-story-1.1-auth-and-dashboard-design.md",
       "testFiles": [
+        "apps/api/test/_auth-test-setup.ts",
         "apps/api/test/auth-duplicate-phone.integration.test.ts",
         "apps/api/test/auth-link-migration.integration.test.ts",
         "apps/api/test/auth-me.integration.test.ts",
@@ -30,8 +31,7 @@
         "apps/api/test/auth-session.integration.test.ts",
         "apps/api/test/auth-staff.integration.spec.ts",
         "apps/api/test/auth-uid-mismatch.integration.test.ts",
-        "apps/api/test/auth-uid-race.integration.test.ts",
-        "apps/api/test/_auth-test-setup.ts"
+        "apps/api/test/auth-uid-race.integration.test.ts"
       ],
       "ciJobs": [
         "integration"
@@ -49,6 +49,7 @@
       ],
       "specFile": "docs/superpowers/specs/2026-04-19-story-1.2-staff-invite-design.md",
       "testFiles": [
+        "apps/api/test/_auth-test-setup.ts",
         "apps/api/test/auth-duplicate-phone.integration.test.ts",
         "apps/api/test/auth-link-migration.integration.test.ts",
         "apps/api/test/auth-me.integration.test.ts",
@@ -58,8 +59,7 @@
         "apps/api/test/auth-session.integration.test.ts",
         "apps/api/test/auth-staff.integration.spec.ts",
         "apps/api/test/auth-uid-mismatch.integration.test.ts",
-        "apps/api/test/auth-uid-race.integration.test.ts",
-        "apps/api/test/_auth-test-setup.ts"
+        "apps/api/test/auth-uid-race.integration.test.ts"
       ],
       "ciJobs": [
         "integration"
@@ -75,6 +75,7 @@
       "frs": [],
       "specFile": "docs/superpowers/specs/2026-04-19-story-1.3-design.md",
       "testFiles": [
+        "apps/api/test/_auth-test-setup.ts",
         "apps/api/test/auth-duplicate-phone.integration.test.ts",
         "apps/api/test/auth-link-migration.integration.test.ts",
         "apps/api/test/auth-me.integration.test.ts",
@@ -84,8 +85,7 @@
         "apps/api/test/auth-session.integration.test.ts",
         "apps/api/test/auth-staff.integration.spec.ts",
         "apps/api/test/auth-uid-mismatch.integration.test.ts",
-        "apps/api/test/auth-uid-race.integration.test.ts",
-        "apps/api/test/_auth-test-setup.ts"
+        "apps/api/test/auth-uid-race.integration.test.ts"
       ],
       "ciJobs": [
         "integration"
@@ -101,6 +101,7 @@
       "frs": [],
       "specFile": "docs/superpowers/specs/2026-04-19-story-1.4-design.md",
       "testFiles": [
+        "apps/api/test/_auth-test-setup.ts",
         "apps/api/test/auth-duplicate-phone.integration.test.ts",
         "apps/api/test/auth-link-migration.integration.test.ts",
         "apps/api/test/auth-me.integration.test.ts",
@@ -110,8 +111,7 @@
         "apps/api/test/auth-session.integration.test.ts",
         "apps/api/test/auth-staff.integration.spec.ts",
         "apps/api/test/auth-uid-mismatch.integration.test.ts",
-        "apps/api/test/auth-uid-race.integration.test.ts",
-        "apps/api/test/_auth-test-setup.ts"
+        "apps/api/test/auth-uid-race.integration.test.ts"
       ],
       "ciJobs": [
         "integration"
@@ -178,6 +178,7 @@
       "frs": [],
       "specFile": "docs/superpowers/specs/2026-04-20-story-1.5-staff-revocation-design.md",
       "testFiles": [
+        "apps/api/test/_auth-test-setup.ts",
         "apps/api/test/auth-duplicate-phone.integration.test.ts",
         "apps/api/test/auth-link-migration.integration.test.ts",
         "apps/api/test/auth-me.integration.test.ts",
@@ -187,8 +188,7 @@
         "apps/api/test/auth-session.integration.test.ts",
         "apps/api/test/auth-staff.integration.spec.ts",
         "apps/api/test/auth-uid-mismatch.integration.test.ts",
-        "apps/api/test/auth-uid-race.integration.test.ts",
-        "apps/api/test/_auth-test-setup.ts"
+        "apps/api/test/auth-uid-race.integration.test.ts"
       ],
       "ciJobs": [
         "integration"
@@ -204,6 +204,7 @@
       "frs": [],
       "specFile": "docs/superpowers/specs/2026-04-20-story-1.6-1.7-audit-trail-logout-all-design.md",
       "testFiles": [
+        "apps/api/test/_auth-test-setup.ts",
         "apps/api/test/auth-duplicate-phone.integration.test.ts",
         "apps/api/test/auth-link-migration.integration.test.ts",
         "apps/api/test/auth-me.integration.test.ts",
@@ -213,8 +214,7 @@
         "apps/api/test/auth-session.integration.test.ts",
         "apps/api/test/auth-staff.integration.spec.ts",
         "apps/api/test/auth-uid-mismatch.integration.test.ts",
-        "apps/api/test/auth-uid-race.integration.test.ts",
-        "apps/api/test/_auth-test-setup.ts"
+        "apps/api/test/auth-uid-race.integration.test.ts"
       ],
       "ciJobs": [
         "integration"

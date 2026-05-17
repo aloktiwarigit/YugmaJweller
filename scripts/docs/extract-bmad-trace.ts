@@ -83,7 +83,10 @@ function findTestFile(root: string, moduleHint: string | null): string | null {
   const moduleName = moduleHint.split('/').pop() ?? '';
   const testDir = join(root, 'apps/api/test');
   if (!existsSync(testDir)) return null;
-  const match = readdirSync(testDir).find(f => f.includes(moduleName));
+  // Sort before .find() so the chosen match is OS-deterministic.
+  // readdirSync returns ext4-order on Linux, NTFS-sorted on Windows — without
+  // the sort, different OSes pick different matches and the output JSON drifts.
+  const match = readdirSync(testDir).sort().find(f => f.includes(moduleName));
   return match ? `apps/api/test/${match}` : null;
 }
 

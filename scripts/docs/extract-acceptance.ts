@@ -49,10 +49,15 @@ function findTestFiles(root: string, sid: string, epicKey: string): string[] {
   const testDir = join(root, 'apps/api/test');
   if (!existsSync(testDir)) return found;
 
-  // Collect all .ts files recursively
+  // Collect all .ts files recursively. Sort each directory's entries before
+  // iterating so the final allFiles order is OS-deterministic (readdirSync
+  // returns ext4-order on Linux, NTFS-sorted on Windows — left unsorted, the
+  // output JSON drifts between platforms and breaks docs-validate in CI).
   const allFiles: Array<{ rel: string; name: string }> = [];
   function collectFiles(dir: string, prefix: string) {
-    const entries = readdirSync(dir, { withFileTypes: true });
+    const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
     for (const entry of entries) {
       if (entry.isDirectory()) {
         collectFiles(join(dir, entry.name), `${prefix}${entry.name}/`);
@@ -72,7 +77,9 @@ function findTestFiles(root: string, sid: string, epicKey: string): string[] {
     const mod = MODULE_HINTS[epicKey];
     if (mod) for (const f of allFiles) if (f.name.includes(mod) || f.rel.includes(mod)) found.push(`apps/api/test/${f.rel}`);
   }
-  return [...new Set(found)];
+  // Dedup + final sort for absolute determinism (Set preserves insertion order;
+  // we want the array order to be a function of CONTENT only, not scan order).
+  return [...new Set(found)].sort();
 }
 
 function smokeTest(sid: string): string {

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-17T09:34:12.879Z",
+  "generated": "2026-05-17T12:29:39.539Z",
   "summary": {
     "total": 140,
     "complete": 4,
@@ -70,7 +70,7 @@
       "wave": null,
       "specFile": "docs/superpowers/specs/2026-04-18-story-1.1-auth-and-dashboard-design.md",
       "codeModule": "apps/api/src/modules/auth",
-      "testFile": "apps/api/test/auth-duplicate-phone.integration.test.ts",
+      "testFile": "apps/api/test/_auth-test-setup.ts",
       "ciJob": "integration"
     },
     {
@@ -109,7 +109,7 @@
       "wave": null,
       "specFile": "docs/superpowers/specs/2026-04-18-story-1.1-auth-and-dashboard-design.md",
       "codeModule": "apps/api/src/modules/auth",
-      "testFile": "apps/api/test/auth-duplicate-phone.integration.test.ts",
+      "testFile": "apps/api/test/_auth-test-setup.ts",
       "ciJob": "integration"
     },
     {
@@ -135,7 +135,7 @@
       "wave": null,
       "specFile": "docs/superpowers/specs/2026-04-18-story-1.1-auth-and-dashboard-design.md",
       "codeModule": "apps/api/src/modules/auth",
-      "testFile": "apps/api/test/auth-duplicate-phone.integration.test.ts",
+      "testFile": "apps/api/test/_auth-test-setup.ts",
       "ciJob": "integration"
     },
     {
@@ -161,7 +161,7 @@
       "wave": null,
       "specFile": "docs/superpowers/specs/2026-04-19-story-1.2-staff-invite-design.md",
       "codeModule": "apps/api/src/modules/auth",
-      "testFile": "apps/api/test/auth-duplicate-phone.integration.test.ts",
+      "testFile": "apps/api/test/_auth-test-setup.ts",
       "ciJob": "integration"
     },
     {
