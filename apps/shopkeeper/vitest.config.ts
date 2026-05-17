@@ -26,6 +26,12 @@ export default defineConfig({
       '@react-native-firebase/auth': fileURLToPath(
         new URL('./test/firebase-auth.mock.ts', import.meta.url),
       ),
+      '@expo/vector-icons': fileURLToPath(
+        new URL('./test/expo-vector-icons.mock.ts', import.meta.url),
+      ),
+      '@goldsmith/auth-client': fileURLToPath(
+        new URL('./test/auth-client.mock.ts', import.meta.url),
+      ),
       '@react-native-async-storage/async-storage': fileURLToPath(
         new URL('./test/async-storage.mock.ts', import.meta.url),
       ),

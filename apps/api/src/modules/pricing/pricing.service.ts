@@ -147,9 +147,13 @@ export class PricingService {
 
   constructor(
     @Inject('PG_POOL') private readonly pool: Pool,
-    private readonly fallbackChain: FallbackChain,
+    @Inject(FallbackChain) private readonly fallbackChain: FallbackChain,
     @Inject('PRICING_REDIS') private readonly redis: Redis,
-  ) {}
+  ) {
+    if (!fallbackChain) {
+      throw new Error('PricingService requires a configured FallbackChain provider');
+    }
+  }
 
   private evictCache(): void {
     this.redis.del(REDIS_KEY_CURRENT).catch((e: unknown) =>

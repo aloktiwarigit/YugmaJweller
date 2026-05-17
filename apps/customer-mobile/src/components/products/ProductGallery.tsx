@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, FlatList, Dimensions, Modal, Pressable, Text } from 'react-native';
 import { Image } from 'expo-image';
+import { storefrontFallbackImage } from '../../assets/storefrontImages';
 
 export type PublicImageRow = {
   id: string;
@@ -48,7 +49,22 @@ export function ProductGallery({
         }}
         accessibilityLabel="तस्वीर उपलब्ध नहीं"
       >
-        <Text style={{ fontSize: 16, color: '#4A526E' }}>तस्वीर उपलब्ध नहीं</Text>
+        <Image
+          source={storefrontFallbackImage}
+          contentFit="cover"
+          style={{ position: 'absolute', width: screenWidth, height: screenWidth, opacity: 0.72 }}
+        />
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(245,237,221,0.38)',
+          }}
+        />
+        <Text style={{ fontSize: 16, color: '#1E2440', fontWeight: '600' }}>तस्वीर उपलब्ध नहीं</Text>
       </View>
     );
   }

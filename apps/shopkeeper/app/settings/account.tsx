@@ -36,7 +36,7 @@ export default function AccountScreen(): React.ReactElement {
   const handleLogoutAll = async (): Promise<void> => {
     setLoading(true);
     try {
-      await api.post('/auth/logout/all');
+      await api.post('/api/v1/auth/logout/all');
       useAuthStore.getState().reset();
       router.replace('/(auth)/phone');
     } catch {

@@ -211,4 +211,39 @@ describe('CustomerController', () => {
       );
     });
   });
+
+  describe('getRateLockPaymentToken', () => {
+    const BOOKING_ID = 'b1111111-1111-1111-1111-111111111111';
+    const JTI        = 'e1111111-1111-1111-1111-111111111111';
+
+    it('returns a paymentUrl for a PENDING_PAYMENT booking', async () => {
+      // Reset all mocks to clear any leftover Once queue from prior tests.
+      vi.resetAllMocks();
+      // 1) booking status check  2) payment_sessions INSERT
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ status: 'PENDING_PAYMENT' }] })
+        .mockResolvedValueOnce({
+          rows: [{ id: JTI, expires_at: new Date(Date.now() + 5 * 60 * 1000) }],
+        });
+      const ctrl   = makeCtrl();
+      const result = await ctrl.getRateLockPaymentToken(fakeReq(), BOOKING_ID);
+      expect(result.paymentUrl).toContain('/api/v1/pay/rate-lock?token=');
+    });
+
+    it('throws NotFoundException when booking is not found', async () => {
+      vi.resetAllMocks();
+      mockPool.query.mockResolvedValueOnce({ rows: [] });
+      const ctrl = makeCtrl();
+      await expect(ctrl.getRateLockPaymentToken(fakeReq(), BOOKING_ID))
+        .rejects.toMatchObject({ response: { code: 'rate_lock.not_found' } });
+    });
+
+    it('throws BadRequestException when booking is not PENDING_PAYMENT', async () => {
+      vi.resetAllMocks();
+      mockPool.query.mockResolvedValueOnce({ rows: [{ status: 'PAID' }] });
+      const ctrl = makeCtrl();
+      await expect(ctrl.getRateLockPaymentToken(fakeReq(), BOOKING_ID))
+        .rejects.toMatchObject({ response: { code: 'rate_lock.not_pending_payment' } });
+    });
+  });
 });

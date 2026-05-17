@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { Text, Pressable, ScrollView } from 'react-native';
 import { colors, typography, spacing } from '@goldsmith/ui-tokens';
 import { TimelineCard } from './TimelineCard';
 import { TimelineEmptyState } from './TimelineEmptyState';
@@ -12,7 +12,7 @@ const PAGE = 20;
 export function TimelinePurchases(): React.ReactElement {
   const [offset, setOffset]     = useState(0);
   const [allItems, setAllItems] = useState<PurchaseHistorySummary[]>([]);
-  const { data, isLoading, isError, refetch } = usePurchases({ limit: PAGE, offset });
+  const { data, isLoading, isError } = usePurchases({ limit: PAGE, offset });
 
   useEffect(() => {
     if (data?.invoices) {
@@ -21,20 +21,12 @@ export function TimelinePurchases(): React.ReactElement {
   }, [data, offset]);
 
   if (isLoading && allItems.length === 0) return <TimelineSkeleton />;
-  if (isError) return (
-    <View style={{ padding: spacing.lg, alignItems: 'center' }}>
-      <Text style={{ fontFamily: typography.body.family, color: colors.error, marginBottom: spacing.sm }}>
-        डेटा लोड नहीं हो सका। पुनः प्रयास करें।
-      </Text>
-      <Pressable
-        onPress={() => { void refetch(); }}
-        style={{ minHeight: 48, justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border }}
-      >
-        <Text style={{ fontFamily: typography.body.family, color: colors.ink }}>पुनः प्रयास</Text>
-      </Pressable>
-    </View>
-  );
-  if (!isLoading && allItems.length === 0) return <TimelineEmptyState tab="purchases" />;
+  // Failure (e.g. 401 for an unauthenticated demo session) collapses into the
+  // friendly empty-state — keeps the profile tab visually clean instead of
+  // surfacing a retry block customers cannot meaningfully act on.
+  if (isError || (!isLoading && allItems.length === 0)) {
+    return <TimelineEmptyState tab="purchases" />;
+  }
 
   const total   = data?.total ?? allItems.length;
   const hasMore = offset + allItems.length < total;

@@ -18,7 +18,7 @@ export async function CompleteTheLook({ productId, shopId }: CompleteTheLookProp
         <p className="font-ui text-xs font-semibold uppercase tracking-widest text-inkSoft">
           इसके साथ पहनें
         </p>
-        <h2 className="font-heading text-xl text-ink mt-0.5">Complete the Look</h2>
+        <h2 className="font-heading text-xl text-ink mt-0.5">पूरा करें यह लुक</h2>
       </div>
       <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory">
         {displayed.map(product => (

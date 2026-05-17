@@ -1,8 +1,3 @@
-import React from 'react';
-import { Redirect, type Href } from 'expo-router';
+import { InventoryListScreen } from '../../src/features/inventory/screens/InventoryListScreen';
 
-const inventoryHref = '/inventory' as Href;
-
-export default function InventoryTabRedirect(): React.ReactElement {
-  return <Redirect href={inventoryHref} />;
-}
+export default InventoryListScreen;

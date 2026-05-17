@@ -1,3 +1,4 @@
+import 'react-native-gesture-handler';
 import { Stack, useNavigationContainerRef } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -5,14 +6,15 @@ import { useEffect, useRef } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import PostHog, { PostHogProvider, usePostHog } from 'posthog-react-native';
+import PostHogClient, { PostHogProvider, usePostHog } from 'posthog-react-native';
 import { AuthProvider } from '../src/providers/AuthProvider';
 import { TenantProvider } from '../src/providers/TenantProvider';
 import { ThemeProvider } from '../src/providers/ThemeProvider';
+import { OfflineProvider } from '../src/providers/OfflineProvider';
 
 const POSTHOG_API_KEY = process.env.EXPO_PUBLIC_POSTHOG_API_KEY;
 const posthogClient = POSTHOG_API_KEY
-  ? new PostHog(POSTHOG_API_KEY, { host: 'https://app.posthog.com' })
+  ? new PostHogClient(POSTHOG_API_KEY, { host: 'https://app.posthog.com' })
   : null;
 
 const queryClient = new QueryClient();
@@ -46,6 +48,12 @@ export default function RootLayout(): JSX.Element | null {
     'MuktaVaani-500': require('../assets/fonts/MuktaVaani-500.ttf'),
     'MuktaVaani-600': require('../assets/fonts/MuktaVaani-600.ttf'),
     'MuktaVaani-700': require('../assets/fonts/MuktaVaani-700.ttf'),
+    NotoSansDevanagari: require('../assets/fonts/MuktaVaani-400.ttf'),
+    'NotoSansDevanagari-Regular': require('../assets/fonts/MuktaVaani-400.ttf'),
+    'NotoSansDevanagari-Bold': require('../assets/fonts/MuktaVaani-700.ttf'),
+    'NotoSansDevanagari-SemiBold': require('../assets/fonts/MuktaVaani-600.ttf'),
+    NotoSansDevanagari_400Regular: require('../assets/fonts/MuktaVaani-400.ttf'),
+    NotoSansDevanagari_700Bold: require('../assets/fonts/MuktaVaani-700.ttf'),
     'TiroDevanagariHindi-Regular': require('../assets/fonts/TiroDevanagariHindi-Regular.ttf'),
     'TiroDevanagariHindi-Italic': require('../assets/fonts/TiroDevanagariHindi-Italic.ttf'),
     'Fraunces-Italic': require('../assets/fonts/Fraunces-VariableItalic.ttf'),
@@ -65,13 +73,15 @@ export default function RootLayout(): JSX.Element | null {
         <ThemeProvider>
           <AuthProvider>
             <TenantProvider>
-              <ScreenTracker />
-              <StatusBar style="dark" />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                }}
-              />
+              <OfflineProvider>
+                <ScreenTracker />
+                <StatusBar style="dark" />
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                  }}
+                />
+              </OfflineProvider>
             </TenantProvider>
           </AuthProvider>
         </ThemeProvider>

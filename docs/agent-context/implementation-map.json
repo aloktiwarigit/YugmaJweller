@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-12T03:43:43.813Z",
+  "generated": "2026-05-16T15:55:31.571Z",
   "apps": [
     {
       "name": "@goldsmith/api",
@@ -32,6 +32,8 @@
       "path": "apps/customer-web",
       "scripts": [
         "build",
+        "deploy",
+        "deploy:dry-run",
         "dev",
         "lint",
         "start",
@@ -211,6 +213,7 @@
       "name": "@goldsmith/queue",
       "path": "packages/queue",
       "scripts": [
+        "build",
         "lint",
         "test",
         "typecheck"
@@ -729,7 +732,22 @@
         },
         {
           "method": "GET",
+          "path": "/api/v1/customer/rate-lock/bookings/:id/payment-token"
+        },
+        {
+          "method": "GET",
           "path": "/api/v1/customer/rate-lock/bookings/:id/payment-page"
+        }
+      ]
+    },
+    {
+      "module": "customer",
+      "file": "apps/api/src/modules/customer/payment.controller.ts",
+      "basePath": "/api/v1/pay",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/v1/pay/rate-lock"
         }
       ]
     },
@@ -1195,6 +1213,14 @@
         "route": "/_layout"
       },
       {
+        "file": "apps/shopkeeper/app/(auth)/email.tsx",
+        "route": "/email"
+      },
+      {
+        "file": "apps/shopkeeper/app/(auth)/login.tsx",
+        "route": "/login"
+      },
+      {
         "file": "apps/shopkeeper/app/(auth)/otp.tsx",
         "route": "/otp"
       },
@@ -1567,6 +1593,14 @@
         "route": "/cancellation-policy"
       },
       {
+        "file": "apps/customer-web/app/collections/[slug]/page.tsx",
+        "route": "/collections/[slug]"
+      },
+      {
+        "file": "apps/customer-web/app/collections/page.tsx",
+        "route": "/collections"
+      },
+      {
         "file": "apps/customer-web/app/contact/page.tsx",
         "route": "/contact"
       },
@@ -1593,6 +1627,10 @@
       {
         "file": "apps/customer-web/app/products/page.tsx",
         "route": "/products"
+      },
+      {
+        "file": "apps/customer-web/app/profile/page.tsx",
+        "route": "/profile"
       },
       {
         "file": "apps/customer-web/app/rate-lock/page.tsx",
@@ -1625,11 +1663,10 @@
     ]
   },
   "migrations": {
-    "count": 63,
-    "current": "0073",
-    "latest": "packages/db/src/migrations/0073_security_definer_schema_resolution.sql",
+    "count": 64,
+    "current": "0074",
+    "latest": "packages/db/src/migrations/0074_payment_sessions.sql",
     "recent": [
-      "packages/db/src/migrations/0058_product_images_tenant_fk.sql",
       "packages/db/src/migrations/0059_reviews_wishlist_update_grant.sql",
       "packages/db/src/migrations/0060_products_cost_paise.sql",
       "packages/db/src/migrations/0066_products_storefront_columns.sql",
@@ -1638,7 +1675,8 @@
       "packages/db/src/migrations/0069_shop_storefront_config.sql",
       "packages/db/src/migrations/0070_product_reviews_visibility.sql",
       "packages/db/src/migrations/0072_reports_pdf_exports.sql",
-      "packages/db/src/migrations/0073_security_definer_schema_resolution.sql"
+      "packages/db/src/migrations/0073_security_definer_schema_resolution.sql",
+      "packages/db/src/migrations/0074_payment_sessions.sql"
     ]
   },
   "rootScripts": {
@@ -1656,6 +1694,7 @@
     "seed:anchor": "tsx scripts/seed-anchor.ts",
     "seed:anchor-dev-2": "tsx scripts/seed-anchor-dev-2.ts",
     "seed:demo": "tsx scripts/seed/demo-tenant.ts",
+    "seed:storefront-demo": "tsx scripts/seed/storefront-demo.ts",
     "docs:context": "tsx scripts/docs/scan-repo-context.ts && tsx scripts/docs/extract-adrs.ts && tsx scripts/docs/extract-bmad-trace.ts && tsx scripts/docs/scan-docs.ts && tsx scripts/docs/extract-acceptance.ts && tsx scripts/docs/scan-current-state.ts && tsx scripts/docs/scan-implementation-map.ts",
     "docs:validate": "tsx scripts/docs/validate-agent-context.ts",
     "test:ci": "pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:integration && pnpm test:tenant-isolation && pnpm semgrep && pnpm docs:validate"
@@ -1663,6 +1702,7 @@
   "ciJobs": [
     "a11y-shopkeeper",
     "build",
+    "build-customer-mobile",
     "build-shopkeeper",
     "docs-validate",
     "e2e-shopkeeper",

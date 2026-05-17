@@ -8,14 +8,65 @@ export interface AuthSessionResponse {
   requires_token_refresh: boolean;
 }
 
-export async function postAuthSession(idToken: string): Promise<AuthSessionResponse> {
-  const res = await api.post<AuthSessionResponse>('/auth/session', { idToken });
-  return res.data;
+export type AuthIdentityResponse = Pick<AuthSessionResponse, 'user' | 'tenant'>;
+
+type RawAuthUser = {
+  id: string;
+  shopId?: string;
+  shop_id?: string;
+  role: string;
+  displayName?: string;
+  display_name?: string;
+};
+
+type RawAuthTenant = {
+  id: string;
+  slug: string;
+  displayName?: string;
+  display_name?: string;
+};
+
+type RawAuthSessionResponse = {
+  user: RawAuthUser;
+  tenant: RawAuthTenant;
+  requires_token_refresh: boolean;
+};
+
+function normalizeTenant(raw: RawAuthTenant): Pick<Tenant, 'id' | 'slug' | 'displayName'> {
+  return {
+    id: raw.id,
+    slug: raw.slug,
+    displayName: raw.displayName ?? raw.display_name ?? raw.slug,
+  };
 }
 
-export async function getAuthMe(): Promise<AuthenticatedUser> {
-  const res = await api.get<{ user: AuthenticatedUser }>('/auth/me');
-  return res.data.user;
+function normalizeUser(raw: RawAuthUser, tenant?: RawAuthTenant): AuthenticatedUser {
+  return {
+    id: raw.id,
+    shopId: raw.shopId ?? raw.shop_id ?? tenant?.id ?? '',
+    role: raw.role,
+    displayName: raw.displayName ?? raw.display_name ?? '',
+  };
+}
+
+export async function postAuthSession(idToken: string): Promise<AuthSessionResponse> {
+  const res = await api.post<RawAuthSessionResponse>('/api/v1/auth/session', { idToken });
+  return {
+    user: normalizeUser(res.data.user, res.data.tenant),
+    tenant: normalizeTenant(res.data.tenant),
+    requires_token_refresh: res.data.requires_token_refresh,
+  };
+}
+
+export async function getAuthMe(): Promise<AuthIdentityResponse> {
+  const res = await api.get<{ user: RawAuthUser; tenant?: RawAuthTenant }>('/api/v1/auth/me');
+  if (!res.data.tenant) {
+    throw new Error('auth.tenant_missing');
+  }
+  return {
+    user: normalizeUser(res.data.user, res.data.tenant),
+    tenant: normalizeTenant(res.data.tenant),
+  };
 }
 
 export async function getTenantBoot(

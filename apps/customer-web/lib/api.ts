@@ -31,16 +31,39 @@ import type {
 //   Browser (client component): API_URL is undefined (Next.js strips non-public vars
 //   from client bundles), so we fall through to NEXT_PUBLIC_API_BASE which is inlined
 //   at build time and safe to expose to the browser.
-const API_URL =
-  process.env['API_URL'] ??
-  process.env.NEXT_PUBLIC_API_BASE ??
-  'http://localhost:3001';
+function resolveApiUrl(): string {
+  const value = process.env['API_URL'] ?? process.env.NEXT_PUBLIC_API_BASE;
+  if (!value) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('[env] API_URL or NEXT_PUBLIC_API_BASE is required in production');
+    }
+    return 'http://localhost:3001';
+  }
+
+  const normalized = value.replace(/\/$/, '');
+  if (process.env.NODE_ENV === 'production') {
+    if (normalized.includes('localhost')) {
+      throw new Error('[env] API_URL must not point to localhost in production');
+    }
+    if (!normalized.startsWith('https://')) {
+      throw new Error('[env] API_URL must use https in production');
+    }
+  }
+
+  return normalized;
+}
+
+const API_URL = resolveApiUrl();
 
 // Per-request timeout protects TTFB budget (<500ms) — slow API calls fall back
 // to graceful empty/unavailable states instead of blocking the page render.
 // Tuned to 1500ms: API p95 should be <300ms in prod; this leaves headroom
 // for cold starts without exceeding the LCP budget (<2500ms).
-const FETCH_TIMEOUT_MS = 1500;
+// 5s, not 1.5s. Cloud Run cold starts (min-instances=0 environments) can take
+// 3-5s; a 1.5s SSR timeout caused intermittent "दुकान उपलब्ध नहीं है" failures
+// when the API container had idled out. min-instances=1 on goldsmith-api now
+// prevents most cold starts, but this is the second layer of defense.
+const FETCH_TIMEOUT_MS = 5000;
 
 function withTimeout(): { signal: AbortSignal } {
   return { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) };

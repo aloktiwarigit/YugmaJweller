@@ -1,10 +1,10 @@
-'use client';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, TextInput, ScrollView, FlatList,
   TouchableOpacity, ActivityIndicator, Pressable,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Image } from 'expo-image';
 import { useQuery } from '@tanstack/react-query';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 import { TenantBrandHeader } from '../../src/components/TenantBrandHeader';
@@ -18,11 +18,85 @@ import {
   removeFilterChip,
 } from '../../src/lib/catalog-filter-utils';
 import type { ActiveFilters } from '../../src/lib/catalog-filter-utils';
+import { CATALOG_SORTS, purityLabel } from '@goldsmith/customer-shared';
 import type { CatalogSort } from '@goldsmith/customer-shared';
+import { imageForCategoryName } from '../../src/assets/storefrontImages';
 
 // ─── Colour tokens not yet on origin/main (land with D1D2D5) ───────────────────
 const PRIMARY_DEEP  = '#8C6628';
 const PRIMARY_WASH  = colors.primaryLight; // '#EFE3BE'
+
+type SearchParamValue = string | string[] | undefined;
+type BrowseRouteParams = Record<string, SearchParamValue>;
+
+interface BrowseRouteState {
+  filters: ActiveFilters;
+  search: string;
+  sort: CatalogSort | undefined;
+  page: number;
+  signature: string;
+}
+
+function firstParam(value: SearchParamValue): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function numericParam(value: SearchParamValue): number | undefined {
+  const raw = firstParam(value);
+  if (!raw) return undefined;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function pageParam(value: SearchParamValue): number {
+  const parsed = numericParam(value);
+  return parsed && parsed > 0 ? Math.floor(parsed) : 1;
+}
+
+function boolParam(value: SearchParamValue): boolean {
+  const raw = firstParam(value);
+  return raw === 'true' || raw === '1';
+}
+
+function sortParam(value: SearchParamValue): CatalogSort | undefined {
+  const raw = firstParam(value);
+  return CATALOG_SORTS.includes(raw as CatalogSort) ? raw as CatalogSort : undefined;
+}
+
+function routeStateFromParams(params: BrowseRouteParams): BrowseRouteState {
+  const giftPersona = firstParam(params['giftPersona']);
+  const style = firstParam(params['style']);
+  const occasion = firstParam(params['occasion']);
+
+  const filters: ActiveFilters = {
+    ...EMPTY_FILTERS,
+    metal:       firstParam(params['metal']),
+    purity:      firstParam(params['purity']) ? [firstParam(params['purity'])!] : [],
+    priceMin:    numericParam(params['priceMin']),
+    priceMax:    numericParam(params['priceMax']),
+    style:       style ? [style] : [],
+    occasion:    occasion ? [occasion] : [],
+    inStockOnly: boolParam(params['inStockOnly']),
+  };
+
+  if (giftPersona && filters.style.length === 0 && filters.occasion.length === 0) {
+    if (giftPersona === 'BRIDE') filters.style = ['BRIDAL'];
+    else if (giftPersona === 'SELF') filters.style = ['DAILY_WEAR'];
+    else filters.occasion = ['GIFT'];
+  }
+
+  const state = {
+    filters,
+    search: firstParam(params['search']) ?? '',
+    sort:   sortParam(params['sort']),
+    page:   pageParam(params['page']),
+  };
+
+  return {
+    ...state,
+    signature: JSON.stringify(state),
+  };
+}
 // ───────────────────────────────────────────────────────────────────────────────
 
 // ---------------------------------------------------------------------------
@@ -31,22 +105,16 @@ const PRIMARY_WASH  = colors.primaryLight; // '#EFE3BE'
 
 function BrowseProductCard({ product }: { product: CatalogProduct }): React.ReactElement {
   const isUnavailable = product.quantity === 0;
-
-  function metalLabel(purity: string): string {
-    const metalKey = purity.split('_')[0] ?? '';
-    const metals: Record<string, string> = { GOLD: 'सोना', SILVER: 'चाँदी', PLATINUM: 'प्लेटिनम' };
-    const purities: Record<string, string> = {
-      GOLD_24K: '24K', GOLD_22K: '22K', GOLD_20K: '20K', GOLD_18K: '18K', GOLD_14K: '14K',
-      SILVER_999: '999', SILVER_925: '925',
-    };
-    const m = metals[metalKey] ?? '';
-    const k = purities[purity] ?? purity;
-    return m ? `${m} ${k}` : k;
-  }
+  const label = purityLabel(product.purity, product.metal);
+  const fallbackImage = useMemo(() => imageForCategoryName(product.categoryName), [product.categoryName]);
 
   return (
     <Pressable
-      onPress={() => !isUnavailable && router.push(`/browse/${product.id}`)}
+      // Always navigate — the PDP renders its own out-of-stock banner. Blocking
+      // the tap on isUnavailable made about half the listing un-openable (the
+      // catalog API returns quantity:0 for ~50% of seeded products), which read
+      // as a "PDP nav regression" during the 2026-05-12 device sweep.
+      onPress={() => router.push(`/browse/${product.id}`)}
       style={{
         flex: 1,
         backgroundColor: colors.white,
@@ -57,16 +125,26 @@ function BrowseProductCard({ product }: { product: CatalogProduct }): React.Reac
         opacity: isUnavailable ? 0.6 : 1,
       }}
       accessible
-      accessibilityLabel={`${metalLabel(product.purity)} — ${product.sku}${isUnavailable ? ', उपलब्ध नहीं' : ''}`}
+      accessibilityLabel={`${label} — ${product.sku}${isUnavailable ? ', उपलब्ध नहीं' : ''}`}
       accessibilityRole="button"
     >
       {/* Image placeholder / primaryImage */}
       {product.primaryImage ? (
-        <View style={{ aspectRatio: 4 / 5, backgroundColor: colors.border }} />
+        <Image
+          source={{ uri: product.primaryImage.url }}
+          placeholder={{ uri: product.primaryImage.placeholderUrl }}
+          contentFit="cover"
+          transition={250}
+          style={{ aspectRatio: 4 / 5, backgroundColor: colors.border }}
+          accessibilityLabel={product.primaryImage.alt ?? label}
+        />
       ) : (
-        <View style={{ aspectRatio: 4 / 5, backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ fontSize: 28, color: colors.inkMute }}>💎</Text>
-        </View>
+        <Image
+          source={fallbackImage}
+          contentFit="contain"
+          style={{ aspectRatio: 4 / 5, backgroundColor: colors.white }}
+          accessibilityLabel={label}
+        />
       )}
 
       <View style={{ padding: spacing.sm }}>
@@ -74,7 +152,7 @@ function BrowseProductCard({ product }: { product: CatalogProduct }): React.Reac
           style={{ fontFamily: typography.body.family, fontSize: 14, color: colors.ink, fontWeight: '600' }}
           numberOfLines={1}
         >
-          {metalLabel(product.purity)}
+          {label}
         </Text>
         <Text
           style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.inkMute, marginTop: 2 }}
@@ -116,15 +194,30 @@ function BrowseProductCard({ product }: { product: CatalogProduct }): React.Reac
 // ---------------------------------------------------------------------------
 
 export default function Browse(): React.ReactElement {
-  const [searchText, setSearchText]             = useState('');
-  const [debouncedSearch, setDebouncedSearch]   = useState('');
-  const [page, setPage]                         = useState(1);
-  const [filters, setFilters]                   = useState<ActiveFilters>(EMPTY_FILTERS);
+  const routeParams = useLocalSearchParams<BrowseRouteParams>();
+  const routeState = useMemo(() => routeStateFromParams(routeParams), [routeParams]);
+  const lastAppliedRouteSignature = useRef(routeState.signature);
+
+  const [searchText, setSearchText]             = useState(routeState.search);
+  const [debouncedSearch, setDebouncedSearch]   = useState(routeState.search);
+  const [page, setPage]                         = useState(routeState.page);
+  const [filters, setFilters]                   = useState<ActiveFilters>(routeState.filters);
   const [filterSheetOpen, setFilterSheetOpen]   = useState(false);
   const [sortModalOpen, setSortModalOpen]        = useState(false);
-  const [sort, setSort]                         = useState<CatalogSort | undefined>(undefined);
+  const [sort, setSort]                         = useState<CatalogSort | undefined>(routeState.sort);
 
-  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (lastAppliedRouteSignature.current === routeState.signature) return;
+    lastAppliedRouteSignature.current = routeState.signature;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setSearchText(routeState.search);
+    setDebouncedSearch(routeState.search);
+    setFilters(routeState.filters);
+    setSort(routeState.sort);
+    setPage(routeState.page);
+  }, [routeState]);
 
   const handleSearchChange = useCallback((text: string) => {
     setSearchText(text);

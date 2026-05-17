@@ -2,6 +2,7 @@ import { Module, OnModuleDestroy, Inject } from '@nestjs/common';
 import { Redis } from '@goldsmith/cache';
 import { createPool } from '@goldsmith/db';
 import { SyncLogger } from '@goldsmith/sync';
+import type { Pool } from 'pg';
 import { AuthModule } from '../auth/auth.module';
 import { SyncController } from './sync.controller';
 import { SyncService } from './sync.service';
@@ -10,7 +11,11 @@ import { SyncService } from './sync.service';
   imports: [AuthModule],
   controllers: [SyncController],
   providers: [
-    SyncService,
+    {
+      provide: SyncService,
+      useFactory: (pool: Pool, redis: Redis) => new SyncService(pool, redis),
+      inject: ['SYNC_POOL', 'SYNC_REDIS'],
+    },
     SyncLogger,
     {
       provide: 'SYNC_POOL',

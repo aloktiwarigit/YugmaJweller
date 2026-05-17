@@ -35,12 +35,12 @@ export const PRICE_BANDS = [
 ] as const;
 
 export const PURITY_FILTERS = [
-  { value: '24K', label: '24K' },
-  { value: '22K', label: '22K' },
-  { value: '18K', label: '18K' },
-  { value: '14K', label: '14K' },
-  { value: '925', label: '925' },
-  { value: '999', label: '999' },
+  { value: 'GOLD_24K', label: '24K' },
+  { value: 'GOLD_22K', label: '22K' },
+  { value: 'GOLD_18K', label: '18K' },
+  { value: 'GOLD_14K', label: '14K' },
+  { value: 'SILVER_925', label: '925' },
+  { value: 'SILVER_999', label: '999' },
 ] as const;
 
 type TenantStringKey = keyof TenantConfigResponse;
@@ -132,12 +132,12 @@ export function jsonLd(value: unknown): string {
 }
 
 export function productDisplayName(product: CatalogProduct): string {
-  const purity = purityLabel(product.purity);
+  const purity = purityLabel(product.purity, product.metal);
   return product.categoryName ? `${purity} ${product.categoryName}` : purity;
 }
 
 export function productMaterial(product: CatalogProduct): string {
-  return `${metalLabel(product.metal)} ${purityLabel(product.purity)}`;
+  return `${metalLabel(product.metal)} ${purityLabel(product.purity, product.metal)}`;
 }
 
 export function productTotalPaise(product: CatalogProduct): number | null {

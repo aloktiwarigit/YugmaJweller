@@ -1,15 +1,23 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ImageBackground } from 'react-native';
 import { router } from 'expo-router';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 import { useTenantStore } from '../../stores/tenantStore';
+import { storefrontHeroImage } from '../../assets/storefrontImages';
 
 export function HeroSection(): React.ReactElement {
   const tenant = useTenantStore((s) => s.tenant);
   const shopName = tenant?.branding?.appName ?? tenant?.displayName ?? 'आपकी दुकान';
 
   return (
-    <View style={styles.container}>
+    <ImageBackground
+        source={storefrontHeroImage}
+        resizeMode="cover"
+        imageStyle={styles.heroImage}
+        style={styles.container}
+      >
+      <View style={styles.scrim} />
+
       {/* Shop name eyebrow */}
       <Text style={styles.eyebrow}>{shopName}</Text>
 
@@ -41,24 +49,32 @@ export function HeroSection(): React.ReactElement {
           <Text style={styles.ctaSecondaryText}>घर पर ट्राय करें</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.surfaceElevated,
     marginHorizontal: spacing.lg,
     marginTop:        spacing.md,
     borderRadius:     radii.lg,
     padding:          spacing.lg,
-    borderWidth:      1,
-    borderColor:      colors.borderSubtle,
+    minHeight:        280,
+    justifyContent:   'flex-end',
+    overflow:         'hidden',
+    backgroundColor:  colors.ink,
+  },
+  heroImage: {
+    borderRadius: radii.lg,
+  },
+  scrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(30, 36, 64, 0.42)',
   },
   eyebrow: {
     fontFamily:    typography.body.family,
     fontSize:      12,
-    color:         colors.inkSoft,
+    color:         'rgba(255,255,255,0.82)',
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom:  spacing.xs,
@@ -67,13 +83,13 @@ const styles = StyleSheet.create({
     fontFamily:   typography.display.family,
     fontSize:     30,
     lineHeight:   36,
-    color:        colors.ink,
+    color:        colors.white,
     marginBottom: spacing.sm,
   },
   subline: {
     fontFamily:   typography.body.family,
     fontSize:     13,
-    color:        colors.inkMute,
+    color:        'rgba(255,255,255,0.82)',
     marginBottom: spacing.lg,
     lineHeight:   20,
   },
@@ -83,7 +99,7 @@ const styles = StyleSheet.create({
   },
   ctaPrimary: {
     flex:             1,
-    backgroundColor:  colors.primary,
+    backgroundColor:  colors.primaryWash,
     borderRadius:     radii.md,
     paddingVertical:  12,
     alignItems:       'center',
@@ -93,22 +109,22 @@ const styles = StyleSheet.create({
   ctaPrimaryText: {
     fontFamily: typography.headingMid.family,
     fontSize:   15,
-    color:      colors.white,
+    color:      colors.ink,
   },
   ctaSecondary: {
     flex:            1,
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius:    radii.md,
     paddingVertical: 12,
     alignItems:      'center',
     minHeight:       48,
     justifyContent:  'center',
     borderWidth:     1,
-    borderColor:     colors.border,
+    borderColor:     'rgba(255,255,255,0.42)',
   },
   ctaSecondaryText: {
     fontFamily: typography.headingMid.family,
     fontSize:   15,
-    color:      colors.ink,
+    color:      colors.white,
   },
 });

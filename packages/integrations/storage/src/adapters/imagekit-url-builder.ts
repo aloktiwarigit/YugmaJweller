@@ -12,7 +12,16 @@ export class ImageKitTransformUrlBuilder {
     this.base = `https://ik.imagekit.io/${id}`;
   }
 
+  private publicAssetUrl(key: string): string | null {
+    if (key.startsWith('public/')) return `/${key.slice('public/'.length)}`;
+    if (key.startsWith('/')) return key;
+    return null;
+  }
+
   url(key: string, opts: { width: number; blur?: number }): string {
+    const publicUrl = this.publicAssetUrl(key);
+    if (publicUrl) return publicUrl;
+
     const parts: string[] = [`w-${opts.width}`];
     if (opts.blur !== undefined) parts.push(`bl-${opts.blur}`);
     parts.push('q-auto', 'f-auto', 'mb-0.25');

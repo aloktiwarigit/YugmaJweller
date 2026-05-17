@@ -27,7 +27,11 @@ describe('secure-storage', () => {
 
   it('uses the documented key (no AsyncStorage drift)', async () => {
     await saveSecureSession({ bearer: 'tok', customerId: 'cid', shopId: 'sid' });
-    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(SECURE_KEY, expect.any(String));
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+      SECURE_KEY,
+      expect.any(String),
+      expect.objectContaining({ keychainAccessible: expect.anything() }),
+    );
     expect(SECURE_KEY).toBe('customer_session_v1');
   });
 

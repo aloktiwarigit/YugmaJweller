@@ -43,6 +43,31 @@ const TextInputMock = React.forwardRef<unknown, AnyProps>(
   },
 );
 
+// Image maps to <img>; source can be a Metro number/object in native tests, so omit it unless URI-like.
+const ImageMock = React.forwardRef<unknown, AnyProps>(
+  ({ testID, source, accessibilityLabel, accessible, resizeMode: _resizeMode, ...rest }, ref) => {
+    const extraProps: AnyProps = {};
+    if (testID !== undefined) extraProps['data-testid'] = testID;
+    if (accessibilityLabel !== undefined) extraProps['alt'] = accessibilityLabel;
+    if (accessible === false) {
+      extraProps['alt'] = '';
+      extraProps['role'] = 'presentation';
+    }
+    if (typeof source === 'string') {
+      extraProps['src'] = source;
+    } else if (
+      typeof source === 'object' &&
+      source !== null &&
+      'uri' in source &&
+      typeof (source as { uri?: unknown }).uri === 'string'
+    ) {
+      extraProps['src'] = (source as { uri: string }).uri;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock shim @why
+    return React.createElement('img', { ...(rest as any), ...extraProps, ref });
+  },
+);
+
 // Modal renders children inline when visible; null when not visible.
 const ModalMock = React.forwardRef<unknown, AnyProps>(
   ({ visible, children, testID, ...rest }, ref) => {
@@ -58,6 +83,7 @@ export const View = passthrough('view');
 export const Text = passthrough('text');
 export const Pressable = PressableMock;
 export const TextInput = TextInputMock;
+export const Image = ImageMock;
 export const Modal = ModalMock;
 export const ScrollView = passthrough('scroll-view');
 export const ActivityIndicator = passthrough('activity-indicator');

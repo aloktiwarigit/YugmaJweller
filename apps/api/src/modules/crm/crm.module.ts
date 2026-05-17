@@ -4,11 +4,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { BullModule, InjectQueue } from '@nestjs/bullmq';
-import type { Queue } from '@goldsmith/queue';
+import type { Queue } from 'bullmq';
 import { LocalKMS, DevKmsAdapter } from '@goldsmith/crypto-envelope';
 import { SearchModule } from '@goldsmith/integrations-search';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
+import { CustomerAuthGuard } from '../customer/customer-auth.guard';
 import { CrmController } from './crm.controller';
 import { CrmService } from './crm.service';
 import { CrmRepository } from './crm.repository';
@@ -50,6 +51,7 @@ const DPDPA_SWEEP_CRON       = '30 20 * * *';
     DpdpaDeletionService, DpdpaDeletionRepository,
     DpdpaHardDeleteProcessor,
     ConsentService, ConsentRepository,
+    CustomerAuthGuard,
     {
       provide: 'KMS_ADAPTER',
       useFactory: () => {

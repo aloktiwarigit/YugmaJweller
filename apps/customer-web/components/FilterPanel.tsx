@@ -20,13 +20,13 @@ export const METAL_OPTIONS = [
 ] as const;
 
 export const PURITY_OPTIONS = [
-  { value: '24K', labelHi: '24K सोना' },
-  { value: '22K', labelHi: '22K सोना' },
-  { value: '20K', labelHi: '20K सोना' },
-  { value: '18K', labelHi: '18K सोना' },
-  { value: '14K', labelHi: '14K सोना' },
-  { value: '925', labelHi: '925 चाँदी' },
-  { value: '999', labelHi: '999 चाँदी' },
+  { value: 'GOLD_24K', labelHi: '24K सोना' },
+  { value: 'GOLD_22K', labelHi: '22K सोना' },
+  { value: 'GOLD_20K', labelHi: '20K सोना' },
+  { value: 'GOLD_18K', labelHi: '18K सोना' },
+  { value: 'GOLD_14K', labelHi: '14K सोना' },
+  { value: 'SILVER_925', labelHi: '925 चाँदी' },
+  { value: 'SILVER_999', labelHi: '999 चाँदी' },
 ] as const;
 
 export const STYLE_LABELS_HI: Record<string, string> = {

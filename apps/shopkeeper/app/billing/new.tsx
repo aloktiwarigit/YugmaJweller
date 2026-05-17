@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,19 +9,29 @@ import {
   Alert,
   StyleSheet,
 } from 'react-native';
-import { router } from 'expo-router';
-import { useMutation } from '@tanstack/react-query';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { v4 as uuid } from 'uuid';
-import { BillingLineBuilder } from '@goldsmith/ui-mobile';
-import type { BillingLineValue, BillingLineProduct } from '@goldsmith/ui-mobile';
+import {
+  BillingLineBuilder,
+  type BillingLineValue,
+  type BillingLineProduct,
+  type PublicRatesResponse,
+} from '@goldsmith/ui-mobile';
 import { api } from '../../src/api/client';
-import type { InvoiceResponse, CreateInvoiceDtoType } from '@goldsmith/shared';
+import type { InvoiceResponse, CreateInvoiceDtoType, ProductResponse } from '@goldsmith/shared';
 import { PanPromptSheet } from '../../src/features/billing/components/PanPromptSheet';
 import type { PanSubmitPayload } from '../../src/features/billing/components/PanPromptSheet';
 import { InvoiceTypeToggle } from '../../src/features/billing/components/InvoiceTypeToggle';
 import { CustomerSearch } from '../../src/features/crm/components/CustomerSearch';
 import type { CustomerHit } from '../../src/features/crm/components/CustomerSearch';
 import { LoyaltyRedeemSheet } from '../../src/features/billing/components/LoyaltyRedeemSheet';
+import { PaymentMethodSelector } from '../../src/features/billing/components/PaymentMethodSelector';
+import {
+  BillingProductPicker,
+  draftFromProduct,
+  type BillingProductDraft,
+} from '../../src/features/billing/components/BillingProductPicker';
 
 interface DraftLine extends BillingLineValue {
   product: BillingLineProduct;
@@ -40,6 +50,9 @@ function extractTotalPaise(errorBody: unknown): bigint {
 }
 
 export default function NewInvoiceScreen(): JSX.Element {
+  const params = useLocalSearchParams<{ productId?: string }>();
+  const initialProductId = typeof params.productId === 'string' ? params.productId : '';
+  const addedInitialProductIdRef = useRef<string | null>(null);
   const [invoiceType, setInvoiceType] = useState<'B2C' | 'B2B_WHOLESALE'>('B2C');
   const [buyerGstin, setBuyerGstin] = useState<string>('');
   const [buyerBusinessName, setBuyerBusinessName] = useState<string>('');
@@ -49,11 +62,26 @@ export default function NewInvoiceScreen(): JSX.Element {
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
   const [showLoyaltySheet, setShowLoyaltySheet] = useState(false);
   const [lines, setLines] = useState<DraftLine[]>([]);
+  const [createdInvoice, setCreatedInvoice] = useState<InvoiceResponse | null>(null);
   const [idempotencyKey] = useState<string>(() => uuid());
 
   // PAN prompt state
   const [panRequired, setPanRequired] = useState(false);
   const [panTotalPaise, setPanTotalPaise] = useState(0n);
+
+  const initialProductQuery = useQuery<ProductResponse>({
+    queryKey: ['billing-initial-product', initialProductId],
+    queryFn: async () =>
+      (await api.get<ProductResponse>(`/api/v1/inventory/products/${initialProductId}`)).data,
+    enabled: initialProductId.length > 0,
+  });
+
+  const ratesQuery = useQuery<PublicRatesResponse>({
+    queryKey: ['catalog', 'rates'],
+    queryFn: async () => (await api.get<PublicRatesResponse>('/api/v1/catalog/rates')).data,
+    enabled: initialProductId.length > 0,
+    staleTime: 55_000,
+  });
 
   const createInvoice = useMutation<InvoiceResponse, unknown, CreateInvoiceDtoType>({
     mutationFn: async (dto) => {
@@ -62,8 +90,7 @@ export default function NewInvoiceScreen(): JSX.Element {
       });
       return res.data;
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onSuccess: (invoice) => router.replace(`/billing/${invoice.id}?celebrate=1` as any),
+    onSuccess: (invoice) => setCreatedInvoice(invoice),
     onError: (err) => {
       const body = (err as { response?: { data?: unknown; status?: number } }).response?.data;
       const status = (err as { response?: { status?: number } }).response?.status;
@@ -78,7 +105,7 @@ export default function NewInvoiceScreen(): JSX.Element {
 
       const message = (body as { detail?: string } | null | undefined)?.detail
         ?? (err instanceof Error ? err.message : 'कुछ गलत हो गया');
-      Alert.alert('Invoice generate नहीं हुआ', message);
+      Alert.alert('बिल नहीं बना', message);
     },
   });
 
@@ -125,6 +152,39 @@ export default function NewInvoiceScreen(): JSX.Element {
     });
   }, []);
 
+  const onAddProduct = useCallback((draft: BillingProductDraft) => {
+    setLines((curr) => [
+      ...curr,
+      {
+        productId: draft.product.id,
+        description: draft.product.description,
+        huid: draft.product.huid,
+        makingChargePct: draft.makingChargePct,
+        product: draft.product,
+        ratePerGramPaise: draft.ratePerGramPaise,
+      },
+    ]);
+  }, []);
+
+  const onRemoveLine = useCallback((index: number) => {
+    setLines((curr) => curr.filter((_, i) => i !== index));
+  }, []);
+
+  useEffect(() => {
+    if (
+      !initialProductId ||
+      addedInitialProductIdRef.current === initialProductId ||
+      !initialProductQuery.data ||
+      !ratesQuery.data
+    ) {
+      return;
+    }
+    const draft = draftFromProduct(initialProductQuery.data, ratesQuery.data);
+    if (draft === null) return;
+    onAddProduct(draft);
+    addedInitialProductIdRef.current = initialProductId;
+  }, [initialProductId, initialProductQuery.data, onAddProduct, ratesQuery.data]);
+
   const onSubmit = useCallback(() => {
     if (invoiceType === 'B2B_WHOLESALE' && buyerGstin.length !== 15) {
       Alert.alert('GSTIN 15 अक्षर का होना चाहिए');
@@ -161,9 +221,9 @@ export default function NewInvoiceScreen(): JSX.Element {
 
   const handleCustomerSearch = useCallback(
     (q: string) =>
-      api.post<{ hits: CustomerHit[]; total: number; source: 'meilisearch' | 'postgres' }>(
-        '/api/v1/crm/search',
-        { q },
+      api.get<{ hits: CustomerHit[]; total: number; source: 'meilisearch' | 'postgres' }>(
+        '/api/v1/crm/customers/search',
+        { params: { q } },
       ).then((r) => r.data),
     [],
   );
@@ -173,10 +233,42 @@ export default function NewInvoiceScreen(): JSX.Element {
     setLoyaltyPointsToRedeem(0);
   }, []);
 
+  if (createdInvoice !== null) {
+    return (
+      <PaymentMethodSelector
+        invoiceId={createdInvoice.id}
+        invoiceTotalPaise={BigInt(createdInvoice.totalPaise)}
+        existingDailyPaiseCash={0n}
+        onInitiateUpi={async (amountPaise) => {
+          const res = await api.post<{ orderId: string }>(
+            `/api/v1/billing/invoices/${createdInvoice.id}/payments/upi`,
+            { amountPaise: amountPaise.toString() },
+          );
+          return res.data;
+        }}
+        onRecordCash={async (amountPaise, paymentIdempotencyKey) => {
+          await api.post(
+            `/api/v1/billing/invoices/${createdInvoice.id}/payments/cash`,
+            { amountPaise: amountPaise.toString() },
+            { headers: { 'Idempotency-Key': paymentIdempotencyKey } },
+          );
+        }}
+        onRecordManual={async (method, amountPaise) => {
+          await api.post(`/api/v1/billing/invoices/${createdInvoice.id}/payments/manual`, {
+            method,
+            amountPaise: amountPaise.toString(),
+          });
+        }}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onComplete={() => router.replace(`/billing/${createdInvoice.id}?celebrate=1` as any)}
+      />
+    );
+  }
+
   return (
     <>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>नया Invoice</Text>
+        <Text style={styles.title}>नया बिल</Text>
 
         <InvoiceTypeToggle
           invoiceType={invoiceType}
@@ -194,7 +286,7 @@ export default function NewInvoiceScreen(): JSX.Element {
             onChangeText={setCustomerName}
             style={styles.input}
             placeholder="नाम लिखें"
-            accessibilityLabel="Customer name"
+            accessibilityLabel="ग्राहक का नाम"
           />
           <Text style={styles.label}>फ़ोन (वैकल्पिक)</Text>
           <TextInput
@@ -204,7 +296,7 @@ export default function NewInvoiceScreen(): JSX.Element {
             maxLength={10}
             style={styles.input}
             placeholder="9876543210"
-            accessibilityLabel="Customer phone"
+            accessibilityLabel="ग्राहक का फोन"
           />
 
           <Text style={styles.label}>CRM से ग्राहक खोजें (वैकल्पिक)</Text>
@@ -257,14 +349,25 @@ export default function NewInvoiceScreen(): JSX.Element {
           )
         )}
 
+        <BillingProductPicker onAddProduct={onAddProduct} />
+
         {lines.map((line, i) => (
-          <BillingLineBuilder
-            key={`${line.productId}-${i}`}
-            product={line.product}
-            ratePerGramPaise={line.ratePerGramPaise}
-            makingChargePct={line.makingChargePct}
-            onChange={(v) => onLineChange(i, v)}
-          />
+          <View key={`${line.productId}-${i}`} style={styles.lineWrapper}>
+            <BillingLineBuilder
+              product={line.product}
+              ratePerGramPaise={line.ratePerGramPaise}
+              makingChargePct={line.makingChargePct}
+              onChange={(v) => onLineChange(i, v)}
+            />
+            <TouchableOpacity
+              onPress={() => onRemoveLine(i)}
+              style={styles.removeLineButton}
+              accessibilityRole="button"
+              accessibilityLabel="आइटम हटाएं"
+            >
+              <Text style={styles.removeLineButtonText}>आइटम हटाएं</Text>
+            </TouchableOpacity>
+          </View>
         ))}
 
         <Pressable
@@ -272,8 +375,9 @@ export default function NewInvoiceScreen(): JSX.Element {
           onPress={() => router.push('/billing/scan' as any)}
           style={styles.scanButton}
           accessibilityRole="button"
+          accessibilityLabel="बारकोड स्कैन"
         >
-          <Text style={styles.scanButtonText}>+ बारकोड स्कैन करें</Text>
+          <Text style={styles.scanButtonText}>बारकोड स्कैन</Text>
         </Pressable>
 
         <Pressable
@@ -287,7 +391,7 @@ export default function NewInvoiceScreen(): JSX.Element {
           accessibilityState={{ disabled: createInvoice.isPending }}
         >
           <Text style={styles.submitButtonText}>
-            {createInvoice.isPending ? 'Generate हो रहा है...' : 'Invoice बनाएं'}
+            {createInvoice.isPending ? 'बिल बन रहा है...' : 'बिल बनाएं'}
           </Text>
         </Pressable>
       </ScrollView>
@@ -417,7 +521,22 @@ const styles = StyleSheet.create({
   },
   scanButtonText: {
     fontSize: 16,
-    fontFamily: 'NotoSansDevanagari',
+    fontFamily: 'MuktaVaani-400',
+  },
+  lineWrapper: {
+    marginBottom: 8,
+  },
+  removeLineButton: {
+    alignSelf: 'flex-end',
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  removeLineButtonText: {
+    color: '#B1402B',
+    fontSize: 14,
+    fontWeight: '700',
   },
   submitButton: {
     backgroundColor: '#92400e',

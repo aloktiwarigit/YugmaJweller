@@ -5,17 +5,25 @@ import {
   SafeAreaView, Share,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Image } from 'expo-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 import {
   getCatalogProduct,
   verifyHuid,
   getProductRecommendations,
   getCatalogProductReviews,
+  addToWishlist,
+  removeFromWishlist,
+  getWishlist,
 } from '../../src/api/endpoints';
-import type { CatalogProduct } from '../../src/api/endpoints';
+import type { CatalogProduct, WishlistItem } from '../../src/api/endpoints';
+import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import { ProductGallery } from '../../src/components/products/ProductGallery';
 import { useProductImages } from '../../src/hooks/useProductImages';
+import { purityLabel } from '@goldsmith/customer-shared';
+import { imageForCategoryName } from '../../src/assets/storefrontImages';
 
 // ─── Colour tokens not yet on origin/main (land with D1D2D5) ───────────────────
 const SURFACE_ELEVATED = '#FFFBF2';
@@ -29,28 +37,32 @@ const WARNING_SAFFRON  = '#C68A1F';
 // Helpers
 // ---------------------------------------------------------------------------
 
-const METAL_LABELS: Record<string, string> = {
-  GOLD: 'सोना', SILVER: 'चाँदी', PLATINUM: 'प्लेटिनम',
-};
-const PURITY_LABELS: Record<string, string> = {
-  GOLD_24K: '24K', GOLD_22K: '22K', GOLD_20K: '20K',
-  GOLD_18K: '18K', GOLD_14K: '14K',
-  SILVER_999: '999', SILVER_925: '925',
-};
-
-function purityLabel(purity: string): string {
-  const key = purity.split('_')[0] ?? '';
-  const m = METAL_LABELS[key] ?? '';
-  const k = PURITY_LABELS[purity] ?? purity;
-  return m ? `${m} ${k}` : k;
-}
-
 function fmtPaise(paiseStr: string): string {
   const rupees = Number(paiseStr) / 100;
   return new Intl.NumberFormat('en-IN', {
     style: 'currency', currency: 'INR',
     minimumFractionDigits: 0, maximumFractionDigits: 0,
   }).format(rupees);
+}
+
+function localizedCategoryName(categoryName: string | null | undefined): string | null {
+  if (!categoryName) return null;
+  const normalized = categoryName.trim().toLowerCase();
+  const known: Record<string, string> = {
+    'gold rings': 'सोने की अंगूठियां',
+    'diamond rings': 'हीरे की अंगूठियां',
+    'silver rings': 'चांदी की अंगूठियां',
+    'gold earrings': 'सोने के झुमके',
+    'diamond earrings': 'हीरे के झुमके',
+    'gold pendants': 'सोने के पेंडेंट',
+    'diamond pendants': 'हीरे के पेंडेंट',
+    'gold bangles': 'सोने की चूड़ियां',
+    'silver anklets': 'चांदी की पायल',
+    'gold necklaces': 'सोने के हार',
+    'mangalsutra': 'मंगलसूत्र',
+    'bracelets': 'ब्रैसलेट',
+  };
+  return known[normalized] ?? categoryName;
 }
 
 // ---------------------------------------------------------------------------
@@ -91,16 +103,25 @@ function CompactProductCard({ product }: { product: CatalogProduct }): React.Rea
         overflow: 'hidden',
         marginRight: spacing.sm,
       }}
-      accessibilityLabel={`${purityLabel(product.purity)} — ${product.sku}`}
+      accessibilityLabel={`${purityLabel(product.purity, product.metal)} — ${product.sku}`}
       accessibilityRole="button"
     >
-      <View style={{ width: 120, height: 150, backgroundColor: colors.border }} />
+      <Image
+        source={
+          product.primaryImage?.url
+            ? { uri: product.primaryImage.url }
+            : imageForCategoryName(product.categoryName ?? null)
+        }
+        style={{ width: 120, height: 150 }}
+        contentFit="cover"
+        accessibilityLabel={`${purityLabel(product.purity, product.metal)} — अनुशंसित आभूषण`}
+      />
       <View style={{ padding: spacing.xs }}>
         <Text
           style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.ink, fontWeight: '600' }}
           numberOfLines={1}
         >
-          {purityLabel(product.purity)}
+          {purityLabel(product.purity, product.metal)}
         </Text>
         {product.priceAvailable && product.estimatedPrice && (
           <Text
@@ -283,8 +304,9 @@ function HuidScanModal({ productId, onClose, onVerified }: HuidScanModalProps): 
 
 export default function ProductDetailScreen(): React.ReactElement {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
   const [showScanModal, setShowScanModal] = useState(false);
-  const [isWishlisted, setIsWishlisted]   = useState(false);
+  const [reviewsExpanded, setReviewsExpanded] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{
     verified: boolean; huid: string; certifyingBody: string;
   } | null>(null);
@@ -312,8 +334,49 @@ export default function ProductDetailScreen(): React.ReactElement {
     retry: false,
   });
 
+  const { isAuthenticated } = useCustomerSession();
+  const queryClient = useQueryClient();
+
+  const { data: wishlistData } = useQuery({
+    queryKey: ['wishlist'],
+    queryFn:  getWishlist,
+    enabled:  !!id && isAuthenticated,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const isWishlisted = (wishlistData ?? []).some((w: WishlistItem) => w.productId === id);
+
+  const wishlistMutation = useMutation({
+    mutationFn: (add: boolean) =>
+      add ? addToWishlist(id!) : removeFromWishlist(id!),
+    onMutate: async (add) => {
+      await queryClient.cancelQueries({ queryKey: ['wishlist'] });
+      const previous = queryClient.getQueryData<WishlistItem[]>(['wishlist']) ?? [];
+      queryClient.setQueryData<WishlistItem[]>(['wishlist'], (old = []) =>
+        add
+          ? (old.some((w) => w.productId === id)
+              ? old
+              : [...old, { productId: id!, sku: '', purity: '', metal: '', grossWeightG: '', netWeightG: '', huid: null, addedAt: new Date().toISOString() }])
+          : old.filter((w) => w.productId !== id),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      queryClient.setQueryData<WishlistItem[]>(['wishlist'], ctx?.previous);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['wishlist'] });
+    },
+  });
+
+  const handleWishlistToggle = (): void => {
+    if (!isAuthenticated || !id) return;
+    wishlistMutation.mutate(!isWishlisted);
+  };
+
   const recommendations = recommendationsData?.items ?? [];
   const reviews         = reviewsData?.items ?? [];
+  const visibleReviews  = reviewsExpanded ? reviews : reviews.slice(0, 6);
 
   if (isLoading) {
     return (
@@ -341,7 +404,8 @@ export default function ProductDetailScreen(): React.ReactElement {
   }
 
   const isUnavailable  = product.quantity === 0;
-  const displayPurity  = purityLabel(product.purity);
+  const displayPurity  = purityLabel(product.purity, product.metal);
+  const displayCategory = localizedCategoryName(product.categoryName);
   const priceFormatted = product.priceAvailable && product.estimatedPrice
     ? product.estimatedPrice.totalFormatted
     : null;
@@ -360,7 +424,14 @@ export default function ProductDetailScreen(): React.ReactElement {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       {/* Main scrollable content — paddingBottom reserves space for sticky bar */}
-      <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md, paddingBottom: 96 }}>
+      <ScrollView
+        contentContainerStyle={{
+          padding: spacing.md,
+          paddingTop: insets.top + spacing.md,
+          gap: spacing.md,
+          paddingBottom: 96 + insets.bottom,
+        }}
+      >
         {/* Back */}
         <TouchableOpacity
           onPress={() => router.back()}
@@ -398,7 +469,7 @@ export default function ProductDetailScreen(): React.ReactElement {
             {displayPurity}
           </Text>
           <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.inkMute }}>
-            SKU: {product.sku}{product.categoryName ? ` · ${product.categoryName}` : ''}
+            SKU: {product.sku}{displayCategory ? ` · ${displayCategory}` : ''}
           </Text>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs }}>
@@ -570,7 +641,7 @@ export default function ProductDetailScreen(): React.ReactElement {
             {
               label: isWishlisted ? 'विशलिस्ट ✓' : 'विशलिस्ट',
               icon: isWishlisted ? '♥' : '♡',
-              onPress: () => setIsWishlisted((v) => !v),
+              onPress: handleWishlistToggle,
               a11y: isWishlisted ? 'विशलिस्ट से हटाएं' : 'विशलिस्ट में जोड़ें',
             },
           ].map(({ label, icon, onPress, a11y }) => (
@@ -625,7 +696,7 @@ export default function ProductDetailScreen(): React.ReactElement {
                 </Text>
               )}
             </View>
-            {reviews.slice(0, 6).map((rev) => (
+            {visibleReviews.map((rev) => (
               <View
                 key={rev.id}
                 style={{
@@ -659,8 +730,13 @@ export default function ProductDetailScreen(): React.ReactElement {
                 )}
               </View>
             ))}
-            {reviewsData?.total !== undefined && reviewsData.total > 6 && (
-              <TouchableOpacity style={{ minHeight: 44, justifyContent: 'center' }}>
+            {!reviewsExpanded && (reviewsData?.total ?? reviews.length) > 6 && (
+              <TouchableOpacity
+                onPress={() => setReviewsExpanded(true)}
+                style={{ minHeight: 44, justifyContent: 'center' }}
+                accessibilityRole="button"
+                accessibilityLabel="सभी समीक्षाएं दिखाएं"
+              >
                 <Text style={{ fontFamily: typography.body.family, fontSize: 14, color: colors.primary }}>
                   और समीक्षाएं →
                 </Text>
@@ -686,7 +762,8 @@ export default function ProductDetailScreen(): React.ReactElement {
           flexDirection: 'row',
           alignItems: 'center',
           paddingHorizontal: spacing.md,
-          paddingVertical: spacing.sm,
+            paddingTop: spacing.sm,
+            paddingBottom: spacing.sm + insets.bottom,
           gap: spacing.sm,
         }}>
           {/* Price */}
@@ -709,7 +786,7 @@ export default function ProductDetailScreen(): React.ReactElement {
 
           {/* Wishlist */}
           <TouchableOpacity
-            onPress={() => setIsWishlisted((v) => !v)}
+            onPress={handleWishlistToggle}
             style={{
               width: 44,
               height: 44,

@@ -23,7 +23,6 @@ import type { ActiveFilters } from '../lib/catalog-filter-utils';
 
 // ─── Colour tokens not yet on origin/main (land with D1D2D5) ───────────────────
 const SURFACE_ELEVATED  = '#FFFBF2';
-const SURFACE_RECESSED  = '#EDE2CC';
 const PRIMARY_DEEP      = '#8C6628';
 const BORDER_STRONG     = '#B89F70';
 const PRIMARY_WASH      = colors.primaryLight; // '#EFE3BE'

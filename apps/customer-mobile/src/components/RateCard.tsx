@@ -26,7 +26,7 @@ export function RateCard(): React.ReactElement {
           marginBottom: spacing.sm,
         }}
       >
-        आज की दर / Today&apos;s rate
+        आज की दर
       </Text>
 
       {isLoading ? (

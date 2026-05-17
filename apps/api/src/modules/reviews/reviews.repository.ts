@@ -47,12 +47,14 @@ export class ReviewsRepository {
       const { rows } = await tx.query<ReviewRow & { avg_rating: string | null; total_count: string }>(
         `SELECT pr.id, pr.shop_id, pr.product_id, pr.customer_id,
                 pr.rating, pr.review_text, pr.created_at,
-                split_part(c.full_name, ' ', 1) AS customer_first_name,
+                split_part(c.name, ' ', 1) AS customer_first_name,
                 AVG(pr.rating) OVER () AS avg_rating,
                 COUNT(*) OVER ()::text AS total_count
            FROM product_reviews pr
-           JOIN customers c ON c.id = pr.customer_id
+           JOIN customers c ON c.id = pr.customer_id AND c.shop_id = pr.shop_id
+           JOIN products p ON p.id = pr.product_id AND p.shop_id = pr.shop_id AND p.published_at IS NOT NULL
           WHERE pr.shop_id = $1 AND pr.product_id = $2
+              AND pr.is_publicly_visible = TRUE
           ORDER BY pr.created_at DESC
           LIMIT 50`,
         [params.shopId, params.productId],

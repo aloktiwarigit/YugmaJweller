@@ -34,10 +34,9 @@ export function ImpersonateButton({ token, tenant }: { token: string; tenant: Te
     setShowForm(false);
     try {
       setSess(await adminApi.startImpersonation(token, tenant.id, trimmed));
-    } catch (err) {
-      // Log full error for debugging; expose only a generic message to avoid leaking API details.
-      console.error('[ImpersonateButton] start failed:', err);
-      setError('Impersonation failed — see DevTools console for details.');
+    } catch {
+      console.error('[ImpersonateButton] start failed');
+      setError('Impersonation failed. Check the platform audit log request ID.');
     } finally {
       setBusy(false);
       setReason('');
@@ -51,15 +50,14 @@ export function ImpersonateButton({ token, tenant }: { token: string; tenant: Te
     try {
       await adminApi.endImpersonation(token, sess.sessionId);
       setSess(null);
-    } catch (err) {
-      console.error('[ImpersonateButton] end failed:', err);
-      setError('Could not end session — see DevTools console.');
+    } catch {
+      console.error('[ImpersonateButton] end failed');
+      setError('Could not end session. Retry or revoke the session from the API.');
     } finally {
       setBusy(false);
     }
   }
 
-  // Token is NEVER rendered in the DOM. Copy-to-clipboard is the only way to retrieve it.
   async function copyToken() {
     if (!sess) return;
     try {
@@ -67,7 +65,7 @@ export function ImpersonateButton({ token, tenant }: { token: string; tenant: Te
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      setError('Clipboard access denied — use DevTools > Application > localStorage to retrieve token.');
+      setError('Clipboard access denied. The token is not displayed for security.');
     }
   }
 
@@ -89,7 +87,7 @@ export function ImpersonateButton({ token, tenant }: { token: string; tenant: Te
           className="px-2 py-1 bg-slate-200 text-slate-800 rounded text-xs hover:bg-slate-300"
           aria-label="Copy session token to clipboard"
         >
-          {copied ? '✓ Copied' : 'Copy token'}
+          {copied ? 'Copied' : 'Copy token'}
         </button>
         {error && <span className="text-xs text-red-600" role="alert">{error}</span>}
       </div>

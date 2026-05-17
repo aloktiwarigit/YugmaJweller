@@ -1,12 +1,13 @@
-import { fetchTenantConfig, fetchPublicRates } from '@/lib/api';
+import { headers } from 'next/headers';
 import type { Metadata } from 'next';
+import { resolveShopSlug } from '@/lib/tenant-slug';
+import { fetchTenantConfig, fetchPublicRates } from '@/lib/api';
 
 export const metadata: Metadata = { title: 'दर-लॉक बुकिंग' };
 
-const SHOP_SLUG = process.env.NEXT_PUBLIC_SHOP_SLUG ?? null;
-
 export default async function RateLockPage(): Promise<JSX.Element> {
-  const config = SHOP_SLUG ? await fetchTenantConfig(SHOP_SLUG) : null;
+  const slug   = resolveShopSlug(headers());
+  const config = slug ? await fetchTenantConfig(slug) : null;
 
   const rates      = await fetchPublicRates();
   const gold24kRup = rates?.GOLD_24K?.perGramRupees
@@ -27,7 +28,6 @@ export default async function RateLockPage(): Promise<JSX.Element> {
         आज की सोने की दर बंद करें — कल बढ़े तो भी आज की दर पर खरीदारी करें।
       </p>
 
-      {/* Current rates card */}
       <div className="rounded-xl bg-amber-50 border border-amber-200 p-6 mb-8">
         <p className="font-body text-sm text-amber-700 mb-3">आज की सोने की दरें</p>
         {gold24kRup !== null ? (
@@ -54,7 +54,6 @@ export default async function RateLockPage(): Promise<JSX.Element> {
         ) : null}
       </div>
 
-      {/* How it works */}
       <section aria-labelledby="how-heading" className="mb-8">
         <h2 id="how-heading" className="font-heading text-xl text-ink mb-4">
           दर-लॉक कैसे करें?
@@ -79,7 +78,6 @@ export default async function RateLockPage(): Promise<JSX.Element> {
         </ol>
       </section>
 
-      {/* CTA */}
       <div className="rounded-xl bg-bg border border-border p-6 text-center">
         <p className="font-body text-inkMute mb-1">दर-लॉक करने के लिए</p>
         <p className="font-heading text-lg text-ink">

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
-import { CatalogService } from './catalog.service';
+import { CatalogService, normalizePurityForRates, expandPurityFilter } from './catalog.service';
 import { computeProductPrice } from '@goldsmith/money';
 
 const NOW = new Date('2026-04-30T10:00:00.000Z');
@@ -214,6 +214,22 @@ describe('CatalogService.getProducts()', () => {
     expect(sqlCall[0]).toContain('p.metal = $');
     expect(sqlCall[1]).toContain('GOLD');
   });
+
+  it('treats diamond metal filter as a diamond category filter', async () => {
+    const pool = makePool([
+      { rows: [] },
+      { rows: [baseProduct] },
+    ]);
+    const ps = { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) };
+    const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never, stubUrlBuilder as never);
+
+    await svc.getProducts({ shopId: 'shop-1', metal: 'diamond', page: 1, limit: 12 });
+
+    const sqlCall = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1];
+    expect(sqlCall[0]).not.toContain('p.metal = $');
+    expect(sqlCall[0]).toContain('pc.name ILIKE $');
+    expect(sqlCall[1]).toContain('%diamond%');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -395,13 +411,17 @@ describe('CatalogService.getProducts() — B1 filter SQL (WS-A)', () => {
     );
   }
 
-  it('appends purity = $N when purity param provided', async () => {
+  it('appends purity ANY() filter when purity param provided (both canonical and raw forms)', async () => {
     const pool = makeFilterPool();
     await makeSvc(pool).getProducts({ shopId: 'shop-1', purity: 'GOLD_22K', page: 1, limit: 12 });
     const sql    = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
     const params = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][1] as unknown[];
-    expect(sql).toContain('p.purity = $');
-    expect(params).toContain('GOLD_22K');
+    expect(sql).toContain('= ANY(');
+    // params includes an array with both canonical and raw purity forms
+    const purities = params.find((p) => Array.isArray(p)) as string[] | undefined;
+    expect(purities).toBeDefined();
+    expect(purities).toContain('GOLD_22K');
+    expect(purities).toContain('22K');
   });
 
   it('appends quantity > 0 when inStockOnly=true', async () => {
@@ -1008,5 +1028,90 @@ describe('CatalogService.getRecommendations()', () => {
     const svc = new CatalogService(pool as never, ps as never, mockSettingsRepo as never, stubUrlBuilder as never);
     const result = await svc.getRecommendations('prod-X', 'shop-1');
     expect(result.items.length).toBeLessThanOrEqual(6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Purity normalization helpers
+// ---------------------------------------------------------------------------
+
+describe('normalizePurityForRates()', () => {
+  it.each([
+    ['GOLD_22K', 'GOLD_22K'],
+    ['22K',      'GOLD_22K'],
+    ['18K',      'GOLD_18K'],
+    ['24K',      'GOLD_24K'],
+    ['14K',      'GOLD_14K'],
+    ['20K',      'GOLD_20K'],
+    ['999',      'SILVER_999'],
+    ['925',      'SILVER_925'],
+    ['SILVER_999',    'SILVER_999'],
+    ['PLATINUM_950',  'PLATINUM_950'],
+  ] as const)('normalizePurityForRates(%s) === %s', (input, expected) => {
+    expect(normalizePurityForRates(input)).toBe(expected);
+  });
+});
+
+describe('expandPurityFilter()', () => {
+  it('returns both canonical and raw forms for known gold purity', () => {
+    const result = expandPurityFilter('GOLD_22K');
+    expect(result).toEqual(expect.arrayContaining(['GOLD_22K', '22K']));
+    expect(result).toHaveLength(2);
+  });
+
+  it('returns both forms for silver', () => {
+    const result = expandPurityFilter('SILVER_999');
+    expect(result).toEqual(expect.arrayContaining(['SILVER_999', '999']));
+  });
+
+  it('returns single-element array for unknown canonical value', () => {
+    expect(expandPurityFilter('PLATINUM_950')).toEqual(['PLATINUM_950']);
+  });
+});
+
+describe('CatalogService.getProducts() — purity normalization (raw stored values)', () => {
+  function makeSvc(pool: ReturnType<typeof makePool>) {
+    return new CatalogService(
+      pool as never,
+      { getCurrentRates: vi.fn().mockResolvedValue(fakeRates) } as never,
+      mockSettingsRepo as never,
+      stubUrlBuilder as never,
+    );
+  }
+
+  it('prices product stored with raw purity "22K" using GOLD_22K rate', async () => {
+    const rawPurityProduct = { ...baseProduct, purity: '22K', total_count: '1' };
+    const pool = makePool([
+      { rows: [] },
+      { rows: [rawPurityProduct] },
+    ]);
+    const result = await makeSvc(pool).getProducts({ shopId: 'shop-1', page: 1, limit: 12 });
+    expect(result.items[0].priceAvailable).toBe(true);
+    expect(result.items[0].estimatedPrice?.totalFormatted).toMatch(/^₹/);
+  });
+
+  it('prices product stored with raw silver purity "999"', async () => {
+    const silverProduct = { ...baseProduct, metal: 'SILVER', purity: '999', total_count: '1' };
+    const pool = makePool([
+      { rows: [] },
+      { rows: [silverProduct] },
+    ]);
+    const result = await makeSvc(pool).getProducts({ shopId: 'shop-1', page: 1, limit: 12 });
+    expect(result.items[0].priceAvailable).toBe(true);
+  });
+
+  it('purity filter uses ANY() and includes both canonical and raw forms', async () => {
+    const pool = makePool([
+      { rows: [] },
+      { rows: [baseProduct] },
+    ]);
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', purity: 'GOLD_22K', page: 1, limit: 12 });
+    const sql    = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    const params = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][1] as unknown[];
+    expect(sql).toContain('= ANY(');
+    const purities = params.find((p) => Array.isArray(p)) as string[] | undefined;
+    expect(purities).toBeDefined();
+    expect(purities).toContain('GOLD_22K');
+    expect(purities).toContain('22K');
   });
 });

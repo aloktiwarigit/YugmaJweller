@@ -9,7 +9,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 import { STOREFRONT_GIFT_PERSONAS } from '@goldsmith/customer-shared';
 
@@ -22,23 +22,25 @@ import { HeroSection } from '../../src/components/sections/HeroSection';
 import { CategoryTileGrid } from '../../src/components/sections/CategoryTileGrid';
 import { StorefrontPromise } from '../../src/components/sections/StorefrontPromise';
 
-import { getCatalogProducts } from '../../src/api/endpoints';
+import { getNewArrivalProducts, getTopSellerProducts, addToWishlist, removeFromWishlist, getWishlist } from '../../src/api/endpoints';
+import type { WishlistItem } from '../../src/api/endpoints';
 import { useTenantStore } from '../../src/stores/tenantStore';
+import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import type { CatalogProductCard } from '@goldsmith/customer-shared';
 
 // ── Section heading ────────────────────────────────────────────────────────────
 
 interface SectionHeadingProps {
   titleHi:     string;
-  eyebrowEn?:  string;
+  eyebrowLabel?: string;
   onSeeAll?:   () => void;
 }
 
-function SectionHeading({ titleHi, eyebrowEn, onSeeAll }: SectionHeadingProps): React.ReactElement {
+function SectionHeading({ titleHi, eyebrowLabel, onSeeAll }: SectionHeadingProps): React.ReactElement {
   return (
     <View style={styles.sectionHeader}>
       <View>
-        {eyebrowEn && <Text style={styles.eyebrow}>{eyebrowEn}</Text>}
+        {eyebrowLabel && <Text style={styles.eyebrow}>{eyebrowLabel}</Text>}
         <Text style={styles.sectionTitle}>{titleHi}</Text>
       </View>
       {onSeeAll && (
@@ -64,9 +66,11 @@ function RateStrip(): React.ReactElement {
 
 interface ProductRowProps {
   products: CatalogProductCard[];
+  wishlistedIds?: Set<string>;
+  onWishlistPress?: (productId: string, nowWishlisted: boolean) => void;
 }
 
-function ProductRow({ products }: ProductRowProps): React.ReactElement {
+function ProductRow({ products, wishlistedIds, onWishlistPress }: ProductRowProps): React.ReactElement {
   const { width } = useWindowDimensions();
   const cardWidth = width * 0.44;
 
@@ -89,7 +93,12 @@ function ProductRow({ products }: ProductRowProps): React.ReactElement {
           accessibilityRole="button"
           accessibilityLabel={item.categoryName ?? 'उत्पाद'}
         >
-          <ProductCard product={item} cardWidth={cardWidth} />
+          <ProductCard
+            product={item}
+            cardWidth={cardWidth}
+            onWishlistPress={onWishlistPress}
+            isWishlisted={wishlistedIds?.has(item.id) ?? false}
+          />
         </TouchableOpacity>
       )}
     />
@@ -102,7 +111,7 @@ function GiftPersonasRow(): React.ReactElement {
   return (
     <View>
       {/* TODO(Phase-E): Fraunces Italic eyebrow font not yet bundled; using system italic */}
-      <Text style={styles.giftEyebrow}>Gift / उपहार</Text>
+      <Text style={styles.giftEyebrow}>उपहार</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -210,11 +219,38 @@ function PremiumStrip(): React.ReactElement {
 
 // ── Footer accordion (collapsed) ──────────────────────────────────────────────
 
-const FOOTER_COLS = [
-  { title: 'खरीदारी',  links: ['सोना', 'हीरा', 'चाँदी', 'ब्राइडल'] },
-  { title: 'सहायता',   links: ['हमसे संपर्क करें', 'वापसी नीति', 'ट्रैक ऑर्डर'] },
-  { title: 'कंपनी',    links: ['हमारे बारे में', 'करियर', 'प्रेस'] },
-] as const;
+interface FooterLink {
+  label: string;
+  href: Parameters<typeof router.push>[0];
+}
+
+const FOOTER_COLS: Array<{ title: string; links: FooterLink[] }> = [
+  {
+    title: 'खरीदारी',
+    links: [
+      { label: 'सोना', href: '/(tabs)/browse?metal=GOLD' as Parameters<typeof router.push>[0] },
+      { label: 'हीरा', href: '/(tabs)/browse?metal=DIAMOND' as Parameters<typeof router.push>[0] },
+      { label: 'चाँदी', href: '/(tabs)/browse?metal=SILVER' as Parameters<typeof router.push>[0] },
+      { label: 'ब्राइडल', href: '/(tabs)/browse?style=BRIDAL' as Parameters<typeof router.push>[0] },
+    ],
+  },
+  {
+    title: 'सहायता',
+    links: [
+      { label: 'हमसे संपर्क करें', href: '/browse/support' as Parameters<typeof router.push>[0] },
+      { label: 'वापसी नीति', href: '/browse/policy' as Parameters<typeof router.push>[0] },
+      { label: 'ट्रैक ऑर्डर', href: '/(tabs)/profile' as Parameters<typeof router.push>[0] },
+    ],
+  },
+  {
+    title: 'सेवाएं',
+    links: [
+      { label: 'साइज़ गाइड', href: '/browse/size-guide' as Parameters<typeof router.push>[0] },
+      { label: 'दर-लॉक', href: '/rate-lock' as Parameters<typeof router.push>[0] },
+      { label: 'ट्राई-एट-होम', href: '/try-at-home' as Parameters<typeof router.push>[0] },
+    ],
+  },
+];
 
 function FooterAccordion(): React.ReactElement {
   const [openCol, setOpenCol] = useState<string | null>(null);
@@ -237,7 +273,15 @@ function FooterAccordion(): React.ReactElement {
             {isOpen && (
               <View style={styles.footerLinks}>
                 {col.links.map((link) => (
-                  <Text key={link} style={styles.footerLink}>{link}</Text>
+                  <TouchableOpacity
+                    key={link.label}
+                    onPress={() => router.push(link.href)}
+                    style={styles.footerLinkButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={link.label}
+                  >
+                    <Text style={styles.footerLink}>{link.label}</Text>
+                  </TouchableOpacity>
                 ))}
               </View>
             )}
@@ -256,23 +300,62 @@ function FooterAccordion(): React.ReactElement {
 export default function Home(): React.ReactElement {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const slug = useTenantStore((s) => s.slug);
+  const { isAuthenticated } = useCustomerSession();
+  const queryClient = useQueryClient();
+
+  const { data: wishlistData } = useQuery({
+    queryKey: ['wishlist'],
+    queryFn:  getWishlist,
+    enabled:  isAuthenticated,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const wishlistedIds = new Set((wishlistData ?? []).map((w: WishlistItem) => w.productId));
+
+  const wishlistMutation = useMutation({
+    mutationFn: ({ productId, add }: { productId: string; add: boolean }) =>
+      add ? addToWishlist(productId) : removeFromWishlist(productId),
+    onMutate: async ({ productId, add }) => {
+      await queryClient.cancelQueries({ queryKey: ['wishlist'] });
+      const previous = queryClient.getQueryData<WishlistItem[]>(['wishlist']) ?? [];
+      queryClient.setQueryData<WishlistItem[]>(['wishlist'], (old = []) =>
+        add
+          ? (old.some((w) => w.productId === productId)
+              ? old
+              : [...old, { productId, sku: '', purity: '', metal: '', grossWeightG: '', netWeightG: '', huid: null, addedAt: new Date().toISOString() }])
+          : old.filter((w) => w.productId !== productId),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      queryClient.setQueryData<WishlistItem[]>(['wishlist'], ctx?.previous);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['wishlist'] });
+    },
+  });
 
   const newArrivals = useQuery({
-    queryKey: ['catalog-products', slug, 'new-arrivals'],
-    queryFn:  () => getCatalogProducts({ limit: 8 }),
+    queryKey: ['catalog-new-arrivals', slug],
+    queryFn:  () => getNewArrivalProducts(8),
     retry:    false,
     staleTime: 5 * 60 * 1000,
   });
 
   const topSellers = useQuery({
-    queryKey: ['catalog-products', slug, 'top-sellers'],
-    queryFn:  () => getCatalogProducts({ limit: 8 }),
+    queryKey: ['catalog-top-sellers', slug],
+    queryFn:  () => getTopSellerProducts(8),
     retry:    false,
     staleTime: 5 * 60 * 1000,
   });
 
   const newArrivalItems = (newArrivals.data?.items ?? []) as CatalogProductCard[];
   const topSellerItems  = (topSellers.data?.items ?? []) as CatalogProductCard[];
+
+  const handleWishlistToggle = (productId: string, nowWishlisted: boolean): void => {
+    if (!isAuthenticated) return;
+    wishlistMutation.mutate({ productId, add: nowWishlisted });
+  };
 
   return (
     <View style={styles.root}>
@@ -291,13 +374,13 @@ export default function Home(): React.ReactElement {
 
         {/* Section 2: Rate strip */}
         <View style={styles.sectionGap}>
-          <SectionHeading titleHi="आज की दर" eyebrowEn="Live Rates" />
+          <SectionHeading titleHi="आज की दर" eyebrowLabel="ताज़ा दरें" />
           <RateStrip />
         </View>
 
         {/* Section 3: Shop by category */}
         <View style={styles.sectionGap}>
-          <SectionHeading titleHi="श्रेणी अनुसार" eyebrowEn="Browse" />
+          <SectionHeading titleHi="श्रेणी अनुसार" eyebrowLabel="खरीदारी" />
           <CategoryTileGrid columns={4} />
         </View>
 
@@ -306,10 +389,10 @@ export default function Home(): React.ReactElement {
           <View style={styles.sectionGap}>
             <SectionHeading
               titleHi="नई कलेक्शन"
-              eyebrowEn="New Arrivals"
+              eyebrowLabel="नया आया"
               onSeeAll={() => router.push('/(tabs)/browse' as Parameters<typeof router.push>[0])}
             />
-            <ProductRow products={newArrivalItems} />
+            <ProductRow products={newArrivalItems} wishlistedIds={wishlistedIds} onWishlistPress={handleWishlistToggle} />
           </View>
         )}
 
@@ -318,21 +401,21 @@ export default function Home(): React.ReactElement {
 
         {/* Section 6: Gift personas */}
         <View style={styles.sectionGap}>
-          <SectionHeading titleHi="प्रियजनों के लिए" eyebrowEn="Gift by Person" />
+          <SectionHeading titleHi="प्रियजनों के लिए" eyebrowLabel="उपहार" />
           <GiftPersonasRow />
         </View>
 
         {/* Section 7: Top sellers */}
         {topSellerItems.length > 0 && (
           <View style={styles.sectionGap}>
-            <SectionHeading titleHi="टॉप सेलर" eyebrowEn="Best Selling" />
-            <ProductRow products={topSellerItems} />
+            <SectionHeading titleHi="टॉप सेलर" eyebrowLabel="लोकप्रिय" />
+            <ProductRow products={topSellerItems} wishlistedIds={wishlistedIds} onWishlistPress={handleWishlistToggle} />
           </View>
         )}
 
         {/* Section 8: Everyday collection */}
         <View style={styles.sectionGap}>
-          <SectionHeading titleHi="रोज़मर्रा की पसंद" eyebrowEn="Everyday" />
+          <SectionHeading titleHi="रोज़मर्रा की पसंद" eyebrowLabel="रोज़मर्रा" />
           <EverydayCollectionGrid />
         </View>
 
@@ -465,7 +548,9 @@ const styles = StyleSheet.create({
   premiumSubtitle: {
     fontFamily:   typography.body.family,
     fontSize:     13,
-    color:        colors.inkMute,
+    // inkMute (#4A526E) is invisible on the ink (#1E2440) container — use the
+    // cream foreground at reduced opacity to keep hierarchy under the title.
+    color:        'rgba(245, 237, 221, 0.72)',
     marginBottom: spacing.md,
   },
   premiumLinks: {
@@ -512,6 +597,10 @@ const styles = StyleSheet.create({
   footerLinks: {
     paddingBottom: spacing.sm,
     gap:           spacing.xs,
+  },
+  footerLinkButton: {
+    minHeight:       36,
+    justifyContent:  'center',
   },
   footerLink: {
     fontFamily:  typography.body.family,

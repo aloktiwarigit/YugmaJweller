@@ -19,7 +19,9 @@ module.exports = {
         error: '#B1402B',
       },
       fontFamily: {
-        display: ['YatraOne'],
+        // display = Tiro Devanagari Hindi (not YatraOne) — see typography.ts
+        // for the rationale: Yatra One drops matras + reph on Android RN.
+        display: ['TiroDevanagariHindi-Regular'],
         body: ['MuktaVaani-400'],
         'body-medium': ['MuktaVaani-500'],
         'body-semibold': ['MuktaVaani-600'],

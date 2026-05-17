@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { colors } from '@goldsmith/ui-tokens';
+import { colors, typography } from '@goldsmith/ui-tokens';
 import { TenantBrandHeader } from '../../src/components/TenantBrandHeader';
 import { getReturnPolicy } from '../../src/api/endpoints';
 
@@ -53,12 +53,12 @@ const styles = StyleSheet.create({
   root:       { flex: 1, backgroundColor: colors.bg },
   scroll:     { padding: 16, paddingBottom: 40 },
   backBtn:    { marginBottom: 16 },
-  backText:   { fontSize: 14, color: colors.primary },
-  title:      { fontSize: 22, color: colors.ink, fontWeight: '700', marginBottom: 16 },
+  backText:   { fontFamily: typography.body.family, fontSize: 14, color: colors.primary },
+  title:      { fontFamily: typography.serif.family, fontSize: 22, color: colors.ink, fontWeight: '700', marginBottom: 16 },
   card: {
     backgroundColor: '#fff', borderRadius: 12,
     borderWidth: 1, borderColor: colors.border, padding: 16,
   },
-  policyText: { fontSize: 15, color: colors.ink, lineHeight: 24 },
-  noPolicy:   { fontSize: 15, color: colors.inkMute, lineHeight: 24 },
+  policyText: { fontFamily: typography.body.family, fontSize: 15, color: colors.ink, lineHeight: 24 },
+  noPolicy:   { fontFamily: typography.body.family, fontSize: 15, color: colors.inkMute, lineHeight: 24 },
 });

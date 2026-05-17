@@ -76,7 +76,7 @@ async function fetchAuditLog(params: {
     qs['category'] = params.category;
   }
   const queryString = new URLSearchParams(qs).toString();
-  const res = await api.get<AuditLogResponse>(`/auth/audit-log?${queryString}`);
+  const res = await api.get<AuditLogResponse>(`/api/v1/auth/audit-log?${queryString}`);
   return res.data;
 }
 

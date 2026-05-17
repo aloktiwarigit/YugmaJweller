@@ -1,21 +1,9 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ImageBackground } from 'react-native';
 import { router } from 'expo-router';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 import { STOREFRONT_CATEGORY_TILES } from '@goldsmith/customer-shared';
-
-// Icon glyphs — Unicode symbols as stand-ins for SVG icons.
-// TODO(Phase-E): replace with react-native-svg icon set
-const ICON_MAP: Record<string, string> = {
-  rings:       '💍',
-  earrings:    '✨',
-  pendants:    '📿',
-  bangles:     '⭕',
-  necklaces:   '🔗',
-  mangalsutra: '❤️',
-  bracelets:   '🔮',
-  silver:      '⬜',
-};
+import { categoryTileImages, storefrontFallbackImage } from '../../assets/storefrontImages';
 
 interface Props {
   columns?: 2 | 4;
@@ -39,10 +27,16 @@ export function CategoryTileGrid({ columns = 4 }: Props): React.ReactElement {
           accessibilityRole="button"
           accessibilityLabel={tile.labelHi}
         >
-          <View style={styles.iconWrap}>
-            <Text style={styles.icon}>{ICON_MAP[tile.key] ?? '💎'}</Text>
-          </View>
-          <Text style={styles.label}>{tile.labelHi}</Text>
+          <ImageBackground
+            source={categoryTileImages[tile.key] ?? storefrontFallbackImage}
+            resizeMode="cover"
+            style={styles.imageWrap}
+            imageStyle={styles.tileImage}
+          >
+            <View style={styles.labelBand}>
+              <Text numberOfLines={2} style={styles.label}>{tile.labelHi}</Text>
+            </View>
+          </ImageBackground>
         </TouchableOpacity>
       ))}
     </View>
@@ -58,27 +52,34 @@ const styles = StyleSheet.create({
   },
   tile: {
     alignItems:    'center',
-    paddingVertical: spacing.sm,
+    paddingVertical: 4,
     paddingHorizontal: 4,
   },
-  iconWrap: {
-    width:           52,
-    height:          52,
+  imageWrap: {
+    width:           '100%',
+    height:          90,
     borderRadius:    radii.md,
-    backgroundColor: colors.surface,
-    alignItems:      'center',
-    justifyContent:  'center',
+    backgroundColor: colors.white,
     borderWidth:     1,
     borderColor:     colors.borderSubtle,
-    marginBottom:    spacing.xs,
+    overflow:        'hidden',
+    justifyContent:  'flex-end',
   },
-  icon: {
-    fontSize: 24,
+  tileImage: {
+    borderRadius: radii.md,
+  },
+  labelBand: {
+    backgroundColor: 'rgba(30,36,64,0.66)',
+    minHeight:       25,
+    alignItems:      'center',
+    justifyContent:  'center',
+    paddingHorizontal: 4,
   },
   label: {
     fontFamily: typography.body.family,
-    fontSize:   12,
-    color:      colors.ink,
+    fontSize:   11,
+    lineHeight: 14,
+    color:      colors.white,
     textAlign:  'center',
   },
 });

@@ -59,17 +59,27 @@ import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
       provide: 'PAYMENTS_ADAPTER',
       useFactory: () => {
         const adapter = process.env['PAYMENTS_ADAPTER'] ?? '';
-        if (adapter === 'razorpay') return new RazorpayAdapter();
-        // Explicit stub is permitted for demo/staging deployments.
-        if (adapter === 'stub') return new StubPaymentsAdapter();
-        // Fail-closed in production: guard against unset/unknown adapter.
-        // Stub accepts any webhook signature — never run without explicit opt-in.
-        if (process.env['NODE_ENV'] === 'production') {
+        const isProd  = process.env['NODE_ENV'] === 'production';
+        // Demo escape hatch: a pre-revenue deploy (e.g. goldsmith-dev for the
+        // jeweller demo) runs with NODE_ENV=production but no Razorpay creds.
+        // Setting ALLOW_STUB_PAYMENTS=1 explicitly opts into the stub adapter
+        // and logs a loud warning. Real-money tenants MUST NOT set this.
+        const allowStub = process.env['ALLOW_STUB_PAYMENTS'] === '1';
+        if (isProd && adapter !== 'razorpay' && !allowStub) {
           throw new Error(
-            'PAYMENTS_ADAPTER must be "razorpay" or "stub" in production. ' +
-            'Unset or unknown adapter values are rejected to prevent misconfigured containers.',
+            'PAYMENTS_ADAPTER must be "razorpay" in production. ' +
+            'The stub payments adapter is only allowed in non-production environments. ' +
+            'For demo/staging deployments in production mode, set ALLOW_STUB_PAYMENTS=1 explicitly.',
           );
         }
+        if (adapter === 'razorpay') return new RazorpayAdapter();
+        if (isProd && allowStub) {
+          // eslint-disable-next-line no-console
+          console.warn('[billing] ALLOW_STUB_PAYMENTS=1 — using StubPaymentsAdapter in production. Demo/staging only.');
+        }
+        // Explicit stub is permitted for non-production demo/staging deployments.
+        if (adapter === 'stub') return new StubPaymentsAdapter();
+        // Unknown non-production values fall back to the local stub.
         return new StubPaymentsAdapter();
       },
     },

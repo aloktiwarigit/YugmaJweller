@@ -1,27 +1,22 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 import {
   productDisplayName,
   formatInrFromPaise,
-  categoryToFallbackSvg,
 } from '@goldsmith/customer-shared';
 import type { CatalogProductCard, CatalogImage } from '@goldsmith/customer-shared';
+import { imageForCategoryName } from '../assets/storefrontImages';
 
-// Category-aware illustrated fallback. SVG string -> data: URI works with
-// expo-image (and react-native-svg/png pipelines) without bundler magic.
 function FallbackPlaceholder({ categoryName }: { categoryName: string | null }): React.ReactElement {
-  const svgUri = useMemo(() => {
-    const svg = categoryToFallbackSvg(categoryName);
-    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-  }, [categoryName]);
+  const source = useMemo(() => imageForCategoryName(categoryName), [categoryName]);
 
   return (
     <Image
-      source={{ uri: svgUri }}
-      contentFit="cover"
-      style={[StyleSheet.absoluteFill, { borderRadius: radii.sm }]}
+      source={source}
+      contentFit="contain"
+      style={[StyleSheet.absoluteFill, { borderRadius: radii.sm, backgroundColor: colors.white }]}
       accessibilityLabel={categoryName ?? 'उत्पाद'}
     />
   );
@@ -50,7 +45,8 @@ const RIBBON_COLORS: Record<RibbonVariant, string> = {
 interface Props {
   product: CatalogProductCard;
   cardWidth?: number;
-  onWishlistPress?: (productId: string) => void;
+  /** Called with (productId, newWishlistedState) after the local toggle fires */
+  onWishlistPress?: (productId: string, nowWishlisted: boolean) => void;
   isWishlisted?: boolean;
 }
 
@@ -64,15 +60,13 @@ export function ProductCard({
   const width  = cardWidth ?? (screenWidth - spacing.lg * 2 - spacing.sm) / 2;
   const height = width * 5 / 4;  // 4:5 portrait ratio
 
-  const [wishlisted, setWishlisted] = useState(isWishlisted);
   const ribbon = productRibbon(product);
   const isUnavailable = product.quantity === 0;
   const displayName   = productDisplayName(product);
   const img: CatalogImage | null = product.primaryImage;
 
   function handleWishlist(): void {
-    setWishlisted((prev) => !prev);
-    onWishlistPress?.(product.id);
+    onWishlistPress?.(product.id, !isWishlisted);
   }
 
   const priceText = product.estimatedPrice
@@ -115,12 +109,12 @@ export function ProductCard({
           onPress={handleWishlist}
           style={styles.wishlistBtn}
           accessibilityRole="button"
-          accessibilityLabel={wishlisted ? 'पसंदीदा से हटाएं' : 'पसंदीदा में जोड़ें'}
-          accessibilityState={{ checked: wishlisted }}
+          accessibilityLabel={isWishlisted ? 'पसंदीदा से हटाएं' : 'पसंदीदा में जोड़ें'}
+          accessibilityState={{ checked: isWishlisted }}
           hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
         >
-          <Text style={[styles.heartIcon, wishlisted && styles.heartIconFilled]}>
-            {wishlisted ? '♥' : '♡'}
+          <Text style={[styles.heartIcon, isWishlisted && styles.heartIconFilled]}>
+            {isWishlisted ? '♥' : '♡'}
           </Text>
         </TouchableOpacity>
 

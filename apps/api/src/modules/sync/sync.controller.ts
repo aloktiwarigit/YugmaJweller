@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post, Query, UnauthorizedException } from '@nestjs/common';
 import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext } from '@goldsmith/tenant-context';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -15,7 +15,7 @@ const ALLOWED_TABLES = new Set<SyncTable>(['products', 'customers', 'shop_settin
 
 @Controller('/api/v1/sync')
 export class SyncController {
-  constructor(private readonly svc: SyncService) {}
+  constructor(@Inject(SyncService) private readonly svc: SyncService) {}
 
   @Get('pull')
   @Roles('shop_admin', 'shop_manager', 'shop_staff')

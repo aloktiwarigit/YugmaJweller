@@ -8,7 +8,7 @@ import type { CatalogProductCard } from '@goldsmith/customer-shared';
 // Accepts both CatalogProduct (Phase 1) and CatalogProductCard (Phase B)
 export function ProductCard({ product }: { product: CatalogProductCard }) {
   const isUnavailable = product.quantity === 0;
-  const label = purityLabel(product.purity);
+  const label = purityLabel(product.purity, product.metal);
 
   return (
     <a

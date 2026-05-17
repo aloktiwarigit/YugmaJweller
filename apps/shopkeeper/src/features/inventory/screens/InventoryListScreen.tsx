@@ -3,28 +3,27 @@ import { View, ScrollView, Pressable, Text, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { RateWidget } from '@goldsmith/ui-mobile';
 import { colors, spacing, radii, typography } from '@goldsmith/ui-tokens';
-import { usePublicRates } from '../../src/hooks/usePublicRates';
-import { InventorySearch } from '../../src/features/inventory/components/InventorySearch';
+import { usePublicRates } from '../../../hooks/usePublicRates';
+import { InventorySearch } from '../components/InventorySearch';
 
 interface QuickAction {
   label: string;
-  href:  string;
+  href: string;
 }
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { label: '+ नया उत्पाद', href: '/inventory/new'         },
-  { label: 'CSV आयात',     href: '/inventory/bulk-import'  },
-  { label: 'मूल्यांकन',    href: '/inventory/valuation'    },
-  { label: 'डेड स्टॉक',   href: '/inventory/dead-stock'   },
-  { label: 'लेबल प्रिंट',  href: '/inventory/print-labels' },
+  { label: '+ नया उत्पाद', href: '/inventory/new' },
+  { label: 'CSV आयात', href: '/inventory/bulk-import' },
+  { label: 'मूल्यांकन', href: '/inventory/valuation' },
+  { label: 'डेड स्टॉक', href: '/inventory/dead-stock' },
+  { label: 'लेबल प्रिंट', href: '/inventory/print-labels' },
 ];
 
-export default function InventoryListScreen(): React.ReactElement {
+export function InventoryListScreen(): React.ReactElement {
   const { data: rates, isLoading } = usePublicRates();
 
   return (
     <View style={styles.screen}>
-      {/* Live rate compact header */}
       <View style={styles.rateHeader}>
         <RateWidget
           variant="compact"
@@ -35,7 +34,6 @@ export default function InventoryListScreen(): React.ReactElement {
         />
       </View>
 
-      {/* Quick-actions pill bar */}
       <View style={styles.quickActionsWrapper}>
         <ScrollView
           horizontal
@@ -58,7 +56,6 @@ export default function InventoryListScreen(): React.ReactElement {
         </ScrollView>
       </View>
 
-      {/* Inventory search + results */}
       <View style={styles.searchContainer}>
         <InventorySearch
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -80,34 +77,34 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   quickActionsWrapper: {
-    backgroundColor:   colors.white,
+    backgroundColor: colors.white,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
-    paddingVertical:   spacing.sm,
+    paddingVertical: spacing.sm,
   },
   quickActionsContent: {
     paddingHorizontal: spacing.md,
   },
   pill: {
-    minHeight:         44,
+    minHeight: 44,
     paddingHorizontal: spacing.md,
-    paddingVertical:   spacing.sm,
-    borderRadius:      radii.pill,
-    borderWidth:       1,
-    borderColor:       colors.border,
-    backgroundColor:   colors.white,
-    marginRight:       spacing.sm,
-    justifyContent:    'center',
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+    marginRight: spacing.sm,
+    justifyContent: 'center',
   },
   pillLabel: {
     fontFamily: typography.body.family,
-    fontSize:   14,
-    color:      colors.ink,
+    fontSize: 14,
+    color: colors.ink,
   },
   searchContainer: {
     flex: 1,
     paddingHorizontal: spacing.md,
-    paddingTop:        spacing.md,
-    paddingBottom:     spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
   },
 });

@@ -1,10 +1,1 @@
-security-review-passed: 2026-05-07
-branch: feat/catalog-api-b2b5b6b7
-reviewer: Claude Sonnet 4.6
-findings: 0 exploitable
-new-endpoints: all @SkipAuth + @SkipTenant; tenant from x-tenant-id header only
-sql-injection: no user strings in SQL templates; parameterised queries throughout
-data-leakage: storage_key never in response; hero images built via toCardImage()
-tenant-isolation: withShopTx on every service method; EXISTS shops.status=ACTIVE guard
-recommendations-404: source product 404 prevents tenant enumeration (same pattern as B4)
-b7-stubs: no SQL writes; no-op; no attack surface
+Security review passed - 7 commits 4a20215..398375d

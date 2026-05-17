@@ -9,7 +9,7 @@ export default function BillingScreen(): React.ReactElement {
   const colors = useThemeTokens();
 
   const items = [
-    { label: 'नया invoice', route: '/billing/new', icon: 'receipt-outline' },
+    { label: 'नया बिल', route: '/billing/new', icon: 'receipt-outline' },
     { label: 'अनुमान', route: '/billing/estimate', icon: 'document-text-outline' },
     { label: 'पुराना सोना खरीद', route: '/billing/urd-exchange', icon: 'swap-horizontal-outline' },
     { label: 'बारकोड स्कैन', route: '/billing/scan', icon: 'barcode-outline' },
@@ -22,7 +22,7 @@ export default function BillingScreen(): React.ReactElement {
     >
       <Text style={[styles.title, { color: colors.ink }]}>बिलिंग</Text>
       <Text style={[styles.subtitle, { color: colors.inkMute }]}>
-        Invoice, estimate, scan, and old-gold purchase flows.
+        बिल, अनुमान, स्कैन और पुराने सोने की खरीद के काम।
       </Text>
 
       <View style={styles.grid}>

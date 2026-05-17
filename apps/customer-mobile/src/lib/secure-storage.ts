@@ -2,6 +2,9 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 export const SECURE_KEY = 'customer_session_v1';
+const SECURE_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+};
 
 export interface PersistedSession {
   bearer: string;
@@ -28,7 +31,7 @@ function isSecureStoreAvailable(): boolean {
 export async function saveSecureSession(s: PersistedSession): Promise<void> {
   if (!isSecureStoreAvailable()) return;
   try {
-    await SecureStore.setItemAsync(SECURE_KEY, JSON.stringify(s));
+    await SecureStore.setItemAsync(SECURE_KEY, JSON.stringify(s), SECURE_STORE_OPTIONS);
   } catch {
     // Defensive — even on native, do not crash the boot path on a
     // SecureStore failure.
@@ -39,7 +42,7 @@ export async function loadSecureSession(): Promise<PersistedSession | null> {
   if (!isSecureStoreAvailable()) return null;
   let raw: string | null;
   try {
-    raw = await SecureStore.getItemAsync(SECURE_KEY);
+    raw = await SecureStore.getItemAsync(SECURE_KEY, SECURE_STORE_OPTIONS);
   } catch {
     return null;
   }
@@ -54,7 +57,7 @@ export async function loadSecureSession(): Promise<PersistedSession | null> {
 export async function clearSecureSession(): Promise<void> {
   if (!isSecureStoreAvailable()) return;
   try {
-    await SecureStore.deleteItemAsync(SECURE_KEY);
+    await SecureStore.deleteItemAsync(SECURE_KEY, SECURE_STORE_OPTIONS);
   } catch {
     // No-op — best-effort.
   }

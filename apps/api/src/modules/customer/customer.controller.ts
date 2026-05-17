@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   Header,
   HttpCode,
   Inject,
+  InternalServerErrorException,
   NotFoundException,
   Param,
   ParseUUIDPipe,
@@ -17,6 +19,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Res } from '@nestjs/common';
+import { createPaymentSession } from './payment-token';
 import { z } from 'zod';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext, Tenant } from '@goldsmith/tenant-context';
@@ -161,14 +164,53 @@ export class CustomerController {
     return this.taSvc.getBookingsForCustomer(customerId, shopId, params);
   }
 
-  // ── Rate-Lock Checkout Page ───────────────────────────────────────────────────
-  // Serves a self-contained HTML page that loads Razorpay checkout.js and opens
-  // the payment modal. Mobile app opens this URL via Linking.openURL; the webhook
-  // activates the booking server-side on payment capture.
+  // ── Rate-Lock Payment Token ───────────────────────────────────────────────────
+  // Authenticated customer requests a short-lived signed token (5 min TTL).
+  // Mobile uses this token to open /api/v1/pay/rate-lock?token=<signed> in the
+  // browser — no auth headers required in the browser request.
+
+  @Get('rate-lock/bookings/:id/payment-token')
+  async getRateLockPaymentToken(
+    @Req() req: Request,
+    @Param('id', ParseUUIDPipe) bookingId: string,
+  ): Promise<{ paymentUrl: string }> {
+    const { customerId, shopId } = getCustomerCtx(req);
+
+    const row = await this.pool.query<{ status: string }>(
+      `SELECT status FROM rate_lock_bookings
+        WHERE id = $1 AND customer_id = $2 AND shop_id = $3`,
+      [bookingId, customerId, shopId],
+    );
+    if (!row.rows[0]) throw new NotFoundException({ code: 'rate_lock.not_found' });
+    if (row.rows[0].status !== 'PENDING_PAYMENT') {
+      throw new BadRequestException({ code: 'rate_lock.not_pending_payment' });
+    }
+
+    const apiBase = process.env['API_PUBLIC_URL'] ?? '';
+    if (!apiBase && process.env['NODE_ENV'] === 'production') {
+      throw new InternalServerErrorException({ code: 'payment.api_url_not_configured' });
+    }
+    const { token } = await createPaymentSession(this.pool, {
+      bookingId,
+      bookingType: 'RATE_LOCK',
+      customerId,
+      shopId,
+    });
+    return { paymentUrl: `${apiBase}/api/v1/pay/rate-lock?token=${token}` };
+  }
+
+  // ── Rate-Lock Checkout Page (legacy — kept for non-browser clients) ───────────
 
   @Get('rate-lock/bookings/:id/payment-page')
   @Header('Content-Type', 'text/html; charset=utf-8')
   @Header('Cache-Control', 'no-store')
+  @Header('Content-Security-Policy',
+    "default-src 'none'; " +
+    "script-src 'self' https://checkout.razorpay.com 'unsafe-inline'; " +
+    "style-src 'unsafe-inline'; " +
+    "connect-src https://api.razorpay.com; " +
+    "frame-ancestors 'none'; " +
+    "base-uri 'none'")
   async getRateLockPaymentPage(
     @Req() req: Request,
     @Param('id', ParseUUIDPipe) bookingId: string,

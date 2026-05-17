@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   signOutOfFirebase,
@@ -36,7 +36,7 @@ export default function AdminHome() {
     return () => unsubscribe?.();
   }, [router]);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!token) return;
     setError(null);
     try {
@@ -46,9 +46,9 @@ export default function AdminHome() {
     } catch (e) {
       setError((e as Error).message);
     }
-  }
+  }, [token, search]);
 
-  useEffect(() => { void refresh(); }, [token]);
+  useEffect(() => { void refresh(); }, [refresh]);
 
   async function handleSignOut() {
     try {

@@ -8,6 +8,13 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 config.watchFolders = [workspaceRoot];
+// Exclude .claude/worktrees and other non-source directories from Metro's file
+// watcher so expo-router typed-routes generation does not pick up worktree TypeScript
+// files and pollute .expo/types/router.d.ts with thousands of spurious route entries.
+config.resolver.blockList = [
+  // Matches .claude/worktrees and any nested paths
+  new RegExp(path.resolve(workspaceRoot, '.claude', 'worktrees').replace(/\\/g, '\\\\') + '.*'),
+];
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
@@ -20,4 +27,10 @@ config.resolver.nodeModulesPaths = [
 // virtual store, not under apps/customer-mobile/node_modules. Disabling
 // hierarchical lookup wedged a clean-bundle on those transitives.
 
-module.exports = withNativeWind(config, { input: './global.css' });
+module.exports = withNativeWind(config, {
+  input: './global.css',
+  // NativeWind 4.0.x splits cliCommand on spaces before spawning it.
+  // Resolve Tailwind through Node's module loader so Windows paths with
+  // spaces in the workspace do not break Metro or Android release bundling.
+  cliCommand: 'node -e "require(\'tailwindcss/lib/cli\')" -- tailwindcss',
+});

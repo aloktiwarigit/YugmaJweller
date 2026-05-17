@@ -1,12 +1,16 @@
 import { z } from 'zod';
 
 export const HeroBannerSchema = z.object({
-  imageId:    z.string().uuid(),
+  imageId:    z.string().uuid().optional(),
+  imageUrl:   z.string().regex(/^(\/|https:\/\/)/, 'must be an internal route or https URL').optional(),
   headlineHi: z.string().min(1).max(120),
   headlineEn: z.string().max(120).optional(),
   ctaUrl:     z.string().regex(/^\//, 'must be an internal route starting with /'),
   validFrom:  z.string().datetime().optional(),
   validTo:    z.string().datetime().optional(),
+}).refine((value) => Boolean(value.imageId || value.imageUrl), {
+  message: 'imageId or imageUrl is required',
+  path: ['imageId'],
 });
 
 export const GiftPersonaOverrideSchema = z.object({

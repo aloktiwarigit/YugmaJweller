@@ -1,5 +1,3 @@
-'use client';
-
 export interface Tenant {
   id: string;
   slug: string;
@@ -13,10 +11,25 @@ export interface ImpersonationSession { sessionId: string; token: string; expire
 
 // Next only statically replaces NEXT_PUBLIC_* via dot-property access in the client bundle;
 // bracket access stays as runtime `process.env[...]` and reads undefined in the browser.
-const BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3001';
+function adminApiBase(): string {
+  const value = process.env.NEXT_PUBLIC_API_BASE;
+  if (!value) throw new Error('Admin API base is not configured.');
+
+  const normalized = value.replace(/\/$/, '');
+  if (process.env.NODE_ENV === 'production') {
+    if (normalized.includes('localhost')) {
+      throw new Error('Admin API base cannot point to localhost in production.');
+    }
+    if (!normalized.startsWith('https://')) {
+      throw new Error('Admin API base must use https in production.');
+    }
+  }
+
+  return normalized;
+}
 
 async function call<T>(token: string, path: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(`${BASE}${path}`, {
+  const r = await fetch(`${adminApiBase()}${path}`, {
     ...init,
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -25,8 +38,10 @@ async function call<T>(token: string, path: string, init?: RequestInit): Promise
     },
   });
   if (!r.ok) {
-    const bodyText = await r.text().catch(() => '');
-    throw new Error(`admin_api ${path} ${r.status}: ${bodyText}`);
+    const requestId = r.headers.get('x-request-id');
+    throw new Error(
+      `admin_api ${path} failed with ${r.status}${requestId ? ` requestId=${requestId}` : ''}`,
+    );
   }
   if (r.status === 204) return undefined as T;
   return r.json() as Promise<T>;

@@ -12,114 +12,83 @@ interface HeroSectionProps {
   heroBanners: HeroBanner[];
 }
 
+const FALLBACK_HERO = {
+  imageUrl: '/demo-shop/campaign-showroom-display.jpg',
+  headlineHi: 'विवाह से रोज़मर्रा तक — हर पल के लिए',
+  ctaUrl: '/products',
+};
+
 export function HeroSection({ shopName, heroBanners }: HeroSectionProps) {
-  const hasBanners = heroBanners.length > 0;
+  const banners = heroBanners.length > 0 ? heroBanners : [FALLBACK_HERO];
+  const primary = banners[0]!;
+  const supporting = banners.slice(1, 4);
 
   return (
     <section
       aria-labelledby="hero-heading"
-      className="w-full bg-bg"
+      className="relative min-h-[620px] overflow-hidden bg-ink md:min-h-[560px]"
     >
-      {/* Desktop: asymmetric 1.02fr / 0.98fr split */}
-      <div className="hidden md:grid" style={{ gridTemplateColumns: '1.02fr 0.98fr', minHeight: 480 }}>
-        {/* Left: editorial card */}
-        <div className="flex flex-col justify-center gap-6 px-12 py-14 bg-surfaceElevated border-r border-borderSubtle">
-          <p
-            className="font-prose italic text-sm text-inkSoft tracking-widest uppercase"
-            aria-hidden="true"
-          >
+      <Image
+        src={primary.imageUrl}
+        alt={primary.headlineHi}
+        fill
+        className="object-cover"
+        sizes="100vw"
+        priority
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-ink/82 via-ink/42 to-ink/12" />
+      <div className="absolute inset-0 bg-gradient-to-t from-ink/60 via-transparent to-transparent" />
+
+      <div className="relative mx-auto flex min-h-[620px] max-w-6xl flex-col justify-end px-4 py-10 md:min-h-[560px] md:justify-center md:py-16">
+        <div className="max-w-xl">
+          <p className="font-prose text-xs uppercase text-primary tracking-[0.22em]">
             श्रेष्ठ आभूषण
           </p>
-          <h1
-            id="hero-heading"
-            className="font-heading text-5xl text-ink leading-tight"
-          >
+          <h1 id="hero-heading" className="mt-3 font-heading text-4xl leading-tight text-white md:text-6xl">
             {shopName}
           </h1>
-          <p className="font-ui text-lg text-inkMute max-w-xs">
-            विश्वसनीय सेवा, हर अवसर के लिए
+          <p className="mt-4 max-w-md font-ui text-base leading-7 text-white/82 md:text-lg">
+            विवाह, उत्सव, उपहार और दैनिक आभूषण — सावधानी से चुना गया सोना और हीरा।
           </p>
-          <div className="flex flex-wrap gap-3 mt-2">
+          <div className="mt-7 flex flex-wrap gap-3">
             <Link
-              href="/products"
-              className="inline-block bg-primary text-white font-ui font-semibold text-sm px-6 py-3 rounded-md hover:opacity-90 focus-visible:outline-2 focus-visible:outline-primary transition-opacity"
+              href={primary.ctaUrl ?? '/products'}
+              className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-6 font-ui text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-primary"
             >
               संग्रह देखें
             </Link>
             <Link
-              href="/products?style=DAILY_WEAR"
-              className="inline-block border border-borderStrong text-ink font-ui font-semibold text-sm px-6 py-3 rounded-md hover:bg-surfaceRecessed focus-visible:outline-2 focus-visible:outline-primary transition-colors"
+              href="/try-at-home"
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-white/55 bg-white/10 px-6 font-ui text-sm font-semibold text-white backdrop-blur transition-colors hover:bg-white/18 focus-visible:outline-2 focus-visible:outline-primary"
             >
               घर पर ट्राय करें
             </Link>
           </div>
         </div>
 
-        {/* Right: 2×2 image mosaic */}
-        <div className="grid grid-cols-2 grid-rows-2 gap-1 bg-surfaceRecessed">
-          {hasBanners
-            ? heroBanners.slice(0, 4).map((b, i) => (
-                <div key={i} className="relative overflow-hidden">
-                  <Image
-                    src={b.imageUrl}
-                    alt={b.headlineHi}
-                    fill
-                    className="object-cover"
-                    sizes="50vw"
-                    priority={i === 0}
-                  />
+        {supporting.length > 0 ? (
+          <div className="mt-10 grid gap-3 md:absolute md:bottom-8 md:right-4 md:mt-0 md:w-[420px] md:grid-cols-3">
+            {supporting.map((banner) => (
+              <Link
+                key={`${banner.imageUrl}-${banner.headlineHi}`}
+                href={banner.ctaUrl ?? '/products'}
+                className="group relative hidden overflow-hidden rounded-md border border-white/25 bg-white/10 md:block"
+                style={{ aspectRatio: '4/5' }}
+              >
+                <Image
+                  src={banner.imageUrl}
+                  alt={banner.headlineHi}
+                  fill
+                  sizes="140px"
+                  className="object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-3 pt-10">
+                  <p className="line-clamp-2 font-ui text-xs font-semibold text-white">{banner.headlineHi}</p>
                 </div>
-              ))
-            : Array.from({ length: 4 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="bg-primaryWash flex items-center justify-center"
-                  aria-hidden="true"
-                >
-                  <span className="font-heading text-4xl text-primary/30">आ</span>
-                </div>
-              ))}
-        </div>
-      </div>
-
-      {/* Mobile: full-bleed editorial with text overlay */}
-      <div className="md:hidden relative" style={{ aspectRatio: '4/5' }}>
-        {hasBanners ? (
-          <Image
-            src={heroBanners[0]!.imageUrl}
-            alt={heroBanners[0]!.headlineHi}
-            fill
-            className="object-cover"
-            priority
-          />
-        ) : (
-          <div className="absolute inset-0 bg-primaryWash flex items-center justify-center">
-            <span className="font-heading text-7xl text-primary/20">आ</span>
+              </Link>
+            ))}
           </div>
-        )}
-        {/* Cream scrim + text overlay bottom-left */}
-        <div
-          className="absolute inset-x-0 bottom-0 px-6 pb-8 pt-24"
-          style={{ background: 'linear-gradient(to top, rgba(245,237,221,0.95) 0%, transparent 100%)' }}
-        >
-          <h1 id="hero-heading" className="font-heading text-3xl text-ink mb-4">
-            {shopName}
-          </h1>
-          <div className="flex flex-col gap-2">
-            <Link
-              href="/products"
-              className="inline-block bg-primary text-white font-ui font-semibold text-sm px-5 py-3 rounded-md text-center"
-            >
-              उत्पाद देखें
-            </Link>
-            <Link
-              href="/products?style=DAILY_WEAR"
-              className="inline-block border border-borderStrong text-ink font-ui font-semibold text-sm px-5 py-3 rounded-md text-center bg-surface/80"
-            >
-              घर पर ट्राय करें
-            </Link>
-          </div>
-        </div>
+        ) : null}
       </div>
     </section>
   );

@@ -25,5 +25,11 @@ describe('ImageKitTransformUrlBuilder', () => {
       const expected640 = builder.url(key, { width: 640 });
       expect(result).toBe(`${expected320} 320w, ${expected640} 640w`);
     });
+
+    it('keeps local public assets on the app origin', () => {
+      const key = 'public/demo-shop/bangle-red.jpg';
+      expect(builder.cardSrcset(key))
+        .toBe('/demo-shop/bangle-red.jpg 320w, /demo-shop/bangle-red.jpg 640w');
+    });
   });
 });

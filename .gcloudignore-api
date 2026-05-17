@@ -1,0 +1,43 @@
+# gcloudignore — for API Cloud Build uploads.
+# Excludes only the OTHER apps + heavy dev artefacts; keeps apps/api/.
+
+.git/
+.github/
+
+# Other apps not needed for the API build
+apps/shopkeeper/
+apps/customer-mobile/
+apps/customer-web/
+apps/admin-web/
+
+# Build outputs (rebuilt in Docker)
+apps/api/dist/
+apps/api/node_modules/
+packages/*/dist/
+packages/integrations/*/dist/
+node_modules/
+.pnpm-store/
+
+# Dev tooling and local artifacts
+.playwright-mcp/
+.claude/
+.remember/
+.serena/
+docs/
+_bmad-output/
+artifacts/
+tools/
+
+# Test / coverage outputs
+coverage/
+*.tsbuildinfo
+
+# Local env secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# OS
+.DS_Store
+Thumbs.db

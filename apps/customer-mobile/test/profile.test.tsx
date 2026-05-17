@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const mocks = vi.hoisted(() => ({
+  customerSelfDelete: vi.fn(),
+  signOut: vi.fn(),
+}));
 
 // Mock all network calls
 vi.mock('../src/api/endpoints', () => ({
@@ -9,13 +14,13 @@ vi.mock('../src/api/endpoints', () => ({
   getCustomOrders:       vi.fn().mockResolvedValue({ orders: [], total: 0 }),
   getRateLockBookings:   vi.fn().mockResolvedValue({ bookings: [], total: 0 }),
   getTryAtHomeBookings:  vi.fn().mockResolvedValue({ bookings: [], total: 0 }),
-  customerSelfDelete:    vi.fn(),
+  customerSelfDelete:    mocks.customerSelfDelete,
 }));
 
 vi.mock('../src/hooks/useCustomerSession', () => ({
   useCustomerSession: vi.fn(() => ({
     customer: { id: 'c1', name: 'राज', phoneE164: '+919999999999' },
-    signOut: vi.fn(),
+    signOut: mocks.signOut,
   })),
 }));
 
@@ -35,7 +40,11 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 describe('Profile screen', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.customerSelfDelete.mockResolvedValue(undefined);
+    mocks.signOut.mockResolvedValue(undefined);
+  });
 
   it('renders brand header and loyalty card', () => {
     const { getByTestId } = render(<Profile />, { wrapper });
@@ -61,5 +70,33 @@ describe('Profile screen', () => {
     const { getByTestId } = render(<Profile />, { wrapper });
     expect(getByTestId('profile-delete-button')).toBeTruthy();
     expect(getByTestId('profile-signout-button')).toBeTruthy();
+  });
+
+  it('requires confirmation before requesting self-deletion and signs out after success', async () => {
+    const { getByTestId } = render(<Profile />, { wrapper });
+
+    fireEvent.click(getByTestId('profile-delete-button'));
+    expect(mocks.customerSelfDelete).not.toHaveBeenCalled();
+
+    fireEvent.click(getByTestId('profile-delete-button'));
+
+    await waitFor(() => expect(mocks.customerSelfDelete).toHaveBeenCalledOnce());
+    expect(mocks.signOut).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the customer signed in and shows an error when deletion is blocked', async () => {
+    mocks.customerSelfDelete.mockRejectedValueOnce(Object.assign(new Error('blocked'), {
+      code: 'crm.deletion.open_invoices',
+      status: 422,
+    }));
+    const { container, getByTestId } = render(<Profile />, { wrapper });
+
+    fireEvent.click(getByTestId('profile-delete-button'));
+    fireEvent.click(getByTestId('profile-delete-button'));
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('खुले बिल होने के कारण');
+    });
+    expect(mocks.signOut).not.toHaveBeenCalled();
   });
 });

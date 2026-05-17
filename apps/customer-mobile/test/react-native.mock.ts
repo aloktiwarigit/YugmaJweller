@@ -27,6 +27,39 @@ const PressableMock = React.forwardRef<unknown, AnyProps>(
   },
 );
 
+const FlatListMock = React.forwardRef<unknown, AnyProps>(
+  ({ testID, data, renderItem, keyExtractor, ListFooterComponent, ...rest }, ref) => {
+    const extraProps: AnyProps = {};
+    if (testID !== undefined) extraProps['data-testid'] = testID;
+    const items = Array.isArray(data) ? data : [];
+    const children: React.ReactNode[] = items.map((item, index) => {
+      const key = typeof keyExtractor === 'function'
+        ? (keyExtractor as (value: unknown, i: number) => React.Key)(item, index)
+        : String(index);
+      return React.createElement(
+        React.Fragment,
+        { key },
+        typeof renderItem === 'function'
+          ? (renderItem as (info: { item: unknown; index: number }) => React.ReactNode)({ item, index })
+          : null,
+      );
+    });
+    if (ListFooterComponent) {
+      children.push(
+        React.createElement(
+          React.Fragment,
+          { key: 'footer' },
+          typeof ListFooterComponent === 'function'
+            ? React.createElement(ListFooterComponent as React.ComponentType)
+            : ListFooterComponent as React.ReactNode,
+        ),
+      );
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock shim @why
+    return React.createElement('flat-list', { ...(rest as any), ...extraProps, ref }, children);
+  },
+);
+
 const TextInputMock = React.forwardRef<unknown, AnyProps>(
   ({ testID, onChangeText, ...rest }, ref) => {
     const extraProps: AnyProps = {};
@@ -75,6 +108,8 @@ export const Platform: { OS: 'ios' | 'android' | 'web'; select: <T>(opts: { ios?
 export const View = passthrough('view');
 export const Text = passthrough('text');
 export const Pressable = PressableMock;
+export const TouchableOpacity = PressableMock;
+export const FlatList = FlatListMock;
 export const TextInput = TextInputMock;
 export const Modal = ModalMock;
 export const ScrollView = passthrough('scroll-view');
@@ -82,6 +117,8 @@ export const ActivityIndicator = passthrough('activity-indicator');
 export const Image = ImageMock;
 export const StyleSheet = {
   create: <T>(s: T): T => s,
+  absoluteFill: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  absoluteFillObject: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   flatten: (s: unknown): Record<string, unknown> =>
     Array.isArray(s)
       ? (Object.assign({}, ...s) as Record<string, unknown>)

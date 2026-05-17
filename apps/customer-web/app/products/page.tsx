@@ -131,6 +131,10 @@ export default async function ProductsPage({ searchParams }: PageProps) {
         {purity      && <input type="hidden" name="purity"      value={purity} />}
         {sort        && <input type="hidden" name="sort"        value={sort} />}
         {inStockOnly && <input type="hidden" name="inStockOnly" value="true" />}
+        {priceMin !== undefined && <input type="hidden" name="priceMin" value={String(priceMin)} />}
+        {priceMax !== undefined && <input type="hidden" name="priceMax" value={String(priceMax)} />}
+        {style       && <input type="hidden" name="style"       value={style} />}
+        {occasion    && <input type="hidden" name="occasion"    value={occasion} />}
         <label htmlFor="product-search" className="sr-only">उत्पाद खोज</label>
         <input
           id="product-search" type="search" name="search" defaultValue={search}

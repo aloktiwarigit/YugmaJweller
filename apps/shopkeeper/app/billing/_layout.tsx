@@ -10,8 +10,8 @@ export default function BillingLayout(): React.ReactElement {
         headerTitleStyle: { fontFamily: 'NotoSansDevanagari', fontSize: 18 },
       }}
     >
-      <Stack.Screen name="new" options={{ title: 'नया Invoice' }} />
-      <Stack.Screen name="[id]" options={{ title: 'Invoice' }} />
+      <Stack.Screen name="new" options={{ title: 'नया बिल' }} />
+      <Stack.Screen name="[id]" options={{ title: 'बिल' }} />
       <Stack.Screen name="scan" options={{ title: 'बारकोड स्कैन' }} />
       <Stack.Screen name="urd-exchange" options={{ title: 'पुराना सोना खरीद' }} />
       <Stack.Screen name="estimate/index" options={{ title: 'अनुमान' }} />

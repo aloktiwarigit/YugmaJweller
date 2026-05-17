@@ -1,0 +1,73 @@
+# Cloud Build template for Goldsmith customer-web (Next.js SSR -> Cloud Run image).
+#
+# This file builds and pushes an immutable image. It does not deploy the image
+# and does not prove that production is live. Production release records must
+# capture the deployed image digest/tag, Git SHA, migration version, and operator.
+#
+# Local/prod submit shape:
+#   gcloud builds submit --config cloudbuild-customer-web.yaml --project "$GCP_PROJECT" \
+#     --substitutions="_SHOP_SLUG=$SHOP_SLUG,_API_URL=$API_URL,_API_BASE=$API_URL,_SITE_URL=$SITE_URL,_FIREBASE_API_KEY=$FIREBASE_API_KEY,_FIREBASE_AUTH_DOMAIN=$FIREBASE_AUTH_DOMAIN,_FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID,_FIREBASE_APP_ID=$FIREBASE_APP_ID" .
+#
+# After the build succeeds, deploy the $BUILD_ID-tagged image via the selected
+# Cloud Run/App Hosting release path. NEXT_PUBLIC_* values are baked into the
+# client bundle, so do not re-tag an image across tenants or Firebase projects.
+
+substitutions:
+  _SHOP_SLUG: REPLACE_WITH_TENANT_SLUG
+  _API_URL: REPLACE_WITH_HTTPS_API_URL
+  _API_BASE: REPLACE_WITH_HTTPS_API_BASE
+  _SITE_URL: REPLACE_WITH_HTTPS_SITE_URL
+  _FIREBASE_API_KEY: REPLACE_WITH_FIREBASE_WEB_API_KEY
+  _FIREBASE_AUTH_DOMAIN: REPLACE_WITH_FIREBASE_AUTH_DOMAIN
+  _FIREBASE_PROJECT_ID: REPLACE_WITH_FIREBASE_PROJECT_ID
+  _FIREBASE_APP_ID: REPLACE_WITH_FIREBASE_WEB_APP_ID
+
+steps:
+  - name: gcr.io/cloud-builders/gcloud
+    id: validate-customer-web-release-env
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        case "${_SHOP_SLUG}" in ""|REPLACE_WITH_*) echo "_SHOP_SLUG must be supplied for a customer-web release build" >&2; exit 1;; esac
+        case "${_API_URL}" in ""|REPLACE_WITH_*) echo "_API_URL must be supplied for a customer-web release build" >&2; exit 1;; esac
+        case "${_API_BASE}" in ""|REPLACE_WITH_*) echo "_API_BASE must be supplied for a customer-web release build" >&2; exit 1;; esac
+        case "${_SITE_URL}" in ""|REPLACE_WITH_*) echo "_SITE_URL must be supplied for a customer-web release build" >&2; exit 1;; esac
+        case "${_FIREBASE_API_KEY}" in ""|REPLACE_WITH_*) echo "_FIREBASE_API_KEY must be supplied for a customer-web release build" >&2; exit 1;; esac
+        case "${_FIREBASE_AUTH_DOMAIN}" in ""|REPLACE_WITH_*) echo "_FIREBASE_AUTH_DOMAIN must be supplied for a customer-web release build" >&2; exit 1;; esac
+        case "${_FIREBASE_PROJECT_ID}" in ""|REPLACE_WITH_*) echo "_FIREBASE_PROJECT_ID must be supplied for a customer-web release build" >&2; exit 1;; esac
+        case "${_FIREBASE_APP_ID}" in ""|REPLACE_WITH_*) echo "_FIREBASE_APP_ID must be supplied for a customer-web release build" >&2; exit 1;; esac
+
+        [[ "${_SHOP_SLUG}" =~ ^[a-z0-9-]+$ ]] || { echo "_SHOP_SLUG must be lowercase kebab-case" >&2; exit 1; }
+        [[ "${_API_URL}" == https://* ]] || { echo "_API_URL must be HTTPS" >&2; exit 1; }
+        [[ "${_API_BASE}" == https://* ]] || { echo "_API_BASE must be HTTPS" >&2; exit 1; }
+        [[ "${_SITE_URL}" == https://* ]] || { echo "_SITE_URL must be HTTPS" >&2; exit 1; }
+
+  - name: gcr.io/cloud-builders/docker
+    id: build-customer-web
+    env:
+      - DOCKER_BUILDKIT=1
+    args:
+      - build
+      - --file=apps/customer-web/Dockerfile
+      - --tag=asia-east1-docker.pkg.dev/$PROJECT_ID/goldsmith-customer-web/web:$BUILD_ID
+      - --tag=asia-east1-docker.pkg.dev/$PROJECT_ID/goldsmith-customer-web/web:latest
+      - --cache-from=asia-east1-docker.pkg.dev/$PROJECT_ID/goldsmith-customer-web/web:latest
+      - --build-arg=NEXT_PUBLIC_SHOP_SLUG=${_SHOP_SLUG}
+      - --build-arg=NEXT_PUBLIC_API_BASE=${_API_BASE}
+      - --build-arg=NEXT_PUBLIC_SITE_URL=${_SITE_URL}
+      - --build-arg=API_URL=${_API_URL}
+      - --build-arg=NEXT_PUBLIC_FIREBASE_API_KEY=${_FIREBASE_API_KEY}
+      - --build-arg=NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${_FIREBASE_AUTH_DOMAIN}
+      - --build-arg=NEXT_PUBLIC_FIREBASE_PROJECT_ID=${_FIREBASE_PROJECT_ID}
+      - --build-arg=NEXT_PUBLIC_FIREBASE_APP_ID=${_FIREBASE_APP_ID}
+      - .
+
+images:
+  - asia-east1-docker.pkg.dev/$PROJECT_ID/goldsmith-customer-web/web:$BUILD_ID
+  - asia-east1-docker.pkg.dev/$PROJECT_ID/goldsmith-customer-web/web:latest
+
+options:
+  machineType: E2_HIGHCPU_8
+  diskSizeGb: 50
+  logging: CLOUD_LOGGING_ONLY

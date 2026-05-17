@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 type FirebaseUser = {
   uid: string;
   phoneNumber: string | null;
@@ -14,9 +16,15 @@ export const __setCurrentUser = (u: FirebaseUser | null): void => {
   if (listener) listener(u);
 };
 
+export const __signOut = vi.fn(async (): Promise<void> => {
+  currentUser = null;
+  if (listener) listener(null);
+});
+
 const auth = (): {
   currentUser: FirebaseUser | null;
   onAuthStateChanged: (cb: AuthStateCallback) => () => void;
+  signOut: () => Promise<void>;
 } => ({
   get currentUser() {
     return currentUser;
@@ -24,11 +32,15 @@ const auth = (): {
   onAuthStateChanged(cb: AuthStateCallback): () => void {
     listener = cb;
     // emit current user asynchronously on subscribe (matches Firebase SDK behaviour)
-    queueMicrotask(() => cb(currentUser));
+    const initialUser = currentUser;
+    queueMicrotask(() => {
+      if (listener === cb && currentUser === initialUser) cb(initialUser);
+    });
     return (): void => {
       listener = null;
     };
   },
+  signOut: __signOut,
 });
 
 export default auth;

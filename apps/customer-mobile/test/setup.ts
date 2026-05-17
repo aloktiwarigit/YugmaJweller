@@ -1,4 +1,20 @@
 import { vi } from 'vitest';
+import React from 'react';
+
+vi.mock('expo-image', () => ({
+  Image: ({ source, accessibilityLabel, ...rest }: {
+    source?: { uri?: string } | string;
+    accessibilityLabel?: string;
+  }) => {
+    const src = typeof source === 'string' ? source : source?.uri;
+    return React.createElement('img', { ...rest, src, alt: accessibilityLabel });
+  },
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  SafeAreaProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}));
 
 // Mock expo-constants — every test gets the dev defaults.
 vi.mock('expo-constants', () => ({
@@ -24,21 +40,34 @@ vi.mock('expo-secure-store', () => {
     deleteItemAsync: vi.fn(async (k: string) => {
       store.delete(k);
     }),
+    WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
     __reset: (): void => store.clear(),
   };
 });
 
-// Mock @react-native-firebase/auth — we don't call Firebase in scaffold tests.
+// Mock @react-native-firebase/auth.
+// onAuthStateChanged immediately fires with null (no user) so the production
+// auth path exercises the not-signed-in branch during unit tests.
 vi.mock('@react-native-firebase/auth', () => ({
   default: () => ({
     signInWithPhoneNumber: vi.fn(),
-    onAuthStateChanged: vi.fn(() => () => undefined),
+    signOut: vi.fn().mockResolvedValue(undefined),
+    onAuthStateChanged: vi.fn((cb: (user: null) => void) => {
+      cb(null);
+      return (): void => undefined;
+    }),
+    onIdTokenChanged: vi.fn((cb: (user: null) => void) => {
+      cb(null);
+      return (): void => undefined;
+    }),
   }),
 }));
 
 // Mock expo-router — LoyaltyPointsCard uses useRouter for navigation.
 vi.mock('expo-router', () => ({
+  router:    { push: vi.fn(), replace: vi.fn(), back: vi.fn() },
   useRouter: vi.fn(() => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() })),
+  useLocalSearchParams: vi.fn(() => ({})),
   Redirect:  vi.fn(() => null),
   Tabs:      { Screen: vi.fn(() => null) },
 }));

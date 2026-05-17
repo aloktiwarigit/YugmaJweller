@@ -15,9 +15,13 @@ async function bootstrap(): Promise<void> {
   // platform admin UI in customer-web /admin runs in the browser and DOES need it.
   // Tenant routes are server-rendered (mobile apps and SSR), so the allowlist is small.
   // Set ADMIN_WEB_ORIGIN to a comma-separated list in production (e.g. "https://admin.goldsmith.example").
-  const adminOriginsRaw =
-    process.env['ADMIN_WEB_ORIGIN'] ??
-    'http://localhost:3000,http://localhost:4173,http://127.0.0.1:4173';
+  const defaultAdminOrigins = process.env['NODE_ENV'] === 'production'
+    ? ''   // fail-closed in production: no CORS if env var is missing
+    : 'http://localhost:3000,http://localhost:4173,http://127.0.0.1:4173';
+  const adminOriginsRaw = process.env['ADMIN_WEB_ORIGIN'] ?? defaultAdminOrigins;
+  if (process.env['NODE_ENV'] === 'production' && !adminOriginsRaw) {
+    throw new Error('ADMIN_WEB_ORIGIN must be set in production');
+  }
   const adminOrigins = adminOriginsRaw.split(',').map((s) => s.trim()).filter(Boolean);
   app.enableCors({
     origin: adminOrigins,

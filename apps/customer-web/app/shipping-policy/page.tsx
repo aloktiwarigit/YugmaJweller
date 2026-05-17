@@ -1,13 +1,14 @@
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
+import { resolveShopSlug } from '@/lib/tenant-slug';
 import { fetchTenantConfig } from '@/lib/api';
 import { tenantShippingPolicy } from '@/lib/storefront';
 
-const SHOP_SLUG = process.env.NEXT_PUBLIC_SHOP_SLUG ?? null;
-
 export default async function ShippingPolicyPage() {
-  if (!SHOP_SLUG) notFound();
+  const slug = resolveShopSlug(headers());
+  if (!slug) notFound();
 
-  const config = await fetchTenantConfig(SHOP_SLUG);
+  const config = await fetchTenantConfig(slug);
   if (!config) notFound();
 
   const policyText = tenantShippingPolicy(config);

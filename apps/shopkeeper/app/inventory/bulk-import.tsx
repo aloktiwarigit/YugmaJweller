@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ScrollView,
   View,
@@ -9,6 +9,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Linking from 'expo-linking';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { SettingsGroupCard } from '@goldsmith/ui-mobile';
 import { colors, spacing } from '@goldsmith/ui-tokens';
@@ -46,7 +47,7 @@ export default function BulkImportScreen(): React.ReactElement {
   const [jobId, setJobId] = useState<string | null>(null);
   const mountedRef = useRef(true);
 
-  React.useEffect(() => {
+  useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
@@ -65,7 +66,7 @@ export default function BulkImportScreen(): React.ReactElement {
     },
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!mountedRef.current) return;
     if (jobStatus?.status === 'completed' || jobStatus?.status === 'failed') {
       setStep('done');
@@ -73,10 +74,20 @@ export default function BulkImportScreen(): React.ReactElement {
   }, [jobStatus?.status]);
 
   function downloadTemplate(): void {
-    Alert.alert(
-      t('inventory.bulk_import_btn_download_template'),
-      `Columns:\n${CSV_TEMPLATE_HEADERS}`,
-    );
+    const csv = `${CSV_TEMPLATE_HEADERS}\n`;
+    void Linking.openURL(`data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`)
+      .catch(() => {
+        Alert.alert(
+          t('inventory.bulk_import_btn_download_template'),
+          `Columns:\n${CSV_TEMPLATE_HEADERS}`,
+        );
+      });
+  }
+
+  function openErrorFile(url: string): void {
+    void Linking.openURL(url).catch(() => {
+      Alert.alert(t('inventory.bulk_import_btn_download_errors'), url);
+    });
   }
 
   async function pickFile(): Promise<void> {
@@ -213,10 +224,7 @@ export default function BulkImportScreen(): React.ReactElement {
             {jobStatus.errorFileUrl ? (
               <Pressable
                 style={[styles.outlineBtn, styles.outlineBtnError]}
-                onPress={() => Alert.alert(
-                  t('inventory.bulk_import_btn_download_errors'),
-                  jobStatus.errorFileUrl ?? '',
-                )}
+                onPress={() => openErrorFile(jobStatus.errorFileUrl!)}
                 accessibilityRole="button"
                 accessibilityLabel={t('inventory.bulk_import_btn_download_errors')}
               >

@@ -7,7 +7,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { colors } from '@goldsmith/ui-tokens';
+import { colors, typography } from '@goldsmith/ui-tokens';
 import { TenantBrandHeader } from '../../src/components/TenantBrandHeader';
 
 type Category = 'rings' | 'bangles' | 'chains';
@@ -136,9 +136,9 @@ const styles = StyleSheet.create({
   root:       { flex: 1, backgroundColor: colors.bg },
   scroll:     { padding: 16, paddingBottom: 40 },
   backBtn:    { marginBottom: 16 },
-  backText:   { fontSize: 14, color: colors.primary },
-  title:      { fontSize: 24, color: colors.ink, fontWeight: '700', marginBottom: 16 },
-  intro:      { fontSize: 13, color: colors.inkMute, marginBottom: 10 },
+  backText:   { fontFamily: typography.body.family, fontSize: 14, color: colors.primary },
+  title:      { fontFamily: typography.serif.family, fontSize: 24, color: colors.ink, fontWeight: '700', marginBottom: 16 },
+  intro:      { fontFamily: typography.body.family, fontSize: 13, color: colors.inkMute, marginBottom: 10 },
   tabs:       { flexDirection: 'row', gap: 8, marginBottom: 16 },
   tab:        {
     flex: 1, paddingVertical: 10, borderRadius: 8,
@@ -147,11 +147,11 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   tabActive:      { borderColor: colors.primary, backgroundColor: colors.primary },
-  tabText:        { fontSize: 14, color: colors.ink },
-  tabTextActive:  { color: '#fff', fontWeight: '600' },
+  tabText:        { fontFamily: typography.body.family, fontSize: 14, color: colors.ink },
+  tabTextActive:  { fontFamily: typography.headingMid.family, color: '#fff', fontWeight: '600' },
   tableHeader:    { flexDirection: 'row', backgroundColor: colors.border, paddingVertical: 6 },
   row:            { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 6 },
-  cell:           { flex: 1, fontSize: 13, color: colors.ink, paddingHorizontal: 6 },
-  headerCell:     { fontWeight: '700', color: colors.ink },
-  boldCell:       { fontWeight: '600' },
+  cell:           { fontFamily: typography.body.family, flex: 1, fontSize: 13, color: colors.ink, paddingHorizontal: 6 },
+  headerCell:     { fontFamily: typography.headingMid.family, fontWeight: '700', color: colors.ink },
+  boldCell:       { fontFamily: typography.headingMid.family, fontWeight: '600' },
 });

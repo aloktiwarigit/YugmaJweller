@@ -162,6 +162,59 @@ jobs:
         # turbo cascades ^build so @goldsmith/shared, @goldsmith/i18n etc. are compiled first.
         run: pnpm exec turbo run typecheck --filter=@goldsmith/shopkeeper
 
+  build-customer-mobile:
+    # Lightweight production-readiness gate for the customer EAS profile.
+    # This does not create a store build; it verifies that APP_ENV=production
+    # resolves to non-dev identifiers, HTTPS API config, and non-dev Firebase
+    # app config file paths before EAS is allowed to build.
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: "${{ env.PNPM_VERSION }}" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: "pnpm" }
+      - run: pnpm install --frozen-lockfile
+      - name: Validate customer-mobile production Expo config
+        working-directory: apps/customer-mobile
+        run: |
+          pnpm --silent exec expo config --type public --json > /tmp/customer-mobile-expo-config.json
+          node <<'NODE'
+          const fs = require('fs');
+          const config = JSON.parse(fs.readFileSync('/tmp/customer-mobile-expo-config.json', 'utf8'));
+          const errors = [];
+          const androidPackage = config.android?.package ?? '';
+          const iosBundleId = config.ios?.bundleIdentifier ?? '';
+          const apiBaseUrl = config.extra?.apiBaseUrl ?? '';
+          const androidGoogleServices = config.android?.googleServicesFile ?? '';
+          const iosGoogleServices = config.ios?.googleServicesFile ?? '';
+
+          if (!androidPackage || androidPackage.endsWith('.dev')) errors.push('android.package must be production and not end with .dev');
+          if (!iosBundleId || iosBundleId.endsWith('.dev')) errors.push('ios.bundleIdentifier must be production and not end with .dev');
+          if (!apiBaseUrl.startsWith('https://')) errors.push('extra.apiBaseUrl must be an HTTPS URL');
+          if (!config.extra?.tenantSlug) errors.push('extra.tenantSlug is required');
+          if (!config.extra?.firebaseProjectId) errors.push('extra.firebaseProjectId is required');
+          if (config.extra?.devAuth) errors.push('extra.devAuth must be false in production');
+          if (!androidGoogleServices || androidGoogleServices.includes('.dev')) errors.push('android.googleServicesFile must come from a production EAS secret path');
+          if (!iosGoogleServices || iosGoogleServices.includes('.dev')) errors.push('ios.googleServicesFile must come from a production EAS secret path');
+
+          if (errors.length > 0) {
+            console.error(errors.map((error) => `- ${error}`).join('\n'));
+            process.exit(1);
+          }
+          NODE
+        env:
+          APP_ENV: production
+          EXPO_PUBLIC_API_BASE_URL: https://example.com
+          EXPO_PUBLIC_SHOP_SLUG: ci-customer
+          EXPO_PUBLIC_ANDROID_PACKAGE: com.goldsmith.customer.ci
+          EXPO_PUBLIC_IOS_BUNDLE_ID: com.goldsmith.customer.ci
+          EXPO_PUBLIC_FIREBASE_PROJECT_ID: goldsmith-ci
+          EXPO_PUBLIC_EAS_PROJECT_ID: 00000000-0000-0000-0000-000000000000
+          GOOGLE_SERVICES_JSON: ./google-services.ci.json
+          GOOGLE_SERVICES_PLIST: ./GoogleService-Info.ci.plist
+
   a11y-shopkeeper:
     needs: install
     runs-on: ubuntu-latest
@@ -223,13 +276,27 @@ jobs:
       - name: Build customer-web
         run: pnpm exec turbo run build --filter=@goldsmith/customer-web
         env:
-          # CI slug — API will 404, pages render graceful fallback state
+          # CI validates production env shape; API calls 404 against example.com.
+          API_URL: https://example.com
+          NEXT_PUBLIC_API_BASE: https://example.com
+          NEXT_PUBLIC_SITE_URL: https://customer-web.ci.goldsmith.example
           NEXT_PUBLIC_SHOP_SLUG: ci-lighthouse-test
+          NEXT_PUBLIC_FIREBASE_API_KEY: ci-public-firebase-api-key
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: goldsmith-ci.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: goldsmith-ci
+          NEXT_PUBLIC_FIREBASE_APP_ID: "1:000000000000:web:0000000000000000000000"
       - name: Run Lighthouse CI (performance + axe-core a11y)
         working-directory: apps/customer-web
         run: pnpm lhci autorun
         env:
+          API_URL: https://example.com
+          NEXT_PUBLIC_API_BASE: https://example.com
+          NEXT_PUBLIC_SITE_URL: https://customer-web.ci.goldsmith.example
           NEXT_PUBLIC_SHOP_SLUG: ci-lighthouse-test
+          NEXT_PUBLIC_FIREBASE_API_KEY: ci-public-firebase-api-key
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: goldsmith-ci.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: goldsmith-ci
+          NEXT_PUBLIC_FIREBASE_APP_ID: "1:000000000000:web:0000000000000000000000"
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
 
   docs-validate:
@@ -250,7 +317,7 @@ jobs:
         run: pnpm docs:validate
 
   build:
-    needs: [typecheck, lint, unit, integration, tenant-isolation, semgrep, build-shopkeeper, a11y-shopkeeper, e2e-shopkeeper, lighthouse-ci]
+    needs: [typecheck, lint, unit, integration, tenant-isolation, semgrep, build-shopkeeper, build-customer-mobile, a11y-shopkeeper, e2e-shopkeeper, lighthouse-ci]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -260,3 +327,12 @@ jobs:
         with: { node-version: "${{ env.NODE_VERSION }}", cache: "pnpm" }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+        env:
+          API_URL: https://example.com
+          NEXT_PUBLIC_API_BASE: https://example.com
+          NEXT_PUBLIC_SITE_URL: https://customer-web.ci.goldsmith.example
+          NEXT_PUBLIC_SHOP_SLUG: ci-lighthouse-test
+          NEXT_PUBLIC_FIREBASE_API_KEY: ci-public-firebase-api-key
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: goldsmith-ci.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: goldsmith-ci
+          NEXT_PUBLIC_FIREBASE_APP_ID: "1:000000000000:web:0000000000000000000000"

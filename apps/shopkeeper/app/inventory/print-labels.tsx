@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import * as Print from 'expo-print';
 import axios from 'axios';
-import { BarcodeLabel } from '@goldsmith/ui-mobile';
-import { encodeCode128B } from '@goldsmith/ui-mobile';
-import type { BarcodeData } from '@goldsmith/shared';
+import { useQuery } from '@tanstack/react-query';
+import { BarcodeLabel, encodeCode128B } from '@goldsmith/ui-mobile';
+import type { BarcodeData, ProductResponse } from '@goldsmith/shared';
 import { api } from '../../src/api/client';
 
 function barcodeSvg(value: string, height: number): string {
@@ -81,13 +81,29 @@ function buildPrintHtml(items: BarcodeData[]): string {
 
 export default function PrintLabelsScreen(): React.JSX.Element {
   const params = useLocalSearchParams<{ productIds?: string }>();
-  const productIds = params.productIds ? (params.productIds as string).split(',') : [];
+  const productIdsParam = typeof params.productIds === 'string' ? params.productIds : '';
+  const productIds = useMemo(
+    () => productIdsParam.split(',').map((id) => id.trim()).filter(Boolean),
+    [productIdsParam],
+  );
 
   const [barcodes, setBarcodes] = useState<BarcodeData[]>([]);
   const [failedIds, setFailedIds] = useState<string[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [printing, setPrinting] = useState(false);
   const mountedRef = useRef(true);
+
+  const { data: products = [], isLoading: productsLoading } = useQuery<ProductResponse[]>({
+    queryKey: ['print-label-products'],
+    queryFn: async () => {
+      const res = await api.get<ProductResponse[]>('/api/v1/inventory/products', {
+        params: { status: 'IN_STOCK', pageSize: 100 },
+      });
+      return res.data;
+    },
+    enabled: productIds.length === 0,
+  });
 
   useEffect(() => {
     mountedRef.current = true;
@@ -96,17 +112,18 @@ export default function PrintLabelsScreen(): React.JSX.Element {
     };
   }, []);
 
-  useEffect(() => {
-    if (productIds.length === 0) {
+  const loadBarcodes = useCallback(async (ids: string[]): Promise<void> => {
+    if (ids.length === 0) {
       setLoading(false);
       return;
     }
-
-    void (async () => {
+    setLoading(true);
+    setFailedIds([]);
+    setBarcodes([]);
       try {
         const response = await api.post<BarcodeData[]>(
           '/api/v1/inventory/products/barcodes',
-          { productIds },
+          { productIds: ids },
         );
         if (!mountedRef.current) return;
         setBarcodes(response.data);
@@ -119,7 +136,7 @@ export default function PrintLabelsScreen(): React.JSX.Element {
         ) {
           const failedId = err.response.data.productId as string;
           setFailedIds([failedId]);
-          const retryIds = productIds.filter((id) => id !== failedId);
+          const retryIds = ids.filter((id) => id !== failedId);
           if (retryIds.length > 0) {
             try {
               const retryResp = await api.post<BarcodeData[]>(
@@ -133,13 +150,27 @@ export default function PrintLabelsScreen(): React.JSX.Element {
             }
           }
         } else {
-          setFailedIds(productIds);
+          setFailedIds(ids);
         }
       } finally {
         if (mountedRef.current) setLoading(false);
       }
-    })();
   }, []);
+
+  useEffect(() => {
+    if (productIds.length === 0) {
+      setLoading(false);
+      return;
+    }
+
+    void loadBarcodes(productIds);
+  }, [loadBarcodes, productIds]);
+
+  const toggleProduct = (id: string): void => {
+    setSelectedProductIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    );
+  };
 
   const handlePrint = async (): Promise<void> => {
     if (barcodes.length === 0) return;
@@ -172,9 +203,53 @@ export default function PrintLabelsScreen(): React.JSX.Element {
       )}
 
       {barcodes.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyText}>कोई लेबल उपलब्ध नहीं है।</Text>
-        </View>
+        productIds.length === 0 ? (
+          <ScrollView contentContainerStyle={styles.selectorContent}>
+            <Text style={styles.readyText}>Select products for label printing</Text>
+            {productsLoading ? (
+              <ActivityIndicator size="small" color="#8B5E3C" />
+            ) : products.length === 0 ? (
+              <Text style={styles.emptyText}>No in-stock products available.</Text>
+            ) : (
+              products.map((product) => {
+                const selected = selectedProductIds.includes(product.id);
+                return (
+                  <Pressable
+                    key={product.id}
+                    style={[styles.productRow, selected && styles.productRowSelected]}
+                    onPress={() => toggleProduct(product.id)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`Select ${product.sku}`}
+                  >
+                    <View style={styles.productInfo}>
+                      <Text style={styles.productSku}>{product.sku}</Text>
+                      <Text style={styles.productMeta}>
+                        {product.metal} {product.purity} - {product.netWeightG}g
+                      </Text>
+                    </View>
+                    <Text style={styles.productSelectText}>{selected ? 'Selected' : 'Select'}</Text>
+                  </Pressable>
+                );
+              })
+            )}
+            <Pressable
+              style={[styles.printButton, selectedProductIds.length === 0 && styles.printButtonDisabled]}
+              onPress={() => void loadBarcodes(selectedProductIds)}
+              disabled={selectedProductIds.length === 0}
+              accessibilityRole="button"
+              accessibilityLabel="Generate labels"
+            >
+              <Text style={styles.printButtonText}>
+                Generate {selectedProductIds.length} labels
+              </Text>
+            </Pressable>
+          </ScrollView>
+        ) : (
+          <View style={styles.center}>
+            <Text style={styles.emptyText}>कोई लेबल उपलब्ध नहीं है।</Text>
+          </View>
+        )
       ) : (
         <>
           <Text style={styles.readyText}>प्रिंट के लिए तैयार — {barcodes.length} लेबल</Text>
@@ -233,6 +308,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     padding: 8,
+  },
+  selectorContent: {
+    padding: 12,
+    paddingBottom: 32,
+  },
+  productRow: {
+    minHeight: 56,
+    borderWidth: 1,
+    borderColor: '#D9C9A8',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  productRowSelected: {
+    borderColor: '#8B5E3C',
+    backgroundColor: '#FFFBF2',
+  },
+  productInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  productSku: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E2440',
+  },
+  productMeta: {
+    fontSize: 13,
+    color: '#4A526E',
+    marginTop: 2,
+  },
+  productSelectText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#8B5E3C',
   },
   errorBanner: {
     backgroundColor: '#FFF3CD',

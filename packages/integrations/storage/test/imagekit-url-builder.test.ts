@@ -38,6 +38,14 @@ describe('ImageKitTransformUrlBuilder', () => {
     expect(url).toContain('https://ik.imagekit.io/goldsmith-test/');
   });
 
+  it('passes through local public demo assets without ImageKit transforms', () => {
+    const b = new ImageKitTransformUrlBuilder();
+    expect(b.url('public/demo-shop/ring-wedding.jpg', { width: 640 }))
+      .toBe('/demo-shop/ring-wedding.jpg');
+    expect(b.srcset('public/demo-shop/ring-wedding.jpg'))
+      .toBe('/demo-shop/ring-wedding.jpg 320w, /demo-shop/ring-wedding.jpg 640w, /demo-shop/ring-wedding.jpg 1024w, /demo-shop/ring-wedding.jpg 1920w');
+  });
+
   it('srcset emits 4 candidates with correct width descriptors', () => {
     const b = new ImageKitTransformUrlBuilder();
     const set = b.srcset('k.jpg');

@@ -74,7 +74,6 @@ function StatusBadge({ status }: { status: StaffUser['status'] }): React.ReactEl
 
 export default function StaffScreen(): React.ReactElement {
   const user = useAuthStore((s) => s.user);
-  const shopId = user?.shopId ?? '';
   const isAdmin = user?.role === 'shop_admin';
 
   // Tab state
@@ -106,7 +105,7 @@ export default function StaffScreen(): React.ReactElement {
     setListLoading(true);
     setListError(null);
     try {
-      const res = await api.get<StaffUser[]>('/auth/users');
+      const res = await api.get<StaffUser[]>('/api/v1/auth/users');
       setStaff((res.data ?? []).filter((m) => m.status !== 'REVOKED'));
     } catch {
       setListError('स्टाफ लोड नहीं हो सका। दोबारा कोशिश करें।');
@@ -127,7 +126,7 @@ export default function StaffScreen(): React.ReactElement {
     if (!isAdmin) return;
     setPermsLoading(true);
     api
-      .get<Record<string, boolean>>('/auth/roles/shop_manager/permissions')
+      .get<Record<string, boolean>>('/api/v1/auth/roles/shop_manager/permissions')
       .then((res) => {
         setPermissions(res.data ?? {});
       })
@@ -151,7 +150,7 @@ export default function StaffScreen(): React.ReactElement {
     setInviteLoading(true);
     setInviteError(null);
     try {
-      await api.post('/auth/invite', { ...data, shop_id: shopId });
+      await api.post('/api/v1/auth/invite', data);
       setSuccessMsg('आमंत्रण भेज दिया गया');
       setTimeout(() => setSuccessMsg(null), 3000);
       // Invalidate staff list
@@ -180,7 +179,7 @@ export default function StaffScreen(): React.ReactElement {
     setPermissions(updated);
     // UpdatePermissionSchema expects { permission_key, is_enabled } — one call per toggle.
     api
-      .put('/auth/roles/shop_manager/permissions', { permission_key: key, is_enabled: value })
+      .put('/api/v1/auth/roles/shop_manager/permissions', { permission_key: key, is_enabled: value })
       .catch(() => {
         // Rollback optimistic update on error
         setPermissions(previous);
@@ -206,7 +205,7 @@ export default function StaffScreen(): React.ReactElement {
     setRevokeTarget(null);
 
     try {
-      await api.delete(`/auth/staff/${target.id}`);
+      await api.delete(`/api/v1/auth/staff/${target.id}`);
       setSuccessMsg('हटा दिया गया');
       setTimeout(() => setSuccessMsg(null), 3000);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);

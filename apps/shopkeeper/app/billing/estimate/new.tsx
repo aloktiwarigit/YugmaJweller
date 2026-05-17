@@ -13,6 +13,10 @@ import { useMutation } from '@tanstack/react-query';
 import { BillingLineBuilder } from '@goldsmith/ui-mobile';
 import type { BillingLineValue, BillingLineProduct } from '@goldsmith/ui-mobile';
 import { api } from '../../../src/api/client';
+import {
+  BillingProductPicker,
+  type BillingProductDraft,
+} from '../../../src/features/billing/components/BillingProductPicker';
 
 export interface EstimateResponse {
   id: string;
@@ -50,6 +54,31 @@ interface CreateEstimateBody {
   customerId?: string;
 }
 
+type EstimateAmounts = Pick<
+  DraftLine,
+  'goldValuePaise' | 'makingChargePaise' | 'gstMetalPaise' | 'gstMakingPaise' | 'lineTotalPaise'
+>;
+
+function computeEstimateAmounts(
+  product: BillingLineProduct,
+  ratePerGramPaise: bigint,
+  makingChargePct: string,
+): EstimateAmounts {
+  const weightUnits = BigInt(Math.round(Number.parseFloat(product.netWeightG) * 10_000));
+  const pctBasisPoints = BigInt(Math.round(Number.parseFloat(makingChargePct || '0') * 100));
+  const goldValuePaise = (ratePerGramPaise * weightUnits) / 10_000n;
+  const makingChargePaise = (goldValuePaise * pctBasisPoints) / 10_000n;
+  const gstMetalPaise = (goldValuePaise * 300n) / 10_000n;
+  const gstMakingPaise = (makingChargePaise * 300n) / 10_000n;
+  return {
+    goldValuePaise,
+    makingChargePaise,
+    gstMetalPaise,
+    gstMakingPaise,
+    lineTotalPaise: goldValuePaise + makingChargePaise + gstMetalPaise + gstMakingPaise,
+  };
+}
+
 export default function NewEstimateScreen(): JSX.Element {
   const [customerName, setCustomerName] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('');
@@ -72,9 +101,39 @@ export default function NewEstimateScreen(): JSX.Element {
   const onLineChange = useCallback((index: number, next: BillingLineValue) => {
     setLines((curr) => {
       const copy = [...curr];
-      copy[index] = { ...copy[index]!, ...next };
+      const current = copy[index]!;
+      const nextMakingPct = next.makingChargePct ?? current.makingChargePct;
+      copy[index] = {
+        ...current,
+        ...next,
+        ...computeEstimateAmounts(current.product, current.ratePerGramPaise, nextMakingPct),
+      };
       return copy;
     });
+  }, []);
+
+  const onAddProduct = useCallback((draft: BillingProductDraft) => {
+    const amounts = computeEstimateAmounts(
+      draft.product,
+      draft.ratePerGramPaise,
+      draft.makingChargePct,
+    );
+    setLines((curr) => [
+      ...curr,
+      {
+        productId: draft.product.id,
+        description: draft.product.description,
+        huid: draft.product.huid,
+        makingChargePct: draft.makingChargePct,
+        product: draft.product,
+        ratePerGramPaise: draft.ratePerGramPaise,
+        ...amounts,
+      },
+    ]);
+  }, []);
+
+  const onRemoveLine = useCallback((index: number) => {
+    setLines((curr) => curr.filter((_, i) => i !== index));
   }, []);
 
   const onSubmit = useCallback(() => {
@@ -160,24 +219,26 @@ export default function NewEstimateScreen(): JSX.Element {
         />
       </View>
 
-      {lines.map((line, i) => (
-        <BillingLineBuilder
-          key={`${line.productId ?? 'manual'}-${i}`}
-          product={line.product}
-          ratePerGramPaise={line.ratePerGramPaise}
-          makingChargePct={line.makingChargePct}
-          onChange={(v) => onLineChange(i, v)}
-        />
-      ))}
+      <BillingProductPicker onAddProduct={onAddProduct} />
 
-      <Pressable
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        onPress={() => router.push('/billing/scan' as any)}
-        style={styles.scanButton}
-        accessibilityRole="button"
-      >
-        <Text style={styles.scanButtonText}>+ बारकोड स्कैन करें</Text>
-      </Pressable>
+      {lines.map((line, i) => (
+        <View key={`${line.productId ?? 'manual'}-${i}`} style={styles.lineWrapper}>
+          <BillingLineBuilder
+            product={line.product}
+            ratePerGramPaise={line.ratePerGramPaise}
+            makingChargePct={line.makingChargePct}
+            onChange={(v) => onLineChange(i, v)}
+          />
+          <Pressable
+            onPress={() => onRemoveLine(i)}
+            style={styles.removeLineButton}
+            accessibilityRole="button"
+            accessibilityLabel="Remove item"
+          >
+            <Text style={styles.removeLineButtonText}>Remove item</Text>
+          </Pressable>
+        </View>
+      ))}
 
       {totalPaise > 0n && (
         <View style={styles.totalRow}>
@@ -238,7 +299,22 @@ const styles = StyleSheet.create({
     paddingVertical: 16, alignItems: 'center',
     marginBottom: 12, minHeight: 48,
   },
-  scanButtonText: { fontSize: 16, fontFamily: 'NotoSansDevanagari' },
+  scanButtonText: { fontSize: 16, fontFamily: 'MuktaVaani-400' },
+  lineWrapper: {
+    marginBottom: 8,
+  },
+  removeLineButton: {
+    alignSelf: 'flex-end',
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  removeLineButtonText: {
+    color: '#B1402B',
+    fontSize: 14,
+    fontWeight: '700',
+  },
   totalRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center',

@@ -8,6 +8,7 @@ import {
 import { BullModule, InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from '@goldsmith/queue';
 import { Redis } from '@goldsmith/cache';
+import type { Pool } from 'pg';
 import { AuthModule } from '../auth/auth.module';
 import { PricingService } from './pricing.service';
 import { PricingController } from './pricing.controller';
@@ -83,7 +84,12 @@ const OUTSIDE_HOURS_CRON  = '0 12-23,0-2 * * *';      // every hour at :00, UTC 
       ) => new FallbackChain(ibja, metalsdev, lkg, console),
       inject: ['IBJA_WITH_CB', 'METALSDEV_WITH_CB', LastKnownGoodCache],
     },
-    PricingService,
+    {
+      provide: PricingService,
+      useFactory: (pool: Pool, fallbackChain: FallbackChain, redis: Redis) =>
+        new PricingService(pool, fallbackChain, redis),
+      inject: ['PG_POOL', FallbackChain, 'PRICING_REDIS'],
+    },
     RatesRefreshProcessor,
   ],
   controllers: [PricingController],

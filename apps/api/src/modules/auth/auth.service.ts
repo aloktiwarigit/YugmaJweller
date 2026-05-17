@@ -130,6 +130,39 @@ export class AuthService {
     };
   }
 
+  async sessionByFirebaseUid(args: { uid: string; ip?: string; userAgent?: string; requestId?: string }): Promise<SessionResult> {
+    const row = await this.repo.lookupByFirebaseUid(args.uid);
+    if (!row) throw new ForbiddenException({ code: 'auth.not_provisioned' });
+    if (row.status !== 'ACTIVE') throw new ForbiddenException({ code: 'auth.rejected' });
+
+    const tenant = await this.loadTenantById(row.shopId);
+
+    const statusCheck = await this.repo.getStatusById(row.shopId, row.userId);
+    if (!statusCheck || statusCheck === 'REVOKED') throw new ForbiddenException({ code: 'auth.rejected' });
+
+    await this.firebase.admin().auth().setCustomUserClaims(args.uid, {
+      shop_id: row.shopId,
+      role: row.role,
+      goldsmith_uid: row.userId,
+    });
+
+    const finalStatus = await this.repo.getStatusById(row.shopId, row.userId);
+    if (!finalStatus || finalStatus === 'REVOKED') {
+      await this.firebase.admin().auth().setCustomUserClaims(args.uid, {});
+      await this.firebase.admin().auth().revokeRefreshTokens(args.uid);
+      throw new ForbiddenException({ code: 'auth.rejected' });
+    }
+
+    await this.auditVerifySuccess({ tenant, userId: row.userId, role: row.role, ip: args.ip, userAgent: args.userAgent, requestId: args.requestId });
+    const user = await this.loadUserDisplayName({ tenant, userId: row.userId, role: row.role });
+
+    return {
+      user: { id: row.userId, display_name: user.display_name, role: row.role },
+      tenant: { id: tenant.id, slug: tenant.slug, display_name: tenant.display_name, config: (tenant.config ?? {}) as Record<string, unknown> },
+      requires_token_refresh: true,
+    };
+  }
+
   async invite(shopId: string, dto: InviteStaffDto, invitedByUserId: string): Promise<{ userId: string }> {
     const tenant = await this.loadTenantById(shopId);
     const result = await this.repo.inviteStaff({

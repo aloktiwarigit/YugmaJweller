@@ -11,7 +11,11 @@ export class SyncService {
   constructor(
     @Inject('SYNC_POOL') private readonly pool: Pool,
     @Inject('SYNC_REDIS') private readonly redis: Redis,
-  ) {}
+  ) {
+    if (!pool || !redis) {
+      throw new Error('SyncService requires configured database and Redis providers');
+    }
+  }
 
   async pull(ctx: TenantContext, req: PullRequest): Promise<PullResponse> {
     return pull(this.pool, ctx, req);

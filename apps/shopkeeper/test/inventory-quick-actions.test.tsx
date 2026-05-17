@@ -22,16 +22,16 @@ vi.mock('@goldsmith/ui-mobile', () => ({
   Button:     () => null,
 }));
 
-import InventoryScreen from '../app/inventory/index';
+import { InventoryListScreen } from '../src/features/inventory/screens/InventoryListScreen';
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
 
-describe('app/inventory/index.tsx quick-actions bar', () => {
+describe('InventoryListScreen quick-actions bar', () => {
   it('renders all 5 quick-action pill labels', () => {
-    const { container } = render(<InventoryScreen />, { wrapper });
+    const { container } = render(<InventoryListScreen />, { wrapper });
     expect(container.textContent).toContain('+ नया उत्पाद');
     expect(container.textContent).toContain('CSV आयात');
     expect(container.textContent).toContain('मूल्यांकन');

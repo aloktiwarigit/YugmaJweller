@@ -2,15 +2,6 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { colors, typography, spacing } from '@goldsmith/ui-tokens';
 
-/**
- * Reviews timeline tab — placeholder.
- *
- * No customer-side endpoint exists yet to list a customer's own submitted reviews.
- * The reviews API is per-product (`GET /api/v1/reviews/products/:productId`),
- * not per-customer. Adding a customer-self listing endpoint is a backend follow-up;
- * for the demo we render a Hindi "coming soon" placeholder so the tab is visible
- * and white-label-clean.
- */
 export function TimelineReviews(): React.ReactElement {
   return (
     <View
@@ -28,12 +19,12 @@ export function TimelineReviews(): React.ReactElement {
           marginBottom: spacing.xs,
         }}
       >
-        जल्द ही उपलब्ध
+        अभी कोई समीक्षा नहीं
       </Text>
       <Text
         style={{ fontFamily: typography.body.family, fontSize: 14, color: colors.inkMute, textAlign: 'center' }}
       >
-        आपकी समीक्षाएं यहां दिखेंगी (coming soon)
+        आपकी खरीद पर दी गई समीक्षाएं यहां दिखेंगी।
       </Text>
     </View>
   );

@@ -9,9 +9,10 @@
     "typecheck": "tsc --noEmit",
     "lint": "next lint",
     "test": "vitest run",
-    "test:lighthouse-ci": "lhci autorun",
-    "test:axe": "lhci autorun --config=lighthouserc.cjs --collect.settings.onlyCategories=accessibility",
-    "deploy": "firebase apphosting:backends:deploy goldsmith-customer-web --project goldsmith-dev"
+    "test:lighthouse-ci": "node scripts/run-lhci.mjs",
+    "test:axe": "node scripts/run-lhci.mjs -- --config=lighthouserc.cjs --collect.settings.onlyCategories=accessibility",
+    "deploy": "firebase deploy --only apphosting:goldsmith-customer-web --project goldsmith-dev",
+    "deploy:dry-run": "firebase deploy --only apphosting:goldsmith-customer-web --project goldsmith-dev --dry-run"
   },
   "dependencies": {
     "@goldsmith/auth-client": "workspace:*",
@@ -24,6 +25,7 @@
     "react-dom": "^18.3.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
+    "sharp": "^0.34.5",
     "tailwind-merge": "^2.2.0"
   },
   "devDependencies": {

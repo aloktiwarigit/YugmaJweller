@@ -4,7 +4,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios';
 import Constants from 'expo-constants';
-import { getIdToken } from '@goldsmith/auth-client';
+import { getIdToken } from '../auth/client';
 
 const baseURL =
   (Constants.expoConfig?.extra?.['apiBaseUrl'] as string | undefined) ?? 'http://localhost:3000';

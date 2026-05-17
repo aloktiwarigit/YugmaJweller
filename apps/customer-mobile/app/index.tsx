@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { colors, spacing, typography } from '@goldsmith/ui-tokens';
 import { useCustomerSession } from '../src/hooks/useCustomerSession';
@@ -11,6 +11,7 @@ export default function Index(): React.ReactElement {
   const { ready } = useCustomerAuthBootstrap();
   const tenantError = useTenantStore((s) => s.error);
   const tenant = useTenantStore((s) => s.tenant);
+  const retryBoot = useTenantStore((s) => s.retryBoot);
 
   if (!ready) {
     return (
@@ -27,10 +28,6 @@ export default function Index(): React.ReactElement {
   // The unauthenticated welcome screen depends on tenant for its
   // dev-continue button and brand header, so surface the error explicitly
   // instead of routing the user to a placeholder they cannot act on.
-  // No retry button: TenantProvider's effect runs once at mount and does
-  // not depend on a refresh trigger, so an in-place retry would no-op.
-  // Retry-on-demand is tracked as a follow-up; manual app re-launch is
-  // the documented recovery for this state.
   if (tenantError !== null || tenant === null) {
     return (
       <View
@@ -62,8 +59,26 @@ export default function Index(): React.ReactElement {
             textAlign: 'center',
           }}
         >
-          कृपया ऐप को बंद करके पुनः खोलें। (Could not load shop. Please close and reopen the app.)
+          नेटवर्क या दुकान कॉन्फ़िगरेशन उपलब्ध नहीं है। कृपया कनेक्शन जांचकर फिर कोशिश करें।
         </Text>
+        <Pressable
+          testID="tenant-boot-retry"
+          onPress={retryBoot}
+          style={{
+            marginTop: spacing.lg,
+            minHeight: 48,
+            paddingHorizontal: spacing.lg,
+            justifyContent: 'center',
+            borderRadius: 8,
+            backgroundColor: colors.ink,
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="दुकान फिर से लोड करें"
+        >
+          <Text style={{ fontFamily: typography.body.family, fontSize: 15, color: colors.white, fontWeight: '700' }}>
+            फिर कोशिश करें
+          </Text>
+        </Pressable>
       </View>
     );
   }

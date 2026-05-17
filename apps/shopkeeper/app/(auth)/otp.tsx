@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text } from 'react-native';
 import { router } from 'expo-router';
-import { verifyOtp, sendOtp, getIdToken } from '@goldsmith/auth-client';
+import { verifyOtp, sendOtp, getIdToken } from '../../src/auth/client';
 import { t } from '@goldsmith/i18n';
 import { Button, Input, Toast } from '@goldsmith/ui-mobile';
 import { colors, typography, spacing } from '@goldsmith/ui-tokens';
@@ -9,8 +9,11 @@ import { useOtpStore } from '../../src/stores/otpStore';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useTenantStore } from '../../src/stores/tenantStore';
 import { postAuthSession } from '../../src/api/endpoints';
+import { assertAuthTenantMatchesApp } from '../../src/providers/AuthProvider';
+import { BrandMark } from '../../src/components/BrandMark';
 
 const RESEND_SECONDS = 60;
+const fallbackDisplayName = 'अयोध्या स्वर्णकार';
 
 function maskPhone(e164: string): string {
   // +91XXXXXXXXXX → +91 XXXXX-XX3210 style: show last 4 digits
@@ -24,6 +27,7 @@ export default function OtpScreen(): React.ReactElement {
   const { confirmation, phoneE164, clear } = useOtpStore();
   const setUser = useAuthStore((s) => s.setUser);
   const tenant = useTenantStore((s) => s.tenant);
+  const displayName = tenant?.displayName ?? fallbackDisplayName;
 
   const [code, setCode] = useState('');
   const [verifying, setVerifying] = useState(false);
@@ -84,6 +88,7 @@ export default function OtpScreen(): React.ReactElement {
     try {
       const { idToken } = await verifyOtp(confirmation, code);
       const sess = await postAuthSession(idToken);
+      assertAuthTenantMatchesApp(sess);
       setUser(sess.user);
       // @spec §4.1(8) — pick up new custom claims synchronously before navigating
       if (sess.requires_token_refresh) {
@@ -133,15 +138,7 @@ export default function OtpScreen(): React.ReactElement {
     >
       {/* Brand row */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xl }}>
-        <View
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 8,
-            backgroundColor: colors.border,
-            marginRight: spacing.sm,
-          }}
-        />
+        <BrandMark size={40} style={{ marginRight: spacing.sm }} />
         <Text
           style={{
             fontFamily: typography.display.family,
@@ -149,7 +146,7 @@ export default function OtpScreen(): React.ReactElement {
             color: colors.ink,
           }}
         >
-          {tenant?.displayName ?? ''}
+          {displayName}
         </Text>
       </View>
 

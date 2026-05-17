@@ -16,8 +16,15 @@ const getIdTokenMock = vi.mocked(authClient.getIdToken);
 
 import MockAdapter from 'axios-mock-adapter';
 import { api } from '../src/api/client';
+import { apiClient } from '../src/lib/api-client';
 
 const mock = new MockAdapter(api);
+
+describe('legacy api client export', () => {
+  it('uses the authenticated API instance', () => {
+    expect(apiClient).toBe(api);
+  });
+});
 
 describe('api client — request interceptor', () => {
   beforeEach(() => {

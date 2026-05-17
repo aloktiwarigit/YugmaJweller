@@ -52,7 +52,7 @@ export function LoyaltyPointsCard(): React.ReactElement {
 
   return (
     <Pressable
-      onPress={() => router.push('/loyalty')}
+      onPress={() => router.push('/loyalty' as Parameters<typeof router.push>[0])}
       style={{
         backgroundColor: colors.white,
         borderRadius: radii.md,

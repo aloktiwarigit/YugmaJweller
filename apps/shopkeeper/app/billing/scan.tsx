@@ -1,24 +1,65 @@
-// apps/shopkeeper/app/billing/scan.tsx
-// Barcode scanner for invoice line selection — wired in Story 5.2
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
+import { colors, spacing, typography } from '@goldsmith/ui-tokens';
+import { InventorySearch } from '../../src/features/inventory/components/InventorySearch';
 
 export default function BillingBarcodeScanScreen(): JSX.Element {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>बारकोड स्कैन</Text>
-      <Text style={styles.body}>यह सुविधा जल्द आ रही है (Story 5.2)</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Barcode lookup</Text>
+        <Text style={styles.subtitle}>Search or enter the SKU/HUID printed on the label.</Text>
+      </View>
+      <View style={styles.searchPanel}>
+        <InventorySearch
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onProductPress={(productId) => router.replace(`/billing/new?productId=${productId}` as any)}
+        />
+      </View>
       <Pressable style={styles.backButton} onPress={() => router.back()} accessibilityRole="button">
-        <Text style={styles.backText}>← वापस जाएं</Text>
+        <Text style={styles.backText}>Back</Text>
       </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:   { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#fafaf9' },
-  title:       { fontSize: 22, fontWeight: '700', fontFamily: 'NotoSansDevanagari', marginBottom: 12 },
-  body:        { fontSize: 16, color: '#57534e', fontFamily: 'NotoSansDevanagari', marginBottom: 32, textAlign: 'center' },
-  backButton:  { backgroundColor: '#92400e', borderRadius: 10, paddingHorizontal: 24, paddingVertical: 14, minHeight: 48 },
-  backText:    { color: '#fff', fontWeight: '600', fontFamily: 'NotoSansDevanagari' },
+  container: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    padding: spacing.md,
+  },
+  header: {
+    marginBottom: spacing.md,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    fontFamily: typography.headingMid.family,
+    color: colors.ink,
+  },
+  subtitle: {
+    marginTop: spacing.xs,
+    fontSize: 15,
+    fontFamily: typography.body.family,
+    color: colors.inkMute,
+  },
+  searchPanel: {
+    flex: 1,
+  },
+  backButton: {
+    minHeight: 48,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  backText: {
+    color: colors.ink,
+    fontWeight: '700',
+    fontFamily: typography.body.family,
+  },
 });

@@ -3,6 +3,10 @@
 android/
 ios/
 
+# Expo CLI metadata — generated at runtime; includes typed routes that depend
+# on local file layout and can pollute with monorepo paths if not ignored.
+.expo/
+
 # Expo-generated local type file.
 expo-env.d.ts
 

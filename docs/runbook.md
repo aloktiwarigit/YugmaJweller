@@ -72,25 +72,28 @@ mvpScope: >
 
 ## 2. Deployment
 
-> 2026-05-04 sweep note: production deployment is not repo-backed yet. The
-> repository can prove CI/build health for `main`, but it has no checked-in
-> deploy script, production deploy workflow, Terraform/azd directory, hosting
-> provider config, EAS production profile, or release promotion record proving
-> that the latest code is live. Do not claim production is current until the
-> actual provider, deployed commit SHA, migration level, secrets, CDN/storage
-> provider, and mobile build channel are verified.
+> 2026-05-16 customer-app readiness note: the repository now contains CI gates
+> and templates for customer-web release artifact builds
+> (`cloudbuild-customer-web.yaml`, `apps/customer-web/apphosting.yaml`) plus a
+> customer-mobile EAS production profile (`apps/customer-mobile/eas.json`).
+> These templates are not proof that production is live. Do not claim production
+> is current until the actual provider/backend, deployed Git SHA or image digest,
+> migration level, secrets, domains, Firebase project, CDN/storage provider, and
+> mobile build/submission IDs are verified and recorded.
 
 ### 2.1 Pre-deploy checklist
 
-Before the first production deploy path is created:
+Before a production promotion:
 
-- [ ] Hosting provider selected and checked in (`azure.yaml`/`azd`, Terraform under `infra/`, or the chosen provider's equivalent)
-- [ ] GitHub Actions production environment added with required approvals and OIDC/secret access scoped to deploy only
-- [ ] Release artifact/version exposes the deployed Git SHA through `/healthz`
+- [ ] customer-web target selected: Cloud Build image to Cloud Run, or Firebase App Hosting backend
+- [ ] customer-web production env values are set and non-local HTTPS: `API_URL`, `NEXT_PUBLIC_API_BASE`, `NEXT_PUBLIC_SITE_URL`
+- [ ] customer-web tenant/Firebase values are set for the target tenant: `NEXT_PUBLIC_SHOP_SLUG`, `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_APP_ID`
+- [ ] GitHub Actions production environment added if CI/CD promotion is automated, with required approvals and OIDC/secret access scoped to deploy only
+- [ ] Release artifact/version exposes the deployed Git SHA through `/healthz` or an equivalent release metadata endpoint
 - [ ] Database migration command and rollback/forward-fix policy are part of the deploy workflow
 - [ ] CDN/storage/ImageKit/Azure Blob production configuration is provisioned and smoke-testable
-- [ ] Mobile production build channel is defined if customer-mobile/shopkeeper native builds are part of the release
-- [ ] CI pipeline green on `main` (type-check · lint · tests ≥ 80% · Semgrep · axe-core · Lighthouse · Codex review)
+- [ ] customer-mobile EAS production profile has tenant-specific env/secrets if the native app is part of the release
+- [ ] CI pipeline green on `main` (type-check, lint, tests, tenant isolation, Semgrep, customer-web build/Lighthouse, customer-mobile production Expo config, Codex review)
 - [ ] Migration plan reviewed: any `DROP`, `ALTER COLUMN TYPE`, or column-remove requires 2-phase deploy (deploy code tolerating both shapes → migrate → deploy code assuming new shape)
 - [ ] `threat-model.md` updated if new trust boundary / vendor / admin role introduced
 - [ ] No pending DPDPA data-subject requests (would be invalidated by schema change)
@@ -99,19 +102,48 @@ Before the first production deploy path is created:
 
 ### 2.2 Deploy procedure
 
-No executable production deploy procedure is checked in yet.
+No one-command production promotion workflow is checked in yet. The current
+repo-backed customer-web paths are build/config templates only; they still
+require a release operator to supply production values and record the deployed
+artifact.
 
-The deploy story must add the concrete provider files and commands before this
-runbook can be used operationally. Minimum shape:
+Customer-web Cloud Build image path:
 
-1. Build and test from a clean `main` checkout.
-2. Create an immutable release artifact or image tagged with the Git SHA.
-3. Run database migrations with the migrator role.
-4. Deploy to staging.
-5. Run the post-deploy smoke tests in this section against staging.
-6. Promote the same artifact to production.
-7. Run the post-deploy smoke tests in this section against production.
-8. Record deployed Git SHA, migration version, artifact ID, and operator in the release log.
+1. Build and test from a clean `main` checkout after CI is green.
+2. Submit the image build with every substitution supplied:
+
+   ```bash
+   SHOP_SLUG=tenant-prod-slug
+   API_URL=https://api.tenant.example.com
+   SITE_URL=https://shop.tenant.example.com
+   FIREBASE_API_KEY=replace-with-firebase-web-api-key
+   FIREBASE_AUTH_DOMAIN=tenant-prod.firebaseapp.com
+   FIREBASE_PROJECT_ID=tenant-prod
+   FIREBASE_APP_ID=1:000000000000:web:0000000000000000000000
+
+   gcloud builds submit --config cloudbuild-customer-web.yaml --project "$GCP_PROJECT" \
+     --substitutions="_SHOP_SLUG=$SHOP_SLUG,_API_URL=$API_URL,_API_BASE=$API_URL,_SITE_URL=$SITE_URL,_FIREBASE_API_KEY=$FIREBASE_API_KEY,_FIREBASE_AUTH_DOMAIN=$FIREBASE_AUTH_DOMAIN,_FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID,_FIREBASE_APP_ID=$FIREBASE_APP_ID" .
+   ```
+
+3. The Cloud Build template rejects unset `REPLACE_WITH_*` values, non-HTTPS
+   API/site URLs, and non-kebab-case tenant slugs.
+4. Deploy the `$BUILD_ID` image, not `latest`, to the selected Cloud Run service
+   with the same runtime env values. `NEXT_PUBLIC_*` values are already baked
+   into the client bundle, so do not promote one image across tenants.
+5. Run the post-deploy smoke tests against staging, then production.
+6. Record deployed Git SHA, image digest/tag, migration version, domain, Firebase
+   project ID, and operator in the release log.
+
+Customer-web Firebase App Hosting path:
+
+1. Create or select the production App Hosting backend in the production Firebase/GCP project.
+2. Replace every `REPLACE_WITH_*` value in `apps/customer-web/apphosting.yaml`
+   for the target tenant/backend before connecting or deploying the backend.
+3. Verify `API_URL`, `NEXT_PUBLIC_API_BASE`, and `NEXT_PUBLIC_SITE_URL` are
+   HTTPS and do not point at local/dev services.
+4. Trigger the App Hosting build from the intended Git SHA.
+5. Record backend ID, Firebase project ID, deployed Git SHA, generated/custom
+   domain, and operator in the release log.
 
 ### 2.3 Rollback
 
@@ -148,6 +180,42 @@ procedure.
 5. Test invoice creation at Rs 1,99,000 (below 269ST cap) — passes; at Rs 2,00,001 — blocks with compliance reason code
 6. BullMQ queue depth steady (not growing)
 7. Tenant isolation sanity: as anchor tenant, hit `/api/shops/$OTHER_TENANT_ID/products` — must return 403
+8. If customer-mobile is in scope, install the exact EAS build on a QA device and verify Firebase OTP login, browse, PDP, wishlist, and payment handoff against the production API.
+
+### 2.5 Customer-mobile EAS production builds
+
+The production profile in `apps/customer-mobile/eas.json` sets
+`APP_ENV=production` only. All tenant, API, Firebase, and store identifiers must
+come from EAS environment variables/secrets or the CI environment at build time.
+CI validates the production Expo config with safe placeholders; it does not
+create or submit a store build.
+
+Required production values:
+
+- `EXPO_PUBLIC_API_BASE_URL`: public HTTPS API origin
+- `EXPO_PUBLIC_SHOP_SLUG`: tenant slug matching the `shops.slug` row
+- `EXPO_PUBLIC_ANDROID_PACKAGE`: production Android package, not ending in `.dev`
+- `EXPO_PUBLIC_IOS_BUNDLE_ID`: production iOS bundle ID, not ending in `.dev`
+- `EXPO_PUBLIC_FIREBASE_PROJECT_ID`: production Firebase project ID
+- `EXPO_PUBLIC_EAS_PROJECT_ID`: EAS project UUID
+- `GOOGLE_SERVICES_JSON`: production Android Firebase config file path/secret
+- `GOOGLE_SERVICES_PLIST`: production iOS Firebase config file path/secret
+- `EXPO_PUBLIC_DEV_AUTH`: must be unset
+
+Build and submit shape:
+
+```bash
+cd apps/customer-mobile
+eas build --platform android --profile production
+eas build --platform ios --profile production
+eas submit --platform android --profile production
+eas submit --platform ios --profile production
+```
+
+Record EAS build IDs, store submission IDs, package/bundle identifiers, Firebase
+project ID, tenant slug, Git SHA, and operator in the release log. A successful
+EAS build or submission is not proof that the API/customer-web production deploy
+is current; verify each shipped surface separately.
 
 ---
 

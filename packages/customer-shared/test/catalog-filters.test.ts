@@ -42,12 +42,36 @@ describe('metalLabel', () => {
 });
 
 describe('purityLabel', () => {
-  it('returns "सोना 22K" for GOLD_22K', () => {
+  it('returns "सोना 22K" for long-form GOLD_22K', () => {
     expect(purityLabel('GOLD_22K')).toBe('सोना 22K');
   });
 
-  it('returns "चाँदी 999" for SILVER_999', () => {
+  it('returns "चाँदी 999" for long-form SILVER_999', () => {
     expect(purityLabel('SILVER_999')).toBe('चाँदी 999');
+  });
+
+  // The current customer catalog API returns short-form purities like "22K"
+  // without the leading metal token. Without the metalHint the split-based
+  // metal recovery breaks and the metal prefix is dropped — see catalog-
+  // filters.ts comment. Callers in front of CatalogProductCard data should
+  // always pass `product.metal` as the second argument.
+  it('returns "सोना 22K" for short-form "22K" with metalHint GOLD', () => {
+    expect(purityLabel('22K', 'GOLD')).toBe('सोना 22K');
+  });
+
+  it('returns "चाँदी 999" for short-form "999" with metalHint SILVER', () => {
+    expect(purityLabel('999', 'SILVER')).toBe('चाँदी 999');
+  });
+
+  it('returns bare purity when neither split nor metalHint resolves', () => {
+    expect(purityLabel('22K')).toBe('22K');
+    expect(purityLabel('22K', 'UNKNOWN')).toBe('22K');
+  });
+
+  it('prefers split metal over metalHint when split resolves', () => {
+    // Defensive: if a caller passes mismatched metalHint with a long-form
+    // purity, we should trust the long-form (it's authoritative).
+    expect(purityLabel('GOLD_22K', 'SILVER')).toBe('सोना 22K');
   });
 });
 

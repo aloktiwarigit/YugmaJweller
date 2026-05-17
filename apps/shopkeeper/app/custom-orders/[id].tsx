@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  TextInput,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -173,6 +174,15 @@ export default function CustomOrderDetailScreen(): React.ReactElement {
           {order.status === 'DEPOSIT_PENDING' && (
             <View style={styles.cashDepositRow}>
               <Text style={styles.label}>नकद अग्रिम (₹)</Text>
+              <TextInput
+                value={depositAmount}
+                onChangeText={(value) => setDepositAmount(value.replace(/[^0-9.]/g, ''))}
+                style={styles.depositInput}
+                keyboardType="decimal-pad"
+                placeholder="Amount in rupees"
+                placeholderTextColor="#9E7A40"
+                accessibilityLabel="Cash deposit amount"
+              />
               <Pressable
                 style={styles.actionBtn}
                 onPress={() => {
@@ -274,6 +284,16 @@ const styles = StyleSheet.create({
   actionsSection:   { gap: 10 },
   cashDepositRow:   { gap: 6 },
   label:            { fontFamily: 'NotoSansDevanagari_700Bold', fontSize: 14, color: '#5C3D11' },
+  depositInput:     {
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: '#D9C9A8',
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    fontSize: 16,
+    color: '#1E2440',
+  },
   actionBtn:        { backgroundColor: '#B8860B', borderRadius: 10, alignItems: 'center', justifyContent: 'center', minHeight: 52, paddingHorizontal: 16 },
   milestoneBtn:     { backgroundColor: '#1565C0' },
   readyBtn:         { backgroundColor: '#2E7D32' },

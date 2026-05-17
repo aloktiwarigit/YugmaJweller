@@ -1,46 +1,43 @@
-# Firebase App Hosting backend config for customer-web (Next.js SSR).
-# Backend: goldsmith-customer-web  Region: asia-east1
-# Docs: https://firebase.google.com/docs/app-hosting/configure
+# Firebase App Hosting template for customer-web (Next.js SSR).
 #
-# REMAINING SETUP (one-time, before demo):
-#   1. Set API_URL + NEXT_PUBLIC_API_BASE once the NestJS API is deployed:
-#      firebase apphosting:backends:update goldsmith-customer-web \
-#        --project goldsmith-dev \
-#        (or set in Console → App Hosting → goldsmith-customer-web → Environment)
-#   2. NEXT_PUBLIC_SITE_URL: set to the Firebase-assigned domain or custom domain
-#   3. Connect GitHub for auto-deploy on push (Console → App Hosting → backend → Source)
+# This template is intentionally not deployable as-is. Replace every
+# REPLACE_WITH_* value for the target tenant/backend before connecting a
+# production App Hosting backend. The repository does not currently contain a
+# release promotion record proving any production backend is live.
+#
+# Required production values:
+#   NEXT_PUBLIC_SHOP_SLUG             lowercase tenant slug
+#   API_URL                           HTTPS server-to-server API origin
+#   NEXT_PUBLIC_API_BASE              HTTPS browser API origin
+#   NEXT_PUBLIC_SITE_URL              HTTPS customer storefront origin
+#   NEXT_PUBLIC_FIREBASE_*            Firebase Web SDK public config
 
 runConfig:
-  minInstances: 0      # scale to zero — ~$0 cost at demo-stage traffic
+  minInstances: 0
   maxInstances: 10
   concurrency: 80
   cpu: 1
   memoryMiB: 512
 
 env:
-  - variable: NODE_ENV
-    value: production
   - variable: NEXT_TELEMETRY_DISABLED
     value: "1"
 
-  # Tenant identity — anchor dev shop for initial demo deploy
   - variable: NEXT_PUBLIC_SHOP_SLUG
-    value: anchor-dev
+    value: REPLACE_WITH_TENANT_SLUG
 
-  # Firebase Web SDK — public keys, safe to commit (restricted by security rules)
-  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyCSuP5JgfjJlXryqBFyPcJ645_Y2WdA5jI
-  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: goldsmith-dev.firebaseapp.com
-  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: goldsmith-dev
-  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: "1:528920018833:web:e8d084284d9bd363e3e430"
-
-  # API endpoints
   - variable: API_URL
-    value: https://goldsmith-api-528920018833.asia-east1.run.app
+    value: REPLACE_WITH_HTTPS_API_URL
   - variable: NEXT_PUBLIC_API_BASE
-    value: https://goldsmith-api-528920018833.asia-east1.run.app
+    value: REPLACE_WITH_HTTPS_API_BASE
   - variable: NEXT_PUBLIC_SITE_URL
-    value: https://goldsmith-customer-web--goldsmith-dev.asia-east1.hosted.app
+    value: REPLACE_WITH_HTTPS_SITE_URL
+
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: REPLACE_WITH_FIREBASE_WEB_API_KEY
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: REPLACE_WITH_FIREBASE_AUTH_DOMAIN
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: REPLACE_WITH_FIREBASE_PROJECT_ID
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: REPLACE_WITH_FIREBASE_WEB_APP_ID

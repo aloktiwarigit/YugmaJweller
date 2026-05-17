@@ -3,14 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
 import { setLocale } from '@goldsmith/i18n';
 
-// Mock expo-router (no navigation in dashboard, but screens import it for type safety)
 vi.mock('expo-router', () => ({
   router: { replace: vi.fn(), push: vi.fn() },
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   Redirect: (): null => null,
 }));
 
-// Mock api client to prevent @goldsmith/auth-client → firebase import chain
 vi.mock('../src/api/client', () => ({
   api: { get: vi.fn() },
 }));
@@ -30,13 +28,13 @@ beforeEach(() => {
 });
 
 describe('(tabs)/index.tsx (dashboard)', () => {
-  it('renders Hindi eyebrow + headline + two CTAs when tenant loaded', () => {
+  it('renders operational shortcuts when tenant loaded', () => {
     useTenantStore.setState({
       slug: 'test-shop',
       tenant: {
         id: 't1',
         slug: 'test-shop',
-        displayName: 'सोना ज्वेलर्स',
+        displayName: 'Sona Jewellers',
         branding: {},
       },
       etag: null,
@@ -44,14 +42,14 @@ describe('(tabs)/index.tsx (dashboard)', () => {
       error: null,
     });
 
-    const { getByText } = render(<Dashboard />);
-    // Eyebrow
-    expect(getByText('स्वागत है')).toBeTruthy();
-    // Headline
-    expect(getByText('आइए, अपना shop set up करें')).toBeTruthy();
-    // Two CTAs
-    expect(getByText('Staff जोड़ें')).toBeTruthy();
-    expect(getByText('सेटिंग्स में जाएँ')).toBeTruthy();
+    const { container } = render(<Dashboard />);
+    expect(container.textContent).toContain('Sona Jewellers');
+    expect(container.textContent).toContain('नया बिल');
+    expect(container.textContent).toContain('इन्वेंटरी खोजें');
+    expect(container.textContent).toContain('आज');
+    expect(container.textContent).toContain('स्टाफ');
+    expect(container.textContent).toContain('ग्राहक');
+    expect(container.textContent).toContain('कस्टम ऑर्डर');
   });
 
   it('renders Skeleton placeholder when tenant is null (loading state)', () => {
@@ -64,7 +62,6 @@ describe('(tabs)/index.tsx (dashboard)', () => {
     });
 
     const { getAllByTestId } = render(<Dashboard />);
-    // Should render skeleton placeholders
     const skeletons = getAllByTestId(/dashboard-skeleton/);
     expect(skeletons.length).toBeGreaterThan(0);
   });
@@ -75,7 +72,7 @@ describe('(tabs)/index.tsx (dashboard)', () => {
       tenant: {
         id: 't1',
         slug: 'test-shop',
-        displayName: 'सोना ज्वेलर्स',
+        displayName: 'Sona Jewellers',
         branding: {},
       },
       etag: null,
@@ -84,8 +81,6 @@ describe('(tabs)/index.tsx (dashboard)', () => {
     });
 
     const { container } = render(<Dashboard />);
-    // The dashboard is the shopkeeper-facing surface — platform brand must never appear
-    // The displayName shown must be the jeweller's name, not "Goldsmith"
     expect(container.textContent).not.toMatch(/\bGoldsmith\b/);
   });
 });

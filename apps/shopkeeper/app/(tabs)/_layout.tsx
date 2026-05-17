@@ -1,6 +1,7 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useThemeTokens } from '../../src/hooks/useThemeTokens';
 
@@ -26,13 +27,14 @@ export default function TabsLayout(): JSX.Element {
   const isStaff = role === 'shop_staff';
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.inkMute,
-      }}
-    >
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: colors.inkMute,
+        }}
+      >
       <Tabs.Screen
         name="index"
         options={{
@@ -80,16 +82,7 @@ export default function TabsLayout(): JSX.Element {
           ),
         }}
       />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'सेटिंग्स',
-          href: isStaff ? null : undefined,
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-            <TabIcon name="settings-outline" color={color} size={size} />
-          ),
-        }}
-      />
-    </Tabs>
+      </Tabs>
+    </SafeAreaView>
   );
 }

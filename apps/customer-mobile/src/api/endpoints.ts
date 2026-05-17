@@ -2,16 +2,14 @@ import axios from 'axios';
 import { api } from './client';
 import type { Tenant, TenantBranding } from '../stores/tenantStore';
 import type {
-  PublicRateEntry,
   PublicRatesResponse,
-  EstimatedPrice,
   CatalogProduct,
   CatalogProductsResponse,
   HuidVerifyResult,
-  ReviewItem,
   ReviewsResponse,
   PublicReviewsResponse,
 } from '@goldsmith/customer-shared';
+import { catalogImageUriForHint } from '../assets/storefrontImages';
 
 // CatalogEstimatedPrice was the mobile-side name for EstimatedPrice.
 // Re-export as alias to avoid breaking existing mobile code that references it.
@@ -34,8 +32,20 @@ interface TenantBootApiResponse {
 }
 
 export interface PublicProduct {
-  id: string;
-  name: string;
+  id:            string;
+  sku:           string;
+  metal:         string;
+  purity:        string;
+  categoryId:    string;
+  categoryName:  string;
+  grossWeightG:  string;
+  netWeightG:    string;
+  huid:          string | null;
+  huidExemptionCategory: string;
+  quantity:      number;
+  priceAvailable: boolean;
+  publishedAt:   string;
+  primaryImage:  string | null;
 }
 
 export interface PublicProductsResponse {
@@ -51,14 +61,14 @@ export interface TypedApiError extends Error {
 export async function getTenantBoot(
   slug: string,
   etag?: string,
-): Promise<{ tenant: Tenant; etag: string | null; notModified: boolean }> {
+): Promise<{ tenant: Tenant | null; etag: string | null; notModified: boolean }> {
   const res = await api.get<TenantBootApiResponse>(`/api/v1/tenant/boot`, {
     params: { slug },
     headers: etag ? { 'If-None-Match': etag } : undefined,
     validateStatus: (s: number) => s === 200 || s === 304,
   });
   if (res.status === 304) {
-    return { tenant: null as unknown as Tenant, etag: etag ?? null, notModified: true };
+    return { tenant: null, etag: etag ?? null, notModified: true };
   }
   // The API returns snake_case `{ id, display_name, config }` from
   // `tenant_boot_lookup`. `shops.config` is a flat JSONB of snake_case keys
@@ -82,12 +92,72 @@ export async function getTenantBoot(
 function brandingFromConfig(config: Record<string, unknown> | null): TenantBranding {
   if (config === null || typeof config !== 'object') return {};
   const lang = config['default_language'];
+  const logoUrl = typeof config['logo_url'] === 'string' ? (config['logo_url'] as string) : undefined;
   return {
     primaryColor: typeof config['primary_color'] === 'string' ? (config['primary_color'] as string) : undefined,
     secondaryColor: typeof config['secondary_color'] === 'string' ? (config['secondary_color'] as string) : undefined,
-    logoUrl: typeof config['logo_url'] === 'string' ? (config['logo_url'] as string) : undefined,
+    logoUrl: logoUrl ? resolveApiAssetUrl(logoUrl) : undefined,
     appName: typeof config['app_name'] === 'string' ? (config['app_name'] as string) : undefined,
     defaultLanguage: lang === 'hi-IN' || lang === 'en-IN' ? lang : undefined,
+  };
+}
+
+type CatalogImageLike = {
+  url: string;
+  placeholderUrl: string;
+  srcset: string;
+};
+
+type CatalogProductWithImage = {
+  primaryImage: CatalogImageLike | null;
+};
+
+function resolveApiAssetUrl(value: string): string {
+  if (/^(?:https?|data|file|content|asset):/i.test(value)) return value;
+  if (value.startsWith('/demo-shop/')) return catalogImageUriForHint(value);
+  const baseURL = api.defaults.baseURL;
+  if (!baseURL) return value;
+  try {
+    return new URL(value, baseURL).toString();
+  } catch {
+    return value;
+  }
+}
+
+function resolveApiSrcset(srcset: string): string {
+  return srcset
+    .split(',')
+    .map((entry) => {
+      const [url, ...descriptor] = entry.trim().split(/\s+/);
+      if (!url) return entry.trim();
+      const resolved = resolveApiAssetUrl(url);
+      if (resolved.startsWith('data:')) return resolved;
+      return [resolved, ...descriptor].join(' ');
+    })
+    .join(', ');
+}
+
+function normalizeCatalogImage<T extends CatalogImageLike | null>(image: T): T {
+  if (!image) return image;
+  return {
+    ...image,
+    url: resolveApiAssetUrl(image.url),
+    placeholderUrl: resolveApiAssetUrl(image.placeholderUrl),
+    srcset: resolveApiSrcset(image.srcset),
+  };
+}
+
+function normalizeCatalogProduct<T extends CatalogProductWithImage>(product: T): T {
+  return {
+    ...product,
+    primaryImage: normalizeCatalogImage(product.primaryImage),
+  };
+}
+
+function normalizeCatalogProducts<T extends { items: CatalogProductWithImage[] }>(data: T): T {
+  return {
+    ...data,
+    items: data.items.map(normalizeCatalogProduct),
   };
 }
 
@@ -131,14 +201,28 @@ export async function getCatalogProducts(opts: {
   if (opts.page)                     params['page']        = opts.page;
   if (opts.limit)                    params['limit']       = opts.limit;
   const res = await api.get<CatalogProductsResponse>('/api/v1/catalog/products', { params });
-  return res.data;
+  return normalizeCatalogProducts(res.data);
 }
 
 export async function getProductRecommendations(productId: string): Promise<CatalogProductsResponse> {
   const res = await api.get<CatalogProductsResponse>(
     `/api/v1/catalog/products/${productId}/recommendations`,
   );
-  return res.data;
+  return normalizeCatalogProducts(res.data);
+}
+
+export async function getNewArrivalProducts(limit = 8): Promise<CatalogProductsResponse> {
+  const res = await api.get<CatalogProductsResponse>('/api/v1/catalog/products/new-arrivals', {
+    params: { limit },
+  });
+  return normalizeCatalogProducts(res.data);
+}
+
+export async function getTopSellerProducts(limit = 8): Promise<CatalogProductsResponse> {
+  const res = await api.get<CatalogProductsResponse>('/api/v1/catalog/products/top-sellers', {
+    params: { limit },
+  });
+  return normalizeCatalogProducts(res.data);
 }
 
 export async function getCatalogProductReviews(productId: string): Promise<PublicReviewsResponse> {
@@ -150,7 +234,7 @@ export async function getCatalogProductReviews(productId: string): Promise<Publi
 
 export async function getCatalogProduct(id: string): Promise<CatalogProduct> {
   const res = await api.get<CatalogProduct>(`/api/v1/catalog/products/${id}`);
-  return res.data;
+  return normalizeCatalogProduct(res.data);
 }
 
 export async function verifyHuid(productId: string, qrPayload: string): Promise<HuidVerifyResult> {
@@ -256,21 +340,24 @@ export async function getProductReviews(productId: string): Promise<ReviewsRespo
   return res.data;
 }
 
-export async function getWishlist(customerId: string): Promise<WishlistItem[]> {
-  const res = await api.get<WishlistItem[]>('/api/v1/wishlist', {
-    params: { customerId },
-  });
+export async function getWishlist(): Promise<WishlistItem[]> {
+  const res = await api.get<WishlistItem[]>('/api/v1/wishlist');
   return res.data;
 }
 
-export async function addToWishlist(customerId: string, productId: string): Promise<void> {
-  await api.post('/api/v1/wishlist', { customerId, productId });
+export async function addToWishlist(productId: string): Promise<void> {
+  await api.post('/api/v1/wishlist', { productId });
 }
 
-export async function removeFromWishlist(customerId: string, productId: string): Promise<void> {
-  await api.delete(`/api/v1/wishlist/${productId}`, {
-    params: { customerId },
-  });
+export async function removeFromWishlist(productId: string): Promise<void> {
+  await api.delete(`/api/v1/wishlist/${productId}`);
+}
+
+export async function getRateLockPaymentToken(bookingId: string): Promise<{ paymentUrl: string }> {
+  const res = await api.get<{ paymentUrl: string }>(
+    `/api/v1/customer/rate-lock/bookings/${bookingId}/payment-token`,
+  );
+  return res.data;
 }
 
 export async function getReturnPolicy(): Promise<string | null> {
@@ -290,11 +377,20 @@ export interface ProductImageRow {
   placeholder_url: string;
 }
 
+function normalizeProductImages(images: ProductImageRow[]): ProductImageRow[] {
+  return images.map((image) => ({
+    ...image,
+    default_url: resolveApiAssetUrl(image.default_url),
+    placeholder_url: resolveApiAssetUrl(image.placeholder_url),
+    srcset: resolveApiSrcset(image.srcset),
+  }));
+}
+
 export async function getProductImages(productId: string): Promise<ProductImageRow[]> {
   const res = await api.get<{ images: ProductImageRow[] }>(
     `/api/v1/catalog/products/${productId}/images`,
   );
-  return res.data.images;
+  return normalizeProductImages(res.data.images);
 }
 
 // ── Customer timeline ─────────────────────────────────────────────────────────

@@ -5,8 +5,40 @@ import { useTenantStore, type Tenant } from '../stores/tenantStore';
 import { api } from '../api/client';
 
 const CACHE_KEY_PREFIX = 'tenant-boot:';
+const fallbackDisplayName = 'अयोध्या स्वर्णकार';
 
 type CachedEntry = { tenant: Tenant; etag: string };
+type RawTenantBoot = {
+  id: string;
+  slug: string;
+  displayName?: string;
+  display_name?: string;
+  branding?: Tenant['branding'];
+  config?: {
+    app_name?: string;
+    default_language?: 'hi-IN' | 'en-IN';
+    logo_url?: string;
+    primary_color?: string;
+    secondary_color?: string;
+  };
+};
+
+function normalizeTenantBoot(raw: RawTenantBoot): Tenant {
+  return {
+    id: raw.id,
+    slug: raw.slug,
+    displayName:
+      raw.displayName ?? raw.display_name ?? raw.config?.app_name ?? fallbackDisplayName,
+    branding: {
+      ...raw.branding,
+      appName: raw.branding?.appName ?? raw.config?.app_name,
+      defaultLanguage: raw.branding?.defaultLanguage ?? raw.config?.default_language,
+      logoUrl: raw.branding?.logoUrl ?? raw.config?.logo_url,
+      primaryColor: raw.branding?.primaryColor ?? raw.config?.primary_color,
+      secondaryColor: raw.branding?.secondaryColor ?? raw.config?.secondary_color,
+    },
+  };
+}
 
 export function TenantProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const setSlug = useTenantStore((s) => s.setSlug);
@@ -39,7 +71,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }): Rea
           // no-op — already in store from cache
           return;
         }
-        const tenant = res.data as Tenant;
+        const tenant = normalizeTenantBoot(res.data as RawTenantBoot);
         const etag = (res.headers['etag'] as string | undefined) ?? null;
         setTenant(tenant, etag);
         await AsyncStorage.setItem(

@@ -22,6 +22,7 @@ describe('StorefrontConfigSchema', () => {
     const config = {
       heroBanners: [{
         imageId: VALID_UUID,
+        imageUrl: '/demo-shop/hero-rings.jpg',
         headlineHi: 'आभूषण संग्रह',
         headlineEn: 'Jewellery Collection',
         ctaUrl: '/products',
@@ -35,6 +36,7 @@ describe('StorefrontConfigSchema', () => {
     };
     const result = StorefrontConfigSchema.parse(config);
     expect(result.heroBanners[0]!.headlineHi).toBe('आभूषण संग्रह');
+    expect(result.heroBanners[0]!.imageUrl).toBe('/demo-shop/hero-rings.jpg');
     expect(result.heroBanners[0]!.ctaUrl).toBe('/products');
     expect(result.brandPalette.accentMode).toBe('warm');
     expect(result.brandPalette.heroPattern).toBe('lotus');
@@ -87,6 +89,15 @@ describe('StorefrontConfigSchema', () => {
         ctaUrl: '/products',
       }),
     ).toThrow(/Invalid uuid/);
+  });
+
+  it('T12: accepts a hero banner backed by a local public image URL', () => {
+    const result = HeroBannerSchema.parse({
+      imageUrl: '/demo-shop/hero-bangles.jpg',
+      headlineHi: 'Test',
+      ctaUrl: '/products',
+    });
+    expect(result.imageUrl).toBe('/demo-shop/hero-bangles.jpg');
   });
 
   it('T2b: partial config keeps existing keys and applies Zod defaults for missing ones', () => {

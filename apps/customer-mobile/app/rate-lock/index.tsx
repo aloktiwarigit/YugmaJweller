@@ -3,29 +3,34 @@ import {
   View, Text, ScrollView, Pressable, TextInput,
   ActivityIndicator, Linking,
 } from 'react-native';
-import Constants from 'expo-constants';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 import { TenantBrandHeader } from '../../src/components/TenantBrandHeader';
 import { useCustomerSession } from '../../src/hooks/useCustomerSession';
-import { getPublicRates, createCustomerRateLockBooking } from '../../src/api/endpoints';
+import { getPublicRates, createCustomerRateLockBooking, getRateLockPaymentToken } from '../../src/api/endpoints';
 import type { RateLockBookingResult } from '../../src/api/endpoints';
-
-const API_BASE =
-  (Constants.expoConfig?.extra?.['apiBaseUrl'] as string | undefined) ?? 'http://localhost:3000';
 
 function ConfirmationCard({ booking }: { booking: RateLockBookingResult }): React.ReactElement {
   const lockedRate = Math.round(Number(booking.lockedRate24kPaisePerGram) / 100);
   const expiry = new Date(booking.expiresAt).toLocaleDateString('hi-IN', {
     day: 'numeric', month: 'long', year: 'numeric',
   });
+  const [paymentPending, setPaymentPending] = useState(false);
+  const [paymentError,   setPaymentError]   = useState<string | null>(null);
 
-  const openPayment = (): void => {
-    // Opens the server-hosted Razorpay Standard Checkout page in the system browser.
-    // The page loads checkout.js and opens the payment modal for the Razorpay order.
-    // Webhook on server activates the booking once payment is captured.
-    const url = `${API_BASE}/api/v1/customer/rate-lock/bookings/${booking.bookingId}/payment-page`;
-    void Linking.openURL(url);
+  const openPayment = async (): Promise<void> => {
+    setPaymentError(null);
+    setPaymentPending(true);
+    try {
+      // Fetch a short-lived signed token from the authenticated API endpoint.
+      // The returned URL embeds the token so the browser page requires no auth headers.
+      const { paymentUrl } = await getRateLockPaymentToken(booking.bookingId);
+      await Linking.openURL(paymentUrl);
+    } catch {
+      setPaymentError('भुगतान पृष्ठ नहीं खुल सका। पुनः प्रयास करें।');
+    } finally {
+      setPaymentPending(false);
+    }
   };
 
   return (
@@ -65,7 +70,8 @@ function ConfirmationCard({ booking }: { booking: RateLockBookingResult }): Reac
         </Text>
       </View>
       <Pressable
-        onPress={openPayment}
+        onPress={() => { void openPayment(); }}
+        disabled={paymentPending}
         style={{
           backgroundColor: '#B8860B',
           borderRadius: radii.sm,
@@ -73,14 +79,24 @@ function ConfirmationCard({ booking }: { booking: RateLockBookingResult }): Reac
           alignItems: 'center',
           minHeight: 52,
           justifyContent: 'center',
+          opacity: paymentPending ? 0.6 : 1,
         }}
         accessibilityLabel="Razorpay पर भुगतान करें"
         accessibilityRole="button"
       >
-        <Text style={{ fontFamily: typography.body.family, fontSize: 16, color: colors.white, fontWeight: '700' }}>
-          Razorpay पर भुगतान करें
-        </Text>
+        {paymentPending ? (
+          <ActivityIndicator color={colors.white} />
+        ) : (
+          <Text style={{ fontFamily: typography.body.family, fontSize: 16, color: colors.white, fontWeight: '700' }}>
+            Razorpay पर भुगतान करें
+          </Text>
+        )}
       </Pressable>
+      {paymentError ? (
+        <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: '#DC2626', textAlign: 'center', marginTop: spacing.xs }} accessibilityRole="alert">
+          {paymentError}
+        </Text>
+      ) : null}
       <Text
         style={{
           fontFamily: typography.body.family,

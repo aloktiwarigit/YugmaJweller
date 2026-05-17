@@ -7,21 +7,29 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
-  Query,
+  Req,
+  UseGuards,
   UsePipes,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { SkipAuth } from '../../common/decorators/skip-auth.decorator';
+import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
+import { CustomerAuthGuard, getCustomerCtx } from '../customer/customer-auth.guard';
 import { WishlistService } from './wishlist.service';
 import type { WishlistItemResponse } from './wishlist.service';
+import { tenantContext } from '@goldsmith/tenant-context';
+import type { AuthenticatedTenantContext, Tenant } from '@goldsmith/tenant-context';
 
 const AddToWishlistSchema = z.object({
-  customerId: z.string().uuid(),
-  productId:  z.string().uuid(),
+  productId: z.string().uuid(),
 });
 
-// Wishlist is customer-facing: customer role modelling is deferred, so Firebase auth is enough.
 @Controller('/api/v1/wishlist')
+@SkipAuth()
+@SkipTenant()
+@UseGuards(CustomerAuthGuard)
 export class WishlistController {
   constructor(
     @Inject(WishlistService) private readonly svc: WishlistService,
@@ -29,22 +37,40 @@ export class WishlistController {
 
   @Post()
   @UsePipes(new ZodValidationPipe(AddToWishlistSchema))
-  addToWishlist(@Body() body: z.infer<typeof AddToWishlistSchema>): Promise<{ added: boolean }> {
-    return this.svc.addToWishlist(body);
+  async addToWishlist(
+    @Req() req: Request,
+    @Body() body: z.infer<typeof AddToWishlistSchema>,
+  ): Promise<{ added: boolean }> {
+    const { customerId, shopId } = getCustomerCtx(req);
+    return tenantContext.runWith(this.makeCtx(shopId, customerId), () =>
+      this.svc.addToWishlist({ customerId, productId: body.productId }),
+    );
   }
 
   @Delete(':productId')
-  removeFromWishlist(
+  async removeFromWishlist(
+    @Req() req: Request,
     @Param('productId', ParseUUIDPipe) productId: string,
-    @Query('customerId', ParseUUIDPipe) customerId: string,
   ): Promise<void> {
-    return this.svc.removeFromWishlist({ customerId, productId });
+    const { customerId, shopId } = getCustomerCtx(req);
+    return tenantContext.runWith(this.makeCtx(shopId, customerId), () =>
+      this.svc.removeFromWishlist({ customerId, productId }),
+    );
   }
 
   @Get()
-  listWishlist(
-    @Query('customerId', ParseUUIDPipe) customerId: string,
+  async listWishlist(
+    @Req() req: Request,
   ): Promise<WishlistItemResponse[]> {
-    return this.svc.listWishlist(customerId);
+    const { customerId, shopId } = getCustomerCtx(req);
+    return tenantContext.runWith(this.makeCtx(shopId, customerId), () =>
+      this.svc.listWishlist(customerId),
+    );
+  }
+
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- shopId comes from authenticated CustomerAuthGuard context, not raw request body
+  private makeCtx(shopId: string, userId: string): AuthenticatedTenantContext {
+    const tenant: Tenant = { id: shopId, slug: '', display_name: '', status: 'ACTIVE' };
+    return { authenticated: true, shopId, userId, role: 'shop_staff', tenant };
   }
 }

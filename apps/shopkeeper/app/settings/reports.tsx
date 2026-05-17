@@ -1,37 +1,75 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing } from '@goldsmith/ui-tokens';
+import { colors, spacing, typography } from '@goldsmith/ui-tokens';
+
+const LINKS = [
+  { label: 'Daily summary', href: '/reports/daily-summary', icon: 'today-outline' },
+  { label: 'Outstanding balances', href: '/reports/outstanding', icon: 'wallet-outline' },
+  { label: 'Stock aging', href: '/reports/stock-aging', icon: 'timer-outline' },
+  { label: 'GSTR export', href: '/reports/gstr-export', icon: 'download-outline' },
+] as const;
 
 export default function ReportsSettingsScreen(): React.ReactElement {
   return (
-    <View style={styles.container} testID="reports-settings-screen">
-      <Ionicons name="bar-chart-outline" size={48} color={colors.inkMute} />
-      <Text style={styles.title}>रिपोर्ट सेटिंग्स</Text>
-      <Text style={styles.body}>यह जल्द उपलब्ध होगा।</Text>
-    </View>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} testID="reports-settings-screen">
+      <Text style={styles.title}>Report shortcuts</Text>
+      <Text style={styles.subtitle}>Open the operational reports and export screens used by the shop.</Text>
+      <View style={styles.list}>
+        {LINKS.map((link) => (
+          <Pressable
+            key={link.href}
+            style={styles.row}
+            onPress={() => router.push(link.href as Parameters<typeof router.push>[0])}
+            accessibilityRole="button"
+            accessibilityLabel={link.label}
+          >
+            <View style={styles.rowLeft}>
+              <Ionicons name={link.icon} size={22} color={colors.infoSky} />
+              <Text style={styles.rowLabel}>{link.label}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.inkMute} />
+          </Pressable>
+        ))}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    gap: spacing.sm,
-  },
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
   title: {
-    fontSize: 20,
+    fontSize: 22,
     fontFamily: typography.headingMid.family,
+    fontWeight: '700',
     color: colors.ink,
-    marginTop: spacing.sm,
   },
-  body: {
-    fontSize: 16,
+  subtitle: {
+    fontSize: 15,
     fontFamily: typography.body.family,
     color: colors.inkMute,
-    textAlign: 'center',
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
+  },
+  list: { gap: spacing.sm },
+  row: {
+    minHeight: 56,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  rowLabel: {
+    fontSize: 16,
+    fontFamily: typography.body.family,
+    fontWeight: '700',
+    color: colors.ink,
   },
 });

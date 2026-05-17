@@ -1,0 +1,54 @@
+{
+    "cli":  {
+                "version":  "\u003e= 18.0.0",
+                "appVersionSource":  "local"
+            },
+    "build":  {
+                  "development":  {
+                                      "developmentClient":  true,
+                                      "distribution":  "internal",
+                                      "android":  {
+                                                      "buildType":  "apk",
+                                                      "gradleCommand":  ":app:assembleDebug"
+                                                  },
+                                      "env":  {
+                                                  "APP_ENV":  "development",
+                                                  "EXPO_PUBLIC_DEV_AUTH":  "1",
+                                                  "EXPO_PUBLIC_API_BASE_URL":  "https://goldsmith-api-s5yuu4e4ra-el.a.run.app",
+                                                  "EXPO_PUBLIC_SHOP_SLUG":  "anchor-dev",
+                                                  "EXPO_PUBLIC_ANDROID_PACKAGE":  "com.goldsmith.customer.dev",
+                                                  "EXPO_PUBLIC_IOS_BUNDLE_ID":  "com.goldsmith.customer.dev",
+                                                  "EXPO_PUBLIC_FIREBASE_PROJECT_ID":  "goldsmith-dev",
+                                                  "EXPO_PUBLIC_APP_NAME":  "श्री राम ज्वैलर्स"
+                                              }
+                                  },
+                  "preview":  {
+                                  "distribution":  "internal",
+                                  "android":  {
+                                                  "buildType":  "apk"
+                                              },
+                                  "env":  {
+                                              "APP_ENV":  "preview",
+                                              "EXPO_PUBLIC_API_BASE_URL":  "https://goldsmith-api-s5yuu4e4ra-el.a.run.app",
+                                              "EXPO_PUBLIC_SHOP_SLUG":  "anchor-dev",
+                                              "EXPO_PUBLIC_ANDROID_PACKAGE":  "com.goldsmith.customer.dev",
+                                              "EXPO_PUBLIC_IOS_BUNDLE_ID":  "com.goldsmith.customer.dev",
+                                              "EXPO_PUBLIC_FIREBASE_PROJECT_ID":  "goldsmith-dev",
+                                              "EXPO_PUBLIC_APP_NAME":  "श्री राम ज्वैलर्स"
+                                          }
+                              },
+                  "production":  {
+                                     "android":  {
+                                                     "buildType":  "app-bundle"
+                                                 },
+                                     "env":  {
+                                                 "APP_ENV":  "production"
+                                             }
+                                 }
+              },
+    "submit":  {
+                   "production":  {
+
+                                  }
+               }
+}

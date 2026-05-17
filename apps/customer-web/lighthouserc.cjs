@@ -2,15 +2,15 @@
 module.exports = {
   ci: {
     collect: {
-      // Static export mode: use 'serve' to host the out/ directory locally.
+      // SSR/App Hosting mode: run against the production Next server so the
+      // audited pages match the artifact deployed by Firebase App Hosting.
       // Run 'pnpm build' before 'pnpm test:lighthouse-ci'.
-      // 'next start' is not valid for output: 'export'.
-      staticDistDir: './out',
+      startServerCommand: 'pnpm start',
+      startServerReadyPattern: 'Ready in',
+      startServerReadyTimeout: 30000,
       url: [
         'http://localhost:3000/',
         'http://localhost:3000/products',
-        // Note: product detail pages are now pre-rendered from API at build time.
-        // Use /products/_placeholder which always renders a 404 (tests error handling).
       ],
       numberOfRuns: 1,
       settings: {

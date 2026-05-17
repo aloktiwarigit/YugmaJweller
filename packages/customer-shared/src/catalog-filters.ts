@@ -7,8 +7,16 @@ export function metalLabel(metal: string): string {
   return METAL_LABELS[metal] ?? metal;
 }
 
-export function purityLabel(purity: string): string {
-  const metalKey = purity.split('_')[0] ?? '';
+// `metalHint` is the catalog API's `product.metal` enum (GOLD/SILVER/PLATINUM).
+// The historic contract returned long-form purities like "GOLD_22K", so the
+// metal could be derived by splitting on "_". The current customer catalog
+// endpoint returns SHORT purities ("22K", "999"); the split is empty and the
+// Hindi metal prefix was being dropped on browse + carousel cards (verified
+// on Moto G 2026-05-12 — "22K" instead of "सोना 22K"). Callers in front of
+// CatalogProductCard data should always pass `product.metal`.
+export function purityLabel(purity: string, metalHint?: string): string {
+  const splitKey = purity.split('_')[0] ?? '';
+  const metalKey = METAL_LABELS[splitKey] ? splitKey : (metalHint ?? '');
   const metalHi  = METAL_LABELS[metalKey] ?? '';
   const k        = PURITY_LABELS[purity] ?? purity;
   return metalHi ? `${metalHi} ${k}` : k;

@@ -54,14 +54,15 @@ export class AuthController {
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   async session(@Req() req: Request, @Ip() ip: string) {
     const user = (req as FirebaseRequest).user;
-    if (!user?.uid || !user.phone_number) throw new UnauthorizedException({ code: 'auth.missing' });
-    return this.svc.session({
-      uid: user.uid,
-      phoneE164: user.phone_number,
-      ip,
-      userAgent: String(req.headers['user-agent'] ?? ''),
-      requestId: String(req.headers['x-request-id'] ?? ''),
-    });
+    if (!user?.uid) throw new UnauthorizedException({ code: 'auth.missing' });
+    const ua = String(req.headers['user-agent'] ?? '');
+    const requestId = String(req.headers['x-request-id'] ?? '');
+    // Phone OTP path: token has phone_number claim
+    if (user.phone_number) {
+      return this.svc.session({ uid: user.uid, phoneE164: user.phone_number, ip, userAgent: ua, requestId });
+    }
+    // OAuth path (Google / email): look up by existing Firebase UID
+    return this.svc.sessionByFirebaseUid({ uid: user.uid, ip, userAgent: ua, requestId });
   }
 
   @TenantWalkerRoute({

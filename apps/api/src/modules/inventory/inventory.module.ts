@@ -1,9 +1,7 @@
 import { Module, OnModuleDestroy, OnModuleInit, Inject } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
-import { Worker } from '@goldsmith/queue';
 import { Redis } from '@goldsmith/cache';
-import { TenantQueue, createTenantWorker } from '@goldsmith/queue';
-import type { JobPayload } from '@goldsmith/queue';
+import { Worker, TenantQueue, createTenantWorker, type JobPayload } from '@goldsmith/queue';
 import { StorageModule } from '@goldsmith/integrations-storage';
 import { SearchModule } from '@goldsmith/integrations-search';
 import { AuthModule } from '../auth/auth.module';

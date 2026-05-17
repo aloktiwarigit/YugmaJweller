@@ -10,6 +10,12 @@ import {
   getCustomOrders,
   getRateLockBookings,
   getTryAtHomeBookings,
+  getCatalogProducts,
+  getProductImages,
+  getNewArrivalProducts,
+  getTopSellerProducts,
+  addToWishlist,
+  removeFromWishlist,
 } from './endpoints';
 
 describe('endpoints', () => {
@@ -103,11 +109,112 @@ describe('endpoints', () => {
     expect(r.items).toEqual([]);
   });
 
-  it('customerSelfDelete maps 501 NotImplemented to typed error', async () => {
-    mock.onDelete('/api/v1/crm/customer/me').reply(501, { code: 'deletion.customer_app_not_yet_available' });
-    await expect(customerSelfDelete()).rejects.toMatchObject({
-      code: 'deletion.customer_app_not_yet_available',
+  it('normalizes relative catalog image URLs against the API origin', async () => {
+    mock.onGet('/api/v1/catalog/products').reply(200, {
+      items: [{
+        id: 'prod-1',
+        sku: 'SKU-1',
+        metal: 'GOLD',
+        purity: 'GOLD_22K',
+        categoryId: null,
+        categoryName: 'Gold Rings',
+        grossWeightG: '5.0000',
+        netWeightG: '4.8000',
+        huid: 'ABC123',
+        huidExemptionCategory: 'none',
+        quantity: 1,
+        priceAvailable: true,
+        publishedAt: '2026-05-16T00:00:00.000Z',
+        primaryImage: {
+          url: '/demo-shop/ring.jpg',
+          placeholderUrl: '/demo-shop/ring-small.jpg',
+          srcset: '/demo-shop/ring.jpg 320w, /demo-shop/ring@2x.jpg 640w',
+          width: 1200,
+          height: 1500,
+          alt: 'Ring',
+        },
+      }],
+      total: 1,
+      page: 1,
     });
+
+    const r = await getCatalogProducts();
+
+    expect(r.items[0]?.primaryImage?.url).toMatch(/^data:image\//);
+    expect(r.items[0]?.primaryImage?.placeholderUrl).toMatch(/^data:image\//);
+    expect(r.items[0]?.primaryImage?.srcset).toMatch(/^data:image\//);
+  });
+
+  it('normalizes relative PDP gallery image URLs against the API origin', async () => {
+    mock.onGet('/api/v1/catalog/products/prod-1/images').reply(200, {
+      images: [{
+        id: 'img-1',
+        alt_text: 'Ring',
+        width: 1200,
+        height: 1500,
+        default_url: '/demo-shop/ring.jpg',
+        placeholder_url: '/demo-shop/ring-small.jpg',
+        srcset: '/demo-shop/ring.jpg 320w',
+      }],
+    });
+
+    const r = await getProductImages('prod-1');
+
+    expect(r[0]?.default_url).toMatch(/^data:image\//);
+    expect(r[0]?.placeholder_url).toMatch(/^data:image\//);
+    expect(r[0]?.srcset).toMatch(/^data:image\//);
+  });
+
+  it('customerSelfDelete sends DELETE /api/v1/crm/customer/me', async () => {
+    mock.onDelete('/api/v1/crm/customer/me').reply(202, {
+      scheduledAt: '2026-05-16T12:00:00.000Z',
+      hardDeleteAt: '2026-06-15T12:00:00.000Z',
+    });
+    await expect(customerSelfDelete()).resolves.toBeUndefined();
+    expect(mock.history['delete']?.[0]?.url).toBe('/api/v1/crm/customer/me');
+  });
+
+  it('customerSelfDelete maps deletion API errors to typed errors', async () => {
+    mock.onDelete('/api/v1/crm/customer/me').reply(422, { code: 'crm.deletion.open_invoices' });
+    await expect(customerSelfDelete()).rejects.toMatchObject({
+      code: 'crm.deletion.open_invoices',
+      status: 422,
+    });
+  });
+});
+
+describe('new-arrivals and top-sellers endpoints', () => {
+  let mock: MockAdapter;
+  beforeEach(() => { mock = new MockAdapter(api); });
+  afterEach(() => mock.reset());
+
+  it('getNewArrivalProducts calls /api/v1/catalog/products/new-arrivals', async () => {
+    const payload = { items: [], total: 0, page: 1 };
+    mock.onGet('/api/v1/catalog/products/new-arrivals').reply(200, payload);
+    const result = await getNewArrivalProducts(8);
+    expect(result.items).toEqual([]);
+    expect(mock.history['get']?.[0]?.url).toBe('/api/v1/catalog/products/new-arrivals');
+  });
+
+  it('getTopSellerProducts calls /api/v1/catalog/products/top-sellers', async () => {
+    const payload = { items: [], total: 0, page: 1 };
+    mock.onGet('/api/v1/catalog/products/top-sellers').reply(200, payload);
+    const result = await getTopSellerProducts(8);
+    expect(result.items).toEqual([]);
+    expect(mock.history['get']?.[0]?.url).toBe('/api/v1/catalog/products/top-sellers');
+  });
+
+  it('addToWishlist posts productId to /api/v1/wishlist', async () => {
+    mock.onPost('/api/v1/wishlist').reply(200);
+    await addToWishlist('prod-abc');
+    expect(mock.history['post']?.[0]?.url).toBe('/api/v1/wishlist');
+    expect(JSON.parse(mock.history['post']?.[0]?.data as string)).toMatchObject({ productId: 'prod-abc' });
+  });
+
+  it('removeFromWishlist sends DELETE /api/v1/wishlist/:id', async () => {
+    mock.onDelete('/api/v1/wishlist/prod-xyz').reply(200);
+    await removeFromWishlist('prod-xyz');
+    expect(mock.history['delete']?.[0]?.url).toBe('/api/v1/wishlist/prod-xyz');
   });
 });
 

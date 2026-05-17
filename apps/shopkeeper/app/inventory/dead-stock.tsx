@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -142,7 +142,7 @@ export default function DeadStockScreen(): React.ReactElement {
   }, []);
 
   // Fetch on mount
-  React.useEffect(() => {
+  useEffect(() => {
     fetchData();
   }, [fetchData]);
 

@@ -18,7 +18,7 @@ export function TopSellersSection({ products }: TopSellersSectionProps) {
           <SectionHeading
             id="top-sellers-heading"
             titleHi="टॉप सेलर"
-            pill={{ labelHi: 'लोकप्रिय', className: 'bg-accentWash text-accent' }}
+            pill={{ labelHi: 'लोकप्रिय', className: 'bg-accentWash text-ink' }}
           />
           <Link
             href="/products?sort=bestseller"

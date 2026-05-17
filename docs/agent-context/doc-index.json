@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-12T03:43:42.812Z",
+  "generated": "2026-05-16T15:55:30.494Z",
   "docs": [
     {
       "path": "_bmad-output/planning-artifacts/adr/0001-auth-provider-supabase.md",
@@ -482,6 +482,14 @@
       "supersededBy": null
     },
     {
+      "path": "docs/demo-image-credits.md",
+      "kind": "other",
+      "estimatedTokens": 580,
+      "readWhen": "reference only",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
       "path": "docs/functional-overview.md",
       "kind": "other",
       "estimatedTokens": 2850,
@@ -756,7 +764,7 @@
     {
       "path": "docs/runbook.md",
       "kind": "other",
-      "estimatedTokens": 6160,
+      "estimatedTokens": 6840,
       "readWhen": "reference only",
       "avoidByDefault": false,
       "supersededBy": null

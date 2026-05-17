@@ -1,13 +1,28 @@
 import { Module, OnModuleInit } from '@nestjs/common';
 import { BullModule, InjectQueue } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
 import { Redis } from '@goldsmith/cache';
 import { RazorpayAdapter, StubPaymentsAdapter } from '@goldsmith/integrations-payments';
-import { Queue } from '@goldsmith/queue';
 import { AuthModule }    from '../auth/auth.module';
 import { PricingModule } from '../pricing/pricing.module';
 import { RateLockBookingsController } from './rate-lock-bookings.controller';
 import { RateLockBookingsService }    from './rate-lock-bookings.service';
 import { RateLockExpiryProcessor, RATE_LOCK_EXPIRY_QUEUE } from '../../workers/rate-lock-expiry.processor';
+
+export function createRateLockPaymentsAdapter(): RazorpayAdapter | StubPaymentsAdapter {
+  const adapter   = process.env['PAYMENTS_ADAPTER'] ?? '';
+  const isProd    = process.env['NODE_ENV'] === 'production';
+  const allowStub = process.env['ALLOW_STUB_PAYMENTS'] === '1';
+  if (isProd && adapter !== 'razorpay' && !allowStub) {
+    throw new Error(
+      'PAYMENTS_ADAPTER must be "razorpay" in production. ' +
+      'The stub payments adapter is only allowed in non-production environments. ' +
+      'Set ALLOW_STUB_PAYMENTS=1 to opt into the stub for demo/staging deployments in production mode.',
+    );
+  }
+  if (adapter === 'razorpay') return new RazorpayAdapter();
+  return new StubPaymentsAdapter();
+}
 
 @Module({
   imports: [
@@ -29,15 +44,7 @@ import { RateLockExpiryProcessor, RATE_LOCK_EXPIRY_QUEUE } from '../../workers/r
     RateLockExpiryProcessor,
     {
       provide: 'RATE_LOCK_PAYMENTS_ADAPTER',
-      useFactory: () => {
-        const adapter = process.env['PAYMENTS_ADAPTER'] ?? '';
-        if (adapter === 'razorpay') return new RazorpayAdapter();
-        if (adapter === 'stub') return new StubPaymentsAdapter();
-        if (process.env['NODE_ENV'] === 'production') {
-          throw new Error('PAYMENTS_ADAPTER must be "razorpay" or "stub" in production.');
-        }
-        return new StubPaymentsAdapter();
-      },
+      useFactory: createRateLockPaymentsAdapter,
     },
     {
       provide: 'RATE_LOCK_REDIS',

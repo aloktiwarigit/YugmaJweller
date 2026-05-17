@@ -70,6 +70,9 @@ class ConditionalTenantInterceptor implements NestInterceptor {
           ...(u.protocol === 'rediss:' ? { tls: {} } : {}),
           lazyConnect: true,
           enableReadyCheck: false,
+          connectTimeout: 10000,
+          maxRetriesPerRequest: null,
+          retryStrategy: (times: number) => Math.min(times * 200, 5000),
         };
       })(),
     }),

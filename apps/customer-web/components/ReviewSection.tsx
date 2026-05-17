@@ -1,19 +1,12 @@
 'use client';
 import { useState } from 'react';
+import type { PublicReviewItem } from '@goldsmith/customer-shared';
 import { StarRating } from './StarRating';
-
-export interface ReviewItem {
-  id:                string;
-  rating:            number;
-  reviewText:        string | null;
-  customerFirstName: string | null;
-  createdAt:         string;
-}
 
 interface ReviewSectionProps {
   productId:     string;
   shopId:        string;
-  reviews:       ReviewItem[];
+  reviews:       PublicReviewItem[];
   averageRating: number | null;
   total:         number;
 }
@@ -43,7 +36,7 @@ export function ReviewSection({ reviews, averageRating, total }: ReviewSectionPr
               <div className="flex items-center gap-2 mb-1">
                 <StarRating rating={r.rating} size="sm" />
                 <span className="font-body text-xs text-inkMute">
-                  {r.customerFirstName ?? 'ग्राहक'}
+                  {r.customerDisplayName}
                 </span>
               </div>
               {r.reviewText && (

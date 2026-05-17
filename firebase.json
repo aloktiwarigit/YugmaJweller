@@ -1,7 +1,28 @@
 {
-  "apphosting": {
-    "backendId": "goldsmith-customer-web"
-  },
+  "apphosting": [
+    {
+      "backendId": "goldsmith-customer-web",
+      "rootDir": "apps/customer-web",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        ".firebase",
+        ".turbo",
+        "coverage",
+        "artifacts",
+        "apps/customer-web/.next",
+        "apps/customer-web/.lighthouseci",
+        "apps/customer-web/.turbo",
+        "apps/customer-web/node_modules",
+        "apps/customer-web/out",
+        "apps/api/tmp",
+        "apps/customer-mobile",
+        "apps/shopkeeper"
+      ]
+    }
+  ],
   "emulators": {
     "auth": {
       "port": 9099

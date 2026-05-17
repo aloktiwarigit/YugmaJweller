@@ -20,15 +20,16 @@ beforeEach(() => {
 });
 
 describe('(tabs)/more.tsx', () => {
-  it('renders 4 menu rows for owner role', () => {
+  it('renders manager menu rows for owner role', () => {
     const { container } = render(<MoreScreen />);
     expect(container.textContent).toContain('ग्राहक सूची');
     expect(container.textContent).toContain('कस्टम ऑर्डर');
     expect(container.textContent).toContain('ट्राई-एट-होम');
     expect(container.textContent).toContain('दर-लॉक बुकिंग');
+    expect(container.textContent).toContain('सेटिंग्स');
   });
 
-  it('hides दर-लॉक बुकिंग for staff role', () => {
+  it('hides manager workflows for staff role', () => {
     useAuthStore.setState({
       firebaseUser: null,
       user: { id: 'u2', shopId: 's1', role: 'shop_staff', displayName: 'Staff' },
@@ -36,11 +37,12 @@ describe('(tabs)/more.tsx', () => {
       loading: false,
     });
     const { container } = render(<MoreScreen />);
-    expect(container.textContent).toContain('ग्राहक सूची');
+    expect(container.textContent).toContain('स्टाफ की पहुंच बिलिंग और इन्वेंटरी तक सीमित है।');
+    expect(container.textContent).not.toContain('ग्राहक सूची');
     expect(container.textContent).not.toContain('दर-लॉक बुकिंग');
   });
 
-  it('renders all three non-rate-lock rows for staff', () => {
+  it('does not render CRM/custom-order/try-at-home rows for staff', () => {
     useAuthStore.setState({
       firebaseUser: null,
       user: { id: 'u2', shopId: 's1', role: 'shop_staff', displayName: 'Staff' },
@@ -48,7 +50,7 @@ describe('(tabs)/more.tsx', () => {
       loading: false,
     });
     const { container } = render(<MoreScreen />);
-    expect(container.textContent).toContain('कस्टम ऑर्डर');
-    expect(container.textContent).toContain('ट्राई-एट-होम');
+    expect(container.textContent).not.toContain('कस्टम ऑर्डर');
+    expect(container.textContent).not.toContain('ट्राई-एट-होम');
   });
 });

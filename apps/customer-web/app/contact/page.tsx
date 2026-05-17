@@ -1,17 +1,12 @@
+import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
+import { resolveShopSlug } from '@/lib/tenant-slug';
 import { fetchTenantConfig } from '@/lib/api';
 
-// searchParams are not available in static export server components.
-// The interest label derived from searchParams is cosmetic-only so we omit it
-// in the static pre-render; the contact info is always correct.
-export const dynamic = 'force-static';
-
-// force-static pages cannot call headers() — use build-time env var.
-// middleware.ts stamps x-shop-slug on all non-static requests; only dynamic
-// pages can benefit from that header via resolveShopSlug(headers()).
-const SHOP_SLUG = process.env.NEXT_PUBLIC_SHOP_SLUG ?? null;
-
 export default async function ContactPage() {
-  const config = SHOP_SLUG ? await fetchTenantConfig(SHOP_SLUG) : null;
+  const slug = resolveShopSlug(headers());
+  if (!slug) notFound();
+  const config = await fetchTenantConfig(slug);
 
   return (
     <div className="max-w-xl mx-auto px-4 py-12">

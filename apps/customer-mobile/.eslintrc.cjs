@@ -2,7 +2,7 @@
 module.exports = {
   root: false,
   extends: ['../../.eslintrc.cjs'],
-  ignorePatterns: ['dist/**', 'node_modules/**', '.expo/**'],
+  ignorePatterns: ['dist/**', 'node_modules/**', '.expo/**', 'android/**', 'ios/**'],
   rules: {
     '@typescript-eslint/no-unused-vars': [
       'error',

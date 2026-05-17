@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import type { CategoryTile } from '@goldsmith/customer-shared';
 
@@ -8,52 +9,56 @@ interface CategoryTileGridProps {
 }
 
 const colClass: Record<number, string> = {
-  4: 'grid-cols-4 sm:grid-cols-4 md:grid-cols-4',
-  3: 'grid-cols-3 sm:grid-cols-3 md:grid-cols-3',
+  4: 'grid-cols-2 sm:grid-cols-4 md:grid-cols-4',
+  3: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3',
 };
 
-function CategoryIcon({ label }: { label: string }) {
-  return (
-    <svg
-      width="32"
-      height="32"
-      viewBox="0 0 32 32"
-      fill="none"
-      aria-hidden="true"
-      className="text-primary"
-    >
-      <rect x="4" y="4" width="24" height="24" rx="4" stroke="currentColor" strokeWidth="1.5" />
-      <text x="16" y="21" textAnchor="middle" fontSize="14" fill="currentColor" fontFamily="serif">
-        {label.slice(0, 1)}
-      </text>
-    </svg>
-  );
-}
+const CATEGORY_IMAGES: Record<string, string> = {
+  rings: '/demo-shop/campaign-rings-showcase.jpg',
+  earrings: '/demo-shop/campaign-gift-table.jpg',
+  pendants: '/demo-shop/campaign-lifestyle-necklace.jpg',
+  bangles: '/demo-shop/hero-bangles.jpg',
+  necklaces: '/demo-shop/campaign-necklace-showcase.jpg',
+  mangalsutra: '/demo-shop/campaign-black-gold.jpg',
+  bracelets: '/demo-shop/gold-ginkgo-wide.jpg',
+  silver: '/demo-shop/campaign-luxe-window.jpg',
+};
 
 export function CategoryTileGrid({ tiles, columns = 4, headingId }: CategoryTileGridProps) {
   const gridClass = colClass[columns] ?? colClass[4];
 
   return (
-    <div
+    <ul
       className={`grid gap-3 ${gridClass}`}
-      role="list"
       aria-labelledby={headingId}
     >
-      {tiles.map((tile) => (
-        <Link
-          key={tile.key}
-          href={tile.href}
-          role="listitem"
-          className="group flex flex-col items-center gap-2 p-3 bg-surface rounded-md border border-borderSubtle hover:border-borderStrong hover:shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-primary"
-        >
-          <div className="w-12 h-12 flex items-center justify-center">
-            <CategoryIcon label={tile.labelHi} />
-          </div>
-          <span className="font-ui font-medium text-xs text-center text-ink group-hover:text-primaryDeep transition-colors line-clamp-2">
-            {tile.labelHi}
-          </span>
-        </Link>
-      ))}
-    </div>
+      {tiles.map((tile) => {
+        const image = CATEGORY_IMAGES[tile.key] ?? '/demo-shop/campaign-showroom-display.jpg';
+
+        return (
+          <li key={tile.key}>
+            <Link
+              href={tile.href}
+              className="group block overflow-hidden rounded-md border border-borderSubtle bg-surface transition-all hover:border-borderStrong hover:shadow-sm focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              <div className="relative bg-bg" style={{ aspectRatio: '4/3' }}>
+                <Image
+                  src={image}
+                  alt={tile.labelEn}
+                  fill
+                  sizes="(max-width: 640px) 50vw, 280px"
+                  className="object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              </div>
+              <div className="flex min-h-12 items-center justify-center px-2 py-2">
+                <span className="line-clamp-2 text-center font-ui text-xs font-semibold text-ink transition-colors group-hover:text-primaryDeep">
+                  {tile.labelHi}
+                </span>
+              </div>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

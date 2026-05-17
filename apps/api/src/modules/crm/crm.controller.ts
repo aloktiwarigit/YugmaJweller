@@ -1,7 +1,8 @@
-import { BadRequestException, Body, Controller, Delete, Get, NotImplementedException, Param, Patch, Post, Put, Query, UnauthorizedException, ParseUUIDPipe } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Put, Query, Req, UnauthorizedException, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import type { Request } from 'express';
 import { z } from 'zod';
-import { TenantContextDec } from '@goldsmith/tenant-context';
-import type { TenantContext } from '@goldsmith/tenant-context';
+import { TenantContextDec, tenantContext } from '@goldsmith/tenant-context';
+import type { AuthenticatedTenantContext, Tenant, TenantContext } from '@goldsmith/tenant-context';
 import { CreateCustomerSchema, UpdateCustomerSchema, CustomerListQuerySchema, LinkFamilySchema, RequestDeletionDtoSchema, UpdateViewingConsentSchema } from '@goldsmith/shared';
 import type { CreateCustomerDto, UpdateCustomerDto, CustomerResponse, LinkFamilyDto, FamilyMemberResponse, RequestDeletionDto, DeletionRequestResponse, UpdateViewingConsentDto, ViewingConsentResponse } from '@goldsmith/shared';
 import type { CustomerSearchResult } from '@goldsmith/integrations-search';
@@ -9,7 +10,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { SkipAuth } from '../../common/decorators/skip-auth.decorator';
 import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { Inject } from '@nestjs/common';
+import { CustomerAuthGuard, getCustomerCtx } from '../customer/customer-auth.guard';
 import { CrmService } from './crm.service';
 import { DpdpaDeletionService } from './dpdpa-deletion.service';
 import { ConsentService } from './consent.service';
@@ -187,9 +188,17 @@ export class CrmController {
     return this.dpdpaSvc.restoreDeletion(ctx, id);
   }
 
-  @Delete('customer/me') @SkipAuth() @SkipTenant()
-  customerSelfDelete(): never {
-    throw new NotImplementedException({ code: 'deletion.customer_app_not_yet_available', message: 'Self-deletion via the customer app launches in Epic 7.' });
+  @Delete('customer/me')
+  @HttpCode(202)
+  @SkipAuth()
+  @SkipTenant()
+  @UseGuards(CustomerAuthGuard)
+  async customerSelfDelete(@Req() req: Request): Promise<DeletionRequestResponse> {
+    const { customerId, shopId } = getCustomerCtx(req);
+    const ctx = this.makeCustomerDeletionCtx(shopId, customerId);
+    return tenantContext.runWith(ctx, () =>
+      this.dpdpaSvc.requestDeletion(ctx, customerId, 'customer'),
+    );
   }
 
   @Get('customers/:id/consent/viewing') @Roles('shop_admin', 'shop_manager', 'shop_staff')
@@ -202,5 +211,11 @@ export class CrmController {
   async updateViewingConsent(@TenantContextDec() ctx: TenantContext, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodValidationPipe(UpdateViewingConsentSchema)) dto: UpdateViewingConsentDto): Promise<ViewingConsentResponse> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.consentSvc.updateConsent(ctx, id, dto, { ip: null, userAgent: null });
+  }
+
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- shopId comes from authenticated CustomerAuthGuard context, not request body
+  private makeCustomerDeletionCtx(shopId: string, customerId: string): AuthenticatedTenantContext {
+    const tenant: Tenant = { id: shopId, slug: '', display_name: '', status: 'ACTIVE' };
+    return { authenticated: true, shopId, userId: customerId, role: 'shop_staff', tenant };
   }
 }

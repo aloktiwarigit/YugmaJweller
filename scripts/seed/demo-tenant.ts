@@ -224,7 +224,7 @@ async function seed(client: PoolClient): Promise<void> {
   const shopRes = await client.query<{ id: string }>(
     `INSERT INTO shops (slug, display_name, status, config, gstin, contact_phone,
         address_json, logo_url, years_in_business)
-     VALUES ('shri-ram-jewellers', $1, 'ACTIVE', $2, $3, $4, $5, NULL, 25)
+     VALUES (COALESCE($6, 'shri-ram-jewellers'), $1, 'ACTIVE', $2, $3, $4, $5, NULL, 25)
      ON CONFLICT (slug) DO UPDATE SET
        display_name = EXCLUDED.display_name,
        gstin = EXCLUDED.gstin,
@@ -252,6 +252,7 @@ async function seed(client: PoolClient): Promise<void> {
         pincode: '224123',
         country: 'IN',
       }),
+      process.env['SEED_SHOP_SLUG'] ?? null,
     ],
   );
   const shopId = shopRes.rows[0].id;
@@ -279,14 +280,18 @@ async function seed(client: PoolClient): Promise<void> {
        updated_at = now()`,
     [
       shopId,
-      JSON.stringify({
-        gold_rings: 12,
-        gold_bangles: 8,
-        silver: 10,
-        diamond: 15,
-        bridal: 14,
-        default: 10,
-      }),
+      // making_charges_json MUST match @goldsmith/shared MakingChargeConfig:
+      // an array of { category, type, value }. Older seeds wrote a flat
+      // {gold_rings: 12, gold_bangles: 8, ...} object that crashed
+      // catalog.service.ts with "configs.map is not a function".
+      JSON.stringify([
+        { category: 'RINGS',     type: 'percent', value: '12.00' },
+        { category: 'CHAINS',    type: 'percent', value: '10.00' },
+        { category: 'BANGLES',   type: 'percent', value: '8.00'  },
+        { category: 'BRIDAL',    type: 'percent', value: '15.00' },
+        { category: 'SILVER',    type: 'percent', value: '5.00'  },
+        { category: 'WHOLESALE', type: 'percent', value: '7.00'  },
+      ]),
       JSON.stringify({ default_pct: 2 }),
       JSON.stringify({
         tiers: [
@@ -731,11 +736,24 @@ async function seed(client: PoolClient): Promise<void> {
 // Entry point
 // ---------------------------------------------------------------------------
 async function main(): Promise<void> {
-  const pool = new Pool({ ...DB });
+  // Honor DATABASE_URL (production secret form) first; fall back to PG* vars
+  // for local dev runs. The connectionString path lets pg parse special
+  // characters in the password without shell-escaping surprises.
+  const connStr = process.env['DATABASE_URL'];
+  const pool = connStr ? new Pool({ connectionString: connStr }) : new Pool({ ...DB });
+
+  // FORCE ROW LEVEL SECURITY is applied to every tenant table, and Cloud SQL's
+  // `postgres` role is NOT a true superuser there — it cannot bypass RLS. The
+  // seed needs unrestricted writes across all tenants, so switch to
+  // `platform_admin` which has rolbypassrls=true. This is a no-op locally
+  // when the connected user is already a superuser.
+  pool.on('connect', (client) => {
+    client.query('SET ROLE platform_admin').catch(() => undefined);
+  });
 
   // Probe connection
   await pool.query('SELECT 1');
-  console.log(`Connected to ${DB.host}:${DB.port}/${DB.database}`);
+  console.log(`Connected (${connStr ? 'via DATABASE_URL' : `to ${DB.host}:${DB.port}/${DB.database}`}) as platform_admin`);
 
   // Check if demo shop already exists
   const existing = await pool.query<{ id: string; display_name: string }>(

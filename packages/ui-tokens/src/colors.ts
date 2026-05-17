@@ -15,7 +15,7 @@ export const colors = {
   surfaceElevated: '#FFFBF2',  // hero card, modal — warmer than pure white
   surfaceRecessed: '#EDE2CC',  // section dividers, filter rail bg
   inkMute:         '#4A526E',  // secondary text
-  inkSoft:         '#6B7392',  // tertiary, captions
+  inkSoft:         '#58607D',  // tertiary, captions; AA on cream canvas for small text
   borderSubtle:    '#E6D8B8',  // inside cream sections
   borderStrong:    '#B89F70',  // active filter, focus ring
   successJade:     '#2F7D5B',  // in-stock, HUID verified ✓

@@ -17,7 +17,7 @@ interface NoResultsProps {
 const CURATED_CATEGORIES: Array<{ svg: string; labelHi: string; sublabelHi: string; href: string }> = [
   { svg: RING_SVG,     labelHi: 'सोना',       sublabelHi: 'सम्पूर्ण संग्रह', href: '/products?metal=GOLD' },
   { svg: SILVER_SVG,   labelHi: 'चाँदी',       sublabelHi: 'सम्पूर्ण संग्रह', href: '/products?metal=SILVER' },
-  { svg: EARRING_SVG,  labelHi: '22K विशेष',   sublabelHi: 'शुद्धता',         href: '/products?purity=22K' },
+  { svg: EARRING_SVG,  labelHi: '22K विशेष',   sublabelHi: 'शुद्धता',         href: '/products?purity=GOLD_22K' },
   { svg: NECKLACE_SVG, labelHi: 'लोकप्रिय',    sublabelHi: 'सबसे ज़्यादा बिकने वाले', href: '/products?sort=trending' },
 ];
 
@@ -25,15 +25,15 @@ function getSuggestions(filters: ActiveFilters): Array<{ labelHi: string; href: 
   const suggestions: Array<{ labelHi: string; href: string }> = [];
 
   if (filters.purity) {
-    const PURITY_ORDER = ['24K', '22K', '20K', '18K', '14K', '925', '999'] as const;
+    const PURITY_ORDER = ['GOLD_24K', 'GOLD_22K', 'GOLD_20K', 'GOLD_18K', 'GOLD_14K', 'SILVER_925', 'SILVER_999'] as const;
     const idx = PURITY_ORDER.indexOf(filters.purity as (typeof PURITY_ORDER)[number]);
     if (idx > 0) {
       const adj = PURITY_ORDER[idx - 1]!;
-      suggestions.push({ labelHi: `${adj} देखें`, href: buildProductsHref({ ...filters, purity: adj }) });
+      suggestions.push({ labelHi: `${adj.replace('GOLD_', '').replace('SILVER_', '')} देखें`, href: buildProductsHref({ ...filters, purity: adj }) });
     }
     if (idx < PURITY_ORDER.length - 1) {
       const adj2 = PURITY_ORDER[idx + 1]!;
-      suggestions.push({ labelHi: `${adj2} देखें`, href: buildProductsHref({ ...filters, purity: adj2 }) });
+      suggestions.push({ labelHi: `${adj2.replace('GOLD_', '').replace('SILVER_', '')} देखें`, href: buildProductsHref({ ...filters, purity: adj2 }) });
     }
     suggestions.push({ labelHi: 'सभी शुद्धता', href: buildProductsHref({ ...filters, purity: undefined }) });
   } else if (filters.metal) {

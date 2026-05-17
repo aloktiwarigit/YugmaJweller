@@ -1,5 +1,5 @@
 import React from 'react';
-import { Redirect } from 'expo-router';
+import { Redirect, type Href } from 'expo-router';
 import { View, ActivityIndicator } from 'react-native';
 import { useAuthStore } from '../src/stores/authStore';
 import { colors } from '@goldsmith/ui-tokens';
@@ -21,5 +21,5 @@ export default function Index(): React.ReactElement {
   if (firebaseUser && user) {
     return <Redirect href="/(tabs)" />;
   }
-  return <Redirect href="/(auth)/phone" />;
+  return <Redirect href={'/(auth)/login' as Href} />;
 }

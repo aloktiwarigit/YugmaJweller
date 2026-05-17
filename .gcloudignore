@@ -1,23 +1,28 @@
-# gcloudignore for Cloud Build API docker builds (submitted from repo root).
-# Firebase App Hosting now uses GitHub integration (not local gcloud upload),
-# so this file is optimised for the API build context only.
-#
-# Include: apps/api/, packages/ (source + compiled dist/), workspace manifests
-# Exclude: other apps, node_modules (rebuilt in Docker), dev artifacts
+# gcloudignore — tuned for Firebase App Hosting web-only source deploy.
+# Target: apps/customer-web only. Everything else excluded.
 
 # Git internals
 .git/
 .github/
 
-# Other apps — not needed to build the API Docker image
+# ALL other apps — only customer-web is needed for this deploy
 apps/shopkeeper/
-apps/customer-web/
+apps/api/
 apps/customer-mobile/
 apps/admin-web/
 
-# Next.js build outputs (not needed for API)
+# Build outputs from customer-web (rebuilt on Firebase build servers)
 apps/customer-web/.next/
 apps/customer-web/out/
+apps/customer-web/node_modules/
+
+# Workspace package compiled outputs — not needed for Next.js (uses transpilePackages)
+packages/*/dist/
+packages/integrations/*/dist/
+
+# pnpm virtual store (rebuilt on Firebase build servers)
+node_modules/
+.pnpm-store/
 
 # Dev tooling and local artifacts
 .playwright-mcp/
@@ -28,10 +33,6 @@ docs/
 _bmad-output/
 artifacts/
 tools/
-
-# pnpm virtual store — rebuilt inside Docker via pnpm install
-node_modules/
-.pnpm-store/
 
 # Test / coverage outputs
 coverage/

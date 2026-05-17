@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { View, Text } from 'react-native';
 import { router } from 'expo-router';
-import { sendOtp } from '@goldsmith/auth-client';
+import { sendOtp } from '../../src/auth/client';
 import { t } from '@goldsmith/i18n';
 import { Button, Input, Toast } from '@goldsmith/ui-mobile';
 import { colors, typography, spacing } from '@goldsmith/ui-tokens';
 import { useOtpStore } from '../../src/stores/otpStore';
 import { useTenantStore } from '../../src/stores/tenantStore';
+import { BrandMark } from '../../src/components/BrandMark';
 
 const PHONE_RE = /^\d{10}$/;
+const fallbackDisplayName = 'अयोध्या स्वर्णकार';
 
 export default function PhoneScreen(): React.ReactElement {
   const [phone, setPhone] = useState('');
@@ -17,6 +19,7 @@ export default function PhoneScreen(): React.ReactElement {
 
   const { setConfirmation } = useOtpStore();
   const tenant = useTenantStore((s) => s.tenant);
+  const displayName = tenant?.displayName ?? fallbackDisplayName;
 
   const isValid = PHONE_RE.test(phone);
 
@@ -55,15 +58,7 @@ export default function PhoneScreen(): React.ReactElement {
     >
       {/* Brand row */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xl }}>
-        <View
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 8,
-            backgroundColor: colors.border,
-            marginRight: spacing.sm,
-          }}
-        />
+        <BrandMark size={40} style={{ marginRight: spacing.sm }} />
         <Text
           style={{
             fontFamily: typography.display.family,
@@ -71,7 +66,7 @@ export default function PhoneScreen(): React.ReactElement {
             color: colors.ink,
           }}
         >
-          {tenant?.displayName ?? ''}
+          {displayName}
         </Text>
       </View>
 

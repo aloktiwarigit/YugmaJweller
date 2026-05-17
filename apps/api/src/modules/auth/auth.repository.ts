@@ -43,6 +43,29 @@ export class AuthRepository {
    * Returns { linked: true } when the UPDATE succeeds, { linked: false } when a concurrent
    * writer won the race (0 rows returned — caller should treat as auth.uid_mismatch).
    */
+  async lookupByFirebaseUid(uid: string): Promise<PhoneLookupRow | null> {
+    const c = await this.pool.connect();
+    try {
+      // Intentionally runs as pool superuser (same privilege as auth_lookup_user_by_phone)
+      // to cross-shop UID resolution for OAuth sign-in.
+      const res = await c.query<{
+        shop_id: string; user_id: string; role: ShopUserRole;
+        status: PhoneLookupRow['status']; firebase_uid: string;
+      }>(
+        `SELECT su.shop_id, su.id AS user_id, su.role, su.status, su.firebase_uid
+           FROM shop_users su
+          WHERE su.firebase_uid = $1 AND su.status != 'REVOKED'
+          LIMIT 1`,
+        [uid],
+      );
+      if (res.rows.length === 0) return null;
+      const r = res.rows[0];
+      return { shopId: r.shop_id, userId: r.user_id, role: r.role, status: r.status, firebaseUid: r.firebase_uid };
+    } finally {
+      c.release();
+    }
+  }
+
   async linkFirebaseUid(args: { shopId: string; userId: string; firebaseUid: string; tenant: Tenant }): Promise<{ linked: boolean }> {
     const unauthCtx: UnauthenticatedTenantContext = { shopId: args.shopId, tenant: args.tenant, authenticated: false };
     return tenantContext.runWith(unauthCtx, () =>

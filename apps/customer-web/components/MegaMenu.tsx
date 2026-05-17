@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback } from 'react';
+import { useCallback } from 'react';
 import type { MegaMenuPanel, MegaMenuLink } from '@goldsmith/customer-shared';
 import { STOREFRONT_BROWSE_NAV, MEGA_MENU_CONTENT } from '@goldsmith/customer-shared';
 
@@ -96,8 +96,6 @@ function MegaPanel({ panel, navKey }: { panel: MegaMenuPanel; navKey: string }) 
 }
 
 export default function MegaMenu({ activeKey, onEnter, onLeave, onClose }: MegaMenuProps) {
-  const menuRef = useRef<HTMLDivElement>(null);
-
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -113,19 +111,18 @@ export default function MegaMenu({ activeKey, onEnter, onLeave, onClose }: MegaM
       aria-label="मुख्य नेविगेशन"
       className="hidden md:block"
     >
-      <ul className="flex items-center gap-0" role="list">
+      <ul className="flex items-center gap-1">
         {STOREFRONT_BROWSE_NAV.map((item) => {
           const hasPanel = item.key in MEGA_MENU_CONTENT;
           const isActive = activeKey === item.key;
           return (
-            <li key={item.key} className="relative" role="none">
+            <li key={item.key} className="relative">
               <a
                 href={item.href}
-                role="menuitem"
                 aria-haspopup={hasPanel ? 'true' : undefined}
                 aria-expanded={hasPanel ? isActive : undefined}
                 className={[
-                  'block px-3 py-2 text-sm font-ui font-medium transition-colors focus-visible:outline-none',
+                  'flex min-h-11 items-center px-3 py-2 text-sm font-ui font-medium transition-colors focus-visible:outline-none',
                   isActive
                     ? 'text-primaryDeep border-b-2 border-primary'
                     : 'text-ink hover:text-primaryDeep',
@@ -135,8 +132,10 @@ export default function MegaMenu({ activeKey, onEnter, onLeave, onClose }: MegaM
                 onKeyDown={(e) => {
                   if (e.key === 'ArrowDown' && hasPanel) {
                     e.preventDefault();
-                    // Focus first link in open panel
-                    const firstLink = menuRef.current?.querySelector<HTMLAnchorElement>('a');
+                    // Traverse to THIS item's panel (role=region is on MegaPanel)
+                    const firstLink = e.currentTarget
+                      .closest('li')
+                      ?.querySelector<HTMLAnchorElement>('[role="region"] a');
                     firstLink?.focus();
                   }
                   if (e.key === 'Escape') onClose();
@@ -147,8 +146,6 @@ export default function MegaMenu({ activeKey, onEnter, onLeave, onClose }: MegaM
 
               {hasPanel && isActive && (
                 <div
-                  ref={menuRef}
-                  role="menu"
                   className="absolute left-0 top-full z-50 mt-0 min-w-[900px] max-w-[1200px] rounded-md bg-surfaceElevated border border-borderSubtle"
                   style={{ boxShadow: '0 16px 40px rgba(30,36,64,0.12)', animation: 'mega-fade-in 180ms ease-out' }}
                   onMouseEnter={() => onEnter(item.key)}

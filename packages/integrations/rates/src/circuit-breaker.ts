@@ -34,43 +34,52 @@ export class CircuitBreaker implements RatesPort {
   }
 
   private async setState(state: CircuitState): Promise<void> {
-    if (state === 'OPEN') {
-      await this.redis.set(this.keyState, state, 'EX', COOLDOWN_SEC * 4);
-    } else if (state === 'HALF_OPEN') {
-      await this.redis.set(this.keyState, state, 'EX', COOLDOWN_SEC);
-    } else {
-      // CLOSED: delete the key; missing → CLOSED in getState()
-      await this.redis.del(this.keyState);
-    }
+    // Best-effort. Redis being out of quota or unreachable must NEVER mask the
+    // adapter's own error or fail the request. If we can't track state,
+    // worst case is a few extra adapter calls — much better than dropping
+    // every rate request when Redis is down.
+    try {
+      if (state === 'OPEN') {
+        await this.redis.set(this.keyState, state, 'EX', COOLDOWN_SEC * 4);
+      } else if (state === 'HALF_OPEN') {
+        await this.redis.set(this.keyState, state, 'EX', COOLDOWN_SEC);
+      } else {
+        await this.redis.del(this.keyState);
+      }
+    } catch { /* Redis unavailable — assume CLOSED on next call */ }
   }
 
   private async resetFailures(): Promise<void> {
-    await this.redis.del(this.keyFailures);
-    await this.redis.del(this.keyOpenedAt);
+    try {
+      await this.redis.del(this.keyFailures);
+      await this.redis.del(this.keyOpenedAt);
+    } catch { /* best-effort */ }
   }
 
   private async recordFailure(): Promise<void> {
-    const count = await this.redis.incr(this.keyFailures);
-    if (count === 1) {
-      // First failure in this window — set TTL
-      await this.redis.expire(this.keyFailures, FAILURE_WINDOW_SEC);
-    }
-    if (count >= FAILURE_THRESHOLD) {
-      const alreadyOpen = await this.redis.get(this.keyState);
-      if (alreadyOpen !== 'OPEN') {
-        // Unconditional SET (no NX) so a re-opened circuit always gets a fresh cooldown start.
-        // The alreadyOpen guard above provides sufficient concurrent double-write protection.
-        await this.redis.set(this.keyOpenedAt, String(Date.now()), 'EX', COOLDOWN_SEC * 4 + FAILURE_WINDOW_SEC);
-        await this.setState('OPEN');
+    // Best-effort. See setState() comment.
+    try {
+      const count = await this.redis.incr(this.keyFailures);
+      if (count === 1) {
+        await this.redis.expire(this.keyFailures, FAILURE_WINDOW_SEC);
       }
-    }
+      if (count >= FAILURE_THRESHOLD) {
+        const alreadyOpen = await this.redis.get(this.keyState);
+        if (alreadyOpen !== 'OPEN') {
+          await this.redis.set(this.keyOpenedAt, String(Date.now()), 'EX', COOLDOWN_SEC * 4 + FAILURE_WINDOW_SEC);
+          await this.setState('OPEN');
+        }
+      }
+    } catch { /* Redis unavailable — skip CB bookkeeping this call */ }
   }
 
   private async checkCooldownElapsed(): Promise<boolean> {
-    const openedAt = await this.redis.get(this.keyOpenedAt);
-    if (!openedAt) return true;
-    const elapsed = (Date.now() - Number(openedAt)) / 1000;
-    return elapsed >= COOLDOWN_SEC;
+    try {
+      const openedAt = await this.redis.get(this.keyOpenedAt);
+      if (!openedAt) return true;
+      const elapsed = (Date.now() - Number(openedAt)) / 1000;
+      return elapsed >= COOLDOWN_SEC;
+    } catch { return true; /* Redis down — let the call through */ }
   }
 
   async getRatesByPurity(): Promise<RatesResult> {
@@ -102,14 +111,14 @@ export class CircuitBreaker implements RatesPort {
   private async probe(): Promise<RatesResult> {
     try {
       const result = await this.adapter.getRatesByPurity();
-      // Success → CLOSED
       await this.setState('CLOSED');
       await this.resetFailures();
       return result;
     } catch (err) {
-      // Failure → back to OPEN; reset opened_at with TTL (fresh 120s cooldown)
       await this.setState('OPEN');
-      await this.redis.set(this.keyOpenedAt, String(Date.now()), 'EX', COOLDOWN_SEC * 4 + FAILURE_WINDOW_SEC);
+      try {
+        await this.redis.set(this.keyOpenedAt, String(Date.now()), 'EX', COOLDOWN_SEC * 4 + FAILURE_WINDOW_SEC);
+      } catch { /* best-effort */ }
       if (err instanceof RatesAdapterError) throw err;
       throw new RatesAdapterError(this.adapter.getName(), err);
     }

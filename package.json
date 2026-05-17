@@ -19,6 +19,7 @@
     "seed:anchor": "tsx scripts/seed-anchor.ts",
     "seed:anchor-dev-2": "tsx scripts/seed-anchor-dev-2.ts",
     "seed:demo": "tsx scripts/seed/demo-tenant.ts",
+    "seed:storefront-demo": "tsx scripts/seed/storefront-demo.ts",
     "docs:context": "tsx scripts/docs/scan-repo-context.ts && tsx scripts/docs/extract-adrs.ts && tsx scripts/docs/extract-bmad-trace.ts && tsx scripts/docs/scan-docs.ts && tsx scripts/docs/extract-acceptance.ts && tsx scripts/docs/scan-current-state.ts && tsx scripts/docs/scan-implementation-map.ts",
     "docs:validate": "tsx scripts/docs/validate-agent-context.ts",
     "test:ci": "pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:integration && pnpm test:tenant-isolation && pnpm semgrep && pnpm docs:validate"

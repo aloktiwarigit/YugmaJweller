@@ -6,6 +6,7 @@ import { LoyaltyModule } from '../loyalty/loyalty.module';
 import { RateLockBookingsModule } from '../rate-lock-bookings/rate-lock-bookings.module';
 import { TryAtHomeBookingsModule } from '../try-at-home-bookings/try-at-home-bookings.module';
 import { CustomerController } from './customer.controller';
+import { PaymentController } from './payment.controller';
 import { CustomerAuthGuard } from './customer-auth.guard';
 
 @Module({
@@ -17,7 +18,7 @@ import { CustomerAuthGuard } from './customer-auth.guard';
     RateLockBookingsModule,
     TryAtHomeBookingsModule,
   ],
-  controllers: [CustomerController],
+  controllers: [CustomerController, PaymentController],
   providers:   [CustomerAuthGuard],
 })
 export class CustomerModule {}

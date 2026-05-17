@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Tabs, Redirect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@goldsmith/ui-tokens';
 import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import { useCustomerAuthBootstrap } from '../../src/providers/CustomerAuthProvider';
@@ -47,10 +48,34 @@ export default function TabsLayout(): React.ReactElement {
         headerShown: false,
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'मुख्य' }} />
-      <Tabs.Screen name="browse" options={{ title: 'उत्पाद' }} />
-      <Tabs.Screen name="wishlist" options={{ title: 'पसंदीदा' }} />
-      <Tabs.Screen name="profile" options={{ title: 'प्रोफ़ाइल' }} />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'मुख्य',
+          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="browse"
+        options={{
+          title: 'उत्पाद',
+          tabBarIcon: ({ color, size }) => <Ionicons name="sparkles-outline" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="wishlist"
+        options={{
+          title: 'पसंदीदा',
+          tabBarIcon: ({ color, size }) => <Ionicons name="heart-outline" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'प्रोफ़ाइल',
+          tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" color={color} size={size} />,
+        }}
+      />
     </Tabs>
   );
 }

@@ -74,7 +74,7 @@ describe('(auth)/otp.tsx', () => {
     verifyOtpMock.mockResolvedValue({ idToken: 'tok-123' });
     postAuthSessionMock.mockResolvedValue({
       user: { id: 'u1', shopId: 's1', role: 'owner', displayName: 'Test' },
-      tenant: { id: 't1', slug: 'test', displayName: 'Test Shop' },
+      tenant: { id: 't1', slug: 'anchor-dev', displayName: 'Test Shop' },
       requires_token_refresh: false,
     });
 
@@ -114,7 +114,7 @@ describe('(auth)/otp.tsx', () => {
     verifyOtpMock.mockResolvedValue({ idToken: 'tok-123' });
     postAuthSessionMock.mockResolvedValue({
       user: { id: 'u1', shopId: 's1', role: 'owner', displayName: 'Test' },
-      tenant: { id: 't1', slug: 'test', displayName: 'Test Shop' },
+      tenant: { id: 't1', slug: 'anchor-dev', displayName: 'Test Shop' },
       requires_token_refresh: true,
     });
     getIdTokenMock.mockResolvedValue('fresh-tok');
@@ -140,7 +140,7 @@ describe('(auth)/otp.tsx', () => {
     verifyOtpMock.mockResolvedValue({ idToken: 'tok-123' });
     postAuthSessionMock.mockResolvedValue({
       user: { id: 'u1', shopId: 's1', role: 'owner', displayName: 'Test' },
-      tenant: { id: 't1', slug: 'test', displayName: 'Test Shop' },
+      tenant: { id: 't1', slug: 'anchor-dev', displayName: 'Test Shop' },
       requires_token_refresh: false,
     });
 

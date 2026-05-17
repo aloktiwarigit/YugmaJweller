@@ -172,6 +172,35 @@ export interface ProductCatalogRow {
 }
 
 // ---------------------------------------------------------------------------
+// Purity normalization
+// Products can be stored with raw purity values ("22K", "999") or canonical
+// rate-key format ("GOLD_22K", "SILVER_999"). These helpers ensure pricing
+// lookups and purity filters work regardless of which format is stored.
+// ---------------------------------------------------------------------------
+
+const RAW_TO_CANONICAL_PURITY: Record<string, string> = {
+  '24K': 'GOLD_24K',
+  '22K': 'GOLD_22K',
+  '20K': 'GOLD_20K',
+  '18K': 'GOLD_18K',
+  '14K': 'GOLD_14K',
+  '999': 'SILVER_999',
+  '925': 'SILVER_925',
+};
+
+export function normalizePurityForRates(storedPurity: string): string {
+  return RAW_TO_CANONICAL_PURITY[storedPurity] ?? storedPurity;
+}
+
+/** Returns both canonical ("GOLD_22K") and raw ("22K") forms for a filter value. */
+export function expandPurityFilter(filterValue: string): string[] {
+  const canonical = filterValue.trim();
+  const rawEntry = Object.entries(RAW_TO_CANONICAL_PURITY).find(([, v]) => v === canonical);
+  // canonical + raw form (if one exists) so the filter matches either stored format
+  return rawEntry ? [canonical, rawEntry[0]] : [canonical];
+}
+
+// ---------------------------------------------------------------------------
 // Sort clause builder — maps known enum values to hardcoded SQL strings only.
 // No user input ever appears in the SQL template (injection-safe).
 // ---------------------------------------------------------------------------
@@ -246,20 +275,27 @@ export class CatalogService {
           whereExtra += ` AND p.category_id = $${queryParams.length}`;
         }
         if (metal && metal.trim().length > 0) {
-          queryParams.push(metal.trim().toUpperCase());
-          whereExtra += ` AND p.metal = $${queryParams.length}`;
+          const normalizedMetal = metal.trim().toUpperCase();
+          if (normalizedMetal === 'DIAMOND') {
+            queryParams.push('%diamond%');
+            whereExtra += ` AND pc.name ILIKE $${queryParams.length}`;
+          } else {
+            queryParams.push(normalizedMetal);
+            whereExtra += ` AND p.metal = $${queryParams.length}`;
+          }
         }
         if (search && search.trim().length > 0) {
           const term = `%${search.trim()}%`;
           queryParams.push(term);
           const idx = queryParams.length;
-          whereExtra += ` AND (p.sku ILIKE $${idx} OR p.metal ILIKE $${idx} OR p.purity ILIKE $${idx})`;
+          whereExtra += ` AND (p.sku ILIKE $${idx} OR p.metal ILIKE $${idx} OR p.purity ILIKE $${idx} OR pc.name ILIKE $${idx})`;
         }
 
         // ─── B1 new filters ──────────────────────────────────────────────────
         if (purity && purity.trim().length > 0) {
-          queryParams.push(purity.trim());
-          whereExtra += ` AND p.purity = $${queryParams.length}`;
+          // Accept both canonical ("GOLD_22K") and raw ("22K") stored purity values
+          queryParams.push(expandPurityFilter(purity.trim()));
+          whereExtra += ` AND p.purity = ANY($${queryParams.length}::text[])`;
         }
         if (priceMin !== undefined) {
           queryParams.push(priceMin);
@@ -459,7 +495,9 @@ export class CatalogService {
     rates: CurrentRatesResult,
     mcMap: Map<string, string>,
   ): CatalogProduct {
-    const rateEntry = (rates as unknown as Record<string, { perGramPaise: bigint } | undefined>)[row.purity];
+    // Normalize raw purity ("22K") to canonical rate key ("GOLD_22K") before lookup
+    const rateKey   = normalizePurityForRates(row.purity);
+    const rateEntry = (rates as unknown as Record<string, { perGramPaise: bigint } | undefined>)[rateKey];
 
     let priceAvailable = false;
     let estimatedPrice: EstimatedPrice | undefined;
@@ -666,13 +704,8 @@ export class CatalogService {
   // extraWhere must only contain hardcoded SQL (never user-supplied strings).
   // params[0] is always shopId.
   // ---------------------------------------------------------------------------
-  private async fetchProductCards(
-    shopId: string,
-    extraWhere: string,
-    extraParams: unknown[],
-    orderBy: string,
-    limit: number,
-  ): Promise<CatalogProduct[]> {
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- internal helper; shopId from tenant context already validated upstream
+  private async fetchProductCards(shopId: string, extraWhere: string, extraParams: unknown[], orderBy: string, limit: number): Promise<CatalogProduct[]> {
     const allParams: unknown[] = [shopId, ...extraParams, limit];
     const limitIdx = allParams.length;
 
@@ -807,13 +840,8 @@ export class CatalogService {
   // ---------------------------------------------------------------------------
   // B2 — GET /catalog/collections/:slug
   // ---------------------------------------------------------------------------
-  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint
-  async getCollection(
-    slug: string,
-    shopId: string,
-    page: number,
-    limit: number,
-  ): Promise<{ collection: Collection; products: CatalogProductsResponse }> {
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint; shopId from tenant header via middleware
+  async getCollection(slug: string, shopId: string, page: number, limit: number): Promise<{ collection: Collection; products: CatalogProductsResponse }> {
     Sentry.addBreadcrumb({ category: 'catalog', message: 'getCollection', data: { tenant_id: shopId }, level: 'info' });
     return withSpan('catalog.getCollection', { 'tenant.id': shopId }, async () => {
     // Validate collection exists (also gates product list)

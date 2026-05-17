@@ -16,8 +16,7 @@ import type { TryAtHomeBookingResponse } from '../../src/features/try-at-home/ty
 
 interface CustomerSummary { id: string; name: string; phone?: string }
 interface ProductSummary  { id: string; sku: string; metal: string; purity: string; status: string }
-
-const MAX_PIECES = 5; // UI guard; server enforces actual shop setting
+interface TryAtHomeSettings { tryAtHomeMaxPieces: number }
 
 export default function NewTryAtHomeBookingScreen(): React.ReactElement {
   const qc = useQueryClient();
@@ -27,13 +26,21 @@ export default function NewTryAtHomeBookingScreen(): React.ReactElement {
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [notes,        setNotes]        = useState('');
 
+  const { data: settings } = useQuery({
+    queryKey: ['settings-try-at-home-limit'],
+    queryFn: async () => (await api.get<TryAtHomeSettings>('/api/v1/settings/try-at-home')).data,
+    retry: false,
+  });
+
+  const maxPieces = settings?.tryAtHomeMaxPieces ?? 5;
+
   const { data: customers } = useQuery({
     queryKey: ['customers-search', customerSearch],
     queryFn:  async () => {
       const q = customerSearch.trim();
       if (!q) return [] as CustomerSummary[];
       const r = await api.get<{ customers: CustomerSummary[] }>(
-        `/api/v1/crm/customers?search=${encodeURIComponent(q)}&limit=10`,
+        `/api/v1/crm/customers?q=${encodeURIComponent(q)}&limit=10`,
       );
       return r.data.customers;
     },
@@ -43,18 +50,18 @@ export default function NewTryAtHomeBookingScreen(): React.ReactElement {
   const { data: products } = useQuery({
     queryKey: ['products-in-stock'],
     queryFn:  async () => {
-      const r = await api.get<{ products: ProductSummary[] }>(
-        '/api/v1/inventory/products?status=IN_STOCK&limit=100',
+      const r = await api.get<ProductSummary[] | { products: ProductSummary[] }>(
+        '/api/v1/inventory/products?status=IN_STOCK&pageSize=100',
       );
-      return r.data.products;
+      return Array.isArray(r.data) ? r.data : r.data.products;
     },
   });
 
   const toggleProduct = (id: string): void => {
     setSelectedProducts((prev) => {
       if (prev.includes(id)) return prev.filter((p) => p !== id);
-      if (prev.length >= MAX_PIECES) {
-        Alert.alert('सीमा', `अधिकतम ${MAX_PIECES} आइटम चुन सकते हैं`);
+      if (prev.length >= maxPieces) {
+        Alert.alert('सीमा', `अधिकतम ${maxPieces} आइटम चुन सकते हैं`);
         return prev;
       }
       return [...prev, id];
@@ -116,7 +123,7 @@ export default function NewTryAtHomeBookingScreen(): React.ReactElement {
 
       <View style={styles.section}>
         <Text style={styles.label}>
-          आइटम चुनें * ({selectedProducts.length}/{MAX_PIECES})
+          आइटम चुनें * ({selectedProducts.length}/{maxPieces})
         </Text>
         {products?.filter((p) => p.status === 'IN_STOCK').map((p) => {
           const isSelected = selectedProducts.includes(p.id);

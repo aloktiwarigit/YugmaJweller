@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import MockAdapter from 'axios-mock-adapter';
 import { render, waitFor } from '@testing-library/react';
 import React from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../api/client';
 import { useTenantStore } from '../stores/tenantStore';
 import { TenantProvider } from './TenantProvider';
@@ -10,9 +11,10 @@ import { makeTenant } from '../../test/factories';
 describe('TenantProvider', () => {
   let mock: MockAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mock = new MockAdapter(api);
     useTenantStore.setState({ slug: null, tenant: null, etag: null, loading: true, error: null });
+    await AsyncStorage.clear();
   });
 
   it('boots tenant from /tenant/boot and stores it', async () => {

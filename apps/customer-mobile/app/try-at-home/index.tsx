@@ -4,13 +4,59 @@ import {
 } from 'react-native';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
+import { purityLabel } from '@goldsmith/customer-shared';
 import { TenantBrandHeader } from '../../src/components/TenantBrandHeader';
 import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import {
   listPublicProducts,
   createCustomerTryAtHomeBooking,
 } from '../../src/api/endpoints';
-import type { TryAtHomeBookingResponse } from '../../src/api/endpoints';
+import type { PublicProduct, TryAtHomeBookingResponse } from '../../src/api/endpoints';
+
+// Hindi labels for the metal axis. The catalog API returns the raw enum
+// (GOLD/SILVER/DIAMOND/PLATINUM) — we render the Hindi customer-facing name
+// inline. Unknown enums fall through to the raw value so we never display
+// blank UI.
+const METAL_HI: Record<string, string> = {
+  GOLD:     'सोना',
+  SILVER:   'चाँदी',
+  DIAMOND:  'हीरा',
+  PLATINUM: 'प्लैटिनम',
+};
+
+function formatWeight(grams: string): string {
+  const n = Number.parseFloat(grams);
+  if (!Number.isFinite(n)) return grams;
+  // Trim trailing zeros: "18.0000" → "18", "2.8500" → "2.85"
+  return `${n.toFixed(2).replace(/\.?0+$/, '')}g`;
+}
+
+function localizedCategoryName(categoryName: string | null | undefined): string {
+  if (!categoryName) return 'आभूषण';
+  const known: Record<string, string> = {
+    'gold rings': 'सोने की अंगूठियां',
+    'diamond rings': 'हीरे की अंगूठियां',
+    'silver rings': 'चांदी की अंगूठियां',
+    'gold earrings': 'सोने के झुमके',
+    'diamond earrings': 'हीरे के झुमके',
+    'gold pendants': 'सोने के पेंडेंट',
+    'diamond pendants': 'हीरे के पेंडेंट',
+    'gold bangles': 'सोने की चूड़ियां',
+    'silver anklets': 'चांदी की पायल',
+    'gold necklaces': 'सोने के हार',
+    'mangalsutra': 'मंगलसूत्र',
+    'bracelets': 'ब्रैसलेट',
+  };
+  return known[categoryName.trim().toLowerCase()] ?? categoryName;
+}
+
+function productPrimaryLabel(p: PublicProduct): string {
+  return purityLabel(p.purity, p.metal) || (METAL_HI[p.metal] ?? p.metal);
+}
+
+function productSecondaryLabel(p: PublicProduct): string {
+  return `${localizedCategoryName(p.categoryName)} · ${formatWeight(p.grossWeightG)} · ${p.sku}`;
+}
 
 const MAX_PIECES_FALLBACK = 3;
 
@@ -160,10 +206,7 @@ export default function TryAtHomeScreen(): React.ReactElement {
               <ActivityIndicator color={colors.ink} style={{ marginTop: spacing.xl }} />
             ) : (
               <ProductList
-                items={(productsData?.items ?? []).filter((p) =>
-                  (p as unknown as Record<string, unknown>)['status'] === 'IN_STOCK' ||
-                  !(p as unknown as Record<string, unknown>)['status'],
-                )}
+                items={(productsData?.items ?? []).filter((p) => p.quantity > 0)}
                 selected={selected}
                 maxPieces={maxPieces}
                 onToggle={toggleProduct}
@@ -229,7 +272,7 @@ function ProductList({
   maxPieces,
   onToggle,
 }: {
-  items:     Array<{ id: string; name?: string }>;
+  items:     PublicProduct[];
   selected:  Set<string>;
   maxPieces: number;
   onToggle:  (id: string) => void;
@@ -258,6 +301,8 @@ function ProductList({
       renderItem={({ item }) => {
         const isSelected  = selected.has(item.id);
         const isDisabled  = !isSelected && selected.size >= maxPieces;
+        const primary     = productPrimaryLabel(item);
+        const secondary   = productSecondaryLabel(item);
         return (
           <Pressable
             testID={`product-${item.id}`}
@@ -273,9 +318,9 @@ function ProductList({
               borderWidth: 1.5,
               borderColor: isSelected ? '#3B82F6' : colors.border,
               opacity: isDisabled ? 0.4 : 1,
-              minHeight: 56,
+              minHeight: 64,
             }}
-            accessibilityLabel={item.name ?? item.id}
+            accessibilityLabel={`${primary}, ${secondary}`}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: isSelected, disabled: isDisabled }}
           >
@@ -296,17 +341,29 @@ function ProductList({
                 <Text style={{ color: colors.white, fontSize: 14, fontWeight: '700' }}>✓</Text>
               ) : null}
             </View>
-            <Text
-              style={{
-                fontFamily: typography.body.family,
-                fontSize: 15,
-                color: colors.ink,
-                flex: 1,
-              }}
-              numberOfLines={2}
-            >
-              {item.name ?? item.id}
-            </Text>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontFamily: typography.headingMid.family,
+                  fontSize: 15,
+                  color: colors.ink,
+                  marginBottom: 2,
+                }}
+                numberOfLines={1}
+              >
+                {primary}
+              </Text>
+              <Text
+                style={{
+                  fontFamily: typography.body.family,
+                  fontSize: 12,
+                  color: colors.inkMute,
+                }}
+                numberOfLines={1}
+              >
+                {secondary}
+              </Text>
+            </View>
           </Pressable>
         );
       }}

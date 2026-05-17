@@ -11,6 +11,7 @@ import {
   Pressable,
 } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 import {
   STOREFRONT_BROWSE_NAV,
@@ -39,6 +40,7 @@ interface Props {
 export function StorefrontDrawer({ visible, onClose }: Props): React.ReactElement {
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     Animated.timing(translateX, {
@@ -80,7 +82,7 @@ export function StorefrontDrawer({ visible, onClose }: Props): React.ReactElemen
       {/* Drawer panel */}
       <Animated.View style={[styles.panel, { transform: [{ translateX }] }]}>
         {/* Header row */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
           <Text style={styles.headerTitle}>ब्राउज़ करें</Text>
           <TouchableOpacity
             onPress={onClose}

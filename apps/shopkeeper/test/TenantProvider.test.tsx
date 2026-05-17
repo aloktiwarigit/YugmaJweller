@@ -65,6 +65,39 @@ describe('TenantProvider', () => {
     expect(parsed.etag).toBe('"v1"');
   });
 
+  it('normalizes snake_case tenant boot payloads for mobile UI state', async () => {
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      status: 200,
+      data: {
+        id: 'tenant-1',
+        slug: 'anchor-dev',
+        display_name: 'अयोध्या स्वर्णकार',
+        config: {
+          app_name: 'अयोध्या स्वर्णकार',
+          logo_url: '/assets/brand/placeholder-logo.svg',
+          primary_color: '#B58A3C',
+          secondary_color: '#D4745A',
+          default_language: 'hi-IN',
+        },
+      },
+      headers: { etag: '"v1"' },
+    });
+
+    await act(async () => {
+      render(<TenantProvider>{null}</TenantProvider>);
+    });
+
+    const tenant = useTenantStore.getState().tenant;
+    expect(tenant?.displayName).toBe('अयोध्या स्वर्णकार');
+    expect(tenant?.branding).toMatchObject({
+      appName: 'अयोध्या स्वर्णकार',
+      defaultLanguage: 'hi-IN',
+      logoUrl: '/assets/brand/placeholder-logo.svg',
+      primaryColor: '#B58A3C',
+      secondaryColor: '#D4745A',
+    });
+  });
+
   it('uses cached tenant immediately and skips update on 304', async () => {
     // Pre-populate cache
     await asyncStorageMock.setItem(
