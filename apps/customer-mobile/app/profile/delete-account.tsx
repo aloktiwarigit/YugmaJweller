@@ -196,7 +196,7 @@ export default function DeleteAccountScreen(): React.ReactElement {
             opacity:         canSubmit ? 1 : 0.6,
           }}
         >
-          <Text style={{ fontFamily: typography.body.family, fontSize: 16, color: '#FFFFFF', fontWeight: '600' }}>
+          <Text style={{ fontFamily: typography.body.family, fontSize: 16, color: colors.white, fontWeight: '600' }}>
             {submitting ? 'हटाया जा रहा है...' : 'हाँ, मेरा खाता हटाएँ'}
           </Text>
         </Pressable>
