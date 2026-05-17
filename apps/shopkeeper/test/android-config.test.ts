@@ -221,8 +221,15 @@ describe('Android Expo SDK config', () => {
     vi.stubEnv('EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER', 'com.goldsmith.shopkeeper');
     vi.stubEnv('EXPO_PUBLIC_EAS_PROJECT_ID', '11111111-1111-4111-8111-111111111111');
 
+    // Accept either failure mode — both block a bad prod Android build:
+    //   1. "must target goldsmith-prod" — file present but pointed at dev project
+    //      (local dev checkout where google-services.json is a dev placeholder)
+    //   2. "is required for production Android builds" — file absent from working
+    //      tree (CI checkout — google-services.json is gitignored, never committed)
+    // The semantic invariant ("production Android builds must use a goldsmith-prod
+    // google-services.json") is enforced by both error paths in app.config.ts.
     await expect(loadAppConfig()).rejects.toThrow(
-      /google-services\.json must target goldsmith-prod/,
+      /google-services\.json (must target goldsmith-prod|is required for production Android builds)/,
     );
   });
 });

@@ -48,6 +48,25 @@ class FailingIbjaAdapter extends IbjaAdapter {
   }
 }
 
+// Deterministic stub used by happy-path tests. The real IbjaAdapter is no
+// longer a stub — it hits api.gold-api.com + open.er-api.com and returns
+// live market rates. For integration tests that pin expected paise values,
+// we substitute a fixed-rate adapter so assertions are stable.
+const STUB_NOW = new Date('2026-04-23T10:00:00.000Z');
+class StubIbjaAdapter extends IbjaAdapter {
+  protected override async _fetch(): Promise<PurityRates> {
+    return {
+      GOLD_24K:   { perGramPaise: 735000n, fetchedAt: STUB_NOW },
+      GOLD_22K:   { perGramPaise: 673750n, fetchedAt: STUB_NOW },
+      GOLD_20K:   { perGramPaise: 612500n, fetchedAt: STUB_NOW },
+      GOLD_18K:   { perGramPaise: 551250n, fetchedAt: STUB_NOW },
+      GOLD_14K:   { perGramPaise: 428750n, fetchedAt: STUB_NOW },
+      SILVER_999: { perGramPaise: 9500n,   fetchedAt: STUB_NOW },
+      SILVER_925: { perGramPaise: 8788n,   fetchedAt: STUB_NOW },
+    };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Shared Postgres testcontainer — one container for all tests in this file
 // ---------------------------------------------------------------------------
@@ -100,8 +119,9 @@ describe('PricingService.refreshRates() — happy path', () => {
   });
 
   it('writes rates:current to Redis and inserts a snapshot row with source=ibja', async () => {
-    // IbjaAdapter and MetalsDevAdapter are MVP stubs (no live HTTP) — always return GOLD_24K = 735000n paise
-    const service = buildService();
+    // IbjaAdapter is now LIVE (hits api.gold-api.com + open.er-api.com); use StubIbjaAdapter
+    // for deterministic test values so the paise assertions stay stable.
+    const service = buildService(new StubIbjaAdapter());
 
     await service.refreshRates();
 

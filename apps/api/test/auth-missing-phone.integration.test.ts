@@ -37,20 +37,33 @@ describe('AuthController.session — missing phone_number claim → 401', () => 
     { provide: 'PG_POOL',             useValue: {} },
   ];
 
-  it('user without phone_number on req.user throws UnauthorizedException auth.missing', async () => {
-    const mockSvc = { session: async () => ({ user: {}, tenant: {}, requires_token_refresh: false }) };
+  it('user without phone_number routes to the OAuth/Firebase-UID session path (not auth.missing)', async () => {
+    // Controller contract evolved: when phone_number is undefined, the request is
+    // treated as an OAuth / email / Apple sign-in and routed to sessionByFirebaseUid.
+    // It is NOT a missing-auth error; the original regression (undefined phone → 500)
+    // is now covered by sessionByFirebaseUid existing and being well-typed. auth.missing
+    // is only thrown when uid itself is absent (see the next test).
+    let sessionByFirebaseUidCalled = false;
+    const mockSvc = {
+      session: async () => {
+        throw new Error('session() should not be called for phone-less users');
+      },
+      sessionByFirebaseUid: async (args: { uid: string }) => {
+        sessionByFirebaseUidCalled = true;
+        expect(args.uid).toBe('email-user-uid');
+        return { user: {}, tenant: {}, requires_token_refresh: false };
+      },
+    };
     const mod = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [{ provide: AuthService, useValue: mockSvc }, ...stubDeps],
     }).compile();
     const controller = mod.get(AuthController);
 
-    // Simulate request with uid but no phone_number (email/anonymous Firebase user)
     const fakeReq = { user: { uid: 'email-user-uid', phone_number: undefined }, headers: {} } as never;
 
-    await expect(controller.session(fakeReq, '1.2.3.4')).rejects.toMatchObject({
-      response: { code: 'auth.missing' },
-    });
+    await controller.session(fakeReq, '1.2.3.4');
+    expect(sessionByFirebaseUidCalled).toBe(true);
   });
 
   it('user with no uid on req.user throws UnauthorizedException auth.missing', async () => {

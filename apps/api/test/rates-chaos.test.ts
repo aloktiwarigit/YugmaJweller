@@ -21,6 +21,7 @@ import {
   CircuitBreaker,
   LastKnownGoodCache,
   RatesUnavailableError,
+  RatesAdapterError,
   type PurityRates,
 } from '@goldsmith/rates';
 import { PricingService } from '../src/modules/pricing/pricing.service';
@@ -55,11 +56,19 @@ beforeEach(async () => {
 // Adapter subclasses for chaos scenarios
 // ---------------------------------------------------------------------------
 
-/** IBJA adapter whose _fetch() takes 5100 ms — simulates a slow/hung primary */
+/**
+ * IBJA adapter whose _fetch() takes 5100 ms — simulates a slow/hung primary.
+ *
+ * NOTE: super._fetch() is no longer a stub (the real IbjaAdapter now hits
+ * api.gold-api.com + open.er-api.com and returns live rates). Calling super
+ * after the artificial sleep would let the call succeed with live data,
+ * which defeats the chaos contract. Throw RatesAdapterError after the sleep
+ * so the FallbackChain falls through to MetalsDev as the test expects.
+ */
 class SlowIbjaAdapter extends IbjaAdapter {
   protected override async _fetch(): Promise<PurityRates> {
     await new Promise<void>((resolve) => setTimeout(resolve, 5_100));
-    return super._fetch();
+    throw new RatesAdapterError('ibja', new Error('Simulated IBJA timeout (>5s)'));
   }
 }
 
