@@ -74,7 +74,27 @@ describe('migration 0075: schema gaps', () => {
       expect(r2.rows[0]?.check_clause).toMatch(/no-need/);
       expect(r2.rows[0]?.check_clause).toMatch(/privacy/);
       expect(r2.rows[0]?.check_clause).toMatch(/other-jeweller/);
-      expect(r2.rows[0]?.check_clause).toMatch(/'other'/);
+      // `'other'` must appear as its own IN-list element, not as a substring of 'other-jeweller'.
+      // PostgreSQL normalises IN(...) to ANY(ARRAY[...]), so check_clause looks like:
+      //   ...'other-jeweller'::text, 'other'::text]))
+      // The negative lookahead ensures we match the standalone 'other', not 'other-jeweller'.
+      expect(r2.rows[0]?.check_clause).toMatch(/'other'(?!-)/);
+
+      // deletion_reason_text column + length guard
+      const r3 = await c.query<{ column_name: string; is_nullable: string }>(
+        `SELECT column_name, is_nullable FROM information_schema.columns
+         WHERE table_name = 'customers' AND column_name = 'deletion_reason_text'`,
+      );
+      expect(r3.rows[0]?.column_name).toBe('deletion_reason_text');
+      expect(r3.rows[0]?.is_nullable).toBe('YES');
+
+      const r4 = await c.query<{ check_clause: string }>(
+        `SELECT cc.check_clause
+         FROM information_schema.check_constraints cc
+         JOIN information_schema.constraint_column_usage ccu USING (constraint_name)
+         WHERE ccu.table_name = 'customers' AND ccu.column_name = 'deletion_reason_text'`,
+      );
+      expect(r4.rows[0]?.check_clause).toMatch(/length\(deletion_reason_text\)\s*<=\s*200/);
     } finally {
       c.release();
     }

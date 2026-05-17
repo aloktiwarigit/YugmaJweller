@@ -46,6 +46,12 @@ ALTER TABLE product_reviews DROP CONSTRAINT product_reviews_customer_id_fkey;
 ALTER TABLE product_reviews ADD CONSTRAINT product_reviews_customer_id_fkey
   FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL;
 
+-- NOTE: uq_review_customer_product (UNIQUE shop_id, customer_id, product_id from
+-- 0047) remains intact. PostgreSQL treats NULL as distinct in unique constraints,
+-- so multiple anonymised rows (customer_id IS NULL) for the same (shop_id,
+-- product_id) are permitted — this is the intended anonymisation behaviour
+-- after customer hard-delete. No constraint change needed.
+
 -- 3. try_at_home_bookings: add CANCELLED status
 ALTER TABLE try_at_home_bookings DROP CONSTRAINT try_at_home_bookings_status_check;
 ALTER TABLE try_at_home_bookings ADD CONSTRAINT try_at_home_bookings_status_check
