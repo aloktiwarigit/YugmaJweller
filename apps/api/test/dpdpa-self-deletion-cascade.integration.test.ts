@@ -7,11 +7,12 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Pool } from 'pg';
 import { resolve } from 'node:path';
-import { createPool, runMigrations, withTenantTx } from '@goldsmith/db';
-import { tenantContext, type Tenant, type AuthenticatedTenantContext } from '@goldsmith/tenant-context';
+import { createPool, runMigrations } from '@goldsmith/db';
+import type { Tenant, AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 
-const SHOP_A     = 'dd750001-0000-4000-8000-000000000001';
-const SHOP_B     = 'dd750001-0000-4000-8000-0000000000bb';
+const SHOP_A = 'dd750001-0000-4000-8000-000000000001';
+const SHOP_B = 'dd750001-0000-4000-8000-0000000000bb';
+// WS-F cascade tests will use CUSTOMER_A, CUSTOMER_B, PRODUCT_A, ctxA, ctxB
 const CUSTOMER_A = 'dd750001-0000-4000-8000-0000000000c1';
 const CUSTOMER_B = 'dd750001-0000-4000-8000-0000000000c2';
 const USER_A     = 'dd750001-0000-4000-8000-0000000000a1';
@@ -21,6 +22,10 @@ const tenantA: Tenant = { id: SHOP_A, slug: 'dpdpa-a', display_name: 'Shop A', s
 const tenantB: Tenant = { id: SHOP_B, slug: 'dpdpa-b', display_name: 'Shop B', status: 'ACTIVE' };
 const ctxA: AuthenticatedTenantContext = { authenticated: true, shopId: SHOP_A, userId: USER_A, role: 'shop_admin', tenant: tenantA };
 const ctxB: AuthenticatedTenantContext = { authenticated: true, shopId: SHOP_B, userId: USER_A, role: 'shop_admin', tenant: tenantB };
+
+// Suppress TS6133 "declared but never read" for WS-F forward-declared constants.
+// These will be used when cascade integration tests are added in WS-F.
+void CUSTOMER_A; void CUSTOMER_B; void PRODUCT_A; void ctxA; void ctxB;
 
 let container: StartedPostgreSqlContainer;
 let pool: Pool;

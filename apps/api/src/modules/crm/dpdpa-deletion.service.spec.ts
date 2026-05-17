@@ -4,6 +4,20 @@ import { ConflictException, UnprocessableEntityException } from '@nestjs/common'
 import { DpdpaDeletionService } from './dpdpa-deletion.service';
 import type { DpdpaDeletionRepository } from './dpdpa-deletion.repository';
 
+// Hoist the spy function so it is created before the module mock runs.
+// auditLogSpy captures all calls to auditLog so we can assert the payload shape.
+const auditLogSpy = vi.hoisted(() => vi.fn(async () => undefined));
+
+// @goldsmith/audit is mocked so vitest doesn't attempt to resolve its package entry.
+vi.mock('@goldsmith/audit', () => ({
+  auditLog: auditLogSpy,
+  AuditAction: {
+    CRM_CUSTOMER_DELETION_REQUESTED: 'CRM_CUSTOMER_DELETION_REQUESTED',
+    CRM_CUSTOMER_SOFT_DELETED:        'CRM_CUSTOMER_SOFT_DELETED',
+    CRM_CUSTOMER_HARD_DELETED:        'CRM_CUSTOMER_HARD_DELETED',
+  },
+}));
+
 const SHOP = 'aaaaaaaa-bbbb-4000-8000-000000000001';
 const SHOP_OTHER = 'aaaaaaaa-bbbb-4000-8000-0000000000ff';
 const USER = 'cccccccc-dddd-4000-8000-000000000002';
@@ -22,10 +36,13 @@ function fakeQueue(): any {
 }
 
 function fakeRepo(overrides: Partial<DpdpaDeletionRepository> = {}): DpdpaDeletionRepository {
-  const scheduledAt = new Date('2026-04-26T12:00:00Z');
-  const hardDeleteAt = new Date('2026-05-26T12:00:00Z');
   return {
-    softDeleteAtomic: vi.fn(async () => ({ scheduledAt, hardDeleteAt })),
+    softDeleteAtomic: vi.fn(async () => ({
+      scheduledAt:            new Date('2026-04-26T12:00:00Z'),
+      hardDeleteAt:           new Date('2026-05-26T12:00:00Z'),
+      cascadeCounts:          { wishlists: 0, reviews: 0, rateLocks: 0, tryAtHome: 0 },
+      rateLockRefundsPending: 0,
+    })),
     hardDeleteAtomic: vi.fn(async () => true),
     findDueForHardDelete: vi.fn(async () => []),
     ...overrides,
@@ -41,7 +58,7 @@ function makeSvc(overrides: { repo?: DpdpaDeletionRepository; pool?: any; queue?
   );
 }
 
-beforeEach(() => { vi.clearAllMocks(); });
+beforeEach(() => { vi.clearAllMocks(); auditLogSpy.mockClear(); });
 
 // ─── requestDeletion ──────────────────────────────────────────────────────────
 
@@ -50,7 +67,7 @@ describe('requestDeletion', () => {
     const repo = fakeRepo();
     const svc = makeSvc({ repo });
     await svc.requestDeletion(authCtx(), CUSTOMER, 'owner');
-    expect(repo.softDeleteAtomic).toHaveBeenCalledWith(CUSTOMER, 'owner');
+    expect(repo.softDeleteAtomic).toHaveBeenCalledWith(CUSTOMER, 'owner', {});
   });
 
   it('returns scheduledAt and hardDeleteAt as ISO strings', async () => {
@@ -110,6 +127,55 @@ describe('requestDeletion', () => {
     const svc = makeSvc({ repo, queue });
     await expect(svc.requestDeletion(authCtx(), CUSTOMER, 'owner')).rejects.toBeInstanceOf(ConflictException);
     expect(queue.add).not.toHaveBeenCalled();
+  });
+
+  it('forwards options.reason and options.reasonText to the repository', async () => {
+    const repo = fakeRepo();
+    const svc = makeSvc({ repo });
+    await svc.requestDeletion(authCtx(), CUSTOMER, 'customer', {
+      reason: 'privacy',
+      reasonText: undefined,
+    });
+    expect(repo.softDeleteAtomic).toHaveBeenCalledWith(CUSTOMER, 'customer', {
+      reason: 'privacy',
+      reasonText: undefined,
+    });
+  });
+
+  it('emits CRM_CUSTOMER_DELETION_REQUESTED with reason and cascadeCounts in after', async () => {
+    auditLogSpy.mockClear();
+    const repo = fakeRepo({
+      softDeleteAtomic: vi.fn(async () => ({
+        scheduledAt:            new Date('2026-05-17T00:00:00Z'),
+        hardDeleteAt:           new Date('2026-06-16T00:00:00Z'),
+        cascadeCounts:          { wishlists: 2, reviews: 1, rateLocks: 0, tryAtHome: 1 },
+        rateLockRefundsPending: 0,
+      })),
+    });
+    const svc = makeSvc({ repo });
+
+    await svc.requestDeletion(authCtx(), CUSTOMER, 'customer', { reason: 'other', reasonText: 'अन्य कारण' });
+
+    const allCalls = auditLogSpy.mock.calls as unknown as Array<[unknown, { action: string; after: Record<string, unknown> }]>;
+    const requestedCall = allCalls.find(
+      (c) => c[1].action === 'CRM_CUSTOMER_DELETION_REQUESTED',
+    );
+    expect(requestedCall).toBeDefined();
+    const after = requestedCall![1].after;
+    expect(after).toMatchObject({
+      requestedBy:            'customer',
+      reason:                 'other',
+      cascadeCounts:          { wishlists: 2, reviews: 1, rateLocks: 0, tryAtHome: 1 },
+      rateLockRefundsPending: 0,
+    });
+    // Per Codex Round 1 finding #3: reasonText is arbitrary customer free-text
+    // and MUST NOT be copied into the audit-log payload (it could contain a
+    // phone number, PAN, or address the customer pasted in). It's persisted
+    // only on customers.deletion_reason_text (their own row) only.
+    expect(after).not.toHaveProperty('reasonText');
+    // No raw PII
+    expect(JSON.stringify(after)).not.toMatch(/\+91\d{10}/);
+    expect(JSON.stringify(after)).not.toMatch(/pan_/i);
   });
 });
 
