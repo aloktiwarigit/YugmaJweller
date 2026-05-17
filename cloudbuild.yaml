@@ -1,12 +1,25 @@
 # Cloud Build config for the Goldsmith NestJS API.
+#
 # Local submit:
 #   gcloud builds submit --config cloudbuild.yaml --ignore-file=.gcloudignore-api \
 #     --project goldsmith-dev .
 #
+# GitHub-triggered: $COMMIT_SHA is available; for local runs $BUILD_ID is used.
+# The .gcloudignore-api at repo root keeps the upload small (excludes other apps + node_modules).
+#
 # All resources are in asia-south1 (Mumbai). The previous asia-east1 stack was
 # decommissioned 2026-05-17.
+#
+# Auth posture TODO: the Cloud Run service is currently deployed with
+# --allow-unauthenticated because mobile and customer-web clients reach the API
+# directly from end-user devices and browsers. Application-layer auth is enforced
+# by FirebaseJwtGuard on every tenant-scoped route; unauthenticated routes
+# (/health, /healthz, /api/v1/tenant/boot, public catalog) are intentionally
+# public. If the risk posture changes (e.g. adding a WAF or API Gateway in front)
+# revisit this flag and remove it — see docs/runbook.md §17 for guidance.
 
 steps:
+  # ── Step 1: build Docker image ────────────────────────────────────────────
   - name: gcr.io/cloud-builders/docker
     id: build-api
     env:
@@ -18,6 +31,64 @@ steps:
       - --tag=asia-south1-docker.pkg.dev/goldsmith-dev/goldsmith-api/api:latest
       - --cache-from=asia-south1-docker.pkg.dev/goldsmith-dev/goldsmith-api/api:latest
       - .
+
+  # ── Step 2: push image to Artifact Registry ───────────────────────────────
+  # (Cloud Build pushes tagged images automatically via the `images:` block below,
+  #  but we push eagerly here so the deploy step can reference the exact BUILD_ID tag.)
+  - name: gcr.io/cloud-builders/docker
+    id: push-api
+    waitFor: [build-api]
+    args:
+      - push
+      - asia-south1-docker.pkg.dev/goldsmith-dev/goldsmith-api/api:$BUILD_ID
+
+  # ── Step 3: deploy to Cloud Run ───────────────────────────────────────────
+  # Uses the immutable BUILD_ID-tagged image (not :latest) so every revision is
+  # traceable to a specific build.
+  #
+  # Health gating: Cloud Run's default startup probe waits for the container to
+  # start accepting traffic on the EXPOSE port (8080). The Dockerfile HEALTHCHECK
+  # at /health provides an additional in-container signal. Cloud Run will only
+  # route traffic to the new revision once startup succeeds; if the revision stays
+  # unhealthy (DB unreachable, bad env var, crash-loop), traffic stays on the
+  # previous revision automatically.
+  #
+  # Scaling: min-instances=0 (scale-to-zero, startup-lean ADR-0015);
+  # max-instances=10 is a safety cap — raise when load justifies it.
+  #
+  # Traffic: 100% traffic is shifted immediately after a healthy startup.
+  # Gradual traffic splits (--no-traffic + manual promote) can be used for
+  # canary deploys — see docs/runbook.md §17 for the manual canary recipe.
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy-cloud-run
+    waitFor: [push-api]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - goldsmith-api
+      - --image=asia-south1-docker.pkg.dev/goldsmith-dev/goldsmith-api/api:$BUILD_ID
+      - --region=asia-south1
+      - --project=goldsmith-dev
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --min-instances=0
+      - --max-instances=10
+      - --cpu=1
+      - --memory=512Mi
+      - --timeout=60
+      - --concurrency=80
+      # Env vars are managed in the Cloud Run service configuration (Secret Manager
+      # references or plain env vars set via Cloud Run console / gcloud run services update).
+      # Do NOT bake secrets into this file. Required env vars:
+      #   DATABASE_URL, REDIS_URL, FIREBASE_PROJECT_ID,
+      #   FIREBASE_SERVICE_ACCOUNT_JSON_B64, KMS_MASTER_SECRET,
+      #   IMAGEKIT_URL_ENDPOINT, IMAGEKIT_PUBLIC_KEY, IMAGEKIT_PRIVATE_KEY
+      # Optional (set to activate non-stub adapters):
+      #   RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, PAYMENTS_ADAPTER=razorpay
+      #   AZURE_BLOB_ACCOUNT, AZURE_BLOB_KEY, STORAGE_ADAPTER=azure
+      #   MEILISEARCH_URL, MEILISEARCH_MASTER_KEY, SEARCH_ADAPTER=meilisearch
 
 images:
   - asia-south1-docker.pkg.dev/goldsmith-dev/goldsmith-api/api:$BUILD_ID

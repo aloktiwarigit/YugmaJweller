@@ -38,6 +38,7 @@ mvpScope: >
 | [§12 Anchor seeding](#12-anchor-seeding-dev--prod) | Dev-time + prod anchor tenant bootstrap |
 | [§13 Firebase service-account rotation](#13-firebase-service-account-rotation-90-day-cadence) | 90-day secret rotation |
 | [§14 Role bootstrap prerequisites (BYPASSRLS)](#14-role-bootstrap-prerequisites-bypassrls) | Pre-migration superuser grant for platform_admin |
+| [§17 Cloud Run deploys](#17-cloud-run-deploys-api--goldsmith-dev-asia-south1) | API build + deploy + rollback on GCP Cloud Run |
 
 ---
 
@@ -677,6 +678,155 @@ DB session rows are unaffected; running sessions must be re-started after rotati
 - Firebase ID tokens for platform admins — issued by Firebase, not us.
 - Tenant-side `audit_events` rows referencing impersonation sessions — the session row's
   `id` is stable across secret rotations.
+
+---
+
+## 17. Cloud Run deploys (API — goldsmith-dev, asia-south1)
+
+> Added 2026-05-16 — Story 19.5. ADR note: ADR-0015 specifies Azure as the target
+> hosting provider. The API is currently deployed to GCP Cloud Run in the goldsmith-dev
+> project as an operational decision made before the Azure subscription was provisioned.
+> This divergence is intentional and temporary; ADR-0015 will be amended in the
+> Infrastructure Story when Azure Container Apps are provisioned for production.
+
+### 17.1 Service facts
+
+| Field | Value |
+|-------|-------|
+| GCP project | `goldsmith-dev` |
+| Region | `asia-south1` |
+| Service name | `goldsmith-api` |
+| Service URL | `https://goldsmith-api-528920018833.asia-south1.run.app` |
+| Artifact Registry | `asia-south1-docker.pkg.dev/goldsmith-dev/goldsmith-api/api` |
+| Health endpoint | `GET /health` → `{ status: "ok", db: "ok" }` (deep, DB check) |
+| Shallow probe | `GET /healthz` → `{ status: "ok" }` (no DB, kept for legacy monitors) |
+
+### 17.2 Deploy trigger
+
+Deploys are triggered by submitting a Cloud Build job against `main`:
+
+```bash
+# From repo root — Cloud Build builds + pushes image + deploys to Cloud Run atomically.
+gcloud builds submit \
+  --config cloudbuild.yaml \
+  --project goldsmith-dev \
+  .
+```
+
+A GitHub Cloud Build trigger can be wired to `main` to make this automatic on push.
+Until the trigger is configured, deploys are manual via the command above.
+
+Pre-deploy: ensure `pnpm typecheck && pnpm lint && pnpm --filter @goldsmith/api test:unit` are
+green on `main`. Do not submit a build that fails local checks.
+
+### 17.3 Health gating and traffic strategy
+
+Cloud Run performs a startup probe on the container's `EXPOSE` port (8080). The `Dockerfile`
+also runs a `HEALTHCHECK` at `GET /health` every 30 s (5 s timeout, 20 s start-period, 3
+retries). Cloud Run will only route traffic to the new revision once the startup probe passes.
+
+**Default traffic strategy:** 100% traffic is shifted to the new revision automatically after
+a healthy startup. This is appropriate for the current single-tenant demo-readiness phase.
+
+**Canary deploys (optional, for future use):**
+
+```bash
+# Deploy new revision but hold all traffic on the current one:
+gcloud run deploy goldsmith-api \
+  --image=asia-south1-docker.pkg.dev/goldsmith-dev/goldsmith-api/api:<BUILD_ID> \
+  --region=asia-south1 \
+  --project=goldsmith-dev \
+  --no-traffic
+
+# Inspect the new revision's health:
+curl https://<new-revision-url>/health
+
+# If healthy, shift 10% of traffic:
+gcloud run services update-traffic goldsmith-api \
+  --region=asia-south1 \
+  --project=goldsmith-dev \
+  --to-revisions=<new-revision-name>=10,LATEST=90
+
+# Fully promote when satisfied:
+gcloud run services update-traffic goldsmith-api \
+  --region=asia-south1 \
+  --project=goldsmith-dev \
+  --to-latest
+```
+
+### 17.4 Rollback recipe
+
+Identify the previous healthy revision name, then shift 100% traffic back to it:
+
+```bash
+# List revisions (most recent first):
+gcloud run revisions list \
+  --service=goldsmith-api \
+  --region=asia-south1 \
+  --project=goldsmith-dev \
+  --format="table(name,status.conditions[0].status,createTime)" \
+  --sort-by="~createTime"
+
+# Roll back to a specific revision (replace <previous-revision-name>):
+gcloud run services update-traffic goldsmith-api \
+  --region=asia-south1 \
+  --project=goldsmith-dev \
+  --to-revisions=<previous-revision-name>=100
+```
+
+**Do NOT roll back DB migrations** when rolling back the application binary. See §2.3 for the
+general rollback policy (additive migrations are safe to leave; destructive migrations require a
+forward-fix, not a code rollback).
+
+### 17.5 Log query (Cloud Logging)
+
+Errors in the current revision:
+
+```
+resource.type="cloud_run_revision"
+resource.labels.service_name="goldsmith-api"
+severity>=ERROR
+```
+
+All structured logs for a specific revision:
+
+```
+resource.type="cloud_run_revision"
+resource.labels.revision_name="<revision-name>"
+```
+
+Cloud Logging URL (replace the project if needed):
+`https://console.cloud.google.com/logs/query;query=resource.type%3D"cloud_run_revision"%0Aseverity%3E%3DERROR?project=goldsmith-dev`
+
+### 17.6 Alert configuration
+
+> **Stub:** Cloud Monitoring alerts for Cloud Run error rate, revision unhealthy, and
+> cold-start latency are not yet configured. Add these before onboarding the first paying
+> tenant. Minimum recommended alerts:
+> - Error rate > 5% sustained for 5 min → P1 page (Alok WhatsApp)
+> - Revision startup failure (health check failed) → P1 page
+> - Request latency p99 > 5 s sustained for 10 min → P2 email
+
+### 17.7 Common failure modes
+
+| Symptom | Cause | Resolution |
+|---------|-------|------------|
+| New revision stays UNHEALTHY, traffic stays on previous | `/health` returns 503 — DB unreachable at startup (bad `DATABASE_URL`, Cloud SQL not reachable, wrong VPC connector) | Check Cloud Logging for the revision; verify `DATABASE_URL` secret; fix and re-deploy |
+| Revision UNHEALTHY — crash-loop | Missing required env var (e.g. `FIREBASE_PROJECT_ID`, `KMS_MASTER_SECRET`) | Check Cloud Logging for `FATAL bootstrap failed`; add missing env var in Cloud Run service config |
+| 503 on `/health` in prod but DB is up | DB pool exhausted (all connections in use) | Increase `DATABASE_POOL_MAX` env var or scale down concurrent requests |
+| Deploy step fails with `PERMISSION_DENIED` | Cloud Build service account lacks `roles/run.admin` or `roles/iam.serviceAccountUser` | Grant roles to `<project-number>@cloudbuild.gserviceaccount.com` |
+| Image not found during deploy | `push-api` step failed or race with `deploy-cloud-run` | Check Cloud Build logs; `push-api` step must complete before `deploy-cloud-run` (`waitFor` enforces this) |
+
+### 17.8 Auth posture note
+
+The service is deployed with `--allow-unauthenticated` because mobile apps and the customer-web
+browser client reach the API directly from end-user devices. Application-layer authentication is
+enforced by `FirebaseJwtGuard` on all tenant-scoped routes. Public routes (`/health`, `/healthz`,
+`/api/v1/tenant/boot`, public catalog) are intentionally unauthenticated.
+
+If a WAF or API Gateway is added in front of Cloud Run in a future phase, the
+`--allow-unauthenticated` flag should be reviewed and potentially removed (traffic would then
+flow through the gateway only, which would enforce its own auth).
 
 ---
 
