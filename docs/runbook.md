@@ -39,6 +39,8 @@ mvpScope: >
 | [§13 Firebase service-account rotation](#13-firebase-service-account-rotation-90-day-cadence) | 90-day secret rotation |
 | [§14 Role bootstrap prerequisites (BYPASSRLS)](#14-role-bootstrap-prerequisites-bypassrls) | Pre-migration superuser grant for platform_admin |
 | [§17 Cloud Run deploys](#17-cloud-run-deploys-api--goldsmith-dev-asia-south1) | API build + deploy + rollback on GCP Cloud Run |
+| [§18 App Hosting deploys](#18-app-hosting-deploys-firebase-app-hosting--customer-web) | customer-web first deploy, env-var matrix, rollback, error triage |
+| [§19 Tenant onboarding — App Hosting backend per tenant](#19-tenant-onboarding--app-hosting-backend-per-tenant) | Manual per-tenant deploy steps until automation story lands |
 
 ---
 
@@ -681,6 +683,7 @@ DB session rows are unaffected; running sessions must be re-started after rotati
 
 ---
 
+<<<<<<< HEAD
 ## 17. Cloud Run deploys (API — goldsmith-dev, asia-south1)
 
 > Added 2026-05-16 — Story 19.5. ADR note: ADR-0015 specifies Azure as the target
@@ -827,6 +830,114 @@ enforced by `FirebaseJwtGuard` on all tenant-scoped routes. Public routes (`/hea
 If a WAF or API Gateway is added in front of Cloud Run in a future phase, the
 `--allow-unauthenticated` flag should be reviewed and potentially removed (traffic would then
 flow through the gateway only, which would enforce its own auth).
+=======
+---
+
+## 18. App Hosting deploys (Firebase App Hosting — customer-web)
+
+The customer-web Next.js app runs on Firebase App Hosting (`goldsmith-customer-web` backend, region `asia-east1`). Each tenant has **one backend deployment** with per-tenant environment variables set in `apps/customer-web/apphosting.yaml`.
+
+### 17.1 First deploy (new tenant)
+
+Prerequisites: Firebase project exists, App Hosting backend created in Firebase console, all `apphosting.yaml` values populated (no `REPLACE_WITH_*` placeholders).
+
+```bash
+# From the repo root. Requires firebase-tools and a logged-in account
+# with Editor or Firebase App Hosting Admin on the project.
+firebase deploy --only apphosting --project <firebase-project-id>
+```
+
+Verify the deploy URL in the Firebase console → App Hosting → backend → Traffic. The initial deploy may take 3–5 minutes for Cloud Build to compile the Next.js SSR bundle.
+
+**CI gate:** The `apphosting-deploy-check` workflow (`.github/workflows/apphosting-deploy-check.yml`) blocks merges when `[deploy]` appears in the commit/PR title AND `apphosting.yaml` still contains `REPLACE_WITH_*` placeholders. Add `[deploy]` to the PR title only when all values are populated and you intend to trigger a deploy. See fixture tests in that workflow for the exact logic.
+
+### 17.2 Environment variable matrix
+
+All variables are set in `apps/customer-web/apphosting.yaml`. The `[env.ts]` column marks variables validated at build time by `apps/customer-web/lib/env.ts` — missing values cause a hard build failure.
+
+| Variable | Purpose | Source | env.ts |
+|---|---|---|---|
+| `NODE_ENV` | Runtime mode (`production`) | Hardcoded in apphosting.yaml | — |
+| `NEXT_TELEMETRY_DISABLED` | Disable Next.js telemetry | Hardcoded `"1"` | — |
+| `NEXT_PUBLIC_SHOP_SLUG` | Tenant slug (maps to `shops.slug` in DB) | Tenant provisioning step (§7.2) | required |
+| `API_URL` | SSR server-to-server API URL | Cloud Run service URL from `gcloud run services describe` | — |
+| `NEXT_PUBLIC_API_BASE` | Browser-accessible API URL | Same as `API_URL` for public Cloud Run; CDN-fronted URL if applicable | required |
+| `NEXT_PUBLIC_SITE_URL` | Canonical public URL for sitemap + OG tags | Firebase App Hosting assigned domain or custom domain | required |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase Web SDK public key | Firebase console → Project settings → Web app SDK config | warning if missing |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Firebase Auth domain | Firebase console → Web app SDK config (format: `<project>.firebaseapp.com`) | warning if missing |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Firebase project ID | Firebase console → Project settings → General | warning if missing |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase web app ID | Firebase console → Web app SDK config (format: `1:<num>:web:<hash>`) | — |
+
+`NEXT_PUBLIC_FIREBASE_*` values are public keys — safe to commit in `apphosting.yaml`. They are restricted by Firebase security rules, not by secrecy.
+
+### 17.3 Rollback
+
+Firebase App Hosting maintains revision history per backend. To roll back:
+
+**Via Firebase console:**
+1. Firebase console → App Hosting → `goldsmith-customer-web` → Traffic
+2. Select the previous revision → "Route all traffic to this revision"
+
+**Via gcloud (equivalent):**
+```bash
+# List revisions
+gcloud run revisions list \
+  --service goldsmith-customer-web \
+  --region asia-east1 \
+  --project <firebase-project-id>
+
+# Route 100% traffic to a previous revision
+gcloud run services update-traffic goldsmith-customer-web \
+  --to-revisions <REVISION_NAME>=100 \
+  --region asia-east1 \
+  --project <firebase-project-id>
+```
+
+Rollback does NOT affect the database or Cloud Run API — only the customer-web SSR layer. Database rollback follows §2.3.
+
+### 17.4 SSR error triage (Cloud Logging)
+
+Cloud Logging URL pattern for this backend (replace `<project-id>` with the Firebase project):
+
+```
+https://console.cloud.google.com/logs/query;query=resource.type%3D%22cloud_run_revision%22%0Aresource.labels.service_name%3D%22goldsmith-customer-web%22%0Aseverity%3E%3DERROR;project=<project-id>
+```
+
+Shorter: navigate to Cloud Logging → select resource type "Cloud Run Revision" → filter by service name `goldsmith-customer-web` → severity >= ERROR.
+
+For SSR errors, the stack trace includes the Next.js route segment and any uncaught error from server components or API route handlers.
+
+### 17.5 Common failure modes
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Build fails: "Missing required production environment variables" | `NEXT_PUBLIC_SHOP_SLUG`, `NEXT_PUBLIC_API_BASE`, or `NEXT_PUBLIC_SITE_URL` absent | Populate all required vars in `apphosting.yaml` before deploy |
+| All pages return 500 | `API_URL` or `NEXT_PUBLIC_API_BASE` points to wrong endpoint | Verify Cloud Run service URL; `curl $API_URL/api/v1/tenant/boot?slug=$SLUG` from Cloud Shell |
+| Tenant not found (404 on storefront) | `NEXT_PUBLIC_SHOP_SLUG` does not match any row in `shops.slug` | Confirm tenant exists: `SELECT slug FROM shops WHERE slug = '<value>';` |
+| /admin login loop | `NEXT_PUBLIC_FIREBASE_*` values missing or wrong project | Copy correct SDK config from Firebase console → Web app → SDK setup |
+| Deploy never completes | Cloud Build quota or billing not enabled on Firebase project | Check Cloud Build history in GCP console; ensure Blaze plan active |
+
+---
+
+## 19. Tenant onboarding — App Hosting backend per tenant
+
+> **Scope:** This section covers the App Hosting deployment step only. Database provisioning, RLS policies, and seed data are in §7.
+
+Each jeweller tenant gets their own `apphosting.yaml` values and their own Firebase App Hosting backend (or the same backend with environment variable updates for single-backend multi-tenant routing).
+
+**Current model (MVP / demo phase):** manual `firebase deploy --only apphosting` per tenant after updating `apphosting.yaml` with that tenant's values. One backend, one tenant.
+
+**Productisation placeholder:** A future story will automate per-tenant App Hosting backend provisioning (Firebase Management API + GitHub Actions per-tenant workflow dispatch). Until that story lands, onboarding a new tenant follows these manual steps:
+
+1. Complete §7.1 pre-onboarding checklist (SOW, brand assets, GSTIN, etc.).
+2. Run §7.2 provisioning steps to create the tenant DB record, RLS policies, and admin user.
+3. Update `apps/customer-web/apphosting.yaml` with the tenant's values (all vars in §18.2).
+4. Open a PR with `[deploy]` in the title — the `apphosting-deploy-check` CI gate verifies zero placeholders remain.
+5. After PR merge: `firebase deploy --only apphosting --project <firebase-project-id>`.
+6. Complete §7.3 post-onboarding checklist.
+
+Estimated elapsed time for steps 3–6: ~1 hour per tenant (primarily wait time for Cloud Build).
+>>>>>>> worktree-agent-a42ad07e19385196f
 
 ---
 
