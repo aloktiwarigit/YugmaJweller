@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { type ReactNode } from 'react';
 import { headers } from 'next/headers';
 import { Yatra_One, Mukta, Hind } from 'next/font/google';
+import * as Sentry from '@sentry/nextjs';
 import './globals.css';
 import { fetchTenantConfig } from '@/lib/api';
 import { resolveShopSlug } from '@/lib/tenant-slug';
@@ -45,6 +46,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const slug   = resolveShopSlug(headers());
   const config = slug ? await fetchTenantConfig(slug) : null;
   const lang = config?.defaultLanguage ?? 'hi';
+
+  // Tag every Sentry event for this request with the resolved tenant slug.
+  // This runs server-side (RSC) and applies to all errors in this render tree.
+  if (slug) {
+    Sentry.setTag('tenant', slug);
+  }
 
   return (
     <html lang={lang} className={fontClasses}>

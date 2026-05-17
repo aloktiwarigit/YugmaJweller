@@ -232,6 +232,42 @@ jobs:
           NEXT_PUBLIC_SHOP_SLUG: ci-lighthouse-test
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
 
+  build-customer-web:
+    # Production build of customer-web with Sentry source-map upload.
+    # SENTRY_AUTH_TOKEN is required — the build fails loudly if absent (per next.config.mjs guard).
+    # Run only on push to main (not on PRs) to avoid burning Sentry quota on every PR.
+    # On PRs, typecheck + lighthouse-ci cover correctness; source-map upload is a deploy concern.
+    needs: [typecheck, lint, unit, lighthouse-ci]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: "${{ env.PNPM_VERSION }}" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: "pnpm" }
+      - run: pnpm install --frozen-lockfile
+      - name: Validate SENTRY_AUTH_TOKEN is present
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ]; then
+            echo "ERROR: SENTRY_AUTH_TOKEN required for source-map upload" >&2
+            echo "Add SENTRY_AUTH_TOKEN to GitHub repository secrets." >&2
+            exit 1
+          fi
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      - name: Build customer-web (with Sentry source-map upload)
+        run: pnpm exec turbo run build --filter=@goldsmith/customer-web
+        env:
+          NODE_ENV: production
+          NEXT_PUBLIC_SHOP_SLUG: ${{ secrets.NEXT_PUBLIC_SHOP_SLUG || 'anchor-dev' }}
+          NEXT_PUBLIC_API_BASE: ${{ secrets.NEXT_PUBLIC_API_BASE || 'https://api.example.com' }}
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || 'https://example.com' }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+
   docs-validate:
     name: docs-validate
     runs-on: ubuntu-latest

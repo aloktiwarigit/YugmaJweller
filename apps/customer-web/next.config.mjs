@@ -17,7 +17,21 @@ if (process.env.NODE_ENV === 'production') {
       console.warn(`[env] WARNING: ${k} contains "localhost" — likely a dev default`);
     }
   }
+
+  // Source-map upload requires SENTRY_AUTH_TOKEN.
+  // Only enforce during actual `next build` (NEXT_PHASE=phase-production-build),
+  // NOT during `next lint`, `next start`, or other phases that also set NODE_ENV=production.
+  const isActualBuild = process.env.NEXT_PHASE === 'phase-production-build';
+  if (isActualBuild && !process.env.SENTRY_AUTH_TOKEN) {
+    throw new Error(
+      '[Sentry] SENTRY_AUTH_TOKEN required for source-map upload in production build.\n' +
+      'Set the SENTRY_AUTH_TOKEN secret in CI (GitHub Actions secret: SENTRY_AUTH_TOKEN).\n' +
+      'For local dev builds, omit NODE_ENV=production or add SENTRY_AUTH_TOKEN to .env.local.',
+    );
+  }
 }
+
+import { withSentryConfig } from '@sentry/nextjs';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -69,7 +83,8 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: https://*.blob.core.windows.net https://ik.imagekit.io",
-              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com wss://*.firebaseio.com",
+              // sentry.io ingestion endpoint for client-side error reporting
+              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com wss://*.firebaseio.com https://*.sentry.io",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
@@ -87,4 +102,33 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  // Sentry webpack plugin options (source-map upload + tree-shake).
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+
+  // Auth token for source-map upload. Required in production.
+  // The build-time guard above ensures this is present before we reach here.
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Upload source maps to Sentry, then delete them from the build output
+  // so they are NOT publicly served. Stack frames resolve via Sentry only.
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+
+  // Silent in CI to avoid noisy output; set to false for local debugging.
+  silent: true,
+
+  // Disable the Sentry tunnel route (not needed; we connect directly to sentry.io).
+  tunnelRoute: undefined,
+
+  // Disable automatic tree-shaking of logger statements in production
+  // (keep console.error visible in Cloud Run logs alongside Sentry).
+  disableLogger: false,
+
+  // Automatically inject Sentry's error handling into API routes.
+  autoInstrumentServerFunctions: true,
+  autoInstrumentMiddleware: true,
+  autoInstrumentAppDirectory: true,
+});
