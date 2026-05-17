@@ -20,9 +20,9 @@ WORKDIR /repo
 # into the client bundle. Defaults are sane placeholders; Cloud Build passes
 # real values via --build-arg.
 ARG NEXT_PUBLIC_SHOP_SLUG=anchor-dev
-ARG NEXT_PUBLIC_API_BASE=https://goldsmith-api-528920018833.asia-east1.run.app
+ARG NEXT_PUBLIC_API_BASE=https://goldsmith-api-528920018833.asia-south1.run.app
 ARG NEXT_PUBLIC_SITE_URL=https://goldsmith-customer-web.example.com
-ARG API_URL=https://goldsmith-api-528920018833.asia-east1.run.app
+ARG API_URL=https://goldsmith-api-528920018833.asia-south1.run.app
 ARG NEXT_PUBLIC_FIREBASE_API_KEY=
 ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
 ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID=

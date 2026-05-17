@@ -15,7 +15,7 @@
       "env": {
         "APP_ENV": "development",
         "EXPO_PUBLIC_DEV_AUTH": "1",
-        "EXPO_PUBLIC_API_BASE_URL": "https://goldsmith-api-s5yuu4e4ra-el.a.run.app",
+        "EXPO_PUBLIC_API_BASE_URL": "https://goldsmith-api-528920018833.asia-south1.run.app",
         "EXPO_PUBLIC_SHOP_SLUG": "anchor-dev",
         "EXPO_PUBLIC_ANDROID_PACKAGE": "com.goldsmith.customer.dev",
         "EXPO_PUBLIC_IOS_BUNDLE_ID": "com.goldsmith.customer.dev",
@@ -30,7 +30,7 @@
       },
       "env": {
         "APP_ENV": "preview",
-        "EXPO_PUBLIC_API_BASE_URL": "https://goldsmith-api-s5yuu4e4ra-el.a.run.app",
+        "EXPO_PUBLIC_API_BASE_URL": "https://goldsmith-api-528920018833.asia-south1.run.app",
         "EXPO_PUBLIC_SHOP_SLUG": "anchor-dev",
         "EXPO_PUBLIC_ANDROID_PACKAGE": "com.goldsmith.customer.dev",
         "EXPO_PUBLIC_IOS_BUNDLE_ID": "com.goldsmith.customer.dev",

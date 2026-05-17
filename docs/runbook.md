@@ -835,7 +835,7 @@ flow through the gateway only, which would enforce its own auth).
 
 ## 18. App Hosting deploys (Firebase App Hosting — customer-web)
 
-The customer-web Next.js app runs on Firebase App Hosting (`goldsmith-customer-web` backend, region `asia-east1`). Each tenant has **one backend deployment** with per-tenant environment variables set in `apps/customer-web/apphosting.yaml`.
+The customer-web Next.js app runs on Firebase App Hosting (`goldsmith-customer-web` backend, region `asia-south1`). Each tenant has **one backend deployment** with per-tenant environment variables set in `apps/customer-web/apphosting.yaml`.
 
 ### 18.1 First deploy (new tenant)
 
@@ -883,13 +883,13 @@ Firebase App Hosting maintains revision history per backend. To roll back:
 # List revisions
 gcloud run revisions list \
   --service goldsmith-customer-web \
-  --region asia-east1 \
+  --region asia-south1 \
   --project <firebase-project-id>
 
 # Route 100% traffic to a previous revision
 gcloud run services update-traffic goldsmith-customer-web \
   --to-revisions <REVISION_NAME>=100 \
-  --region asia-east1 \
+  --region asia-south1 \
   --project <firebase-project-id>
 ```
 

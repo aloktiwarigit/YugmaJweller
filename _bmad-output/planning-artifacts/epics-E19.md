@@ -65,7 +65,7 @@ notes:
 - NFR-S* (security): customer-side audit log coverage, fresh /security-review on deployment surface, DPDPA Right to Erasure
 - NFR-OPS* (operations): Sentry on both customer apps, structured deploy + rollback, observability parity with API
 - NFR-A4, NFR-A6, NFR-A7 (accessibility): unaffected — already on; this epic does not regress them
-- NFR-C7 (data residency): Cloud Run deploy step + App Hosting config must target asia-east1 / India region
+- NFR-C7 (data residency): Cloud Run deploy step + App Hosting config must target asia-south1 / India region
 
 **Phase:** Phase 2 — Customer-Surface Hardening (post Phase E demo-readiness merge per memory `project_phase_e_demo_readiness_merged.md`)
 
@@ -317,7 +317,7 @@ I want `cloudbuild.yaml` to not just build the API Docker image but also deploy 
 So that API ships are predictable and reversible without me running gcloud commands by memory.
 
 **FRs implemented:** none directly (operationalises every API FR by making deploys reliable)
-**NFRs verified:** NFR-C7 (data residency — Cloud Run service in asia-east1 India-compliant region); NFR-OPS — deploy reversibility (rollback ≤ 5 minutes)
+**NFRs verified:** NFR-C7 (data residency — Cloud Run service in asia-south1 India-compliant region); NFR-OPS — deploy reversibility (rollback ≤ 5 minutes)
 
 **Modules + packages touched:**
 - `cloudbuild.yaml` (add `gcloud run deploy` step after the Docker build + Artifact Registry push)
@@ -335,7 +335,7 @@ So that API ships are predictable and reversible without me running gcloud comma
 
 **Given** a commit lands on main
 **When** Cloud Build triggers
-**Then** it builds the Docker image, pushes to Artifact Registry, AND deploys to Cloud Run in asia-east1
+**Then** it builds the Docker image, pushes to Artifact Registry, AND deploys to Cloud Run in asia-south1
 **And** the new revision passes the `/health` probe before receiving 100% traffic
 **And** if the health probe fails, traffic stays on the previous revision (no rollback needed because the new revision never received traffic)
 
