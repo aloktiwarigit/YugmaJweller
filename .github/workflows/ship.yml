@@ -271,9 +271,12 @@ jobs:
           }
           NODE
         env:
+          # All EXPO_PUBLIC_* vars listed in apps/customer-mobile/app.config.ts
+          # `required` (lines 47–66) must be set or production config eval throws.
           APP_ENV: production
           EXPO_PUBLIC_API_BASE_URL: https://example.com
           EXPO_PUBLIC_SHOP_SLUG: ci-customer
+          EXPO_PUBLIC_APP_NAME: Goldsmith CI
           EXPO_PUBLIC_ANDROID_PACKAGE: com.goldsmith.customer.ci
           EXPO_PUBLIC_IOS_BUNDLE_ID: com.goldsmith.customer.ci
           EXPO_PUBLIC_FIREBASE_PROJECT_ID: goldsmith-ci
