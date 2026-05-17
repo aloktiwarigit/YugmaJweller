@@ -73,6 +73,7 @@ export const Platform: { OS: 'ios' | 'android' | 'web'; select: <T>(opts: { ios?
 };
 
 export const View = passthrough('view');
+export const SafeAreaView = passthrough('safe-area-view');
 export const Text = passthrough('text');
 export const Pressable = PressableMock;
 export const TextInput = TextInputMock;

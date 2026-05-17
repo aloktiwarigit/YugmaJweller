@@ -1,0 +1,40 @@
+{
+  "cli": {
+    "version": ">= 7.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENV": "development",
+        "EXPO_PUBLIC_API_BASE_URL": "http://10.0.2.2:3001",
+        "EXPO_PUBLIC_DEV_AUTH": "1"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENV": "preview"
+      }
+    },
+    "production": {
+      "comment": "Production profile is populated in Story 19.4 (EAS production build). Do not edit here."
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "comment": "Play Store submission config populated in Story 19.4."
+      }
+    }
+  }
+}

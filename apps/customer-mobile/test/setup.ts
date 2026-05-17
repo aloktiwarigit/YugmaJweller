@@ -43,6 +43,26 @@ vi.mock('expo-router', () => ({
   Tabs:      { Screen: vi.fn(() => null) },
 }));
 
+// Mock @sentry/react-native — native SDK requires native binaries unavailable in jsdom.
+// Tests that exercise Sentry behaviour mock ../lib/sentry instead (which re-exports Sentry).
+// This global mock prevents import-time crashes from RN native module resolution.
+vi.mock('@sentry/react-native', () => ({
+  init: vi.fn(),
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+  withScope: vi.fn((cb: (scope: unknown) => void) => {
+    cb({
+      setTag: vi.fn(),
+      setExtra: vi.fn(),
+      setUser: vi.fn(),
+    });
+  }),
+  setTag: vi.fn(),
+  setExtra: vi.fn(),
+  setUser: vi.fn(),
+  wrap: (component: unknown) => component,
+}));
+
 // Mock @react-native-async-storage/async-storage with an in-memory map.
 // Defensive — no first-party code in this app uses AsyncStorage (we use SecureStore
 // per the auth-token invariant), but transitive deps may require it at module load.

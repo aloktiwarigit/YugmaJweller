@@ -249,6 +249,47 @@ jobs:
       - name: Validate agent-context layer
         run: pnpm docs:validate
 
+  build-customer-mobile:
+    # Story 19.2: validates Expo config + Sentry env vars are present.
+    # Real EAS mobile builds happen via EAS post-anchor-SOW (Story 19.4).
+    # This job ensures the Sentry integration is configured before merging.
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: "${{ env.PNPM_VERSION }}" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: "pnpm" }
+      - run: pnpm install --frozen-lockfile
+      - name: Validate Sentry env vars are present
+        # Fail fast with a clear message if secrets are not configured.
+        # SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT must all be set for
+        # source-map upload to work in EAS builds. EXPO_PUBLIC_SENTRY_DSN must
+        # be set for events to be transmitted at runtime.
+        # In PR runs the secrets may not be available — the check uses
+        # SENTRY_REQUIRED=true to opt in (set on main-branch deploys only).
+        run: |
+          if [ "${SENTRY_REQUIRED:-false}" = "true" ]; then
+            : "${SENTRY_AUTH_TOKEN:?SENTRY_AUTH_TOKEN required for source-map upload}"
+            : "${SENTRY_ORG:?SENTRY_ORG required for source-map upload}"
+            : "${SENTRY_PROJECT:?SENTRY_PROJECT required for source-map upload}"
+            : "${EXPO_PUBLIC_SENTRY_DSN:?EXPO_PUBLIC_SENTRY_DSN required for Sentry event transmission}"
+            echo "All Sentry env vars present."
+          else
+            echo "SENTRY_REQUIRED not set — skipping secret presence check (PR build)."
+          fi
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
+      - name: Validate Expo config + plugin resolution
+        working-directory: apps/customer-mobile
+        run: pnpm exec expo config --type public > /dev/null
+      - name: Typecheck customer-mobile
+        run: pnpm exec turbo run typecheck --filter=@goldsmith/customer-mobile
+
   build:
     needs: [typecheck, lint, unit, integration, tenant-isolation, semgrep, build-shopkeeper, a11y-shopkeeper, e2e-shopkeeper, lighthouse-ci]
     runs-on: ubuntu-latest

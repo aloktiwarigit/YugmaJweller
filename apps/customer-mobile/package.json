@@ -13,6 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@sentry/react-native": "~5.14.0",
     "@expo/metro-runtime": "~3.2.3",
     "@expo/vector-icons": "~14.0.0",
     "@goldsmith/auth-client": "workspace:*",
