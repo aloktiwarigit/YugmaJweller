@@ -1,8 +1,22 @@
 import type { ExpoConfig } from 'expo/config';
+import { assertProductionBuildEnv } from './src/build-validation';
 
 // White-label: appName MUST come from tenant runtime config when shipping a per-tenant build.
 // EXPO_PUBLIC_APP_NAME is a build-time fallback for dev/anchor builds only.
 const appName = process.env['EXPO_PUBLIC_APP_NAME'] ?? 'अयोध्या स्वर्णकार';
+
+// Production build guard — fails fast if env vars are unsafe for a store build.
+// Guards: HTTPS-only API URL, no .dev package/bundle IDs in non-dev builds.
+// Only runs when EXPO_PUBLIC_DEV_AUTH is not set to '1'.
+// See src/build-validation.ts for the rules and docs/runbook.md §17 for remediation.
+if (process.env['EXPO_PUBLIC_DEV_AUTH'] !== '1') {
+  assertProductionBuildEnv({
+    apiBaseUrl: process.env['EXPO_PUBLIC_API_BASE_URL'],
+    devAuth: process.env['EXPO_PUBLIC_DEV_AUTH'],
+    androidPackage: process.env['EXPO_PUBLIC_ANDROID_PACKAGE'],
+    iosBundleId: process.env['EXPO_PUBLIC_IOS_BUNDLE_ID'],
+  });
+}
 
 const config: ExpoConfig = {
   name: appName,

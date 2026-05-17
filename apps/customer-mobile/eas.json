@@ -1,0 +1,75 @@
+{
+  "_comment": "EAS build configuration. See docs/runbook.md §17 for first-build steps and value-population guide. REPLACE_WITH_* placeholders must be filled in before running `eas build --profile production`.",
+  "cli": {
+    "version": ">= 12.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "http://10.0.2.2:3001",
+        "EXPO_PUBLIC_SHOP_SLUG": "anchor-dev",
+        "EXPO_PUBLIC_DEV_AUTH": "1",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "goldsmith-dev",
+        "EXPO_PUBLIC_APP_NAME": "Goldsmith Customer Dev",
+        "EXPO_PUBLIC_ANDROID_PACKAGE": "com.goldsmith.customer.dev",
+        "EXPO_PUBLIC_IOS_BUNDLE_ID": "com.goldsmith.customer.dev"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "REPLACE_WITH_STAGING_API_URL",
+        "EXPO_PUBLIC_SHOP_SLUG": "REPLACE_WITH_TENANT_SLUG",
+        "EXPO_PUBLIC_DEV_AUTH": "0",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "REPLACE_WITH_FIREBASE_PROJECT_ID",
+        "EXPO_PUBLIC_APP_NAME": "REPLACE_WITH_TENANT_APP_NAME",
+        "EXPO_PUBLIC_ANDROID_PACKAGE": "REPLACE_WITH_TENANT_ANDROID_PACKAGE",
+        "EXPO_PUBLIC_IOS_BUNDLE_ID": "REPLACE_WITH_TENANT_IOS_BUNDLE_ID"
+      }
+    },
+    "production": {
+      "_comment": "WHITE-LABEL NOTE: Every tenant gets a SEPARATE production build with their own package name, bundle ID, app name, and Firebase project. Do NOT share one production APK/IPA across tenants. See docs/runbook.md §17.",
+      "distribution": "store",
+      "channel": "production",
+      "credentialsSource": "remote",
+      "android": {
+        "buildType": "app-bundle",
+        "package": "REPLACE_WITH_TENANT_ANDROID_PACKAGE"
+      },
+      "ios": {
+        "bundleIdentifier": "REPLACE_WITH_TENANT_IOS_BUNDLE_ID"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "REPLACE_WITH_PRODUCTION_HTTPS_API_URL",
+        "EXPO_PUBLIC_SHOP_SLUG": "REPLACE_WITH_TENANT_SLUG",
+        "EXPO_PUBLIC_DEV_AUTH": "0",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "REPLACE_WITH_PRODUCTION_FIREBASE_PROJECT_ID",
+        "EXPO_PUBLIC_APP_NAME": "REPLACE_WITH_TENANT_APP_NAME_IN_HINDI",
+        "EXPO_PUBLIC_ANDROID_PACKAGE": "REPLACE_WITH_TENANT_ANDROID_PACKAGE",
+        "EXPO_PUBLIC_IOS_BUNDLE_ID": "REPLACE_WITH_TENANT_IOS_BUNDLE_ID"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "_comment": "Populate after Play Store / App Store developer accounts are created. See docs/runbook.md §17.",
+      "android": {
+        "serviceAccountKeyPath": "REPLACE_WITH_PATH_TO_PLAY_STORE_SERVICE_ACCOUNT_JSON",
+        "track": "internal"
+      },
+      "ios": {
+        "_comment": "iOS submission deferred. Apple Developer Program enrollment required per tenant. See docs/runbook.md §17.",
+        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID"
+      }
+    }
+  }
+}

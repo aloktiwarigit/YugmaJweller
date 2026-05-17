@@ -140,6 +140,43 @@ jobs:
   # Run `codex review --diff HEAD~1` (or the `codex-review-gate` Claude Code plugin)
   # before opening / merging a PR. CI handles the objective gates only.
 
+  build-customer-mobile:
+    # Validates customer-mobile Expo config + production build guards.
+    # Real EAS builds happen outside CI (post-tenant-SOW); this job only
+    # validates that the config is syntactically valid and that the production
+    # guard logic (HTTPS URL, no .dev bundle IDs) is wired correctly.
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: "${{ env.PNPM_VERSION }}" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: "pnpm" }
+      - run: pnpm install --frozen-lockfile
+      - name: Validate Expo config (dev profile — guards bypass for dev)
+        working-directory: apps/customer-mobile
+        env:
+          EXPO_PUBLIC_DEV_AUTH: "1"
+          EXPO_PUBLIC_API_BASE_URL: "http://10.0.2.2:3001"
+          EXPO_PUBLIC_SHOP_SLUG: "anchor-dev"
+          EXPO_PUBLIC_APP_NAME: "Goldsmith Dev"
+          EXPO_PUBLIC_ANDROID_PACKAGE: "com.goldsmith.customer.dev"
+          EXPO_PUBLIC_IOS_BUNDLE_ID: "com.goldsmith.customer.dev"
+          EXPO_PUBLIC_FIREBASE_PROJECT_ID: "goldsmith-dev"
+        run: pnpm exec expo config --type public > /dev/null
+      - name: Assert production guards (vitest build-validation suite)
+        # Runs the unit tests in test/build-validation.test.ts which verify:
+        #   - http:// URL is rejected in production builds
+        #   - .dev bundle IDs are rejected in production builds
+        #   - dev builds (EXPO_PUBLIC_DEV_AUTH=1) bypass both guards
+        # This catches regressions in src/build-validation.ts before a bad
+        # build reaches the store.
+        working-directory: apps/customer-mobile
+        run: pnpm exec vitest run test/build-validation.test.ts
+      - name: Typecheck customer-mobile
+        run: pnpm exec turbo run typecheck --filter=@goldsmith/customer-mobile
+
   build-shopkeeper:
     # Validates Expo config + plugin resolution without running the full web
     # export. Real mobile builds happen via EAS post-anchor-SOW (same deferral
@@ -250,7 +287,7 @@ jobs:
         run: pnpm docs:validate
 
   build:
-    needs: [typecheck, lint, unit, integration, tenant-isolation, semgrep, build-shopkeeper, a11y-shopkeeper, e2e-shopkeeper, lighthouse-ci]
+    needs: [typecheck, lint, unit, integration, tenant-isolation, semgrep, build-customer-mobile, build-shopkeeper, a11y-shopkeeper, e2e-shopkeeper, lighthouse-ci]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
