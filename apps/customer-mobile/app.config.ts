@@ -121,6 +121,17 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-secure-store',
     './plugins/with-pnpm-gradle-plugin-paths',
+    // Sentry Expo plugin — wires native crash reporting + source-map upload.
+    // @sentry/react-native ≥ 5.x uses this plugin directly (sentry-expo is deprecated for SDK 50+).
+    // Source-map upload uses SENTRY_AUTH_TOKEN + SENTRY_ORG + SENTRY_PROJECT at build time.
+    [
+      '@sentry/react-native/expo',
+      {
+        url: 'https://sentry.io',
+        project: process.env['SENTRY_PROJECT'] ?? 'goldsmith-customer-mobile',
+        organization: process.env['SENTRY_ORG'] ?? 'goldsmith',
+      },
+    ],
   ],
   // White-label: package / bundleIdentifier MUST differ per tenant build.
   android: {

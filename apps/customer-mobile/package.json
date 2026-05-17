@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@babel/runtime": "^7.24.0",
+    "@sentry/react-native": "~5.14.0",
     "@expo/metro-runtime": "~3.2.3",
     "@expo/vector-icons": "~14.0.0",
     "@goldsmith/auth-client": "workspace:*",
