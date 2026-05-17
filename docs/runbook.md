@@ -683,7 +683,6 @@ DB session rows are unaffected; running sessions must be re-started after rotati
 
 ---
 
-<<<<<<< HEAD
 ## 17. Cloud Run deploys (API — goldsmith-dev, asia-south1)
 
 > Added 2026-05-16 — Story 19.5. ADR note: ADR-0015 specifies Azure as the target
@@ -830,14 +829,14 @@ enforced by `FirebaseJwtGuard` on all tenant-scoped routes. Public routes (`/hea
 If a WAF or API Gateway is added in front of Cloud Run in a future phase, the
 `--allow-unauthenticated` flag should be reviewed and potentially removed (traffic would then
 flow through the gateway only, which would enforce its own auth).
-=======
+
 ---
 
 ## 18. App Hosting deploys (Firebase App Hosting — customer-web)
 
 The customer-web Next.js app runs on Firebase App Hosting (`goldsmith-customer-web` backend, region `asia-east1`). Each tenant has **one backend deployment** with per-tenant environment variables set in `apps/customer-web/apphosting.yaml`.
 
-### 17.1 First deploy (new tenant)
+### 18.1 First deploy (new tenant)
 
 Prerequisites: Firebase project exists, App Hosting backend created in Firebase console, all `apphosting.yaml` values populated (no `REPLACE_WITH_*` placeholders).
 
@@ -851,7 +850,7 @@ Verify the deploy URL in the Firebase console → App Hosting → backend → Tr
 
 **CI gate:** The `apphosting-deploy-check` workflow (`.github/workflows/apphosting-deploy-check.yml`) blocks merges when `[deploy]` appears in the commit/PR title AND `apphosting.yaml` still contains `REPLACE_WITH_*` placeholders. Add `[deploy]` to the PR title only when all values are populated and you intend to trigger a deploy. See fixture tests in that workflow for the exact logic.
 
-### 17.2 Environment variable matrix
+### 18.2 Environment variable matrix
 
 All variables are set in `apps/customer-web/apphosting.yaml`. The `[env.ts]` column marks variables validated at build time by `apps/customer-web/lib/env.ts` — missing values cause a hard build failure.
 
@@ -870,7 +869,7 @@ All variables are set in `apps/customer-web/apphosting.yaml`. The `[env.ts]` col
 
 `NEXT_PUBLIC_FIREBASE_*` values are public keys — safe to commit in `apphosting.yaml`. They are restricted by Firebase security rules, not by secrecy.
 
-### 17.3 Rollback
+### 18.3 Rollback
 
 Firebase App Hosting maintains revision history per backend. To roll back:
 
@@ -895,7 +894,7 @@ gcloud run services update-traffic goldsmith-customer-web \
 
 Rollback does NOT affect the database or Cloud Run API — only the customer-web SSR layer. Database rollback follows §2.3.
 
-### 17.4 SSR error triage (Cloud Logging)
+### 18.4 SSR error triage (Cloud Logging)
 
 Cloud Logging URL pattern for this backend (replace `<project-id>` with the Firebase project):
 
@@ -907,7 +906,7 @@ Shorter: navigate to Cloud Logging → select resource type "Cloud Run Revision"
 
 For SSR errors, the stack trace includes the Next.js route segment and any uncaught error from server components or API route handlers.
 
-### 17.5 Common failure modes
+### 18.5 Common failure modes
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
@@ -937,7 +936,6 @@ Each jeweller tenant gets their own `apphosting.yaml` values and their own Fireb
 6. Complete §7.3 post-onboarding checklist.
 
 Estimated elapsed time for steps 3–6: ~1 hour per tenant (primarily wait time for Cloud Build).
->>>>>>> worktree-agent-a42ad07e19385196f
 
 ---
 
