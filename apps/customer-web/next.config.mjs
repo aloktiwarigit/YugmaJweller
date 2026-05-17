@@ -1,5 +1,21 @@
 import { PHASE_PRODUCTION_BUILD } from 'next/constants.js';
+import { withSentryConfig } from '@sentry/nextjs';
 import { assertEnv, publicApiOrigin } from './lib/env.mjs';
+
+// Source-map upload guard: SENTRY_AUTH_TOKEN must be present when running an
+// actual production build (NEXT_PHASE=phase-production-build), NOT during
+// `next lint`, `next start`, or other phases that also set NODE_ENV=production.
+if (
+  process.env.NODE_ENV === 'production' &&
+  process.env.NEXT_PHASE === 'phase-production-build' &&
+  !process.env.SENTRY_AUTH_TOKEN
+) {
+  throw new Error(
+    '[Sentry] SENTRY_AUTH_TOKEN required for source-map upload in production build.\n' +
+      'Set the SENTRY_AUTH_TOKEN secret in CI (GitHub Actions secret: SENTRY_AUTH_TOKEN).\n' +
+      'For local dev builds, omit NODE_ENV=production or add SENTRY_AUTH_TOKEN to .env.local.',
+  );
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -44,6 +60,8 @@ const nextConfig = {
       'https://securetoken.googleapis.com',
       'https://firestore.googleapis.com',
       'wss://*.firebaseio.com',
+      // Sentry ingestion endpoint for browser-side error reporting (Story 19.1).
+      'https://*.sentry.io',
     ];
     const apiOrigin = publicApiOrigin(process.env);
     if (apiOrigin) connectSrc.push(apiOrigin);
@@ -110,11 +128,27 @@ const nextConfig = {
   },
 };
 
+// Wrap with Sentry (Story 19.1) so source-map upload runs at build time.
+const wrappedConfig = withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+  silent: true,
+  tunnelRoute: undefined,
+  disableLogger: false,
+  autoInstrumentServerFunctions: true,
+  autoInstrumentMiddleware: true,
+  autoInstrumentAppDirectory: true,
+});
+
+// Export a phase-aware config function: runs env assertion at PRODUCTION_BUILD,
+// then returns the Sentry-wrapped Next config.
 export default function config(phase) {
-  // Run env validation during `next build`. `next lint` and `next dev` skip
-  // it so unrelated workflows aren't blocked by an unsynced production env.
   if (phase === PHASE_PRODUCTION_BUILD && process.env.npm_lifecycle_event !== 'lint') {
     assertEnv(process.env);
   }
-  return nextConfig;
+  return wrappedConfig;
 }
