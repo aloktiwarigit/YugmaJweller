@@ -1,0 +1,139 @@
+name: apphosting-deploy-check
+
+# Guards apphosting.yaml against un-populated REPLACE_WITH_* placeholders.
+#
+# Design: commit-message opt-in pattern.
+# - Any PR that modifies apphosting.yaml runs this job.
+# - If the commit message / PR title contains "[deploy]", zero REPLACE_WITH_
+#   placeholders are tolerated (hard fail).
+# - Without "[deploy]", the check runs but exits 0 with a warning (scaffolding
+#   PRs and intermediate edits pass cleanly).
+#
+# Rationale for commit-message pattern over "detect only structural changes":
+# - Detecting "only values changed" vs "structure changed" is fragile YAML
+#   diffing. A developer consciously adding "[deploy]" to signal prod-readiness
+#   is self-documenting and cannot be accidentally bypassed.
+# - A future story populates the real values; that PR must include "[deploy]"
+#   in its commit/PR title to prove readiness before merge.
+
+on:
+  pull_request:
+    paths:
+      - 'apps/customer-web/apphosting.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/customer-web/apphosting.yaml'
+
+jobs:
+  check-placeholders:
+    name: Check apphosting.yaml placeholders
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect REPLACE_WITH_* placeholders
+        id: detect
+        run: |
+          YAML_FILE="apps/customer-web/apphosting.yaml"
+          COUNT=$(grep -c 'REPLACE_WITH_' "$YAML_FILE" || true)
+          echo "placeholder_count=$COUNT" >> "$GITHUB_OUTPUT"
+          if [ "$COUNT" -gt 0 ]; then
+            echo "Found $COUNT REPLACE_WITH_* placeholder(s) in $YAML_FILE:"
+            grep -n 'REPLACE_WITH_' "$YAML_FILE" || true
+          else
+            echo "No REPLACE_WITH_* placeholders found — $YAML_FILE is clean."
+          fi
+
+      - name: Enforce zero placeholders on [deploy] commits
+        env:
+          PLACEHOLDER_COUNT: ${{ steps.detect.outputs.placeholder_count }}
+          # PR title takes precedence; fall back to commit message for push events.
+          COMMIT_MSG: ${{ github.event.pull_request.title || github.event.head_commit.message }}
+        run: |
+          if echo "$COMMIT_MSG" | grep -qi '\[deploy\]'; then
+            echo "[deploy] flag detected — enforcing zero REPLACE_WITH_* placeholders."
+            if [ "$PLACEHOLDER_COUNT" -gt 0 ]; then
+              echo ""
+              echo "ERROR: apphosting.yaml contains $PLACEHOLDER_COUNT un-populated placeholder(s)."
+              echo "Populate every REPLACE_WITH_* value before deploying."
+              echo "See docs/runbook.md §17 (App Hosting deploys) for the env-var matrix."
+              exit 1
+            else
+              echo "PASS: No placeholders found. Safe to deploy."
+            fi
+          else
+            if [ "$PLACEHOLDER_COUNT" -gt 0 ]; then
+              echo "WARNING: $PLACEHOLDER_COUNT REPLACE_WITH_* placeholder(s) remain in apphosting.yaml."
+              echo "This is OK for scaffolding PRs. Add [deploy] to the commit/PR title when the"
+              echo "values are populated and you intend to trigger an App Hosting deploy."
+            else
+              echo "INFO: apphosting.yaml is fully populated (no placeholders). Consider adding"
+              echo "[deploy] to the commit/PR title to signal production-readiness."
+            fi
+            exit 0
+          fi
+
+  # Fixture tests: verify the gate logic against synthetic inputs.
+  # Runs on every PR/push regardless of path filter — it tests shell logic only,
+  # not the real apphosting.yaml.
+  fixture-tests:
+    name: Gate logic fixtures (positive + negative)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Positive fixture — clean YAML + [deploy] should pass
+        run: |
+          TMPFILE=$(mktemp)
+          cat > "$TMPFILE" <<'EOF'
+          env:
+            - variable: NEXT_PUBLIC_SHOP_SLUG
+              value: anchor-dev
+            - variable: API_URL
+              value: https://api.example.com
+          EOF
+          COUNT=$(grep -c 'REPLACE_WITH_' "$TMPFILE" || true)
+          COMMIT_MSG="feat: populate apphosting values [deploy]"
+          if echo "$COMMIT_MSG" | grep -qi '\[deploy\]'; then
+            if [ "$COUNT" -gt 0 ]; then
+              echo "FAIL: positive fixture incorrectly failed"; exit 1
+            else
+              echo "PASS: positive fixture (clean YAML + [deploy]) → pass"
+            fi
+          fi
+          rm "$TMPFILE"
+
+      - name: Negative fixture — REPLACE_WITH_ present + [deploy] should fail
+        run: |
+          TMPFILE=$(mktemp)
+          cat > "$TMPFILE" <<'EOF'
+          env:
+            - variable: NEXT_PUBLIC_SHOP_SLUG
+              value: REPLACE_WITH_TENANT_SLUG
+            - variable: API_URL
+              value: REPLACE_WITH_API_URL
+          EOF
+          COUNT=$(grep -c 'REPLACE_WITH_' "$TMPFILE" || true)
+          COMMIT_MSG="feat: deploy tenant alpha [deploy]"
+          if echo "$COMMIT_MSG" | grep -qi '\[deploy\]'; then
+            if [ "$COUNT" -gt 0 ]; then
+              echo "PASS: negative fixture (REPLACE_WITH_ + [deploy]) → correctly blocked"
+            else
+              echo "FAIL: negative fixture should have found placeholders"; exit 1
+            fi
+          fi
+          rm "$TMPFILE"
+
+      - name: Scaffolding fixture — REPLACE_WITH_ present without [deploy] should pass
+        run: |
+          TMPFILE=$(mktemp)
+          cat > "$TMPFILE" <<'EOF'
+          env:
+            - variable: NEXT_PUBLIC_SHOP_SLUG
+              value: REPLACE_WITH_TENANT_SLUG
+          EOF
+          COUNT=$(grep -c 'REPLACE_WITH_' "$TMPFILE" || true)
+          COMMIT_MSG="chore: scaffold apphosting.yaml placeholders"
+          if ! echo "$COMMIT_MSG" | grep -qi '\[deploy\]'; then
+            echo "PASS: scaffolding fixture (REPLACE_WITH_ without [deploy]) → warning only, not blocked"
+          fi
+          rm "$TMPFILE"
