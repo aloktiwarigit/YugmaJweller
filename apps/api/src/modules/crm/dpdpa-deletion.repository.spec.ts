@@ -150,7 +150,7 @@ describe('softDeleteAtomic cascade', () => {
     expect(result.cascadeCounts).toEqual({
       wishlists: 3,
       reviews:   2,
-      rateLocks: expect.any(Number),
+      rateLocks: 1,
       tryAtHome: 1,
     });
     expect(result.rateLockRefundsPending).toBe(1);

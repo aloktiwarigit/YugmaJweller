@@ -30,7 +30,7 @@ import type { OccasionResponse, AddOccasionDto } from './occasions.service';
 // which throws "Required" and returns 400 to the existing client — breaking the
 // backwards-compatible no-body call path. The TypeScript-level `body = {}` default
 // fires AFTER the pipe and cannot rescue this; the pipe must accept undefined itself.
-const CustomerSelfDeleteBodySchema = z.object({
+export const CustomerSelfDeleteBodySchema = z.object({
   reason:     z.enum(['no-need', 'privacy', 'other-jeweller', 'other']).optional(),
   reasonText: z.string().max(200).optional(),
 }).strict().default({});

@@ -4,7 +4,7 @@ import { UnauthorizedException } from '@nestjs/common';
 import { GUARDS_METADATA, HTTP_CODE_METADATA } from '@nestjs/common/constants';
 import type { Request } from 'express';
 import { CustomerAuthGuard, DEV_MOCK_CUSTOMER_ID } from '../customer/customer-auth.guard';
-import { CrmController } from './crm.controller';
+import { CrmController, CustomerSelfDeleteBodySchema } from './crm.controller';
 
 const SHOP = 'aaaaaaaa-bbbb-4000-8000-000000000001';
 
@@ -95,6 +95,14 @@ describe('CrmController customer self-deletion', () => {
       'customer',
       { reason: 'privacy', reasonText: undefined },
     );
+  });
+
+  it('CustomerSelfDeleteBodySchema parses undefined to {} — guards .default({}) regression', () => {
+    // Per Codex round 2 fix #3 + round 3 review: NestJS runs ZodValidationPipe
+    // on raw `undefined` for missing body BEFORE TypeScript default parameters
+    // fire. The schema's `.default({})` is load-bearing — removing it would
+    // make existing no-body customer-mobile callers regress to 400.
+    expect(CustomerSelfDeleteBodySchema.parse(undefined)).toEqual({});
   });
 
   it('accepts an empty body (reason optional, backwards-compatible)', async () => {
