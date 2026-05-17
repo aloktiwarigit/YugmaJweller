@@ -393,9 +393,18 @@ jobs:
         run: pnpm exec turbo run build --filter=@goldsmith/customer-web
         env:
           NODE_ENV: production
+          # All vars listed in apps/customer-web/lib/env.ts REQUIRED_PRODUCTION
+          # must be set or `assertEnv()` throws before `next build` runs. Secrets
+          # fall through to safe defaults so a PR-cycle main-push doesn't
+          # require every tenant secret to be configured before the gate exists.
+          API_URL: ${{ secrets.API_URL || 'https://api.example.com' }}
           NEXT_PUBLIC_SHOP_SLUG: ${{ secrets.NEXT_PUBLIC_SHOP_SLUG || 'anchor-dev' }}
           NEXT_PUBLIC_API_BASE: ${{ secrets.NEXT_PUBLIC_API_BASE || 'https://api.example.com' }}
           NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || 'https://example.com' }}
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY || 'ci-public-firebase-api-key' }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'goldsmith-ci.firebaseapp.com' }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'goldsmith-ci' }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID || '1:000000000000:web:0000000000000000000000' }}
           NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}

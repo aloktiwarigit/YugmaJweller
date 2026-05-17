@@ -1,5 +1,9 @@
 import type { ExpoConfig } from 'expo/config';
-import { assertProductionBuildEnv } from './src/build-validation';
+// NOTE: do NOT import from './src/build-validation' here. Expo's config loader
+// transpiles app.config.ts but not its sibling .ts imports in clean checkouts
+// (no compiled JS exists for them). The production guards below are inlined for
+// the `production` profile; the build-validation.ts module retains its unit
+// tests as a standalone helper but is intentionally not wired into the config.
 
 // White-label: appName MUST come from tenant runtime config when shipping a per-tenant build.
 // EXPO_PUBLIC_APP_NAME is a build-time fallback for dev/anchor builds only.
@@ -97,18 +101,15 @@ if (!easProjectId && !isProduction) {
   console.warn('[app.config.ts] EXPO_PUBLIC_EAS_PROJECT_ID is not set. EAS builds will fail until configured.');
 }
 
-// Production build guard — fails fast if env vars are unsafe for a store build.
-// Guards: HTTPS-only API URL, no .dev package/bundle IDs in non-dev builds.
-// Only runs when EXPO_PUBLIC_DEV_AUTH is not set to '1'.
-// See src/build-validation.ts for the rules and docs/runbook.md §17 for remediation.
-if (process.env['EXPO_PUBLIC_DEV_AUTH'] !== '1') {
-  assertProductionBuildEnv({
-    apiBaseUrl: process.env['EXPO_PUBLIC_API_BASE_URL'],
-    devAuth: process.env['EXPO_PUBLIC_DEV_AUTH'],
-    androidPackage: process.env['EXPO_PUBLIC_ANDROID_PACKAGE'],
-    iosBundleId: process.env['EXPO_PUBLIC_IOS_BUNDLE_ID'],
-  });
-}
+// NOTE: The previous `if (process.env['EXPO_PUBLIC_DEV_AUTH'] !== '1') {
+// assertProductionBuildEnv(...) }` block has been removed. It (a) imported a
+// .ts sibling that fails to resolve in clean Expo config evaluations, and
+// (b) fired on the `preview` EAS profile (which uses .dev bundle IDs by
+// design). The production-only guards in the `if (isProduction)` block above
+// (lines 47–93) already enforce HTTPS-only API URL, no .dev bundle IDs, no
+// dev Firebase service files, and no devAuth=1 — gated on APP_ENV=production,
+// which is the correct trigger for store builds. The `preview` profile is
+// intentionally free of these guards.
 
 const config: ExpoConfig = {
   name: appName,
