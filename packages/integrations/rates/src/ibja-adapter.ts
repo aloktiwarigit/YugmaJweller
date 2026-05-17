@@ -90,7 +90,7 @@ export class IbjaAdapter implements RatesPort {
     const silverPaise  = inrPerGramFromUsdPerOz(silver.price, usdToInr, premium);
 
     // Derive karats linearly. ratio = karat/24.
-    const k = (ratio: number) => BigInt(Math.round(Number(gold24kPaise) * ratio));
+    const k = (ratio: number): bigint => BigInt(Math.round(Number(gold24kPaise) * ratio));
 
     return {
       GOLD_24K: { perGramPaise: gold24kPaise,         fetchedAt: now },
