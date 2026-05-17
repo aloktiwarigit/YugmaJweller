@@ -2,18 +2,25 @@ import { PHASE_PRODUCTION_BUILD } from 'next/constants.js';
 import { withSentryConfig } from '@sentry/nextjs';
 import { assertEnv, publicApiOrigin } from './lib/env.mjs';
 
-// Source-map upload guard: SENTRY_AUTH_TOKEN must be present when running an
-// actual production build (NEXT_PHASE=phase-production-build), NOT during
-// `next lint`, `next start`, or other phases that also set NODE_ENV=production.
+// Source-map upload posture: SENTRY_AUTH_TOKEN enables source-map upload to
+// Sentry at build time (so production stack traces show readable code, not
+// minified). It is OPTIONAL — the Sentry RUNTIME SDK still captures errors
+// without it (driven by NEXT_PUBLIC_SENTRY_DSN). When the token is absent
+// during a production build, log a warning so it's visible in CI logs and
+// continue; pre-paying-tenant environments are expected to run without
+// source-map upload until the first deploy. Hardened on first paying tenant
+// per Story 19.6 marker text.
 if (
   process.env.NODE_ENV === 'production' &&
   process.env.NEXT_PHASE === 'phase-production-build' &&
   !process.env.SENTRY_AUTH_TOKEN
 ) {
-  throw new Error(
-    '[Sentry] SENTRY_AUTH_TOKEN required for source-map upload in production build.\n' +
-      'Set the SENTRY_AUTH_TOKEN secret in CI (GitHub Actions secret: SENTRY_AUTH_TOKEN).\n' +
-      'For local dev builds, omit NODE_ENV=production or add SENTRY_AUTH_TOKEN to .env.local.',
+  // eslint-disable-next-line no-console
+  console.warn(
+    '[Sentry] SENTRY_AUTH_TOKEN not set — source-map upload is disabled for this build.\n' +
+      'Production stack traces in Sentry will show minified code until the token is configured.\n' +
+      'Runtime error capture (via NEXT_PUBLIC_SENTRY_DSN) is unaffected.\n' +
+      'To enable upload: set the SENTRY_AUTH_TOKEN secret in GitHub Actions or .env.local.',
   );
 }
 

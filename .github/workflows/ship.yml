@@ -370,7 +370,10 @@ jobs:
 
   build-customer-web:
     # Production build of customer-web with Sentry source-map upload.
-    # SENTRY_AUTH_TOKEN is required — the build fails loudly if absent (per next.config.mjs guard).
+    # Source-map upload is OPTIONAL pre-paying-tenant. When SENTRY_AUTH_TOKEN is
+    # set in GitHub repo secrets, the build uploads source maps; when unset, the
+    # build logs a warning and skips upload. Runtime Sentry capture (via the
+    # public DSN) is unaffected. See next.config.mjs source-map guard.
     # Run only on push to main (not on PRs) to avoid burning Sentry quota on every PR.
     # On PRs, typecheck + lighthouse-ci cover correctness; source-map upload is a deploy concern.
     needs: [typecheck, lint, unit, lighthouse-ci]
@@ -383,12 +386,14 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "${{ env.NODE_VERSION }}", cache: "pnpm" }
       - run: pnpm install --frozen-lockfile
-      - name: Validate SENTRY_AUTH_TOKEN is present
+      - name: Report Sentry source-map posture
         run: |
           if [ -z "$SENTRY_AUTH_TOKEN" ]; then
-            echo "ERROR: SENTRY_AUTH_TOKEN required for source-map upload" >&2
-            echo "Add SENTRY_AUTH_TOKEN to GitHub repository secrets." >&2
-            exit 1
+            echo "::warning::SENTRY_AUTH_TOKEN not set — source-map upload disabled for this build."
+            echo "::warning::Runtime error capture via NEXT_PUBLIC_SENTRY_DSN is unaffected."
+            echo "::warning::Set SENTRY_AUTH_TOKEN in repo secrets before the first paying-tenant deploy."
+          else
+            echo "SENTRY_AUTH_TOKEN present — source-map upload will run."
           fi
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
