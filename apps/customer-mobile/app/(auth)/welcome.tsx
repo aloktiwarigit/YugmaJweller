@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Text, TextInput, Pressable, ActivityIndicator,
   KeyboardAvoidingView, Platform, ScrollView,
@@ -18,7 +18,19 @@ type Step = 'phone' | 'otp';
 export default function Welcome(): React.ReactElement {
   const devAuth    = Boolean(Constants.expoConfig?.extra?.['devAuth']);
   const setSession = useCustomerSessionStore((s) => s.setSession);
+  const customer   = useCustomerSessionStore((s) => s.customer);
   const tenant     = useTenantStore((s) => s.tenant);
+
+  // Real-OTP path: after confirmation.confirm() succeeds, the Firebase SDK
+  // fires onIdTokenChanged inside CustomerAuthProvider, which then calls
+  // setSession. The /(auth)/welcome screen is not re-evaluated by app/index.tsx's
+  // redirect when session state changes, so we have to navigate explicitly here
+  // when the customer record appears.
+  useEffect(() => {
+    if (customer) {
+      router.replace('/(tabs)');
+    }
+  }, [customer]);
 
   const [step,        setStep]        = useState<Step>('phone');
   const [phoneInput,  setPhoneInput]  = useState('');

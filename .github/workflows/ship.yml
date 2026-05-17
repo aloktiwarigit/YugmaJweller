@@ -225,11 +225,14 @@ jobs:
         # turbo cascades ^build so @goldsmith/shared, @goldsmith/i18n etc. are compiled first.
         run: pnpm exec turbo run typecheck --filter=@goldsmith/shopkeeper
 
-  build-customer-mobile:
+  build-customer-mobile-prod:
     # Lightweight production-readiness gate for the customer EAS profile.
     # This does not create a store build; it verifies that APP_ENV=production
     # resolves to non-dev identifiers, HTTPS API config, and non-dev Firebase
     # app config file paths before EAS is allowed to build.
+    # Renamed from `build-customer-mobile` — three jobs shared that ID prior to
+    # the Story 19.6 review gate, a YAML duplicate-keys bug that silently
+    # dropped earlier steps. Fixed post-db9c22a.
     needs: install
     runs-on: ubuntu-latest
     steps:
@@ -415,49 +418,15 @@ jobs:
       - name: Validate agent-context layer
         run: pnpm docs:validate
 
-  build-customer-mobile:
-    # Story 19.2: validates Expo config + Sentry env vars are present.
-    # Real EAS mobile builds happen via EAS post-anchor-SOW (Story 19.4).
-    # This job ensures the Sentry integration is configured before merging.
-    needs: install
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { version: "${{ env.PNPM_VERSION }}" }
-      - uses: actions/setup-node@v4
-        with: { node-version: "${{ env.NODE_VERSION }}", cache: "pnpm" }
-      - run: pnpm install --frozen-lockfile
-      - name: Validate Sentry env vars are present
-        # Fail fast with a clear message if secrets are not configured.
-        # SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT must all be set for
-        # source-map upload to work in EAS builds. EXPO_PUBLIC_SENTRY_DSN must
-        # be set for events to be transmitted at runtime.
-        # In PR runs the secrets may not be available — the check uses
-        # SENTRY_REQUIRED=true to opt in (set on main-branch deploys only).
-        run: |
-          if [ "${SENTRY_REQUIRED:-false}" = "true" ]; then
-            : "${SENTRY_AUTH_TOKEN:?SENTRY_AUTH_TOKEN required for source-map upload}"
-            : "${SENTRY_ORG:?SENTRY_ORG required for source-map upload}"
-            : "${SENTRY_PROJECT:?SENTRY_PROJECT required for source-map upload}"
-            : "${EXPO_PUBLIC_SENTRY_DSN:?EXPO_PUBLIC_SENTRY_DSN required for Sentry event transmission}"
-            echo "All Sentry env vars present."
-          else
-            echo "SENTRY_REQUIRED not set — skipping secret presence check (PR build)."
-          fi
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-          EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
-      - name: Validate Expo config + plugin resolution
-        working-directory: apps/customer-mobile
-        run: pnpm exec expo config --type public > /dev/null
-      - name: Typecheck customer-mobile
-        run: pnpm exec turbo run typecheck --filter=@goldsmith/customer-mobile
+  # Removed: third duplicate `build-customer-mobile` definition (lines 418-457 in
+  # pre-fix HEAD). It was a true subset duplicate of the combined 19.2+19.4 job at
+  # lines 143-204. Three identical job IDs in one workflow is a YAML duplicate-keys
+  # bug — GitHub silently kept only the last definition, dropping the production-
+  # guards vitest step + the explicit Sentry-secret presence check. Fixed in
+  # Story 19.6 review gate (commit follows db9c22a).
 
   build:
-    needs: [typecheck, lint, unit, integration, tenant-isolation, semgrep, build-shopkeeper, build-customer-mobile, a11y-shopkeeper, e2e-shopkeeper, lighthouse-ci]
+    needs: [typecheck, lint, unit, integration, tenant-isolation, semgrep, build-shopkeeper, build-customer-mobile, build-customer-mobile-prod, a11y-shopkeeper, e2e-shopkeeper, lighthouse-ci]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

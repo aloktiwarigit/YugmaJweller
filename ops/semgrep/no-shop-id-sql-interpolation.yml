@@ -1,0 +1,36 @@
+rules:
+  - id: goldsmith-no-shop-id-sql-interpolation
+    pattern-either:
+      - pattern: |
+          $C.query(`SET LOCAL app.current_shop_id = '${...}'`)
+      - pattern: |
+          $C.query(`SET LOCAL app.current_shop_id = '${...}'`, ...)
+      - pattern: |
+          $C.query(`SET app.current_shop_id = '${...}'`)
+      - pattern: |
+          $C.query(`SET app.current_shop_id = '${...}'`, ...)
+    message: >
+      Do not interpolate shopId into SET / SET LOCAL via template literals.
+      pg's simple query protocol allows multi-statement execution, so any
+      caller that bypasses UUID validation upstream creates a SQL injection
+      sink. Use parameter binding instead:
+
+        await client.query(
+          'SELECT set_config($1, $2, true)',   // is_local=true → SET LOCAL
+          ['app.current_shop_id', shopId],
+        );
+
+        await client.query(
+          'SELECT set_config($1, $2, false)',  // is_local=false → SET (session)
+          ['app.current_shop_id', POISON_UUID],
+        );
+
+      See packages/db/src/tx.ts and apps/api/src/modules/auth/{auth,permissions}.repository.ts
+      for the canonical pattern. Fixed in story 19.6 (commit db9c22a +
+      follow-up).
+    languages: [typescript]
+    severity: ERROR
+    paths:
+      include:
+        - "packages/**"
+        - "apps/api/**"

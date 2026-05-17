@@ -12,15 +12,18 @@ export class PermissionsRepository {
     const c = await this.pool.connect();
     try {
       await c.query('SET ROLE app_user');
+      // Parameter-bound set_config — never string-interpolate shopId into SQL.
       // Set GUC so RLS policy on role_permissions can filter on current_setting('app.current_shop_id').
-      await c.query(`SET app.current_shop_id = '${shopId}'`);
+      await c.query('SELECT set_config($1, $2, false)', ['app.current_shop_id', shopId]);
       const res = await c.query<{ permission_key: string; is_enabled: boolean }>(
         `SELECT permission_key, is_enabled FROM role_permissions WHERE shop_id = $1 AND role = $2`,
         [shopId, role],
       );
       return Object.fromEntries(res.rows.map((r) => [r.permission_key, r.is_enabled]));
     } finally {
-      await c.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
+      await c
+        .query('SELECT set_config($1, $2, false)', ['app.current_shop_id', POISON_UUID])
+        .catch(() => undefined);
       await c.query('RESET ROLE').catch(() => undefined);
       c.release();
     }

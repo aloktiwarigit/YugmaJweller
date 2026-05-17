@@ -12,9 +12,13 @@ export function createPool(config: PoolConfig): Pool {
   });
 
   pool.on('connect', (client) => {
-    client.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch((err) => {
-      logger.error({ err }, 'failed to set poison default on new client');
-    });
+    // Parameter-bound — defence in depth against any future change to POISON_UUID
+    // and consistent with the wider GUC-setting pattern (tx.ts, auth.repository.ts).
+    client
+      .query('SELECT set_config($1, $2, false)', ['app.current_shop_id', POISON_UUID])
+      .catch((err) => {
+        logger.error({ err }, 'failed to set poison default on new client');
+      });
   });
 
   pool.on('error', (err) => {

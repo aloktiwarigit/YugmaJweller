@@ -28,7 +28,9 @@ export class AuthRepository {
       return { shopId: r.shop_id, userId: r.user_id, role: r.role, status: r.status, firebaseUid: r.firebase_uid };
     } finally {
       // Re-poison the GUC so no subsequent pool connection sees a stale shop context.
-      await c.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
+      await c
+        .query('SELECT set_config($1, $2, false)', ['app.current_shop_id', POISON_UUID])
+        .catch(() => undefined);
       await c.query('RESET ROLE').catch(() => undefined);
       c.release();
     }
@@ -118,7 +120,7 @@ export class AuthRepository {
     const c = await this.pool.connect();
     try {
       await c.query('SET ROLE app_user');
-      await c.query(`SET app.current_shop_id = '${shopId}'`);
+      await c.query('SELECT set_config($1, $2, false)', ['app.current_shop_id', shopId]);
       const res = await c.query<{ firebase_uid: string | null; role: ShopUserRole; status: string }>(
         `SELECT firebase_uid, role, status FROM shop_users WHERE id = $1 AND shop_id = $2 AND status != 'REVOKED'`,
         [targetUserId, shopId],
@@ -126,7 +128,9 @@ export class AuthRepository {
       if (res.rows.length === 0) return null;
       return { firebaseUid: res.rows[0].firebase_uid, role: res.rows[0].role, status: res.rows[0].status };
     } finally {
-      await c.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
+      await c
+        .query('SELECT set_config($1, $2, false)', ['app.current_shop_id', POISON_UUID])
+        .catch(() => undefined);
       await c.query('RESET ROLE').catch(() => undefined);
       c.release();
     }
@@ -136,14 +140,16 @@ export class AuthRepository {
     const c = await this.pool.connect();
     try {
       await c.query('SET ROLE app_user');
-      await c.query(`SET app.current_shop_id = '${shopId}'`);
+      await c.query('SELECT set_config($1, $2, false)', ['app.current_shop_id', shopId]);
       const res = await c.query<{ status: string }>(
         `SELECT status FROM shop_users WHERE id = $1 AND shop_id = $2`,
         [userId, shopId],
       );
       return res.rows.length > 0 ? res.rows[0].status : null;
     } finally {
-      await c.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
+      await c
+        .query('SELECT set_config($1, $2, false)', ['app.current_shop_id', POISON_UUID])
+        .catch(() => undefined);
       await c.query('RESET ROLE').catch(() => undefined);
       c.release();
     }
@@ -153,14 +159,16 @@ export class AuthRepository {
     const c = await this.pool.connect();
     try {
       await c.query('SET ROLE app_user');
-      await c.query(`SET app.current_shop_id = '${shopId}'`);
+      await c.query('SELECT set_config($1, $2, false)', ['app.current_shop_id', shopId]);
       const res = await c.query<{ firebase_uid: string | null }>(
         `SELECT firebase_uid FROM shop_users WHERE id = $1 AND shop_id = $2`,
         [userId, shopId],
       );
       return res.rows.length > 0 ? (res.rows[0].firebase_uid ?? null) : null;
     } finally {
-      await c.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
+      await c
+        .query('SELECT set_config($1, $2, false)', ['app.current_shop_id', POISON_UUID])
+        .catch(() => undefined);
       await c.query('RESET ROLE').catch(() => undefined);
       c.release();
     }
@@ -188,7 +196,7 @@ export class AuthRepository {
     try {
       await c.query('SET ROLE app_user');
       // Set GUC so RLS policy on shop_users can filter on current_setting('app.current_shop_id').
-      await c.query(`SET app.current_shop_id = '${shopId}'`);
+      await c.query('SELECT set_config($1, $2, false)', ['app.current_shop_id', shopId]);
       const res = await c.query<{
         id: string; display_name: string; role: string; status: string;
         phone: string; invited_at: string | null; activated_at: string | null;
@@ -207,7 +215,9 @@ export class AuthRepository {
         activatedAt: r.activated_at,
       }));
     } finally {
-      await c.query(`SET app.current_shop_id = '${POISON_UUID}'`).catch(() => undefined);
+      await c
+        .query('SELECT set_config($1, $2, false)', ['app.current_shop_id', POISON_UUID])
+        .catch(() => undefined);
       await c.query('RESET ROLE').catch(() => undefined);
       c.release();
     }
