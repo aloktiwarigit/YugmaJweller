@@ -22,8 +22,16 @@ async function bootstrap(): Promise<void> {
     : 'http://localhost:3000,http://localhost:4173,http://127.0.0.1:4173';
   const adminOriginsRaw    = process.env['ADMIN_WEB_ORIGIN']    ?? defaultBrowserOrigins;
   const customerOriginsRaw = process.env['CUSTOMER_WEB_ORIGIN'] ?? defaultBrowserOrigins;
-  if (process.env['NODE_ENV'] === 'production' && !adminOriginsRaw) {
-    throw new Error('ADMIN_WEB_ORIGIN must be set in production');
+  if (process.env['NODE_ENV'] === 'production') {
+    if (!adminOriginsRaw) {
+      throw new Error('ADMIN_WEB_ORIGIN must be set in production');
+    }
+    // Story 19.7: customer-web /profile/delete-account makes a browser
+    // DELETE call. Without CUSTOMER_WEB_ORIGIN, CORS preflight blocks it
+    // and the deletion flow is silently broken in production.
+    if (!customerOriginsRaw) {
+      throw new Error('CUSTOMER_WEB_ORIGIN must be set in production');
+    }
   }
   const allowedOrigins = [
     ...adminOriginsRaw.split(',').map((s) => s.trim()).filter(Boolean),

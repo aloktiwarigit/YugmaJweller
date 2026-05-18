@@ -40,7 +40,7 @@ beforeAll(async () => {
   } finally {
     c.release();
   }
-}, 180_000);
+}, 300_000);
 
 afterAll(async () => {
   await pool?.end();

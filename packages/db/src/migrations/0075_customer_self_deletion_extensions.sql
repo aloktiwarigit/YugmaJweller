@@ -69,15 +69,54 @@ ALTER TABLE try_at_home_bookings DROP CONSTRAINT try_at_home_bookings_customer_i
 ALTER TABLE try_at_home_bookings ADD CONSTRAINT try_at_home_bookings_customer_id_fkey
   FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL;
 
--- 6. Backfill: customers whose deletion was requested BEFORE this migration
---    landed have wishlist rows still in place (6.8's softDeleteAtomic
---    predates the wishlist cascade added in 19.7's repository changes).
---    hardDeleteAtomic does not touch wishlists, so the day-30
---    DELETE FROM customers would FK-violate for those pending deletions.
---    Idempotent: drops any wishlist row whose customer is already soft-deleted.
+-- 6. Backfill for already-soft-deleted customers (pre-19.7 deletions). These
+--    rows never ran the new cascade, so they have orphaned children that the
+--    new FK SET NULL would silently leave dangling (and DISPATCHED try-at-home
+--    would lose its customer link, blocking physical recovery).
+--
+--    Order:
+--    a) FAIL the migration if any soft-deleted customer has a DISPATCHED
+--       try-at-home — the shopkeeper must recover the piece before we can
+--       finish the deletion. Operator sees a clear NOTICE.
+--    b) Hard-delete wishlists (ephemeral, no audit value).
+--    c) Cancel ACTIVE / PENDING_PAYMENT rate-lock bookings — they can no
+--       longer be honored.
+--    d) Cancel REQUESTED try-at-home bookings — same reasoning.
+
+DO $$
+DECLARE
+  dispatched_count INT;
+BEGIN
+  SELECT COUNT(*) INTO dispatched_count
+    FROM try_at_home_bookings t
+    JOIN customers c ON c.id = t.customer_id
+   WHERE c.deleted_at IS NOT NULL
+     AND t.status = 'DISPATCHED';
+
+  IF dispatched_count > 0 THEN
+    RAISE EXCEPTION
+      '0075 backfill: % soft-deleted customer(s) have DISPATCHED try-at-home bookings — recover the pieces first',
+      dispatched_count;
+  END IF;
+END $$;
+
 DELETE FROM wishlists w
  USING customers c
  WHERE w.customer_id = c.id
    AND c.deleted_at IS NOT NULL;
+
+UPDATE rate_lock_bookings rlb
+   SET status = 'CANCELLED'
+  FROM customers c
+ WHERE rlb.customer_id = c.id
+   AND c.deleted_at IS NOT NULL
+   AND rlb.status IN ('PENDING_PAYMENT','ACTIVE');
+
+UPDATE try_at_home_bookings tah
+   SET status = 'CANCELLED'
+  FROM customers c
+ WHERE tah.customer_id = c.id
+   AND c.deleted_at IS NOT NULL
+   AND tah.status = 'REQUESTED';
 
 COMMIT;

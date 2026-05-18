@@ -1,14 +1,14 @@
 // apps/customer-web/app/profile/delete-account/page.tsx
 import React from 'react';
+import { headers } from 'next/headers';
+import { resolveShopSlug } from '@/lib/tenant-slug';
 import { DeleteAccountPageClient } from './delete-account-page-client';
 
 export const dynamic = 'force-dynamic';
 
 interface TenantBootResponse { id: string }
 
-async function resolveShopId(): Promise<string | null> {
-  const slug = process.env['NEXT_PUBLIC_SHOP_SLUG'];
-  if (!slug) return null;
+async function resolveShopId(slug: string): Promise<string | null> {
   const apiBase = process.env['API_URL'] ?? process.env['NEXT_PUBLIC_API_BASE'];
   if (!apiBase) return null;
   try {
@@ -24,7 +24,12 @@ async function resolveShopId(): Promise<string | null> {
 }
 
 export default async function DeleteAccountPage(): Promise<React.ReactElement> {
-  const shopId = await resolveShopId();
+  // Resolve slug via the shared helper so x-shop-slug header + localhost
+  // fallback work the same as the rest of customer-web. Without this, a
+  // header-routed multi-tenant deployment would resolve to the env-fixed
+  // tenant and a same-phone customer could delete the wrong shop's row.
+  const slug = resolveShopSlug(headers());
+  const shopId = slug ? await resolveShopId(slug) : null;
   if (!shopId) {
     return (
       <main className="mx-auto max-w-2xl px-4 py-16 text-center">
