@@ -12,6 +12,7 @@ import {
   addToWishlist,
   removeFromWishlist,
 } from '@/lib/api';
+import { posthog } from '@/app/lib/posthog';
 
 interface WishlistButtonProps {
   productId:   string;
@@ -78,6 +79,8 @@ export function WishlistButton({ productId, productName, compact }: WishlistButt
       if (!ok) {
         setWishlisted(!next); // rollback
         showError('इच्छा सूची में जोड़ नहीं पाए');
+      } else {
+        posthog.capture(next ? 'wishlist_add' : 'wishlist_remove', { productId, shopId });
       }
     } catch {
       setWishlisted(!next); // rollback

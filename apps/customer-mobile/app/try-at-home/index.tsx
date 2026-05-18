@@ -13,6 +13,7 @@ import {
 } from '../../src/api/endpoints';
 import type { PublicProduct, TryAtHomeBookingResponse } from '../../src/api/endpoints';
 import { useTenantStore } from '../../src/stores/tenantStore';
+import { captureEvent } from '../../src/lib/posthog';
 
 // Hindi labels for the metal axis. The catalog API returns the raw enum
 // (GOLD/SILVER/DIAMOND/PLATINUM) — we render the Hindi customer-facing name
@@ -134,7 +135,10 @@ export default function TryAtHomeScreen(): React.ReactElement {
 
   const { mutate: submit, isPending, isError, error } = useMutation({
     mutationFn: (ids: string[]) => createCustomerTryAtHomeBooking(ids),
-    onSuccess:  (result) => { setBooking(result); },
+    onSuccess:  (result) => {
+      captureEvent('booking_create', { bookingType: 'try_at_home', shopId: customer?.shopId, pieceCount: selected.size });
+      setBooking(result);
+    },
   });
 
   const apiError = isError
