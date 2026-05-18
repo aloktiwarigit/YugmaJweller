@@ -1,20 +1,2 @@
-security-review-passed: 2026-05-17
-HEAD: 24fcb0d62bb7029bfce52da7aaeb86ad0a8dc171
-Range: 398375d..24fcb0d (26 commits — supersedes prior marker covering 4a20215..398375d)
-Branch: main
-Reviewer: Claude /security-review (3 rounds)
-Reviewed: Story 19.6 (E19 Wave 1 P0 deploy unblockers + ~200-file in-flight snapshot) — Sentry wiring, Cloud Run + Dockerfile + /health, App Hosting + EAS scaffolding, customer-auth.guard, payment-token + Razorpay HMAC verify, public catalog x-tenant-id resolution, payment_sessions migration 0074, admin impersonation surface
-Rounds: 3
-Findings: P0=0  P1=0  P2=0
-HIGH findings fixed across rounds 1+2 (see commits db9c22a, a7f5263):
-  - Vuln 1 (round 1): SQL injection sink in packages/db/src/tx.ts via `client.query(\`SET LOCAL app.current_shop_id = '${shopId}'\`)` — pg simple query protocol enables multi-statement execution; reachable from open internet via Cloud Run --allow-unauthenticated. Fixed via parameter-bound set_config($1, $2, true).
-  - Vuln 2 (round 1): 14 public catalog endpoints with @SkipAuth() @SkipTenant() accepted raw x-tenant-id with no UUID validation. Fixed via new assertPublicTenantHeader() helper in apps/api/src/common/validators/tenant-header.ts (12-test suite). Same header reaches CustomerAuthGuard but that path already UUID-validated.
-  - Round 2 sweep: 6 sibling sinks in auth.repository.ts + permissions.repository.ts + provider.ts (same exploit class). Defense-in-depth — not exploitable today due to upstream UUID-cast at tenants.byId, but closes regression vector entirely. Plus Semgrep rule ops/semgrep/no-shop-id-sql-interpolation.yml prevents future regression (0 findings on current tree).
-  - Round 3 verification: all 6 fixes verified at file:line; broader sweep clean (no new @SkipAuth/@SkipTenant decorators take raw header; no new withShopTx caller bypasses tenant context; Razorpay webhooks HMAC-verified; customer auth Firebase ID token path unchanged).
-Other security surface verified clean in prior rounds:
-  - Sentry PII scrubbers (customer-web + customer-mobile) — phone/email/PAN/OTP/name/address stripped; cookies + auth headers blanked
-  - Cloud Run Docker non-root user; --allow-unauthenticated documented + FirebaseJwtGuard enforces app-layer auth
-  - Customer-mobile dev-auth path NODE_ENV-allowlist-gated (production rejects)
-  - Payment token HMAC-SHA256 + timingSafeEqual + atomic FOR UPDATE single-use consume
-  - Migration 0074 payment_sessions: FORCE RLS, composite (shop_id, customer_id) FK, no DELETE GRANT
-Standing exclusions per skill precedent: DOS/rate-limit, secrets-on-disk, theoretical races, doc-only findings, test-only patterns.
+afca74a485903b3e72725f1e00035c57f01308f7 2026-05-17T21:48:32-0400
+Story 19.7 — /security-review skill returned 'No security vulnerabilities found.' Comprehensive scan covered PII handling (reasonText excluded from audit), SQL injection (all parameterised), tenant isolation (RLS + belt-and-suspenders shop_id scoping), Firebase OTP boundary, cross-tenant FK cascade safety, replay protection, JSON injection in audit, DOM XSS, SSR data leak.
