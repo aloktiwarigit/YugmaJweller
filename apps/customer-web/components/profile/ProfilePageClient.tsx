@@ -48,17 +48,24 @@ export function ProfilePageClient({ resolvedShopId }: Props): JSX.Element {
   const [activeTab, setActiveTab] = useState<TabId>('purchases');
 
   useEffect(() => {
+    let alive = true;
     const unsub = onCustomerAuthChanged(async (u) => {
       if (u === null) {
+        if (alive) { setUser(null); router.replace('/sign-in?returnTo=/profile'); }
+        return;
+      }
+      const tok = await u.getIdToken().catch(() => null);
+      if (!alive) return;
+      if (tok === null) {
+        // Token fetch failed — redirect to sign-in rather than infinite skeleton
         setUser(null);
         router.replace('/sign-in?returnTo=/profile');
         return;
       }
-      const tok = await u.getIdToken().catch(() => null);
       setUser(u);
       setIdToken(tok);
     });
-    return unsub;
+    return () => { alive = false; unsub(); };
   }, [router]);
 
   const handleKeyDown = useCallback(
@@ -69,6 +76,12 @@ export function ProfilePageClient({ resolvedShopId }: Props): JSX.Element {
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
         setActiveTab(TABS[(idx + TABS.length - 1) % TABS.length]!.id);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        setActiveTab(TABS[0]!.id);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        setActiveTab(TABS[TABS.length - 1]!.id);
       }
     },
     [],

@@ -1,7 +1,7 @@
 // apps/customer-web/app/profile/loading.tsx
 export default function ProfileLoading(): JSX.Element {
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 animate-pulse" aria-hidden="true">
+    <div className="mx-auto max-w-5xl px-4 py-10 animate-pulse" role="status" aria-label="लोड हो रहा है">
       <div className="h-3 w-16 bg-border rounded mb-4" />
       <div className="h-8 w-40 bg-border rounded mb-8" />
       <div className="flex gap-4 border-b border-borderSubtle pb-2">
