@@ -64,7 +64,7 @@ export async function sendOtp(phone: string, verifier: RecaptchaVerifier): Promi
   return signInWithPhoneNumber(getCustomerAuth(), toE164(phone), verifier);
 }
 
-export type { ConfirmationResult, User };
+export type { ConfirmationResult, User, RecaptchaVerifier };
 
 export async function getCustomerIdToken(): Promise<string | null> {
   const user = getCustomerAuth().currentUser;
