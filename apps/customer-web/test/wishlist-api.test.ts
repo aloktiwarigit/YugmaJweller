@@ -109,4 +109,10 @@ describe('removeFromWishlist', () => {
     const ok = await removeFromWishlist(TEST_PROD, TEST_TOKEN, TEST_SHOP);
     expect(ok).toBe(false);
   });
+
+  it('returns false on network error', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('network fail'));
+    const ok = await removeFromWishlist(TEST_PROD, TEST_TOKEN, TEST_SHOP);
+    expect(ok).toBe(false);
+  });
 });
