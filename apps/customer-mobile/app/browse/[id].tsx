@@ -20,6 +20,7 @@ import {
 } from '../../src/api/endpoints';
 import type { CatalogProduct, WishlistItem } from '../../src/api/endpoints';
 import { useCustomerSession } from '../../src/hooks/useCustomerSession';
+import { captureEvent } from '../../src/lib/posthog';
 import { ProductGallery } from '../../src/components/products/ProductGallery';
 import { useProductImages } from '../../src/hooks/useProductImages';
 import { purityLabel } from '@goldsmith/customer-shared';
@@ -334,7 +335,7 @@ export default function ProductDetailScreen(): React.ReactElement {
     retry: false,
   });
 
-  const { isAuthenticated } = useCustomerSession();
+  const { isAuthenticated, customer } = useCustomerSession();
   const queryClient = useQueryClient();
 
   const { data: wishlistData } = useQuery({
@@ -371,6 +372,12 @@ export default function ProductDetailScreen(): React.ReactElement {
 
   const handleWishlistToggle = (): void => {
     if (!isAuthenticated || !id) return;
+    const shopId = customer?.shopId;
+    if (isWishlisted) {
+      captureEvent('wishlist_remove', { productId: id, shopId });
+    } else {
+      captureEvent('wishlist_add', { productId: id, shopId });
+    }
     wishlistMutation.mutate(!isWishlisted);
   };
 
