@@ -5,7 +5,7 @@ import type { Queue } from '@goldsmith/queue';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import type { AuthenticatedTenantContext, TenantContext } from '@goldsmith/tenant-context';
 import { DpdpaDeletionRepository } from './dpdpa-deletion.repository';
-import type { DueForHardDelete } from './dpdpa-deletion.repository';
+import type { DueForHardDelete, SoftDeleteOptions } from './dpdpa-deletion.repository';
 import { CrmSearchService } from './crm-search.service';
 import { withTenantTx } from '@goldsmith/db';
 
@@ -40,11 +40,12 @@ export class DpdpaDeletionService {
    * driven by a delayed BullMQ job + a daily safety-net sweep.
    */
   async requestDeletion(
-    ctx: AuthenticatedTenantContext,
-    customerId: string,
+    ctx:         AuthenticatedTenantContext,
+    customerId:  string,
     requestedBy: 'customer' | 'owner',
+    options:     SoftDeleteOptions = {},
   ): Promise<RequestDeletionResponse> {
-    const { scheduledAt, hardDeleteAt } = await this.repo.softDeleteAtomic(customerId, requestedBy);
+    const result = await this.repo.softDeleteAtomic(customerId, requestedBy, options);
 
     // Remove from Meilisearch immediately so search results don't expose deleted customers.
     void this.searchSvc.removeFromIndex(ctx.shopId, customerId).catch(() => undefined);
@@ -54,7 +55,18 @@ export class DpdpaDeletionService {
       subjectType: 'customer',
       subjectId:   customerId,
       actorUserId: ctx.userId,
-      after:       { requestedBy, scheduledAt: scheduledAt.toISOString(), hardDeleteAt: hardDeleteAt.toISOString() },
+      after: {
+        requestedBy,
+        reason:                 options.reason ?? null,
+        // NOTE: options.reasonText is intentionally NOT copied into the audit
+        // payload. It's free customer text and may contain PII (phone, PAN,
+        // address) the customer pasted in. The reasonText value is persisted
+        // on customers.deletion_reason_text (their own row) only.
+        cascadeCounts:          result.cascadeCounts,
+        rateLockRefundsPending: result.rateLockRefundsPending,
+        scheduledAt:            result.scheduledAt.toISOString(),
+        hardDeleteAt:           result.hardDeleteAt.toISOString(),
+      },
     }).catch(() => undefined);
 
     void auditLog(this.pool, {
@@ -62,13 +74,18 @@ export class DpdpaDeletionService {
       subjectType: 'customer',
       subjectId:   customerId,
       actorUserId: ctx.userId,
-      after:       { piiScrubbed: true, hardDeleteScheduledAt: hardDeleteAt.toISOString() },
+      after: {
+        piiScrubbed:            true,
+        hardDeleteScheduledAt:  result.hardDeleteAt.toISOString(),
+        cascadeCounts:          result.cascadeCounts,
+        rateLockRefundsPending: result.rateLockRefundsPending,
+      },
     }).catch(() => undefined);
 
-    const delay = Math.max(0, hardDeleteAt.getTime() - Date.now());
+    const delay = Math.max(0, result.hardDeleteAt.getTime() - Date.now());
     await this.queue.add(
       HARD_DELETE_JOB_NAME,
-      { shopId: ctx.shopId, customerId, hardDeleteAt: hardDeleteAt.toISOString() },
+      { shopId: ctx.shopId, customerId, hardDeleteAt: result.hardDeleteAt.toISOString() },
       {
         delay,
         jobId: `hard-delete:${ctx.shopId}:${customerId}`,
@@ -80,8 +97,8 @@ export class DpdpaDeletionService {
     );
 
     return {
-      scheduledAt:  scheduledAt.toISOString(),
-      hardDeleteAt: hardDeleteAt.toISOString(),
+      scheduledAt:  result.scheduledAt.toISOString(),
+      hardDeleteAt: result.hardDeleteAt.toISOString(),
     };
   }
 

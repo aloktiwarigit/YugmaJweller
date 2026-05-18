@@ -12,6 +12,8 @@ import {
   createCustomerTryAtHomeBooking,
 } from '../../src/api/endpoints';
 import type { PublicProduct, TryAtHomeBookingResponse } from '../../src/api/endpoints';
+import { useTenantStore } from '../../src/stores/tenantStore';
+import { captureEvent } from '../../src/lib/posthog';
 
 // Hindi labels for the metal axis. The catalog API returns the raw enum
 // (GOLD/SILVER/DIAMOND/PLATINUM) — we render the Hindi customer-facing name
@@ -60,7 +62,14 @@ function productSecondaryLabel(p: PublicProduct): string {
 
 const MAX_PIECES_FALLBACK = 3;
 
-function ConfirmedCard({ booking }: { booking: TryAtHomeBookingResponse }): React.ReactElement {
+function ConfirmedCard({
+  booking,
+  primaryColor,
+}: {
+  booking: TryAtHomeBookingResponse;
+  primaryColor: string;
+}): React.ReactElement {
+  const primaryWash = primaryColor + '20';
   const dispatched = booking.dispatchAt
     ? new Date(booking.dispatchAt).toLocaleDateString('hi-IN', { day: 'numeric', month: 'short' })
     : null;
@@ -71,18 +80,18 @@ function ConfirmedCard({ booking }: { booking: TryAtHomeBookingResponse }): Reac
   return (
     <View
       style={{
-        backgroundColor: '#EFF6FF',
+        backgroundColor: primaryWash,
         borderRadius: radii.md,
         padding: spacing.lg,
         borderWidth: 1,
-        borderColor: '#BFDBFE',
+        borderColor: colors.borderSubtle,
       }}
     >
       <Text
         style={{
           fontFamily: typography.headingMid.family,
           fontSize: 18,
-          color: '#1D4ED8',
+          color: primaryColor,
           marginBottom: spacing.md,
         }}
       >
@@ -110,6 +119,9 @@ function ConfirmedCard({ booking }: { booking: TryAtHomeBookingResponse }): Reac
 }
 
 export default function TryAtHomeScreen(): React.ReactElement {
+  const branding     = useTenantStore((s) => s.tenant?.branding);
+  const primaryColor = branding?.primaryColor ?? colors.primary;
+
   const { isAuthenticated } = useCustomerSession();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [booking, setBooking]   = useState<TryAtHomeBookingResponse | null>(null);
@@ -123,7 +135,10 @@ export default function TryAtHomeScreen(): React.ReactElement {
 
   const { mutate: submit, isPending, isError, error } = useMutation({
     mutationFn: (ids: string[]) => createCustomerTryAtHomeBooking(ids),
-    onSuccess:  (result) => { setBooking(result); },
+    onSuccess:  (result) => {
+      captureEvent('booking_create', { bookingType: 'try_at_home', shopId: customer?.shopId, pieceCount: selected.size });
+      setBooking(result);
+    },
   });
 
   const apiError = isError
@@ -199,7 +214,7 @@ export default function TryAtHomeScreen(): React.ReactElement {
         </Text>
 
         {booking ? (
-          <ConfirmedCard booking={booking} />
+          <ConfirmedCard booking={booking} primaryColor={primaryColor} />
         ) : (
           <>
             {productsLoading ? (
@@ -210,6 +225,7 @@ export default function TryAtHomeScreen(): React.ReactElement {
                 selected={selected}
                 maxPieces={maxPieces}
                 onToggle={toggleProduct}
+                primaryColor={primaryColor}
               />
             )}
 
@@ -271,12 +287,15 @@ function ProductList({
   selected,
   maxPieces,
   onToggle,
+  primaryColor,
 }: {
-  items:     PublicProduct[];
-  selected:  Set<string>;
-  maxPieces: number;
-  onToggle:  (id: string) => void;
+  items:         PublicProduct[];
+  selected:      Set<string>;
+  maxPieces:     number;
+  onToggle:      (id: string) => void;
+  primaryColor:  string;
 }): React.ReactElement {
+  const primaryWash = primaryColor + '20';
   if (items.length === 0) {
     return (
       <Text
@@ -311,12 +330,12 @@ function ProductList({
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: isSelected ? '#EFF6FF' : colors.white,
+              backgroundColor: isSelected ? primaryWash : colors.white,
               borderRadius: radii.sm,
               padding: spacing.md,
               marginBottom: spacing.xs,
               borderWidth: 1.5,
-              borderColor: isSelected ? '#3B82F6' : colors.border,
+              borderColor: isSelected ? primaryColor : colors.border,
               opacity: isDisabled ? 0.4 : 1,
               minHeight: 64,
             }}
@@ -330,8 +349,8 @@ function ProductList({
                 height: 22,
                 borderRadius: 4,
                 borderWidth: 1.5,
-                borderColor: isSelected ? '#3B82F6' : colors.border,
-                backgroundColor: isSelected ? '#3B82F6' : 'transparent',
+                borderColor: isSelected ? primaryColor : colors.border,
+                backgroundColor: isSelected ? primaryColor : 'transparent',
                 marginRight: spacing.sm,
                 alignItems: 'center',
                 justifyContent: 'center',

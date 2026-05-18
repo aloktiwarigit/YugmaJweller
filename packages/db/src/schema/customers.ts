@@ -29,4 +29,6 @@ export const customers = tenantScopedTable('customers', {
   hardDeleteScheduledAt:  timestamp('hard_delete_scheduled_at',  { withTimezone: true }),
   piiRedactedAt:          timestamp('pii_redacted_at',           { withTimezone: true }),
   deletionRequestedBy:    text('deletion_requested_by'),
+  deletionReason:         text('deletion_reason'),
+  deletionReasonText:     text('deletion_reason_text'),
 }, { encryptedColumns: ['panCiphertext'] });

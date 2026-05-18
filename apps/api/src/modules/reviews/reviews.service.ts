@@ -1,5 +1,6 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import type { Pool } from 'pg';
+import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import { withShopTx } from '@goldsmith/db';
 import { ReviewsRepository } from './reviews.repository';
@@ -61,6 +62,14 @@ export class ReviewsService {
       rating:     dto.rating,
       reviewText: dto.reviewText,
     });
+
+    void auditLog(this.pool, {
+      action:      AuditAction.CUSTOMER_REVIEW_SUBMIT,
+      subjectType: 'product',
+      subjectId:   dto.productId,
+      actorUserId: dto.customerId,
+      after:       { rating: dto.rating, shopId },
+    }).catch(() => undefined);
 
     return {
       id:                row.id,

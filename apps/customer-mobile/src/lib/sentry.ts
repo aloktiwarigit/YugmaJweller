@@ -22,9 +22,9 @@ import type { Event } from '@sentry/react-native';
 
 /** Inline type matching @sentry/types EventHint — avoids direct @sentry/types dep resolution issues */
 interface SentryEventHint {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mirrors @sentry/types EventHint shape
-  originalException?: Error | string | null;
-  [key: string]: unknown;
+  originalException?: unknown;
+  event_id?: string;
+  data?: unknown;
 }
 
 // ── PII scrubbing ────────────────────────────────────────────────────────────

@@ -9,8 +9,16 @@ import { TenantBrandHeader } from '../../src/components/TenantBrandHeader';
 import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import { getPublicRates, createCustomerRateLockBooking, getRateLockPaymentToken } from '../../src/api/endpoints';
 import type { RateLockBookingResult } from '../../src/api/endpoints';
+import { useTenantStore } from '../../src/stores/tenantStore';
+import { captureEvent } from '../../src/lib/posthog';
 
-function ConfirmationCard({ booking }: { booking: RateLockBookingResult }): React.ReactElement {
+function ConfirmationCard({
+  booking,
+  primaryColor,
+}: {
+  booking: RateLockBookingResult;
+  primaryColor: string;
+}): React.ReactElement {
   const lockedRate = Math.round(Number(booking.lockedRate24kPaisePerGram) / 100);
   const expiry = new Date(booking.expiresAt).toLocaleDateString('hi-IN', {
     day: 'numeric', month: 'long', year: 'numeric',
@@ -36,25 +44,25 @@ function ConfirmationCard({ booking }: { booking: RateLockBookingResult }): Reac
   return (
     <View
       style={{
-        backgroundColor: '#F0FDF4',
+        backgroundColor: colors.successWash,
         borderRadius: radii.md,
         padding: spacing.lg,
         borderWidth: 1,
-        borderColor: '#A7F3D0',
+        borderColor: colors.borderSubtle,
       }}
     >
       <Text
         style={{
           fontFamily: typography.headingMid.family,
           fontSize: 18,
-          color: '#065F46',
+          color: colors.successJade,
           marginBottom: spacing.md,
         }}
       >
         बुकिंग बनाई गई
       </Text>
       <View style={{ marginBottom: spacing.sm }}>
-        <Text style={{ fontFamily: typography.body.family, fontSize: 13, color: '#6B7280' }}>
+        <Text style={{ fontFamily: typography.body.family, fontSize: 13, color: colors.inkMute }}>
           बंद की गई 24K दर
         </Text>
         <Text style={{ fontFamily: typography.headingMid.family, fontSize: 22, color: colors.ink }}>
@@ -62,7 +70,7 @@ function ConfirmationCard({ booking }: { booking: RateLockBookingResult }): Reac
         </Text>
       </View>
       <View style={{ marginBottom: spacing.md }}>
-        <Text style={{ fontFamily: typography.body.family, fontSize: 13, color: '#6B7280' }}>
+        <Text style={{ fontFamily: typography.body.family, fontSize: 13, color: colors.inkMute }}>
           वैध तारीख तक
         </Text>
         <Text style={{ fontFamily: typography.body.family, fontSize: 15, color: colors.ink }}>
@@ -73,7 +81,7 @@ function ConfirmationCard({ booking }: { booking: RateLockBookingResult }): Reac
         onPress={() => { void openPayment(); }}
         disabled={paymentPending}
         style={{
-          backgroundColor: '#B8860B',
+          backgroundColor: primaryColor,
           borderRadius: radii.sm,
           paddingVertical: spacing.md,
           alignItems: 'center',
@@ -93,7 +101,7 @@ function ConfirmationCard({ booking }: { booking: RateLockBookingResult }): Reac
         )}
       </Pressable>
       {paymentError ? (
-        <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: '#DC2626', textAlign: 'center', marginTop: spacing.xs }} accessibilityRole="alert">
+        <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.error, textAlign: 'center', marginTop: spacing.xs }} accessibilityRole="alert">
           {paymentError}
         </Text>
       ) : null}
@@ -101,7 +109,7 @@ function ConfirmationCard({ booking }: { booking: RateLockBookingResult }): Reac
         style={{
           fontFamily: typography.body.family,
           fontSize: 12,
-          color: '#6B7280',
+          color: colors.inkMute,
           textAlign: 'center',
           marginTop: spacing.sm,
         }}
@@ -113,6 +121,9 @@ function ConfirmationCard({ booking }: { booking: RateLockBookingResult }): Reac
 }
 
 export default function RateLockScreen(): React.ReactElement {
+  const branding     = useTenantStore((s) => s.tenant?.branding);
+  const primaryColor = branding?.primaryColor ?? colors.primary;
+
   const { isAuthenticated } = useCustomerSession();
   const [depositRupees, setDepositRupees] = useState('');
   const [fieldError, setFieldError]       = useState<string | null>(null);
@@ -126,7 +137,10 @@ export default function RateLockScreen(): React.ReactElement {
 
   const { mutate: lockRate, isPending, isError, error } = useMutation({
     mutationFn: (depositAmountPaise: string) => createCustomerRateLockBooking(depositAmountPaise),
-    onSuccess:  (result) => { setBooking(result); },
+    onSuccess:  (result) => {
+      captureEvent('booking_create', { bookingType: 'rate_lock', shopId: customer?.shopId });
+      setBooking(result);
+    },
   });
 
   const apiError = isError
@@ -226,7 +240,7 @@ export default function RateLockScreen(): React.ReactElement {
         </View>
 
         {booking ? (
-          <ConfirmationCard booking={booking} />
+          <ConfirmationCard booking={booking} primaryColor={primaryColor} />
         ) : (
           <>
             {/* Deposit amount input */}

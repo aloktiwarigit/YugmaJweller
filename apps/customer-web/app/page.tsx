@@ -10,6 +10,7 @@ import {
   fetchCollections,
 } from '@/lib/api';
 import { STOREFRONT_CATEGORY_TILES } from '@goldsmith/customer-shared';
+import type { Collection, StorefrontConfig } from '@/lib/api';
 import { HeroSection }               from '@/components/sections/HeroSection';
 import { RetailRateStrip }           from '@/components/sections/RetailRateStrip';
 import { CampaignStorySection }      from '@/components/sections/CampaignStorySection';
@@ -56,9 +57,9 @@ export default async function HomePage() {
   const newArrivals  = newArrivalsData?.items  ?? [];
   const topSellers   = topSellersData?.items   ?? [];
   const recommended  = featuredData?.items     ?? [];
-  const spotlightCollection = collections.find((collection) => collection.isPremium) ?? collections[0];
-  const heroBanners   = (storefrontConfig?.heroBanners ?? []).flatMap((banner) =>
-    banner.imageUrl
+  const spotlightCollection = (collections as Collection[]).find((collection) => collection.isPremium) ?? collections[0];
+  const heroBanners   = ((storefrontConfig as StorefrontConfig | null)?.heroBanners ?? []).flatMap((banner) =>
+    banner.imageUrl && banner.headlineHi && banner.ctaUrl
       ? [{
           imageUrl:   banner.imageUrl,
           headlineHi: banner.headlineHi,

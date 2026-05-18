@@ -312,15 +312,25 @@ export async function createCustomerTryAtHomeBooking(
   return res.data;
 }
 
-export async function customerSelfDelete(): Promise<void> {
+export interface CustomerSelfDeleteOptions {
+  reason?:     'no-need' | 'privacy' | 'other-jeweller' | 'other';
+  reasonText?: string;
+}
+
+export async function customerSelfDelete(options?: CustomerSelfDeleteOptions): Promise<void> {
   try {
-    await api.delete('/api/v1/crm/customer/me');
+    const body = options && (options.reason || options.reasonText) ? options : undefined;
+    await api.delete('/api/v1/crm/customer/me', body ? { data: body } : undefined);
   } catch (e) {
     const axiosErr = axios.isAxiosError<{ code?: string }>(e) ? e : null;
-    const code = axiosErr?.response?.data?.code ?? 'unknown';
-    const status = axiosErr?.response?.status;
-    const err: TypedApiError = Object.assign(new Error(code), { code, status });
-    throw err;
+    if (axiosErr) {
+      const err: TypedApiError = Object.assign(new Error(axiosErr.message), {
+        code:   axiosErr.response?.data?.code ?? 'unknown',
+        status: axiosErr.response?.status,
+      });
+      throw err;
+    }
+    throw e;
   }
 }
 
@@ -479,5 +489,22 @@ export async function getTryAtHomeBookings(
   params: { limit?: number; offset?: number } = {},
 ): Promise<TryAtHomeBookingsListResponse> {
   const res = await api.get<TryAtHomeBookingsListResponse>('/api/v1/customer/try-at-home/bookings', { params });
+  return res.data;
+}
+
+export interface SubmitReviewPayload {
+  productId:   string;
+  rating:      number;
+  reviewText?: string;
+}
+
+export interface SubmitReviewResult {
+  id: string;
+}
+
+export async function submitCustomerReview(
+  payload: SubmitReviewPayload,
+): Promise<SubmitReviewResult> {
+  const res = await api.post<SubmitReviewResult>('/api/v1/reviews', payload);
   return res.data;
 }

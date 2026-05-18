@@ -112,3 +112,18 @@ vi.mock('@react-native-async-storage/async-storage', () => {
     },
   };
 });
+
+// Mock posthog-react-native — SDK requires native modules unavailable in jsdom.
+vi.mock('posthog-react-native', () => {
+  const mockCapture  = vi.fn();
+  const mockIdentify = vi.fn();
+  class MockPostHog {
+    capture  = mockCapture;
+    identify = mockIdentify;
+  }
+  return {
+    default: MockPostHog,
+    __mockCapture:  mockCapture,
+    __mockIdentify: mockIdentify,
+  };
+});

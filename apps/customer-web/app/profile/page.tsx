@@ -1,54 +1,47 @@
-export default function ProfilePage() {
-  const actions = [
-    {
-      title: 'इच्छा सूची',
-      description: 'आपके सहेजे गए आभूषण इसी ब्राउज़र में सुरक्षित रहते हैं।',
-      href: '/wishlist',
-    },
-    {
-      title: 'घर पर ट्राय',
-      description: 'चुने हुए आभूषणों को घर पर देखने की जानकारी लें।',
-      href: '/try-at-home',
-    },
-    {
-      title: 'दर-लॉक',
-      description: 'आज की सोने-चांदी की दर पर बुकिंग विकल्प देखें।',
-      href: '/rate-lock',
-    },
-    {
-      title: 'दुकान सहायता',
-      description: 'प्रोफ़ाइल या ऑर्डर से जुड़े सवालों के लिए दुकान से बात करें।',
-      href: '/contact?interest=profile',
-    },
-  ];
+// apps/customer-web/app/profile/page.tsx
+//
+// Server component: resolves shopId from tenant slug then hands off to
+// ProfilePageClient which handles Firebase auth gate + tabbed timeline.
+// Pattern mirrors app/profile/delete-account/page.tsx.
+import React from 'react';
+import { headers } from 'next/headers';
+import { resolveShopSlug } from '@/lib/tenant-slug';
+import { ProfilePageClient } from '@/components/profile/ProfilePageClient';
 
-  return (
-    <div className="mx-auto max-w-5xl px-4 py-10 md:py-14">
-      <p className="font-prose text-[11px] uppercase tracking-[0.28em] text-inkMute">
-        ग्राहक
-      </p>
-      <h1 className="mt-2 font-heading text-3xl text-ink md:text-[2.25rem]">
-        प्रोफ़ाइल
-      </h1>
-      <p className="mt-3 max-w-2xl font-prose text-sm leading-relaxed text-inkMute md:text-[15px]">
-        ऑनलाइन खाता सुविधा जल्द उपलब्ध होगी। अभी आप अपनी इच्छा सूची, घर पर ट्राय और दर-लॉक
-        सेवाओं तक सीधे जा सकते हैं।
-      </p>
+export const dynamic = 'force-dynamic';
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        {actions.map((action) => (
-          <a
-            key={action.href}
-            href={action.href}
-            className="rounded-md border border-borderSubtle bg-surface p-5 transition-colors hover:border-primary hover:bg-primaryWash focus-visible:outline-2 focus-visible:outline-primary"
-          >
-            <h2 className="font-heading text-xl text-ink">{action.title}</h2>
-            <p className="mt-2 font-prose text-sm leading-relaxed text-inkMute">
-              {action.description}
-            </p>
-          </a>
-        ))}
-      </div>
-    </div>
-  );
+interface TenantBootResponse { id: string }
+
+async function resolveShopId(slug: string): Promise<string | null> {
+  const apiBase = process.env['API_URL'] ?? process.env['NEXT_PUBLIC_API_BASE'];
+  if (!apiBase) return null;
+  try {
+    const res = await fetch(
+      `${apiBase}/api/v1/tenant/boot?slug=${encodeURIComponent(slug)}`,
+      { cache: 'no-store' },
+    );
+    if (!res.ok) return null;
+    const json = (await res.json()) as TenantBootResponse;
+    return json.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function ProfilePage(): Promise<React.ReactElement> {
+  const slug   = resolveShopSlug(headers());
+  const shopId = slug ? await resolveShopId(slug) : null;
+
+  if (!shopId) {
+    return (
+      <main className="mx-auto max-w-2xl px-4 py-16 text-center">
+        <h1 className="font-heading text-2xl text-ink">अनुपलब्ध</h1>
+        <p className="mt-3 text-sm text-inkMute">
+          अभी यह पेज लोड नहीं हो सका। कृपया बाद में प्रयास करें।
+        </p>
+      </main>
+    );
+  }
+
+  return <ProfilePageClient resolvedShopId={shopId} />;
 }

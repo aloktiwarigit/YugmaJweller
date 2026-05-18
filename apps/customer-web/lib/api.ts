@@ -301,3 +301,176 @@ export async function fetchReturnPolicy(shopId: string): Promise<string | null> 
     return null;
   }
 }
+
+// ── Wishlist API — client-side only (requires Firebase ID token) ──────────────
+
+export interface WishlistItemResponse {
+  productId:    string;
+  sku:          string;
+  purity:       string;
+  metal:        string;
+  grossWeightG: string;
+  netWeightG:   string;
+  huid:         string | null;
+  addedAt:      string;
+}
+
+function authHeaders(idToken: string, shopId: string): Record<string, string> {
+  return {
+    'Authorization': `Bearer ${idToken}`,
+    'X-Tenant-Id':   shopId,
+  };
+}
+
+export async function getWishlist(idToken: string, shopId: string): Promise<WishlistItemResponse[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/wishlist`, {
+      headers: authHeaders(idToken, shopId),
+      cache: 'no-store',
+      ...withTimeout(),
+    });
+    if (!res.ok) return [];
+    return res.json() as Promise<WishlistItemResponse[]>;
+  } catch {
+    return [];
+  }
+}
+
+export async function addToWishlist(
+  productId: string,
+  idToken: string,
+  shopId: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/wishlist`, {
+      method:  'POST',
+      headers: { ...authHeaders(idToken, shopId), 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ productId }),
+      ...withTimeout(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function removeFromWishlist(
+  productId: string,
+  idToken: string,
+  shopId: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/wishlist/${productId}`, {
+      method:  'DELETE',
+      headers: authHeaders(idToken, shopId),
+      ...withTimeout(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ── Customer-auth'd types (FR96 — purchase + booking history) ────────────
+
+export interface PurchaseHistorySummary {
+  invoiceId:     string;
+  invoiceNumber: string;
+  issuedAt:      string | null;
+  totalPaise:    string;
+  status:        string;
+  lineCount:     number;
+  paymentMethod: string;
+}
+
+export interface PurchaseHistoryResponse {
+  invoices: PurchaseHistorySummary[];
+  total:    number;
+}
+
+export interface CustomerRateLockItem {
+  id:                        string;
+  status:                    string;
+  lockedRate24kPaisePerGram: string;
+  depositAmountPaise:        string;
+  expiresAt:                 string;
+  lockedAt:                  string;
+}
+
+export interface CustomerRateLocksResponse {
+  bookings: CustomerRateLockItem[];
+  total:    number;
+}
+
+export interface TryAtHomeBookingItem {
+  id:           string;
+  shopId:       string;
+  customerId:   string | null;
+  productIds:   string[];
+  status:       string;
+  requestedAt:  string;
+  dispatchAt:   string | null;
+  returnDueAt:  string | null;
+}
+
+export interface TryAtHomeBookingsResponse {
+  bookings: TryAtHomeBookingItem[];
+  total:    number;
+}
+
+export async function fetchCustomerPurchases(
+  shopId:  string,
+  idToken: string,
+  params:  { limit?: number; offset?: number } = {},
+): Promise<PurchaseHistoryResponse | null> {
+  const qs = new URLSearchParams();
+  if (params.limit  !== undefined) qs.set('limit',  String(params.limit));
+  if (params.offset !== undefined) qs.set('offset', String(params.offset));
+  const qStr = qs.toString();
+  try {
+    const res = await fetch(
+      `${API_URL}/api/v1/customer/purchases${qStr ? `?${qStr}` : ''}`,
+      { headers: authHeaders(idToken, shopId), cache: 'no-store', ...withTimeout() },
+    );
+    if (!res.ok) return null;
+    return res.json() as Promise<PurchaseHistoryResponse>;
+  } catch { return null; }
+}
+
+export async function fetchCustomerRateLocks(
+  shopId:  string,
+  idToken: string,
+  params:  { limit?: number; offset?: number } = {},
+): Promise<CustomerRateLocksResponse | null> {
+  const qs = new URLSearchParams();
+  if (params.limit  !== undefined) qs.set('limit',  String(params.limit));
+  if (params.offset !== undefined) qs.set('offset', String(params.offset));
+  const qStr = qs.toString();
+  try {
+    const res = await fetch(
+      `${API_URL}/api/v1/customer/rate-lock/bookings${qStr ? `?${qStr}` : ''}`,
+      { headers: authHeaders(idToken, shopId), cache: 'no-store', ...withTimeout() },
+    );
+    if (!res.ok) return null;
+    return res.json() as Promise<CustomerRateLocksResponse>;
+  } catch { return null; }
+}
+
+export async function fetchCustomerTryAtHomeBookings(
+  shopId:  string,
+  idToken: string,
+  params:  { limit?: number; offset?: number } = {},
+): Promise<TryAtHomeBookingsResponse | null> {
+  const qs = new URLSearchParams();
+  if (params.limit  !== undefined) qs.set('limit',  String(params.limit));
+  if (params.offset !== undefined) qs.set('offset', String(params.offset));
+  const qStr = qs.toString();
+  try {
+    const res = await fetch(
+      `${API_URL}/api/v1/customer/try-at-home/bookings${qStr ? `?${qStr}` : ''}`,
+      { headers: authHeaders(idToken, shopId), cache: 'no-store', ...withTimeout() },
+    );
+    if (!res.ok) return null;
+    return res.json() as Promise<TryAtHomeBookingsResponse>;
+  } catch { return null; }
+}
