@@ -1,6 +1,8 @@
 import { Module, type ExecutionContext, type CallHandler, Injectable, type NestInterceptor } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
+import Redis from 'ioredis';
+import { logger } from '@goldsmith/observability';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { Observable } from 'rxjs';
@@ -59,9 +61,13 @@ class ConditionalTenantInterceptor implements NestInterceptor {
     EventEmitterModule.forRoot({ wildcard: false }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     BullModule.forRoot({
+      // Use a shared ioredis instance so we can attach an error handler once.
+      // Without this, every BullMQ Queue/Worker created by NestJS emits unhandled
+      // 'error' events (e.g. Upstash rate-limit, transient connection issues) that
+      // crash the process before it can bind to port 8080.
       connection: (() => {
         const u = new URL(process.env['REDIS_URL'] ?? 'redis://localhost:6379');
-        return {
+        const client = new Redis({
           host: u.hostname,
           port: Number(u.port || 6379),
           ...(u.password ? { password: decodeURIComponent(u.password) } : {}),
@@ -73,7 +79,13 @@ class ConditionalTenantInterceptor implements NestInterceptor {
           connectTimeout: 10000,
           maxRetriesPerRequest: null,
           retryStrategy: (times: number) => Math.min(times * 200, 5000),
-        };
+        });
+        // Absorb connection/command-level errors — degraded queue functionality
+        // should not crash the API process (catalog, auth, billing still work).
+        client.on('error', (err: Error) => {
+          logger.warn({ err }, 'redis.client_error — queue functionality degraded, API still running');
+        });
+        return client;
       })(),
     }),
     AuthModule,
