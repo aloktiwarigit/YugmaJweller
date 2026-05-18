@@ -491,3 +491,20 @@ export async function getTryAtHomeBookings(
   const res = await api.get<TryAtHomeBookingsListResponse>('/api/v1/customer/try-at-home/bookings', { params });
   return res.data;
 }
+
+export interface SubmitReviewPayload {
+  productId:   string;
+  rating:      number;
+  reviewText?: string;
+}
+
+export interface SubmitReviewResult {
+  id: string;
+}
+
+export async function submitCustomerReview(
+  payload: SubmitReviewPayload,
+): Promise<SubmitReviewResult> {
+  const res = await api.post<SubmitReviewResult>('/api/v1/reviews', payload);
+  return res.data;
+}

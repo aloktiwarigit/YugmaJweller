@@ -22,6 +22,7 @@ import type { CatalogProduct, WishlistItem } from '../../src/api/endpoints';
 import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import { captureEvent } from '../../src/lib/posthog';
 import { ProductGallery } from '../../src/components/products/ProductGallery';
+import { ReviewSubmitForm } from '../../src/components/ReviewSubmitForm';
 import { useProductImages } from '../../src/hooks/useProductImages';
 import { purityLabel } from '@goldsmith/customer-shared';
 import { imageForCategoryName } from '../../src/assets/storefrontImages';
@@ -749,6 +750,13 @@ export default function ProductDetailScreen(): React.ReactElement {
                 </Text>
               </TouchableOpacity>
             )}
+          </View>
+        )}
+
+        {/* Review submission form — authenticated users only */}
+        {isAuthenticated && id && (
+          <View style={{ marginTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md }}>
+            <ReviewSubmitForm productId={id} />
           </View>
         )}
       </ScrollView>
