@@ -15,7 +15,7 @@ export function createTenantWorker<T>(
   connection: Redis,
   opts: Omit<WorkerOptions, 'connection'> = {},
 ): Worker<JobPayload<T>> {
-  return new Worker<JobPayload<T>>(
+  const worker = new Worker<JobPayload<T>>(
     name,
     async (job: Job<JobPayload<T>>) => {
       const shopId = extractTenantId(job.data);
@@ -30,4 +30,10 @@ export function createTenantWorker<T>(
     },
     { connection, ...opts },
   );
+  // Same resilience pattern as TenantQueue — absorb Redis errors so a
+  // temporarily unavailable Redis does not crash the API process.
+  worker.on('error', (err) => {
+    logger.warn({ err, workerName: name }, 'worker.redis_error — worker degraded, API still running');
+  });
+  return worker;
 }
