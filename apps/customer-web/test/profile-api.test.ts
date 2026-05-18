@@ -58,8 +58,12 @@ describe('fetchCustomerRateLocks', () => {
   it('calls correct URL with auth headers', async () => {
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({ bookings: [], total: 0 }) });
     await fetchCustomerRateLocks(SHOP, TOKEN);
-    const [url] = mockFetch.mock.calls[0]!;
+    const [url, opts] = mockFetch.mock.calls[0]!;
     expect(url).toContain('/api/v1/customer/rate-lock/bookings');
+    expect((opts as RequestInit).headers).toMatchObject({
+      Authorization: `Bearer ${TOKEN}`,
+      'X-Tenant-Id': SHOP,
+    });
   });
 
   it('returns null on error', async () => {
@@ -74,8 +78,12 @@ describe('fetchCustomerTryAtHomeBookings', () => {
   it('calls correct URL with auth headers', async () => {
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({ bookings: [], total: 0 }) });
     await fetchCustomerTryAtHomeBookings(SHOP, TOKEN);
-    const [url] = mockFetch.mock.calls[0]!;
+    const [url, opts] = mockFetch.mock.calls[0]!;
     expect(url).toContain('/api/v1/customer/try-at-home/bookings');
+    expect((opts as RequestInit).headers).toMatchObject({
+      Authorization: `Bearer ${TOKEN}`,
+      'X-Tenant-Id': SHOP,
+    });
   });
 
   it('returns null on non-ok', async () => {
