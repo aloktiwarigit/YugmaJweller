@@ -11,6 +11,7 @@ import {
   buildDevMockBearer,
   buildDevMockCustomer,
 } from '../lib/dev-mock-session';
+import { identifyPostHog } from '../lib/posthog';
 
 interface CustomerAuthBootstrapValue {
   ready: boolean;
@@ -49,6 +50,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
               { id: persisted.customerId, shopId: persisted.shopId, name: DEV_MOCK_CUSTOMER_NAME, phoneE164: DEV_MOCK_CUSTOMER_PHONE },
               persisted.bearer,
             );
+            void identifyPostHog(DEV_MOCK_CUSTOMER_PHONE, persisted.shopId);
             return;
           }
           const bearer   = buildDevMockBearer();
@@ -56,6 +58,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
           await saveSecureSession({ bearer, customerId: customer.id, shopId: customer.shopId });
           if (cancelled) return;
           setSession(customer, bearer);
+          void identifyPostHog(customer.phoneE164, customer.shopId);
         } finally {
           if (!cancelled) setReady(true);
         }
@@ -98,6 +101,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
           { id: firebaseUser.uid, shopId: tenant.id, name: phone, phoneE164: phone },
           idToken,
         );
+        void identifyPostHog(phone, tenant.id);
       } finally {
         if (!bootstrapped) {
           bootstrapped = true;
