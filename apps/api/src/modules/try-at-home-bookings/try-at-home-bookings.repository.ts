@@ -5,7 +5,7 @@ import { withShopTx, withTenantTx } from '@goldsmith/db';
 export interface TryAtHomeBookingRow {
   id:           string;
   shop_id:      string;
-  customer_id:  string;
+  customer_id:  string | null;
   product_ids:  string[];
   status:       string;
   requested_at: Date;

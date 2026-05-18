@@ -64,7 +64,7 @@ export default function TryAtHomeDetailScreen(): React.ReactElement {
 
       {/* Details */}
       <View style={styles.card}>
-        <Row label="ग्राहक ID" value={booking.customerId.slice(0, 8) + '…'} />
+        <Row label="ग्राहक ID" value={booking.customerId != null ? booking.customerId.slice(0, 8) + '…' : '—'} />
         <Row label="आइटम संख्या" value={String(booking.productIds.length)} />
         <Row label="अनुरोध तिथि" value={formatDate(booking.requestedAt)} />
         {booking.dispatchAt  && <Row label="भेजी गई" value={formatDate(booking.dispatchAt)} />}

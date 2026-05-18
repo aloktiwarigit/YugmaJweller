@@ -13,18 +13,12 @@ import type { Tenant, AuthenticatedTenantContext } from '@goldsmith/tenant-conte
 
 const SHOP_A = 'dd750001-0000-4000-8000-000000000001';
 const SHOP_B = 'dd750001-0000-4000-8000-0000000000bb';
-// WS-F cascade tests will use CUSTOMER_A, CUSTOMER_B, PRODUCT_A, ctxA, ctxB
-const CUSTOMER_A = 'dd750001-0000-4000-8000-0000000000c1';
-const CUSTOMER_B = 'dd750001-0000-4000-8000-0000000000c2';
-const USER_A     = 'dd750001-0000-4000-8000-0000000000a1';
-const PRODUCT_A  = 'dd750001-0000-4000-8000-0000000000d1';
+const USER_A = 'dd750001-0000-4000-8000-0000000000a1';
 
 const tenantA: Tenant = { id: SHOP_A, slug: 'dpdpa-a', display_name: 'Shop A', status: 'ACTIVE' };
 const tenantB: Tenant = { id: SHOP_B, slug: 'dpdpa-b', display_name: 'Shop B', status: 'ACTIVE' };
 const ctxA: AuthenticatedTenantContext = { authenticated: true, shopId: SHOP_A, userId: USER_A, role: 'shop_admin', tenant: tenantA };
 const ctxB: AuthenticatedTenantContext = { authenticated: true, shopId: SHOP_B, userId: USER_A, role: 'shop_admin', tenant: tenantB };
-
-// CUSTOMER_A, CUSTOMER_B, PRODUCT_A, ctxA, ctxB are used by WS-F cascade tests below.
 
 let container: StartedPostgreSqlContainer;
 let pool: Pool;
