@@ -5,21 +5,31 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { usePathname } from 'expo-router';
 import { colors } from '@goldsmith/ui-tokens';
 import { TenantProvider } from '../src/providers/TenantProvider';
 import { CustomerAuthProvider } from '../src/providers/CustomerAuthProvider';
 import { RootErrorBoundary } from '../src/components/RootErrorBoundary';
 import { initSentry } from '../src/lib/sentry';
+import { initPostHog, captureEvent } from '../src/lib/posthog';
 import '../global.css';
 
-// Initialise Sentry before any other app code runs.
-// initSentry is synchronous and safe to call at module-evaluation time.
-// If EXPO_PUBLIC_SENTRY_DSN is absent the SDK runs as a no-op.
+// Initialise Sentry and PostHog before any other app code runs.
 initSentry();
+initPostHog();
 
 const queryClient = new QueryClient();
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/** Fires page_view PostHog event on every route change. */
+function PostHogRouteTracker(): null {
+  const pathname = usePathname();
+  useEffect(() => {
+    captureEvent('page_view', { path: pathname });
+  }, [pathname]);
+  return null;
+}
 
 export default function RootLayout(): JSX.Element | null {
   const [fontsLoaded, fontError] = useFonts({
@@ -47,6 +57,7 @@ export default function RootLayout(): JSX.Element | null {
         <SafeAreaProvider>
           <TenantProvider>
             <CustomerAuthProvider>
+              <PostHogRouteTracker />
               <StatusBar style="dark" />
               <Stack
                 screenOptions={{
