@@ -12,7 +12,7 @@ import {
   sendOtp,
   type ConfirmationResult,
   type RecaptchaVerifier,
-} from '../../../src/auth/firebase-customer';
+} from '../../src/auth/firebase-customer';
 
 function safeReturnTo(raw: string | null): string {
   if (typeof raw === 'string' && raw.startsWith('/') && !raw.startsWith('//')) return raw;
