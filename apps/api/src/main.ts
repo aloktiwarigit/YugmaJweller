@@ -27,10 +27,17 @@ async function bootstrap(): Promise<void> {
       throw new Error('ADMIN_WEB_ORIGIN must be set in production');
     }
     // Story 19.7: customer-web /profile/delete-account makes a browser
-    // DELETE call. Without CUSTOMER_WEB_ORIGIN, CORS preflight blocks it
-    // and the deletion flow is silently broken in production.
+    // DELETE call. Without CUSTOMER_WEB_ORIGIN, CORS preflight blocks
+    // that flow — but we WARN instead of throwing so a deployment that
+    // doesn't ship this env var yet still serves all the other routes.
+    // Operators should add CUSTOMER_WEB_ORIGIN to the deploy config
+    // (see ops/deploy/README.md) before relying on the deletion UX.
     if (!customerOriginsRaw) {
-      throw new Error('CUSTOMER_WEB_ORIGIN must be set in production');
+      logger.warn(
+        'CUSTOMER_WEB_ORIGIN is not set — customer-web DELETE flows ' +
+        '(Story 19.7 /profile/delete-account) will fail at CORS preflight ' +
+        'until this env var is configured.',
+      );
     }
   }
   const allowedOrigins = [
