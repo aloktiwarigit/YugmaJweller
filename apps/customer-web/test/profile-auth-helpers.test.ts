@@ -52,4 +52,11 @@ describe('onCustomerAuthChanged', () => {
     const unsub = onCustomerAuthChanged(cb);
     expect(typeof unsub).toBe('function');
   });
+
+  it('forwards auth state changes to the callback', () => {
+    const cb = vi.fn();
+    onCustomerAuthChanged(cb);
+    mockAuthChangedCb(null);
+    expect(cb).toHaveBeenCalledWith(null);
+  });
 });
