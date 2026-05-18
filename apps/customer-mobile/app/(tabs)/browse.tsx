@@ -21,10 +21,7 @@ import type { ActiveFilters } from '../../src/lib/catalog-filter-utils';
 import { CATALOG_SORTS, purityLabel } from '@goldsmith/customer-shared';
 import type { CatalogSort } from '@goldsmith/customer-shared';
 import { imageForCategoryName } from '../../src/assets/storefrontImages';
-
-// ─── Colour tokens not yet on origin/main (land with D1D2D5) ───────────────────
-const PRIMARY_DEEP  = '#8C6628';
-const PRIMARY_WASH  = colors.primaryLight; // '#EFE3BE'
+import { useTenantStore } from '../../src/stores/tenantStore';
 
 type SearchParamValue = string | string[] | undefined;
 type BrowseRouteParams = Record<string, SearchParamValue>;
@@ -194,6 +191,10 @@ function BrowseProductCard({ product }: { product: CatalogProduct }): React.Reac
 // ---------------------------------------------------------------------------
 
 export default function Browse(): React.ReactElement {
+  const branding     = useTenantStore((s) => s.tenant?.branding);
+  const primaryColor = branding?.primaryColor ?? colors.primary;
+  const primaryWash  = primaryColor + '20';
+
   const routeParams = useLocalSearchParams<BrowseRouteParams>();
   const routeState = useMemo(() => routeStateFromParams(routeParams), [routeParams]);
   const lastAppliedRouteSignature = useRef(routeState.signature);
@@ -313,10 +314,10 @@ export default function Browse(): React.ReactElement {
             alignItems: 'center',
             justifyContent: 'center',
             gap: spacing.xs,
-            backgroundColor: filterCount > 0 ? PRIMARY_WASH : colors.white,
+            backgroundColor: filterCount > 0 ? primaryWash : colors.white,
             borderRadius: radii.md,
             borderWidth: 1,
-            borderColor: filterCount > 0 ? PRIMARY_DEEP : colors.border,
+            borderColor: filterCount > 0 ? primaryColor : colors.border,
             minHeight: 44,
           }}
           accessibilityLabel={`फ़िल्टर${filterCount > 0 ? ` (${filterCount} सक्रिय)` : ''}`}
@@ -324,7 +325,7 @@ export default function Browse(): React.ReactElement {
         >
           <Text style={{
             fontFamily: typography.body.family, fontSize: 14,
-            color: filterCount > 0 ? PRIMARY_DEEP : colors.ink,
+            color: filterCount > 0 ? primaryColor : colors.ink,
             fontWeight: filterCount > 0 ? '600' : '400',
           }}>
             ⚙ फ़िल्टर{filterCount > 0 ? ` (${filterCount})` : ''}
@@ -340,10 +341,10 @@ export default function Browse(): React.ReactElement {
             alignItems: 'center',
             justifyContent: 'center',
             gap: spacing.xs,
-            backgroundColor: sort ? PRIMARY_WASH : colors.white,
+            backgroundColor: sort ? primaryWash : colors.white,
             borderRadius: radii.md,
             borderWidth: 1,
-            borderColor: sort ? PRIMARY_DEEP : colors.border,
+            borderColor: sort ? primaryColor : colors.border,
             minHeight: 44,
           }}
           accessibilityLabel="क्रमबद्ध करें"
@@ -351,7 +352,7 @@ export default function Browse(): React.ReactElement {
         >
           <Text style={{
             fontFamily: typography.body.family, fontSize: 14,
-            color: sort ? PRIMARY_DEEP : colors.ink,
+            color: sort ? primaryColor : colors.ink,
             fontWeight: sort ? '600' : '400',
           }}>
             ↕ क्रमबद्ध करें
@@ -380,7 +381,7 @@ export default function Browse(): React.ReactElement {
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                backgroundColor: PRIMARY_WASH,
+                backgroundColor: primaryWash,
                 borderRadius: radii.pill,
                 paddingHorizontal: spacing.sm,
                 paddingVertical: spacing.xs,
@@ -392,11 +393,11 @@ export default function Browse(): React.ReactElement {
             >
               <Text style={{
                 fontFamily: typography.body.family, fontSize: 12,
-                color: PRIMARY_DEEP, fontWeight: '600',
+                color: primaryColor, fontWeight: '600',
               }}>
                 {chip.labelHi}
               </Text>
-              <Text style={{ fontSize: 11, color: PRIMARY_DEEP }}>×</Text>
+              <Text style={{ fontSize: 11, color: primaryColor }}>×</Text>
             </TouchableOpacity>
           ))}
 

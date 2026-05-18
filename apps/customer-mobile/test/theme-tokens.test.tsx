@@ -69,7 +69,6 @@ function wrapper({ children }: { children: React.ReactNode }): React.ReactElemen
 // RGB equivalents of hardcoded anchor colours (jsdom normalises hex → rgb)
 const RGB_ANCHOR_GOLD   = '140, 102, 40';   // #8C6628
 const RGB_ANCHOR_WASH   = '239, 227, 190';  // #EFE3BE
-const RGB_OLD_PAYMENT   = '184, 134, 11';   // #B8860B  (rate-lock CTA)
 const RGB_OLD_SELECTION = '59, 130, 246';   // #3B82F6  (try-at-home selection)
 const RGB_EMERALD       = '15, 118, 110';   // #0F766E  (injected tenant colour)
 
