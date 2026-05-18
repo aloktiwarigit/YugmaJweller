@@ -42,8 +42,24 @@ export function createInvisibleRecaptcha(container: HTMLElement): RecaptchaVerif
   return new RecaptchaVerifier(getCustomerAuth(), container, { size: 'invisible' });
 }
 
+/**
+ * Normalise a customer-entered phone to E.164. Firebase Web phone auth
+ * rejects anything else — and the customer-web UI's permissive
+ * `/^\+?\d{10,15}$/` validator can let a bare 10-digit Indian number
+ * through. We default to +91 for 10-digit input; otherwise we require
+ * a leading + and pass through.
+ */
+function toE164(phone: string): string {
+  const trimmed = phone.trim();
+  if (trimmed.startsWith('+')) return trimmed;
+  // Bare 10-digit → India default. Anything longer/shorter without a +
+  // prefix is rejected by Firebase anyway; pass through and let it error.
+  if (/^\d{10}$/.test(trimmed)) return '+91' + trimmed;
+  return trimmed;
+}
+
 export async function sendOtp(phone: string, verifier: RecaptchaVerifier): Promise<ConfirmationResult> {
-  return signInWithPhoneNumber(getCustomerAuth(), phone, verifier);
+  return signInWithPhoneNumber(getCustomerAuth(), toE164(phone), verifier);
 }
 
 export type { ConfirmationResult, User };

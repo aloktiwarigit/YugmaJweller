@@ -69,4 +69,15 @@ ALTER TABLE try_at_home_bookings DROP CONSTRAINT try_at_home_bookings_customer_i
 ALTER TABLE try_at_home_bookings ADD CONSTRAINT try_at_home_bookings_customer_id_fkey
   FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL;
 
+-- 6. Backfill: customers whose deletion was requested BEFORE this migration
+--    landed have wishlist rows still in place (6.8's softDeleteAtomic
+--    predates the wishlist cascade added in 19.7's repository changes).
+--    hardDeleteAtomic does not touch wishlists, so the day-30
+--    DELETE FROM customers would FK-violate for those pending deletions.
+--    Idempotent: drops any wishlist row whose customer is already soft-deleted.
+DELETE FROM wishlists w
+ USING customers c
+ WHERE w.customer_id = c.id
+   AND c.deleted_at IS NOT NULL;
+
 COMMIT;
