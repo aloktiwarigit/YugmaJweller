@@ -1,6 +1,7 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
+    "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
     "types": ["nativewind/types", "node", "vitest/globals"]

@@ -41,13 +41,13 @@ describe('endpoints', () => {
       { etag: '"v1"' },
     );
     const r = await getTenantBoot('anchor-dev');
-    expect(r.tenant.id).toBe('tid');
-    expect(r.tenant.slug).toBe('anchor-dev');
-    expect(r.tenant.displayName).toBe('Test Shop');
-    expect(r.tenant.branding.appName).toBe('Test Shop App');
-    expect(r.tenant.branding.defaultLanguage).toBe('hi-IN');
-    expect(r.tenant.branding.primaryColor).toBe('#8C2A1E');
-    expect(r.tenant.branding.logoUrl).toBe('https://cdn.example/logo.png');
+    expect(r.tenant!.id).toBe('tid');
+    expect(r.tenant!.slug).toBe('anchor-dev');
+    expect(r.tenant!.displayName).toBe('Test Shop');
+    expect(r.tenant!.branding.appName).toBe('Test Shop App');
+    expect(r.tenant!.branding.defaultLanguage).toBe('hi-IN');
+    expect(r.tenant!.branding.primaryColor).toBe('#8C2A1E');
+    expect(r.tenant!.branding.logoUrl).toBe('https://cdn.example/logo.png');
     expect(r.etag).toBe('"v1"');
     expect(r.notModified).toBe(false);
   });
@@ -63,8 +63,8 @@ describe('endpoints', () => {
       { etag: '"v2"' },
     );
     const r = await getTenantBoot('anchor-dev');
-    expect(r.tenant.branding.primaryColor).toBeUndefined();
-    expect(r.tenant.branding.defaultLanguage).toBeUndefined();
+    expect(r.tenant!.branding.primaryColor).toBeUndefined();
+    expect(r.tenant!.branding.defaultLanguage).toBeUndefined();
   });
 
   it('getTenantBoot defaults branding to empty when config is null', async () => {
@@ -74,7 +74,7 @@ describe('endpoints', () => {
       { etag: '"v3"' },
     );
     const r = await getTenantBoot('anchor-dev');
-    expect(r.tenant.branding).toEqual({
+    expect(r.tenant!.branding).toEqual({
       primaryColor: undefined,
       secondaryColor: undefined,
       logoUrl: undefined,
