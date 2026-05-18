@@ -30,3 +30,15 @@ describe('reports export audit actions', () => {
     expect(AuditAction.REPORT_EXPORT_REGENERATED).toBe('REPORT_EXPORT_REGENERATED');
   });
 });
+
+describe('customer-write audit actions (story 19.13)', () => {
+  it.each([
+    'CUSTOMER_WISHLIST_ADD',
+    'CUSTOMER_WISHLIST_REMOVE',
+    'CUSTOMER_REVIEW_SUBMIT',
+    'CUSTOMER_RATE_LOCK_CREATED',
+    'CUSTOMER_TRY_AT_HOME_REQUESTED',
+  ])('AuditAction.%s exists and equals its string key', (key) => {
+    expect(AuditAction[key as keyof typeof AuditAction]).toBe(key);
+  });
+});

@@ -1,5 +1,6 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import type { Pool } from 'pg';
+import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import { WishlistRepository } from './wishlist.repository';
 import type { WishlistProductRow } from './wishlist.repository';
@@ -33,12 +34,26 @@ export class WishlistService {
     if (rows.length === 0) throw new NotFoundException({ code: 'product.not_found' });
 
     await this.repo.add({ shopId, customerId: params.customerId, productId: params.productId });
+    void auditLog(this.pool, {
+      action:      AuditAction.CUSTOMER_WISHLIST_ADD,
+      subjectType: 'product',
+      subjectId:   params.productId,
+      actorUserId: params.customerId,
+      after:       { shopId },
+    }).catch(() => undefined);
     return { added: true };
   }
 
   async removeFromWishlist(params: { customerId: string; productId: string }): Promise<void> {
     const { shopId } = tenantContext.requireCurrent();
     await this.repo.remove({ shopId, customerId: params.customerId, productId: params.productId });
+    void auditLog(this.pool, {
+      action:      AuditAction.CUSTOMER_WISHLIST_REMOVE,
+      subjectType: 'product',
+      subjectId:   params.productId,
+      actorUserId: params.customerId,
+      after:       { shopId },
+    }).catch(() => undefined);
   }
 
   async listWishlist(customerId: string): Promise<WishlistItemResponse[]> {
