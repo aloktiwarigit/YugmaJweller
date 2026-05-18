@@ -87,7 +87,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
 
   const activeFilters: ActiveFilters = {
     search, metal, purity, priceMin, priceMax,
-    inStockOnly, style, occasion,
+    inStockOnly, style, occasion, giftPersona,
     sort: sort as CatalogSort | undefined,
   };
   const heading = catalogHeading({ search, metal, collection });
@@ -104,6 +104,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
     if (inStockOnly)  params.set('inStockOnly', 'true');
     if (style)        params.set('style', style);
     if (occasion)     params.set('occasion', occasion);
+    if (giftPersona)  params.set('giftPersona', giftPersona);
     if (sort)         params.set('sort', sort);
     const qs = params.toString();
     return `/products${qs ? `?${qs}` : ''}`;
@@ -135,6 +136,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
         {priceMax !== undefined && <input type="hidden" name="priceMax" value={String(priceMax)} />}
         {style       && <input type="hidden" name="style"       value={style} />}
         {occasion    && <input type="hidden" name="occasion"    value={occasion} />}
+        {giftPersona && <input type="hidden" name="giftPersona" value={giftPersona} />}
         <label htmlFor="product-search" className="sr-only">उत्पाद खोज</label>
         <input
           id="product-search" type="search" name="search" defaultValue={search}
