@@ -12,7 +12,7 @@ import { api } from '../../api/client';
 
 interface RateLockDetail {
   id: string;
-  customerId: string;
+  customerId: string | null;
   lockedRate24kPaisePerGram: string;
   lockedAt: string;
   expiresAt: string;
@@ -149,11 +149,14 @@ export function RateLockDetailScreen({
         </View>
       ) : null}
 
-      {/* Invoice CTA — only for ACTIVE bookings */}
-      {booking.status === 'ACTIVE' ? (
+      {/* Invoice CTA — only for ACTIVE bookings with a live customer.
+         Migration 0075 made rate_lock_bookings.customer_id nullable (FK SET
+         NULL on customer hard-delete). ACTIVE+non-null is the runtime
+         invariant for a bookable invoice. */}
+      {booking.status === 'ACTIVE' && booking.customerId !== null ? (
         <TouchableOpacity
           style={styles.invoiceBtn}
-          onPress={() => onCreateInvoice(booking.customerId)}
+          onPress={() => onCreateInvoice(booking.customerId as string)}
           accessibilityLabel="इनवॉइस बनाएं"
           accessibilityRole="button"
         >

@@ -1046,3 +1046,74 @@ The CI `build-customer-mobile` job automatically verifies:
 Unit tests in `apps/customer-mobile/test/build-validation.test.ts` cover all guard rules. Run locally: `pnpm --filter @goldsmith/customer-mobile test`.
 
 _Runbook entries must stay actionable. If a section becomes prose rather than steps, split it or move it to architecture.md._
+
+---
+
+## DPDPA Right to Erasure
+
+### Overview
+
+Customer-self deletion is initiated from either the customer-mobile or customer-web app via `DELETE /api/v1/crm/customer/me`. Owner-initiated deletion remains at the existing CRM admin path. Both paths converge on `DpdpaDeletionService.requestDeletion(ctx, customerId, requestedBy, options?)`.
+
+The deletion happens in two stages:
+
+1. **Day 0 — soft-delete + PII scrub.** Inside a single `withTenantTx` transaction: `customers` row is updated (`name='Deleted Customer'`, all PII columns NULLed, `phone` replaced by SHA-256 hash, `deleted_at` / `hard_delete_scheduled_at` / `pii_redacted_at` set, `deletion_reason` captured); wishlists hard-deleted; reviews anonymised (`customer_id → NULL`); rate-lock bookings PENDING_PAYMENT/ACTIVE → `CANCELLED`; try-at-home REQUESTED → `CANCELLED`; family_members/customer_notes/customer_occasions/customer_balances cleared; Meilisearch index entry removed; audit log written.
+
+2. **Day 30 — hard-delete.** BullMQ delayed job (with a daily safety-net sweep). Removes the customers row entirely. Reviews keep `customer_id=NULL` automatically via the FK's `ON DELETE SET NULL`. Invoices have `customer_id` set to NULL (kept for PMLA 5-year retention). Rate-lock and try-at-home rows stay with `status='CANCELLED'` for the shopkeeper's audit trail.
+
+### Blocking conditions
+
+A deletion request is REJECTED with 422 if either:
+
+- `crm.deletion.open_invoices` — customer has at least one `DRAFT` invoice. Resolution: shopkeeper issues or voids the invoice, then customer retries.
+- `crm.deletion.try_at_home_in_flight` — customer has at least one `DISPATCHED` try-at-home booking. Resolution: shopkeeper marks the booking RETURNED (physical recovery), then customer retries.
+
+A second deletion request returns 409 `crm.deletion.already_requested`. Restoration is NOT possible (PII is already scrubbed); the customer must re-register through the shopkeeper's CRM.
+
+### Manual refund handling
+
+When a customer cancels with an ACTIVE rate-lock booking that has `deposit_paid_paise > 0`, the deposit is NOT auto-refunded — the payments adapter has no refund API plumbed. The soft-delete audit event includes `after.rateLockRefundsPending` (count) so the operator can identify these and process refunds via Razorpay dashboard manually.
+
+### Operator audit-query recipe
+
+Find all customer-self deletions in the last 30 days. The audit table is `audit_events` (created in `0001_initial_schema.sql`); `@goldsmith/audit::auditLog` writes here. `reasonText` is intentionally NOT in the audit payload — operators retrieve free-text reasons from `customers.deletion_reason_text` if needed (joined by subject_id).
+
+```sql
+SELECT
+  ae.created_at,
+  ae.subject_id AS customer_id,
+  ae.after->>'requestedBy'             AS requested_by,
+  ae.after->>'reason'                  AS reason,
+  ae.after->'cascadeCounts'            AS cascade_counts,
+  (ae.after->>'rateLockRefundsPending')::int AS refunds_pending,
+  ae.after->>'hardDeleteAt'            AS hard_delete_at
+FROM audit_events ae
+WHERE ae.action = 'CRM_CUSTOMER_DELETION_REQUESTED'
+  AND ae.shop_id = current_setting('app.current_shop_id')::uuid
+  AND ae.created_at > NOW() - INTERVAL '30 days'
+ORDER BY ae.created_at DESC;
+```
+
+Verify that an individual customer's deletion fully cascaded (post-hard-delete check):
+
+```sql
+-- The customer row should be gone (hard-deleted at day 30):
+SELECT id FROM customers WHERE id = $1;            -- 0 rows = correct
+
+-- Their reviews persist with NULL author:
+SELECT id, customer_id FROM product_reviews WHERE id = $reviewId;  -- customer_id = NULL = correct
+
+-- Their bookings persist as CANCELLED with NULL customer_id (audit only):
+SELECT id, status, customer_id FROM rate_lock_bookings WHERE id = $rateLockId;
+SELECT id, status, customer_id FROM try_at_home_bookings WHERE id = $tahId;
+```
+
+### Re-registration
+
+Post-deletion, the customer cannot self-register — `customer-auth.guard.ts` enforces a pre-existing `customers` row. The shopkeeper re-adds them via the CRM admin UI, which generates a new row with the same phone (the soft-deleted row's phone is now SHA-256 hashed so the unique-index slot is free).
+
+This is a known platform constraint, not a deletion-flow bug. A future story may add customer-self provisioning to close the loop.
+
+### Firebase Auth user record
+
+The Firebase Auth user record (UID + phone) is NOT deleted by this flow. If the customer signs in via OTP at the same shop post-deletion, Firebase OTP succeeds but our API returns `customer.not_found` (401). The shopkeeper must re-add them through CRM. Deleting the Firebase user via Admin SDK is a possible future enhancement.

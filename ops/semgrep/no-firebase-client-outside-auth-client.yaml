@@ -19,3 +19,4 @@ rules:
         # clients for their respective apps; the rule's "outside auth-client"
         # rule fires on the wrapper itself otherwise.
         - "apps/shopkeeper/src/auth/**"
+        - "apps/customer-web/src/auth/**"  # Added Story 19.7 delete-account OTP gate

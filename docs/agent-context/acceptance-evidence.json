@@ -1,24 +1,20 @@
 {
-  "generated": "2026-05-17T12:29:40.923Z",
+  "generated": "2026-05-18T02:13:45.207Z",
   "summary": {
-    "total": 23,
-    "implemented": 14,
+    "total": 24,
+    "implemented": 15,
     "planned": 9,
     "withTestEvidence": 14,
-    "coveragePct": 61,
-    "implementedCoveragePct": 100
+    "coveragePct": 58,
+    "implementedCoveragePct": 93
   },
   "stories": [
     {
       "id": "1.1",
-      "title": "Shop Owner reaches the empty shop dashboard (Firebase Auth + Hindi-first Expo shell)",
+      "title": "2026-04-18-story-1.1-auth-and-dashboard-design.md",
       "class": "B",
       "status": "complete",
-      "frs": [
-        "FR8 (shopkeeper OTP login)",
-        "FR10 (session persistence across app restarts — via Firebase SDK native Keystore)",
-        "FR5 (tenant-isolation invariant — first authenticated consumer)"
-      ],
+      "frs": [],
       "specFile": "docs/superpowers/specs/2026-04-18-story-1.1-auth-and-dashboard-design.md",
       "testFiles": [
         "apps/api/test/_auth-test-setup.ts",
@@ -41,12 +37,10 @@
     },
     {
       "id": "1.2",
-      "title": "Shop Owner invites a staff member by phone and assigns a role",
+      "title": "2026-04-19-story-1.2-staff-invite-design.md",
       "class": "B",
       "status": "complete",
-      "frs": [
-        "FR12 (invite staff by phone + role)"
-      ],
+      "frs": [],
       "specFile": "docs/superpowers/specs/2026-04-19-story-1.2-staff-invite-design.md",
       "testFiles": [
         "apps/api/test/_auth-test-setup.ts",
@@ -310,6 +304,20 @@
       ],
       "smokeTest": "ci:playwright",
       "evidenceGaps": []
+    },
+    {
+      "id": "19.7",
+      "title": "2026-05-17-story-19.7-dpdpa-customer-self-deletion-design.md",
+      "class": "B",
+      "status": "partial",
+      "frs": [],
+      "specFile": "docs/superpowers/specs/2026-05-17-story-19.7-dpdpa-customer-self-deletion-design.md",
+      "testFiles": [],
+      "ciJobs": [],
+      "smokeTest": "ci:playwright",
+      "evidenceGaps": [
+        "no-test-file"
+      ]
     },
     {
       "id": "WS-3C",

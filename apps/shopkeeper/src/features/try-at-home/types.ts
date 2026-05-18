@@ -1,7 +1,7 @@
 export interface TryAtHomeBookingResponse {
   id:          string;
   shopId:      string;
-  customerId:  string;
+  customerId:  string | null;
   productIds:  string[];
   status:      BookingStatus;
   requestedAt: string;
@@ -15,7 +15,8 @@ export type BookingStatus =
   | 'DISPATCHED'
   | 'RETURNED'
   | 'CONVERTED_TO_SALE'
-  | 'EXPIRED';
+  | 'EXPIRED'
+  | 'CANCELLED';
 
 export const STATUS_LABELS: Record<BookingStatus, string> = {
   REQUESTED:         'अनुरोध किया',
@@ -23,6 +24,7 @@ export const STATUS_LABELS: Record<BookingStatus, string> = {
   RETURNED:          'वापस',
   CONVERTED_TO_SALE: 'बिक्री हुई',
   EXPIRED:           'समय समाप्त',
+  CANCELLED:         'रद्द',
 };
 
 export const STATUS_COLORS: Record<BookingStatus, string> = {
@@ -31,4 +33,5 @@ export const STATUS_COLORS: Record<BookingStatus, string> = {
   RETURNED:          '#757575',
   CONVERTED_TO_SALE: '#2E7D32',
   EXPIRED:           '#C62828',
+  CANCELLED:         '#757575',
 };

@@ -33,7 +33,7 @@ export interface RecordReturnDto {
 export interface BookingResponse {
   id:           string;
   shopId:       string;
-  customerId:   string;
+  customerId:   string | null;
   productIds:   string[];
   status:       string;
   requestedAt:  string;
@@ -211,7 +211,11 @@ export class TryAtHomeBookingsService {
 
         const invoice = await this.billing.createInvoice(
           {
-            customerId:    booking.customer_id,
+            // Migration 0075: try_at_home_bookings.customer_id can now be NULL
+            // after the customer was hard-deleted via DPDPA cascade. In that
+            // case, the invoice is created with no customer linkage; the
+            // shopkeeper-supplied keptCustomerName/Phone carries the contact.
+            customerId:    booking.customer_id ?? undefined,
             customerName:  dto.keptCustomerName,
             customerPhone: dto.keptCustomerPhone,
             lines,

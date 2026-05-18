@@ -1,23 +1,4 @@
-codex-review-passed: 2026-05-17
-HEAD: 24fcb0d62bb7029bfce52da7aaeb86ad0a8dc171
-Range: 398375d..24fcb0d (26 commits — supersedes prior marker covering 4a20215..398375d)
-Branch: main
-Reviewed: Story 19.6 (E19 Wave 1 P0 deploy unblockers + asia-south1 region migration + ~200-file in-flight snapshot) — Sentry on customer-web + customer-mobile, App Hosting scaffolding, EAS production scaffold, Cloud Run deploy step + /health DB probe, deploy-time CI gates
-Rounds: 5
-Findings: P0=0  P1=0  P2=4
-P2 follow-ups (do NOT block this marker; tracked for follow-up stories):
-  - app.config.ts:152 — Firebase service file defaults point to .dev paths absent from disk (preview EAS build will fail)
-  - CustomerAuthProvider.tsx:97 — setSession fires before backend customers.id is resolved (real-OTP path UX edge case)
-  - customer.controller.ts:199 — payment URL is relative when API_PUBLIC_URL unset (dev/preview only)
-  - customer-web/app/products/page.tsx:88 — collection filter not preserved across pagination/search/sort
-Codex P1s fixed across rounds 1–5 (see commits db9c22a, a7f5263, 4cddf32, 6efa27c, 24fcb0d):
-  - tx.ts SQLi sink (template-string interpolation into SET LOCAL) closed via set_config($1, $2, ...)
-  - 6 sibling SET app.current_shop_id sinks in auth.repository.ts + permissions.repository.ts + provider.ts closed
-  - 14 public catalog @SkipAuth() @SkipTenant() endpoints now UUID-validate x-tenant-id via assertPublicTenantHeader
-  - Semgrep rule no-shop-id-sql-interpolation.yml codifies the pattern (0 findings on tree)
-  - ship.yml 3 duplicate build-customer-mobile jobs → 2 distinct jobs (build-customer-mobile + build-customer-mobile-prod)
-  - welcome.tsx OTP confirm now navigates to /(tabs) via session subscription
-  - app.config.ts no longer imports ./src/build-validation (TS-only resolution issue)
-  - build-customer-web env block now has API_URL + NEXT_PUBLIC_FIREBASE_* required vars
-  - build-customer-mobile-prod env block now has EXPO_PUBLIC_APP_NAME
-  - @sentry/react-native/expo plugin entry removed (SDK 5.14 doesn't export that path)
+afca74a485903b3e72725f1e00035c57f01308f7 2026-05-17T21:48:31-04:00
+Story 19.7 Customer-Self DPDPA Right to Erasure (Class A).
+Codex full-delivery review converged across 4 rounds (4 + 4 + 3 + 1 in-scope findings, all addressed inline). Two round-4 findings on packages/integrations/rates/ acknowledged as pre-existing main-branch issues, out of Story 19.7 scope.
+Plan-Codex (pre-execution) also clean across 4 rounds.

@@ -2,9 +2,16 @@ import { Inject, Injectable, ConflictException, NotFoundException, Unprocessable
 import type { Pool, PoolClient } from 'pg';
 import { withTenantTx } from '@goldsmith/db';
 
+export interface SoftDeleteOptions {
+  reason?:     'no-need' | 'privacy' | 'other-jeweller' | 'other';
+  reasonText?: string;
+}
+
 export interface SoftDeleteResult {
-  scheduledAt:  Date;
-  hardDeleteAt: Date;
+  scheduledAt:             Date;
+  hardDeleteAt:            Date;
+  cascadeCounts:           { wishlists: number; reviews: number; rateLocks: number; tryAtHome: number };
+  rateLockRefundsPending:  number;
 }
 
 export interface DueForHardDelete {
@@ -39,9 +46,12 @@ export class DpdpaDeletionRepository {
    *   1. SELECT FOR UPDATE — verifies the row belongs to the tenant and is not
    *      already deleted (avoids re-scrubbing or stacking schedules).
    *   2. Guards against open DRAFT invoices — these block deletion until paid or voided.
-   *   3. Scrubs PII columns + replaces the phone with a SHA-256(shop_id || ':' || phone)
+   *   3. Guards against DISPATCHED try-at-home bookings — pieces must be returned first.
+   *   4. Scrubs PII columns + replaces the phone with a SHA-256(shop_id || ':' || phone)
    *      hash so the unique-phone constraint is preserved without exposing the number.
-   *   4. Anonymizes/deletes related rows in child tables (notes/occasions/balances/family).
+   *   5. Cascades to: wishlists (hard-delete), product_reviews (anonymise via NULL
+   *      customer_id), rate_lock_bookings (CANCELLED), try_at_home_bookings (REQUESTED→CANCELLED).
+   *   6. Anonymizes/deletes related rows in child tables (notes/occasions/balances/family).
    *      Child tables that ship in stories 6.3/6.5/6.6 are guarded with to_regclass
    *      so this branch can be tested in isolation; on main they all exist.
    *
@@ -49,8 +59,13 @@ export class DpdpaDeletionRepository {
    *   - NotFoundException                    'crm.customer_not_found'
    *   - ConflictException                    'crm.deletion.already_requested'
    *   - UnprocessableEntityException         'crm.deletion.open_invoices'
+   *   - UnprocessableEntityException         'crm.deletion.try_at_home_in_flight'
    */
-  async softDeleteAtomic(customerId: string, requestedBy: 'customer' | 'owner'): Promise<SoftDeleteResult> {
+  async softDeleteAtomic(
+    customerId:  string,
+    requestedBy: 'customer' | 'owner',
+    options:     SoftDeleteOptions = {},
+  ): Promise<SoftDeleteResult> {
     return withTenantTx(this.pool, async (tx) => {
       const sel = await tx.query<{ deleted_at: Date | null }>(
         `SELECT deleted_at FROM customers
@@ -82,6 +97,21 @@ export class DpdpaDeletionRepository {
         });
       }
 
+      // Mirror open-DRAFT-invoices guard: physical pieces dispatched to this
+      // customer must be returned before deletion. Otherwise we lose the
+      // shopkeeper's only link to the dispatched stock.
+      const dispatched = await tx.query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM try_at_home_bookings
+         WHERE customer_id = $1 AND shop_id = ${TENANT_SQL} AND status = 'DISPATCHED'`,
+        [customerId],
+      );
+      if (parseInt(dispatched.rows[0].count, 10) > 0) {
+        throw new UnprocessableEntityException({
+          code: 'crm.deletion.try_at_home_in_flight',
+          message: 'Cannot delete customer with dispatched try-at-home bookings — recover the piece first',
+        });
+      }
+
       const upd = await tx.query<{ deleted_at: Date; hard_delete_scheduled_at: Date }>(
         `UPDATE customers SET
            name                     = 'Deleted Customer',
@@ -101,11 +131,62 @@ export class DpdpaDeletionRepository {
            hard_delete_scheduled_at = now() + interval '30 days',
            pii_redacted_at          = now(),
            deletion_requested_by    = $2,
+           deletion_reason          = $3,
+           deletion_reason_text     = $4,
            updated_at               = now()
          WHERE id = $1
            AND shop_id = ${TENANT_SQL}
          RETURNING deleted_at, hard_delete_scheduled_at`,
-        [customerId, requestedBy],
+        [customerId, requestedBy, options.reason ?? null, options.reasonText ?? null],
+      );
+
+      // Wishlists are ephemeral — hard-delete now (day 0).
+      const wishlistRes = await tx.query(
+        `DELETE FROM wishlists
+         WHERE customer_id = $1 AND shop_id = ${TENANT_SQL}`,
+        [customerId],
+      );
+
+      // Cascade: anonymise reviews — keep them for storefront social proof but
+      // drop the customer attribution. The FK is ON DELETE SET NULL after 0075,
+      // so the day-30 hard-delete cleans up automatically; we NULL it here at
+      // day 0 so the storefront query stops rendering the soft-deleted-customer
+      // name immediately.
+      const reviewsRes = await tx.query(
+        `UPDATE product_reviews
+           SET customer_id = NULL
+         WHERE customer_id = $1 AND shop_id = ${TENANT_SQL}`,
+        [customerId],
+      );
+
+      // Cascade: cancel rate-lock bookings. The schema enum has 'CANCELLED'
+      // since 0045. Active bookings with paid deposits surface a
+      // rateLockRefundsPending count in the audit log so the shopkeeper can
+      // process refunds manually (the payments adapter has no refund API).
+      const rateLockRes = await tx.query<{ refunds_pending: string; total: string }>(
+        `WITH cancelled AS (
+           UPDATE rate_lock_bookings
+              SET status = 'CANCELLED'
+            WHERE customer_id = $1 AND shop_id = ${TENANT_SQL}
+              AND status IN ('PENDING_PAYMENT','ACTIVE')
+            RETURNING deposit_paid_paise
+         )
+         SELECT COUNT(*) FILTER (WHERE deposit_paid_paise > 0)::text AS refunds_pending,
+                COUNT(*)::text AS total FROM cancelled`,
+        [customerId],
+      );
+      const rateLockRefundsPending = parseInt(rateLockRes.rows[0]?.refunds_pending ?? '0', 10);
+      const rateLocksCount         = parseInt(rateLockRes.rows[0]?.total ?? '0', 10);
+
+      // Cascade: cancel REQUESTED try-at-home bookings. DISPATCHED is blocked
+      // at the top of this function; RETURNED / CONVERTED_TO_SALE / EXPIRED
+      // are terminal and unaffected.
+      const tryAtHomeRes = await tx.query(
+        `UPDATE try_at_home_bookings
+           SET status = 'CANCELLED'
+         WHERE customer_id = $1 AND shop_id = ${TENANT_SQL}
+           AND status = 'REQUESTED'`,
+        [customerId],
       );
 
       // family_members: drop both directions immediately.
@@ -143,6 +224,13 @@ export class DpdpaDeletionRepository {
       return {
         scheduledAt:  upd.rows[0].deleted_at,
         hardDeleteAt: upd.rows[0].hard_delete_scheduled_at,
+        cascadeCounts: {
+          wishlists: wishlistRes.rowCount ?? 0,
+          reviews:   reviewsRes.rowCount ?? 0,
+          rateLocks: rateLocksCount,
+          tryAtHome: tryAtHomeRes.rowCount ?? 0,
+        },
+        rateLockRefundsPending,
       };
     });
   }

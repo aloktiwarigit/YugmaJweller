@@ -25,6 +25,18 @@ import type { NoteResponse } from './notes.service';
 import { OccasionsService } from './occasions.service';
 import type { OccasionResponse, AddOccasionDto } from './occasions.service';
 
+// `.default({})` ensures the schema returns `{}` when NestJS passes `undefined`
+// for a missing body. Without it, ZodValidationPipe runs `schema.parse(undefined)`
+// which throws "Required" and returns 400 to the existing client — breaking the
+// backwards-compatible no-body call path. The TypeScript-level `body = {}` default
+// fires AFTER the pipe and cannot rescue this; the pipe must accept undefined itself.
+export const CustomerSelfDeleteBodySchema = z.object({
+  reason:     z.enum(['no-need', 'privacy', 'other-jeweller', 'other']).optional(),
+  reasonText: z.string().max(200).optional(),
+}).strict().default({});
+
+type CustomerSelfDeleteBody = z.infer<typeof CustomerSelfDeleteBodySchema>;
+
 const AddNoteSchema = z.object({
   body: z.string().trim().min(1, 'Note body required').max(5000),
 });
@@ -193,11 +205,14 @@ export class CrmController {
   @SkipAuth()
   @SkipTenant()
   @UseGuards(CustomerAuthGuard)
-  async customerSelfDelete(@Req() req: Request): Promise<DeletionRequestResponse> {
+  async customerSelfDelete(
+    @Req() req: Request,
+    @Body(new ZodValidationPipe(CustomerSelfDeleteBodySchema)) body: CustomerSelfDeleteBody,
+  ): Promise<DeletionRequestResponse> {
     const { customerId, shopId } = getCustomerCtx(req);
     const ctx = this.makeCustomerDeletionCtx(shopId, customerId);
     return tenantContext.runWith(ctx, () =>
-      this.dpdpaSvc.requestDeletion(ctx, customerId, 'customer'),
+      this.dpdpaSvc.requestDeletion(ctx, customerId, 'customer', body),
     );
   }
 

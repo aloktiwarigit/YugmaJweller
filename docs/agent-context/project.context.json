@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-17T12:29:36.627Z",
+  "generated": "2026-05-18T02:13:41.775Z",
   "repo": "Goldsmith",
   "description": "Multi-tenant white-label jewellery platform for local Indian jewellers",
   "stack": {
@@ -210,7 +210,7 @@
     ]
   },
   "migrations": {
-    "current": "0074",
+    "current": "0075",
     "reserved": "0060-0085",
     "pattern": "packages/db/src/migrations/{seq}_{slug}.sql"
   }
