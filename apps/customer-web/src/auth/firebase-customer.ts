@@ -10,10 +10,12 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import {
   getAuth,
+  onAuthStateChanged,
   signInWithPhoneNumber,
   RecaptchaVerifier,
   type Auth,
   type ConfirmationResult,
+  type Unsubscribe,
   type User,
 } from 'firebase/auth';
 
@@ -63,3 +65,21 @@ export async function sendOtp(phone: string, verifier: RecaptchaVerifier): Promi
 }
 
 export type { ConfirmationResult, User };
+
+export async function getCustomerIdToken(): Promise<string | null> {
+  const user = getCustomerAuth().currentUser;
+  if (!user) return null;
+  try {
+    return await user.getIdToken();
+  } catch {
+    return null;
+  }
+}
+
+export function onCustomerAuthChanged(
+  cb: (user: User | null) => void,
+): Unsubscribe {
+  return onAuthStateChanged(getCustomerAuth(), cb);
+}
+
+export type { Unsubscribe };
