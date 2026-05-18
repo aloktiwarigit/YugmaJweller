@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-17T12:29:41.890Z",
+  "generated": "2026-05-18T02:13:46.375Z",
   "apps": [
     {
       "name": "@goldsmith/api",
@@ -1563,6 +1563,14 @@
         "route": "/profile/addresses"
       },
       {
+        "file": "apps/customer-mobile/app/profile/delete-account-done.tsx",
+        "route": "/profile/delete-account-done"
+      },
+      {
+        "file": "apps/customer-mobile/app/profile/delete-account.tsx",
+        "route": "/profile/delete-account"
+      },
+      {
         "file": "apps/customer-mobile/app/profile/referral.tsx",
         "route": "/profile/referral"
       },
@@ -1629,6 +1637,14 @@
         "route": "/products"
       },
       {
+        "file": "apps/customer-web/app/profile/delete-account/done/page.tsx",
+        "route": "/profile/delete-account/done"
+      },
+      {
+        "file": "apps/customer-web/app/profile/delete-account/page.tsx",
+        "route": "/profile/delete-account"
+      },
+      {
         "file": "apps/customer-web/app/profile/page.tsx",
         "route": "/profile"
       },
@@ -1663,11 +1679,10 @@
     ]
   },
   "migrations": {
-    "count": 64,
-    "current": "0074",
-    "latest": "packages/db/src/migrations/0074_payment_sessions.sql",
+    "count": 65,
+    "current": "0075",
+    "latest": "packages/db/src/migrations/0075_customer_self_deletion_extensions.sql",
     "recent": [
-      "packages/db/src/migrations/0059_reviews_wishlist_update_grant.sql",
       "packages/db/src/migrations/0060_products_cost_paise.sql",
       "packages/db/src/migrations/0066_products_storefront_columns.sql",
       "packages/db/src/migrations/0067_collections.sql",
@@ -1676,7 +1691,8 @@
       "packages/db/src/migrations/0070_product_reviews_visibility.sql",
       "packages/db/src/migrations/0072_reports_pdf_exports.sql",
       "packages/db/src/migrations/0073_security_definer_schema_resolution.sql",
-      "packages/db/src/migrations/0074_payment_sessions.sql"
+      "packages/db/src/migrations/0074_payment_sessions.sql",
+      "packages/db/src/migrations/0075_customer_self_deletion_extensions.sql"
     ]
   },
   "rootScripts": {

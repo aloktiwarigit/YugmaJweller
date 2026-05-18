@@ -78,7 +78,7 @@ export default function Profile(): React.ReactElement {
           <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
             <Pressable
               testID="profile-delete-button"
-              onPress={() => router.push('/profile/delete-account' as any)}
+              onPress={() => router.push('/profile/delete-account')}
               style={{
                 backgroundColor:   colors.white,
                 borderRadius:      radii.md,

@@ -57,7 +57,7 @@ export default function DeleteAccountScreen(): React.ReactElement {
         reasonText: reason === 'other' && reasonText.trim().length > 0 ? reasonText.trim() : undefined,
       });
       await signOut();
-      router.replace('/profile/delete-account-done' as any);
+      router.replace('/profile/delete-account-done');
     } catch (err) {
       setError(errorMessage(err));
       setSubmitting(false);
