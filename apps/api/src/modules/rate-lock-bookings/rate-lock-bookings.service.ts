@@ -176,6 +176,14 @@ export class RateLockBookingsService {
       },
     }).catch(() => undefined);
 
+    void auditLog(this.pool, {
+      action:      AuditAction.CUSTOMER_RATE_LOCK_CREATED,
+      subjectType: 'rate_lock_booking',
+      subjectId:   booking.id,
+      actorUserId: dto.customerId,
+      after:       { shopId: ctx.shopId, lockedRatePaise: locked24k.toString() },
+    }).catch(() => undefined);
+
     return {
       bookingId:                 booking.id,
       razorpayOrderId:           order.orderId,

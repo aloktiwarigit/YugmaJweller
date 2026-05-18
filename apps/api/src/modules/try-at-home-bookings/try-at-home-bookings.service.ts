@@ -116,6 +116,14 @@ export class TryAtHomeBookingsService {
       after:       { customerId: dto.customerId, productCount: dto.productIds.length },
     }).catch(() => undefined);
 
+    void auditLog(this.pool, {
+      action:      AuditAction.CUSTOMER_TRY_AT_HOME_REQUESTED,
+      subjectType: 'try_at_home_booking',
+      subjectId:   row.id,
+      actorUserId: dto.customerId,
+      after:       { shopId: ctx.shopId, productIds: dto.productIds },
+    }).catch(() => undefined);
+
     return rowToResponse(row);
   }
 

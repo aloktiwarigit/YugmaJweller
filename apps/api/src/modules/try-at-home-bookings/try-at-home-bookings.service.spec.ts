@@ -28,10 +28,12 @@ vi.mock('@goldsmith/audit', () => ({
     TRY_AT_HOME_BOOKING_CREATED:          'TRY_AT_HOME_BOOKING_CREATED',
     TRY_AT_HOME_BOOKING_DISPATCHED:       'TRY_AT_HOME_BOOKING_DISPATCHED',
     TRY_AT_HOME_BOOKING_RETURN_RECORDED:  'TRY_AT_HOME_BOOKING_RETURN_RECORDED',
+    CUSTOMER_TRY_AT_HOME_REQUESTED:       'CUSTOMER_TRY_AT_HOME_REQUESTED',
   },
 }));
 
 import { withShopTx } from '@goldsmith/db';
+import { auditLog } from '@goldsmith/audit';
 import { TryAtHomeBookingsService } from './try-at-home-bookings.service';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -152,6 +154,24 @@ describe('TryAtHomeBookingsService.createBooking — piece count limit', () => {
     const svc = buildSvc();
     await expect(svc.createBooking({ customerId: CUSTOMER, productIds: [] }))
       .rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('emits CUSTOMER_TRY_AT_HOME_REQUESTED audit event with customer as actor and no PII', async () => {
+    const svc = buildSvc({ settings: fakeSettings({ enabled: true, maxPieces: 3 }) });
+    await svc.createBooking({ customerId: CUSTOMER, productIds: [PROD_A] });
+
+    const calls = vi.mocked(auditLog).mock.calls;
+    const customerCall = calls.find((c) => (c[1] as { action: string }).action === 'CUSTOMER_TRY_AT_HOME_REQUESTED');
+    expect(customerCall).toBeDefined();
+    expect(customerCall![1]).toMatchObject({
+      action:      'CUSTOMER_TRY_AT_HOME_REQUESTED',
+      subjectType: 'try_at_home_booking',
+      actorUserId: CUSTOMER,
+    });
+    const after = (customerCall![1] as { after?: Record<string, unknown> }).after ?? {};
+    expect(after).not.toHaveProperty('phone');
+    expect(after).not.toHaveProperty('pan');
+    expect(after).not.toHaveProperty('customerId');
   });
 });
 

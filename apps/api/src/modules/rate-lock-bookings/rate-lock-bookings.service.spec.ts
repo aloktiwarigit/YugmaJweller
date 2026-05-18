@@ -17,10 +17,11 @@ vi.mock('@goldsmith/tenant-context', () => ({
 vi.mock('@goldsmith/audit', () => ({
   auditLog: vi.fn(async () => undefined),
   AuditAction: {
-    RATE_LOCK_BOOKING_CREATED: 'RATE_LOCK_BOOKING_CREATED',
-    RATE_LOCK_ACTIVATED: 'RATE_LOCK_ACTIVATED',
-    RATE_LOCK_USED: 'RATE_LOCK_USED',
-    RATE_LOCK_EXPIRY_SWEEP: 'RATE_LOCK_EXPIRY_SWEEP',
+    RATE_LOCK_BOOKING_CREATED:   'RATE_LOCK_BOOKING_CREATED',
+    RATE_LOCK_ACTIVATED:         'RATE_LOCK_ACTIVATED',
+    RATE_LOCK_USED:              'RATE_LOCK_USED',
+    RATE_LOCK_EXPIRY_SWEEP:      'RATE_LOCK_EXPIRY_SWEEP',
+    CUSTOMER_RATE_LOCK_CREATED:  'CUSTOMER_RATE_LOCK_CREATED',
   },
 }));
 
@@ -39,6 +40,7 @@ vi.mock('@goldsmith/db', () => ({
 }));
 
 import { withShopTx } from '@goldsmith/db';
+import { auditLog } from '@goldsmith/audit';
 import { RateLockBookingsService } from './rate-lock-bookings.service';
 
 function makePool(opts: {
@@ -135,6 +137,28 @@ describe('RateLockBookingsService', () => {
           notes: expect.objectContaining({ customerId: CUSTOMER, type: 'rate_lock_deposit' }),
         }),
       );
+    });
+
+    it('emits CUSTOMER_RATE_LOCK_CREATED audit event with customer as actor and no PII', async () => {
+      const { svc } = makeSvc();
+      await svc.createBooking({ customerId: CUSTOMER, depositAmountPaise: 50_000n });
+
+      expect(auditLog).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          action:      'CUSTOMER_RATE_LOCK_CREATED',
+          subjectType: 'rate_lock_booking',
+          subjectId:   BOOKING,
+          actorUserId: CUSTOMER,
+        }),
+      );
+      const calls = vi.mocked(auditLog).mock.calls;
+      const customerCall = calls.find((c) => (c[1] as { action: string }).action === 'CUSTOMER_RATE_LOCK_CREATED');
+      expect(customerCall).toBeDefined();
+      const after = (customerCall![1] as { after?: Record<string, unknown> }).after ?? {};
+      expect(after).not.toHaveProperty('phone');
+      expect(after).not.toHaveProperty('pan');
+      expect(after).not.toHaveProperty('depositAmountPaise');
     });
 
     it('409 when ACTIVE lock already exists for customer+shop', async () => {
