@@ -52,9 +52,11 @@ export function captureEvent(
 /**
  * Identify the current user after sign-in.
  * Uses hashed phone (first 12 hex of SHA-256) as distinct_id — never raw phone.
+ * @param phoneE164 - raw phone; hashed before being sent to PostHog
+ * @param shopSlug  - tenant shop identifier sent as a PostHog property (NOT a TenantContext param)
  */
-export async function identifyPostHog(phoneE164: string, shopId: string): Promise<void> {
+export async function identifyPostHog(phoneE164: string, shopSlug: string): Promise<void> {
   if (!_client) return;
   const distinctId = await hashPhone(phoneE164);
-  _client.identify(distinctId, { shopId });
+  _client.identify(distinctId, { shopId: shopSlug });
 }
