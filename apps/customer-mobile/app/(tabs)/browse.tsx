@@ -195,7 +195,7 @@ export default function Browse(): React.ReactElement {
   const primaryColor = branding?.primaryColor ?? colors.primary;
   const primaryWash  = primaryColor + '20';
 
-  const routeParams = useLocalSearchParams<BrowseRouteParams>();
+  const routeParams = useLocalSearchParams() as BrowseRouteParams;
   const routeState = useMemo(() => routeStateFromParams(routeParams), [routeParams]);
   const lastAppliedRouteSignature = useRef(routeState.signature);
 
