@@ -1,4 +1,1 @@
-afca74a485903b3e72725f1e00035c57f01308f7 2026-05-17T21:48:31-04:00
-Story 19.7 Customer-Self DPDPA Right to Erasure (Class A).
-Codex full-delivery review converged across 4 rounds (4 + 4 + 3 + 1 in-scope findings, all addressed inline). Two round-4 findings on packages/integrations/rates/ acknowledged as pre-existing main-branch issues, out of Story 19.7 scope.
-Plan-Codex (pre-execution) also clean across 4 rounds.
+{"timestamp":"2026-05-18T02:36:55-04:00","commit":"942fafc86d385c43a525347ee7896a199f7dfa40","reviewer":"codex","model":"gpt-5.5","verdict":"clean"}

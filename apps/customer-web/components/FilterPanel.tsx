@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   PRICE_BANDS,
   CATALOG_STYLES,
   CATALOG_OCCASIONS,
+  CATALOG_GIFT_PERSONAS,
   buildProductsHref,
   type CatalogSort,
 } from '@goldsmith/customer-shared';
@@ -45,6 +46,15 @@ export const OCCASION_LABELS_HI: Record<string, string> = {
   OFFICE:      'ऑफिस',        PARTY:      'पार्टी',
 };
 
+export const GIFT_PERSONA_LABELS_HI: Record<string, string> = {
+  MOTHER: 'माँ',
+  SISTER: 'बहन',
+  WIFE:   'पत्नी',
+  BRIDE:  'दुल्हन',
+  SELF:   'खुद के लिए',
+  FRIEND: 'दोस्त',
+};
+
 export const SORT_OPTIONS: { value: CatalogSort; labelHi: string }[] = [
   { value: 'newest',     labelHi: 'नवीनतम' },
   { value: 'priceAsc',   labelHi: 'मूल्य: कम से अधिक' },
@@ -63,6 +73,7 @@ export interface ActiveFilters {
   inStockOnly?: boolean;
   style?:       string;
   occasion?:    string;
+  giftPersona?: string;
   sort?:        CatalogSort;
   search?:      string;
 }
@@ -82,7 +93,8 @@ function useFilterNav(filters: ActiveFilters) {
     router.push(buildProductsHref({
       metal: next.metal, purity: next.purity, priceMin: next.priceMin,
       priceMax: next.priceMax, inStockOnly: next.inStockOnly, style: next.style,
-      occasion: next.occasion, sort: next.sort as CatalogSort | undefined, search: next.search,
+      occasion: next.occasion, giftPersona: next.giftPersona,
+      sort: next.sort as CatalogSort | undefined, search: next.search,
     }), { scroll: false });
   }, [filters, router]);
 }
@@ -160,7 +172,7 @@ function FilterSections({ filters, apply }: { filters: ActiveFilters; apply: (p:
         ))}
       </FilterSection>
 
-      <FilterSection title="मूल्य">
+      <FilterSection title="दाम">
         {PRICE_BANDS.map(band => {
           const active = filters.priceMin === band.min;
           return (
@@ -190,7 +202,15 @@ function FilterSections({ filters, apply }: { filters: ActiveFilters; apply: (p:
         ))}
       </FilterSection>
 
-      <FilterSection title="उपलब्धता">
+      <FilterSection title="उपहार किसके लिए">
+        {CATALOG_GIFT_PERSONAS.map(g => (
+          <CheckOpt key={g} value={g} labelHi={GIFT_PERSONA_LABELS_HI[g] ?? g}
+            checked={filters.giftPersona === g}
+            onChange={(v, on) => apply({ giftPersona: on ? v : '' })} />
+        ))}
+      </FilterSection>
+
+      <FilterSection title="मौजूद">
         <CheckOpt value="inStock" labelHi="उपलब्ध उत्पाद ही दिखाएं"
           checked={!!filters.inStockOnly}
           onChange={(_, on) => apply({ inStockOnly: on || undefined })} />
@@ -204,7 +224,7 @@ function FilterSections({ filters, apply }: { filters: ActiveFilters; apply: (p:
 export function FilterSidebar({ filters }: { filters: ActiveFilters }) {
   const router = useRouter();
   const apply = useFilterNav(filters);
-  const count = [filters.metal, filters.purity, filters.priceMin !== undefined, filters.inStockOnly, filters.style, filters.occasion].filter(Boolean).length;
+  const count = [filters.metal, filters.purity, filters.priceMin !== undefined, filters.inStockOnly, filters.style, filters.occasion, filters.giftPersona].filter(Boolean).length;
 
   const clearAll = () => router.push(buildProductsHref({ search: filters.search || undefined }), { scroll: false });
 
@@ -234,7 +254,7 @@ export function FilterControls({ filters, totalCount }: { filters: ActiveFilters
 
   const clearAll = () => router.push(buildProductsHref({ search: filters.search || undefined }), { scroll: false });
 
-  const count = [filters.metal, filters.purity, filters.priceMin !== undefined, filters.inStockOnly, filters.style, filters.occasion].filter(Boolean).length;
+  const count = [filters.metal, filters.purity, filters.priceMin !== undefined, filters.inStockOnly, filters.style, filters.occasion, filters.giftPersona].filter(Boolean).length;
 
   // Active chips
   const chips: { label: string; clear: Partial<ActiveFilters> }[] = [];
@@ -247,6 +267,7 @@ export function FilterControls({ filters, totalCount }: { filters: ActiveFilters
   if (filters.inStockOnly) chips.push({ label: 'उपलब्ध', clear: { inStockOnly: undefined } });
   if (filters.style)       chips.push({ label: STYLE_LABELS_HI[filters.style] ?? filters.style, clear: { style: '' } });
   if (filters.occasion)    chips.push({ label: OCCASION_LABELS_HI[filters.occasion] ?? filters.occasion, clear: { occasion: '' } });
+  if (filters.giftPersona) chips.push({ label: GIFT_PERSONA_LABELS_HI[filters.giftPersona] ?? filters.giftPersona, clear: { giftPersona: '' } });
 
   return (
     <>
