@@ -301,3 +301,72 @@ export async function fetchReturnPolicy(shopId: string): Promise<string | null> 
     return null;
   }
 }
+
+// ── Wishlist API — client-side only (requires Firebase ID token) ──────────────
+
+export interface WishlistItemResponse {
+  productId:    string;
+  sku:          string;
+  purity:       string;
+  metal:        string;
+  grossWeightG: string;
+  netWeightG:   string;
+  huid:         string | null;
+  addedAt:      string;
+}
+
+function authHeaders(idToken: string, shopId: string): Record<string, string> {
+  return {
+    'Authorization': `Bearer ${idToken}`,
+    'X-Tenant-Id':   shopId,
+  };
+}
+
+export async function getWishlist(idToken: string, shopId: string): Promise<WishlistItemResponse[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/wishlist`, {
+      headers: authHeaders(idToken, shopId),
+      cache: 'no-store',
+      ...withTimeout(),
+    });
+    if (!res.ok) return [];
+    return res.json() as Promise<WishlistItemResponse[]>;
+  } catch {
+    return [];
+  }
+}
+
+export async function addToWishlist(
+  productId: string,
+  idToken: string,
+  shopId: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/wishlist`, {
+      method:  'POST',
+      headers: { ...authHeaders(idToken, shopId), 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ productId }),
+      ...withTimeout(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function removeFromWishlist(
+  productId: string,
+  idToken: string,
+  shopId: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/wishlist/${productId}`, {
+      method:  'DELETE',
+      headers: authHeaders(idToken, shopId),
+      ...withTimeout(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
