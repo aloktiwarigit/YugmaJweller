@@ -12,6 +12,7 @@ import { TenantBrandHeader } from '../../src/components/TenantBrandHeader';
 import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import { getWishlist, removeFromWishlist } from '../../src/api/endpoints';
 import type { WishlistItem } from '../../src/api/endpoints';
+import { captureEvent } from '../../src/lib/posthog';
 
 export default function Wishlist(): React.ReactElement {
   const { customer } = useCustomerSession();
@@ -43,6 +44,7 @@ export default function Wishlist(): React.ReactElement {
     setRemoveError(null);
     try {
       await removeFromWishlist(productId);
+      captureEvent('wishlist_remove', { productId, shopId: customer.shopId });
       setItems((prev) => prev.filter((i) => i.productId !== productId));
     } catch {
       setRemoveError('उत्पाद हटाया नहीं जा सका। कृपया फिर कोशिश करें।');

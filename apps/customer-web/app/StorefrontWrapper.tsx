@@ -1,21 +1,37 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import StorefrontHeader from '@/components/StorefrontHeader';
 import { StorefrontFooter } from '@/components/StorefrontFooter';
 import { buildThemeStyle } from '@/lib/theme';
 import type { TenantConfigResponse } from '@/lib/api';
+import { initPostHog, posthog } from './lib/posthog';
 
 interface Props {
   config: TenantConfigResponse | null;
   children: ReactNode;
 }
 
-// Conditionally wraps children with the jeweller's storefront chrome (header + footer + theme).
-// Admin routes bypass the storefront wrapper entirely — they use the admin layout instead.
 export function StorefrontWrapper({ config, children }: Props) {
-  const pathname = usePathname();
+  const pathname       = usePathname();
+  const shopId         = config?.shopId ?? null;
+  const initCalledRef  = useRef(false);
+
+  // Initialise PostHog once per mount (client-side only).
+  useEffect(() => {
+    if (initCalledRef.current) return;
+    initCalledRef.current = true;
+    initPostHog();
+  }, []);
+
+  // Fire page_view on every pathname change.
+  useEffect(() => {
+    posthog.capture('page_view', {
+      path:   pathname,
+      shopId: shopId ?? undefined,
+    });
+  }, [pathname, shopId]);
 
   if (!config || pathname.startsWith('/admin')) {
     return <>{children}</>;

@@ -10,6 +10,7 @@ import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import { getPublicRates, createCustomerRateLockBooking, getRateLockPaymentToken } from '../../src/api/endpoints';
 import type { RateLockBookingResult } from '../../src/api/endpoints';
 import { useTenantStore } from '../../src/stores/tenantStore';
+import { captureEvent } from '../../src/lib/posthog';
 
 function ConfirmationCard({
   booking,
@@ -136,7 +137,10 @@ export default function RateLockScreen(): React.ReactElement {
 
   const { mutate: lockRate, isPending, isError, error } = useMutation({
     mutationFn: (depositAmountPaise: string) => createCustomerRateLockBooking(depositAmountPaise),
-    onSuccess:  (result) => { setBooking(result); },
+    onSuccess:  (result) => {
+      captureEvent('booking_create', { bookingType: 'rate_lock', shopId: customer?.shopId });
+      setBooking(result);
+    },
   });
 
   const apiError = isError
