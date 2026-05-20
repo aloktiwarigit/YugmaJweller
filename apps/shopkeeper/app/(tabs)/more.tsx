@@ -19,6 +19,7 @@ const ROWS: MenuRow[] = [
   { label: 'ग्राहक सूची',   icon: 'people-outline',      href: '/customers',     managerOnly: true },
   { label: 'कस्टम ऑर्डर',  icon: 'construct-outline',   href: '/custom-orders', managerOnly: true },
   { label: 'ट्राई-एट-होम', icon: 'home-outline',         href: '/try-at-home',   managerOnly: true },
+  { label: 'समीक्षाएँ',    icon: 'star-outline',          href: '/reviews',       managerOnly: true },
   { label: 'दर-लॉक बुकिंग', icon: 'lock-closed-outline', href: '/rate-lock',     managerOnly: true },
   { label: 'सेटिंग्स',      icon: 'settings-outline',    href: '/settings',      managerOnly: true },
 ];

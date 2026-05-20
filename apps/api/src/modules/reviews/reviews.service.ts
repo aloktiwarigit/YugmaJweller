@@ -1,9 +1,23 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import { withShopTx } from '@goldsmith/db';
 import { ReviewsRepository } from './reviews.repository';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export interface ModerationReviewItem {
+  id:                  string;
+  productId:           string;
+  productName:         string | null;
+  customerId:          string | null;
+  customerFirstName:   string | null;
+  rating:              number;
+  reviewText:          string | null;
+  isPubliclyVisible:   boolean;
+  createdAt:           string;
+}
 
 export interface CreateReviewDto {
   productId:   string;
@@ -101,5 +115,36 @@ export class ReviewsService {
       averageRating,
       total,
     };
+  }
+
+  async listModerationReviews(): Promise<ModerationReviewItem[]> {
+    const { shopId } = tenantContext.requireCurrent();
+    const rows = await this.repo.listAllForShop(shopId);
+    return rows.map((r) => ({
+      id:                r.id,
+      productId:         r.product_id,
+      productName:       r.product_name,
+      customerId:        r.customer_id,
+      customerFirstName: r.customer_first_name,
+      rating:            r.rating,
+      reviewText:        r.review_text,
+      isPubliclyVisible: r.is_publicly_visible,
+      createdAt:         r.created_at.toISOString(),
+    }));
+  }
+
+  async setReviewVisibility(reviewId: string, visible: boolean): Promise<void> {
+    if (!UUID_RE.test(reviewId)) {
+      throw new BadRequestException({ code: 'review.invalid_id' });
+    }
+    const { shopId, userId } = tenantContext.requireCurrent();
+    await this.repo.setVisibility(shopId, reviewId, visible);
+    void auditLog(this.pool, {
+      action:      AuditAction.REVIEW_MODERATED,
+      subjectType: 'review',
+      subjectId:   reviewId,
+      actorUserId: userId,
+      after:       { visible },
+    }).catch(() => undefined);
   }
 }
