@@ -167,8 +167,14 @@ try {
             Remove-Item -LiteralPath $WorkspacePath -Recurse -Force
         }
         New-Item -ItemType Directory -Path $WorkspacePath -Force | Out-Null
-        & xcopy /E /I /Q /Y "$repoRoot" "$WorkspacePath" | Out-Null
-        Write-Ok "Copied"
+
+        # robocopy is more reliable than xcopy for deep trees with space-containing paths.
+        # /XD excludes directories by name (not path substring), avoiding MAX_PATH on
+        # .claude/worktrees/* and node_modules/.pnpm/...long-hash...
+        robocopy "$repoRoot" "$WorkspacePath" /E /XD ".claude" "node_modules" ".git" ".gradle" "build" ".turbo" /NFL /NDL /NJH /NJS | Out-Null
+        # robocopy exits 1 for "files copied, no errors" — treat ≤7 as success
+        if ($LASTEXITCODE -ge 8) { Fail "robocopy failed (exit $LASTEXITCODE)" }
+        Write-Ok "Copied (node_modules and build dirs excluded)"
 
         $npmrc = Join-Path $WorkspacePath ".npmrc"
         if (-not (Get-Content -LiteralPath $npmrc -ErrorAction SilentlyContinue | Select-String "public-hoist-pattern")) {
@@ -179,8 +185,9 @@ try {
         Write-Step "Installing dependencies in $WorkspacePath"
         Push-Location $WorkspacePath
         try {
-            pnpm install --frozen-lockfile 2>&1 | Select-Object -Last 5 | ForEach-Object { Write-Host "  $_" }
-            if ($LASTEXITCODE -ne 0) { Fail "pnpm install failed" }
+            # Run pnpm via cmd to avoid PowerShell 5.1 treating stderr as ErrorRecord
+            cmd /c "pnpm install --frozen-lockfile"
+            if ($LASTEXITCODE -ne 0) { Fail "pnpm install failed (exit $LASTEXITCODE)" }
         } finally {
             Pop-Location
         }
