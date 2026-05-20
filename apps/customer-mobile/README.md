@@ -25,20 +25,23 @@ pnpm --filter @goldsmith/customer-mobile start
 
 | Var | Required | Purpose |
 |---|---|---|
+| `BUILD_TARGET_PLATFORM` | local validation | Set to `android` for Play internal testing or `ios` for the deferred App Store path |
 | `EXPO_PUBLIC_API_BASE_URL` | **required** | Public HTTPS API origin (e.g. `https://api.your-shop.com`) |
 | `EXPO_PUBLIC_SHOP_SLUG` | **required** | Tenant slug matching the shop's `slug` column |
 | `EXPO_PUBLIC_ANDROID_PACKAGE` | **required** | Android package name (e.g. `com.your-shop.customer`) — must not end in `.dev` |
 | `EXPO_PUBLIC_IOS_BUNDLE_ID` | **required** | iOS bundle ID (e.g. `com.your-shop.customer`) — must not end in `.dev` |
 | `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | **required** | Firebase project ID for phone OTP |
 | `EXPO_PUBLIC_EAS_PROJECT_ID` | **required** | EAS project UUID for OTA updates |
-| `GOOGLE_SERVICES_JSON` | **required** (Android) | Path to `google-services.json` EAS secret |
-| `GOOGLE_SERVICES_PLIST` | **required** (iOS) | Path to `GoogleService-Info.plist` EAS secret |
+| `GOOGLE_SERVICES_JSON` | **required** (Android build worker) | EAS production file variable for `google-services.json` |
+| `GOOGLE_SERVICES_PLIST` | **required** (iOS build worker) | EAS production file variable for `GoogleService-Info.plist` |
 | `EXPO_PUBLIC_DEV_AUTH` | must be unset | Setting this to `1` in a production build throws at config time |
 
-Production config evaluation fails fast when `GOOGLE_SERVICES_JSON` or
-`GOOGLE_SERVICES_PLIST` are missing, when either service file path points to a
-`.dev` placeholder, when `EXPO_PUBLIC_API_BASE_URL` is not `https://`, or when
-the API origin points to localhost.
+Production config evaluation fails fast when required tenant values are missing
+or still contain placeholders, when bundle IDs are malformed or end in `.dev`,
+when Firebase service file paths point to `.dev` placeholders, when
+`EXPO_PUBLIC_API_BASE_URL` is not `https://`, or when the API origin points to
+localhost. Firebase service file variables are required on EAS build workers;
+local config resolution may omit them when they are stored as EAS file variables.
 
 ### API env vars (affects payment handoff)
 

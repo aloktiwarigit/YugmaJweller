@@ -67,8 +67,8 @@ describe('ReviewSubmitForm — PostHog event', () => {
 
   it('fires review_submit with productId + rating, no PII, on mutation success', () => {
     // Simulate immediate onSuccess when mutate is called
-    vi.mocked(useMutation).mockImplementation((opts: { onSuccess?: (data: unknown) => void }) => ({
-      mutate: vi.fn(() => { opts.onSuccess?.({ id: 'review-1' }); }),
+    vi.mocked(useMutation).mockImplementation((opts) => ({
+      mutate: vi.fn(() => { opts.onSuccess?.({ id: 'review-1' }, undefined, undefined, {} as never); }),
       isPending: false,
       isError: false,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -6,6 +6,9 @@ import type { ExpoConfig } from 'expo/config';
 const appRoot = resolve(__dirname, '..');
 const productionEnvKeys = [
   'APP_ENV',
+  'BUILD_TARGET_PLATFORM',
+  'EAS_BUILD_PLATFORM',
+  'EAS_BUILD',
   'EXPO_PUBLIC_ANDROID_PACKAGE',
   'EXPO_PUBLIC_IOS_BUNDLE_ID',
   'EXPO_PUBLIC_APP_NAME',
@@ -99,8 +102,27 @@ describe('Android Expo SDK config', () => {
     expect(plugin).toContain("paths: [require.resolve('react-native/package.json')]");
   });
 
-  it('fails production config when Firebase service files are missing', async () => {
+  it('keeps the EAS Android production profile Play-internal ready', () => {
+    const eas = JSON.parse(readFileSync(resolve(appRoot, 'eas.json'), 'utf8')) as {
+      build: Record<string, unknown>;
+    };
+    const production = eas.build.production as {
+      autoIncrement?: boolean;
+      environment?: string;
+      android?: { buildType?: string };
+      env?: Record<string, string>;
+    };
+
+    expect(production.environment).toBe('production');
+    expect(production.autoIncrement).toBe(true);
+    expect(production.android?.buildType).toBe('app-bundle');
+    expect(production.env?.BUILD_TARGET_PLATFORM).toBe('android');
+    expect(JSON.stringify(production)).not.toContain('REPLACE_WITH_');
+  });
+
+  it('fails production config on EAS build workers when Firebase service files are missing', async () => {
     stubProductionEnv({
+      EAS_BUILD: 'true',
       GOOGLE_SERVICES_JSON: undefined,
       GOOGLE_SERVICES_PLIST: undefined,
     });
@@ -126,10 +148,36 @@ describe('Android Expo SDK config', () => {
     await expect(loadAppConfig()).rejects.toThrow(/must use https:\/\//);
   });
 
+  it('rejects production placeholder values', async () => {
+    stubProductionEnv({ EXPO_PUBLIC_SHOP_SLUG: 'REPLACE_WITH_TENANT_SLUG' });
+
+    await expect(loadAppConfig()).rejects.toThrow(/placeholder env vars/);
+    await expect(loadAppConfig()).rejects.toThrow(/EXPO_PUBLIC_SHOP_SLUG/);
+  });
+
+  it('rejects malformed Android package names in production', async () => {
+    stubProductionEnv({ EXPO_PUBLIC_ANDROID_PACKAGE: 'not_a_package' });
+
+    await expect(loadAppConfig()).rejects.toThrow(/EXPO_PUBLIC_ANDROID_PACKAGE/);
+    await expect(loadAppConfig()).rejects.toThrow(/reverse-DNS/);
+  });
+
   it('rejects localhost API base URL in production', async () => {
     stubProductionEnv({ EXPO_PUBLIC_API_BASE_URL: 'https://localhost:3001' });
 
     await expect(loadAppConfig()).rejects.toThrow(/must not point to localhost/);
+  });
+
+  it('allows Android-only production config without an iOS Firebase plist', async () => {
+    stubProductionEnv({
+      BUILD_TARGET_PLATFORM: 'android',
+      GOOGLE_SERVICES_PLIST: undefined,
+    });
+
+    const config = await loadAppConfig();
+
+    expect(config.android?.package).toBe('com.goldsmith.customer');
+    expect(config.android?.googleServicesFile).toBe('./google-services.json');
   });
 
   it('accepts explicit production config with production service files', async () => {
@@ -142,6 +190,16 @@ describe('Android Expo SDK config', () => {
     expect(config.icon).toBe('./assets/app/icon.png');
     expect(config.splash?.image).toBe('./assets/app/splash-icon.png');
     expect(config.android?.adaptiveIcon?.foregroundImage).toBe('./assets/app/adaptive-icon-foreground.png');
+    expect(config.plugins).toContainEqual([
+      'expo-build-properties',
+      {
+        android: {
+          buildToolsVersion: '35.0.0',
+          compileSdkVersion: 35,
+          targetSdkVersion: 35,
+        },
+      },
+    ]);
     expect(config.ios?.bundleIdentifier).toBe('com.goldsmith.customer');
     expect(config.ios?.googleServicesFile).toBe('./GoogleService-Info.plist');
     expect(config.extra?.apiBaseUrl).toBe('https://api.goldsmith.example.com');

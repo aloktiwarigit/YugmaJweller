@@ -12,6 +12,7 @@
     "test:integration": "turbo run test:integration",
     "test:tenant-isolation": "turbo run test:tenant-isolation",
     "build": "turbo run build",
+    "deploy:customer-release": "powershell -ExecutionPolicy Bypass -File scripts/deploy-customer-release.ps1",
     "db:reset": "bash scripts/db-reset.sh",
     "db:generate-rls": "tsx packages/db/src/codegen/generate-rls.ts",
     "db:assert-marked": "tsx packages/db/src/codegen/assert-all-tables-marked.ts",

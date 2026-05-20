@@ -46,7 +46,13 @@ export function captureEvent(
   event: string,
   properties?: Record<string, string | number | boolean | undefined>,
 ): void {
-  _client?.capture(event, properties);
+  const cleanProperties: Record<string, string | number | boolean> | undefined = properties
+    ? Object.entries(properties).reduce<Record<string, string | number | boolean>>((acc, [key, value]) => {
+        if (value !== undefined) acc[key] = value;
+        return acc;
+      }, {})
+    : undefined;
+  _client?.capture(event, cleanProperties);
 }
 
 /**

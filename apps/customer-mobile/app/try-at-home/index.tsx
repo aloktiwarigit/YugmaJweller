@@ -122,7 +122,7 @@ export default function TryAtHomeScreen(): React.ReactElement {
   const branding     = useTenantStore((s) => s.tenant?.branding);
   const primaryColor = branding?.primaryColor ?? colors.primary;
 
-  const { isAuthenticated } = useCustomerSession();
+  const { customer, isAuthenticated } = useCustomerSession();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [booking, setBooking]   = useState<TryAtHomeBookingResponse | null>(null);
   const maxPieces = MAX_PIECES_FALLBACK;

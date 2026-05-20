@@ -11,10 +11,44 @@ const appName = process.env['EXPO_PUBLIC_APP_NAME'] ?? 'श्री राम �
 
 const isProduction = process.env['APP_ENV'] === 'production';
 const devAuth      = process.env['EXPO_PUBLIC_DEV_AUTH'] === '1';
+const isEasBuildWorker = process.env['EAS_BUILD'] === 'true';
+const buildTargetPlatform =
+  process.env['BUILD_TARGET_PLATFORM'] ?? process.env['EAS_BUILD_PLATFORM'];
+const requireAndroidProductionConfig = isProduction && buildTargetPlatform !== 'ios';
+const requireIosProductionConfig     = isProduction && buildTargetPlatform !== 'android';
+const androidGoogleServicesFile =
+  process.env['GOOGLE_SERVICES_JSON'] ?? (isProduction ? './google-services.json' : './google-services.json.dev');
+const iosGoogleServicesFile =
+  process.env['GOOGLE_SERVICES_PLIST'] ?? (isProduction ? './GoogleService-Info.plist' : './GoogleService-Info.plist.dev');
 
 function serviceFilePointsToDevPlaceholder(path: string): boolean {
   const filename = path.replace(/\\/g, '/').split('/').pop() ?? path;
   return filename.endsWith('.dev') || filename.includes('.dev.');
+}
+
+function valueLooksLikePlaceholder(value: string): boolean {
+  return value.includes('REPLACE_WITH_') || value.startsWith('SET-');
+}
+
+function assertNoPlaceholderValues(entries: Array<[string, string | undefined]>): void {
+  const placeholders = entries
+    .filter(([, value]) => value && valueLooksLikePlaceholder(value))
+    .map(([key]) => key);
+
+  if (placeholders.length > 0) {
+    throw new Error(
+      `[app.config.ts] Production build contains placeholder env vars:\n  ${placeholders.join('\n  ')}\n` +
+      'Replace these values before building for Play/App Store.',
+    );
+  }
+}
+
+function assertBundleIdentifier(value: string, key: string): void {
+  if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}$/i.test(value)) {
+    throw new Error(
+      `[app.config.ts] ${key} must be a valid reverse-DNS identifier with at least three segments. Got: "${value}".`,
+    );
+  }
 }
 
 function assertProductionApiBaseUrl(value: string): void {
@@ -50,16 +84,24 @@ if (isProduction) {
   // Hard-fail on missing critical production config so a misconfigured build
   // is caught at build time, not discovered after submission.
   const required: Array<[string, string | undefined]> = [
-    ['EXPO_PUBLIC_ANDROID_PACKAGE',   process.env['EXPO_PUBLIC_ANDROID_PACKAGE']],
-    ['EXPO_PUBLIC_IOS_BUNDLE_ID',     process.env['EXPO_PUBLIC_IOS_BUNDLE_ID']],
     ['EXPO_PUBLIC_APP_NAME',          process.env['EXPO_PUBLIC_APP_NAME']],
     ['EXPO_PUBLIC_FIREBASE_PROJECT_ID', process.env['EXPO_PUBLIC_FIREBASE_PROJECT_ID']],
     ['EXPO_PUBLIC_EAS_PROJECT_ID',    process.env['EXPO_PUBLIC_EAS_PROJECT_ID']],
     ['EXPO_PUBLIC_API_BASE_URL',      process.env['EXPO_PUBLIC_API_BASE_URL']],
     ['EXPO_PUBLIC_SHOP_SLUG',         process.env['EXPO_PUBLIC_SHOP_SLUG']],
-    ['GOOGLE_SERVICES_JSON',          process.env['GOOGLE_SERVICES_JSON']],
-    ['GOOGLE_SERVICES_PLIST',         process.env['GOOGLE_SERVICES_PLIST']],
   ];
+  if (requireAndroidProductionConfig) {
+    required.push(
+      ['EXPO_PUBLIC_ANDROID_PACKAGE', process.env['EXPO_PUBLIC_ANDROID_PACKAGE']],
+    );
+    if (isEasBuildWorker) required.push(['GOOGLE_SERVICES_JSON', process.env['GOOGLE_SERVICES_JSON']]);
+  }
+  if (requireIosProductionConfig) {
+    required.push(
+      ['EXPO_PUBLIC_IOS_BUNDLE_ID', process.env['EXPO_PUBLIC_IOS_BUNDLE_ID']],
+    );
+    if (isEasBuildWorker) required.push(['GOOGLE_SERVICES_PLIST', process.env['GOOGLE_SERVICES_PLIST']]);
+  }
   const missing = required.filter(([, v]) => !v).map(([k]) => k);
   if (missing.length > 0) {
     throw new Error(
@@ -67,6 +109,7 @@ if (isProduction) {
       'Set these in your EAS secret / CI environment before building.',
     );
   }
+  assertNoPlaceholderValues(required);
   if (devAuth) {
     throw new Error(
       '[app.config.ts] EXPO_PUBLIC_DEV_AUTH=1 must NOT be set in production builds.',
@@ -74,17 +117,27 @@ if (isProduction) {
   }
   const pkg = process.env['EXPO_PUBLIC_ANDROID_PACKAGE'] ?? '';
   const bid = process.env['EXPO_PUBLIC_IOS_BUNDLE_ID'] ?? '';
-  if (pkg.endsWith('.dev') || bid.endsWith('.dev')) {
+  if (
+    (requireAndroidProductionConfig && pkg.endsWith('.dev')) ||
+    (requireIosProductionConfig && bid.endsWith('.dev'))
+  ) {
     throw new Error(
       '[app.config.ts] Production bundle identifiers must not end with .dev — update EXPO_PUBLIC_ANDROID_PACKAGE / EXPO_PUBLIC_IOS_BUNDLE_ID.',
     );
   }
+  if (requireAndroidProductionConfig) assertBundleIdentifier(pkg, 'EXPO_PUBLIC_ANDROID_PACKAGE');
+  if (requireIosProductionConfig) assertBundleIdentifier(bid, 'EXPO_PUBLIC_IOS_BUNDLE_ID');
   assertProductionApiBaseUrl(process.env['EXPO_PUBLIC_API_BASE_URL'] ?? '');
 
   const devServiceFiles = [
-    ['GOOGLE_SERVICES_JSON', process.env['GOOGLE_SERVICES_JSON'] ?? ''],
-    ['GOOGLE_SERVICES_PLIST', process.env['GOOGLE_SERVICES_PLIST'] ?? ''],
+    ...(requireAndroidProductionConfig
+      ? [['GOOGLE_SERVICES_JSON', process.env['GOOGLE_SERVICES_JSON'] ?? ''] as const]
+      : []),
+    ...(requireIosProductionConfig
+      ? [['GOOGLE_SERVICES_PLIST', process.env['GOOGLE_SERVICES_PLIST'] ?? ''] as const]
+      : []),
   ]
+    .filter(([, value]) => value.length > 0)
     .filter(([, value]) => serviceFilePointsToDevPlaceholder(value))
     .map(([key]) => key);
   if (devServiceFiles.length > 0) {
@@ -106,10 +159,11 @@ if (!easProjectId && !isProduction) {
 // .ts sibling that fails to resolve in clean Expo config evaluations, and
 // (b) fired on the `preview` EAS profile (which uses .dev bundle IDs by
 // design). The production-only guards in the `if (isProduction)` block above
-// (lines 47–93) already enforce HTTPS-only API URL, no .dev bundle IDs, no
-// dev Firebase service files, and no devAuth=1 — gated on APP_ENV=production,
-// which is the correct trigger for store builds. The `preview` profile is
-// intentionally free of these guards.
+// enforce required tenant values, no placeholders, HTTPS-only API URL,
+// reverse-DNS bundle IDs, no .dev bundle IDs, no dev Firebase service files,
+// and no devAuth=1. They are gated on APP_ENV=production, which is the correct
+// trigger for store builds. The `preview` profile is intentionally free of
+// these guards.
 
 const config: ExpoConfig = {
   name: appName,
@@ -135,6 +189,16 @@ const config: ExpoConfig = {
     'expo-font',
     'expo-router',
     'expo-secure-store',
+    [
+      'expo-build-properties',
+      {
+        android: {
+          buildToolsVersion: '35.0.0',
+          compileSdkVersion: 35,
+          targetSdkVersion: 35,
+        },
+      },
+    ],
     './plugins/with-pnpm-gradle-plugin-paths',
     // NOTE: @sentry/react-native/expo plugin is NOT used here. The installed
     // SDK 5.14 does not export an Expo config plugin entry — that path was
@@ -149,7 +213,7 @@ const config: ExpoConfig = {
   // White-label: package / bundleIdentifier MUST differ per tenant build.
   android: {
     package: process.env['EXPO_PUBLIC_ANDROID_PACKAGE'] ?? 'com.goldsmith.customer.dev',
-    googleServicesFile: process.env['GOOGLE_SERVICES_JSON'] ?? './google-services.json.dev',
+    googleServicesFile: androidGoogleServicesFile,
     adaptiveIcon: {
       foregroundImage: './assets/app/adaptive-icon-foreground.png',
       backgroundImage: './assets/app/adaptive-icon-background.png',
@@ -159,7 +223,7 @@ const config: ExpoConfig = {
   ios: {
     bundleIdentifier: process.env['EXPO_PUBLIC_IOS_BUNDLE_ID'] ?? 'com.goldsmith.customer.dev',
     supportsTablet: false,
-    googleServicesFile: process.env['GOOGLE_SERVICES_PLIST'] ?? './GoogleService-Info.plist.dev',
+    googleServicesFile: iosGoogleServicesFile,
   },
   extra: {
     apiBaseUrl:        process.env['EXPO_PUBLIC_API_BASE_URL'] ?? 'http://10.0.2.2:3001',

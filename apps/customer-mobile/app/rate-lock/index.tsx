@@ -124,7 +124,7 @@ export default function RateLockScreen(): React.ReactElement {
   const branding     = useTenantStore((s) => s.tenant?.branding);
   const primaryColor = branding?.primaryColor ?? colors.primary;
 
-  const { isAuthenticated } = useCustomerSession();
+  const { customer, isAuthenticated } = useCustomerSession();
   const [depositRupees, setDepositRupees] = useState('');
   const [fieldError, setFieldError]       = useState<string | null>(null);
   const [booking, setBooking]             = useState<RateLockBookingResult | null>(null);

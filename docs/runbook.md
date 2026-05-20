@@ -958,24 +958,29 @@ The Goldsmith platform brand MUST NOT appear on any customer-facing surface. The
 
 - [ ] EAS account created: `eas login`
 - [ ] EAS project initialised for this tenant: `eas project:init` (run from `apps/customer-mobile`)
-- [ ] EAS project ID written into `app.config.ts` `extra.eas.projectId`
-- [ ] Tenant values populated in `apps/customer-mobile/eas.json` production profile (all `REPLACE_WITH_*` placeholders replaced)
+- [ ] EAS project ID stored as `EXPO_PUBLIC_EAS_PROJECT_ID` in the EAS `production` environment
+- [ ] Tenant values populated in the EAS `production` environment or local `apps/customer-mobile/.env.production` (never committed)
 - [ ] Android keystore generated and uploaded to EAS Vault: `eas credentials --platform android`
-- [ ] `google-services.json` for the tenant's Firebase project placed at `apps/customer-mobile/google-services.json` (gitignored)
+- [ ] `GOOGLE_SERVICES_JSON` configured as an EAS production file variable for the tenant Firebase Android client config
+- [ ] Android target SDK is 35 or higher (`expo-build-properties` in `app.config.ts`)
 - [ ] `EXPO_PUBLIC_API_BASE_URL` starts with `https://` — build fails if not
 - [ ] `EXPO_PUBLIC_ANDROID_PACKAGE` does NOT end with `.dev` — build fails if not
-- [ ] iOS: deferred until Apple Developer Program membership confirmed — see §17.7
+- [ ] iOS: deferred until Apple Developer Program membership confirmed — use the `production-ios` profile when unblocked
 
 ### 20.3 Env-var matrix
 
 | Variable | Purpose | Where to source |
 |---|---|---|
+| `BUILD_TARGET_PLATFORM` | Local production config validation target | `android` for Play internal testing |
 | `EXPO_PUBLIC_API_BASE_URL` | Production API base URL | Azure Container Apps FQDN after deploy |
 | `EXPO_PUBLIC_SHOP_SLUG` | Tenant slug for `/tenant/boot` | `shops.slug` column in production DB |
 | `EXPO_PUBLIC_APP_NAME` | App display name (Hindi) | Tenant branding brief |
 | `EXPO_PUBLIC_ANDROID_PACKAGE` | Play Store package name | Convention: `com.<tenant>.customer` |
 | `EXPO_PUBLIC_IOS_BUNDLE_ID` | App Store bundle ID | Convention: `com.<tenant>.customer` |
 | `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | Firebase project ID | Firebase Console → Project settings |
+| `EXPO_PUBLIC_EAS_PROJECT_ID` | EAS project UUID | `eas project:init` output / Expo dashboard |
+| `GOOGLE_SERVICES_JSON` | Android Firebase client config | EAS production file variable |
+| `GOOGLE_SERVICES_PLIST` | iOS Firebase client config | EAS production file variable; deferred for Android-only Play internal |
 | `EXPO_PUBLIC_DEV_AUTH` | Dev bypass flag | MUST be `0` in production |
 
 See `apps/customer-mobile/.env.production.example` for comments on each variable.
@@ -992,12 +997,14 @@ eas whoami
 # 2. Upload keystore if not already in EAS Vault
 eas credentials --platform android
 
-# 3. Push production secrets to EAS (env vars the build needs)
-eas secret:push --scope project --env-file .env.production
-#    .env.production is gitignored; populate from .env.production.example
+# 3. Create or update the EAS production environment.
+#    Push string values, then upload Firebase client config as a file variable.
+eas env:push --environment production --path .env.production
+eas env:create production --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json --visibility secret --force
 
-# 4. Trigger the production build (non-interactive for CI compatibility)
-eas build --profile production --platform android --non-interactive
+# 4. Validate config locally, then trigger the production AAB build.
+pnpm deploy:customer-release -- -Mode play-internal -SkipBuild
+pnpm deploy:customer-release -- -Mode play-internal
 
 # 5. Wait for build to complete; download the AAB
 eas build:list --status finished --limit 1
@@ -1006,15 +1013,19 @@ eas build:list --status finished --limit 1
 ### 20.5 Play Store submission (manual first time)
 
 1. Create the app listing in Google Play Console for this tenant.
-2. Download the AAB from EAS: `eas build:download --id <build-id>`.
-3. Upload the AAB to the Internal testing track via Play Console.
-4. Promote through Closed → Open → Production tracks after QA sign-off.
-5. For subsequent automated submissions: populate `eas.json` `submit.production.android.serviceAccountKeyPath` and run `eas submit --platform android --latest`.
+2. Complete app access, ads declaration, content rating, target audience, data safety, privacy policy URL, and account-deletion URL.
+3. Enable Play App Signing and confirm the package name matches `EXPO_PUBLIC_ANDROID_PACKAGE`.
+4. Create the Internal testing track, tester list, countries/regions, and release notes.
+5. Download the AAB from EAS: `eas build:download --id <build-id>`.
+6. Upload the AAB to the Internal testing track via Play Console and verify Play reports target SDK 35+.
+7. Run `docs/customer-mobile-internal-testing-manual-qa-checklist.md` on the Moto G and attach the completed checklist to the release record.
+8. Promote through Closed → Open → Production tracks after QA sign-off.
+9. For automated submissions: populate `eas.json` `submit.production.android.serviceAccountKeyPath` and run `pnpm deploy:customer-release -- -Mode play-internal -Submit`.
 
 ### 20.6 Version bump conventions
 
 - `version` in `apps/customer-mobile/package.json` follows SemVer (`MAJOR.MINOR.PATCH`).
-- `expo.android.versionCode` auto-increments via EAS (`autoIncrement: true` can be added to `eas.json` build profile).
+- Android `versionCode` auto-increments via EAS (`autoIncrement: true` in the production build profile).
 - Tag each production build in git: `git tag customer-mobile/v<version>-<tenant-slug>`.
 
 ### 20.7 iOS submission (deferred)
@@ -1023,8 +1034,9 @@ iOS requires an Apple Developer Program membership per tenant (or a shared platf
 
 1. Enroll the tenant (or platform) in Apple Developer Program.
 2. `eas credentials --platform ios` — EAS can generate certificates and provisioning profiles automatically.
-3. `eas build --profile production --platform ios --non-interactive`
-4. `eas submit --platform ios --latest`
+3. Populate iOS production values in the EAS `production` environment, including `EXPO_PUBLIC_IOS_BUNDLE_ID` and `GOOGLE_SERVICES_PLIST`.
+4. `eas build --profile production-ios --platform ios --non-interactive`
+5. `eas submit --platform ios --profile production-ios --latest`
 
 ### 20.8 Rollback
 
@@ -1043,7 +1055,7 @@ The CI `build-customer-mobile` job automatically verifies:
 - The config evaluates cleanly in dev mode (guards bypass).
 - The guards correctly reject an `http://` API URL and `.dev` bundle IDs.
 
-Unit tests in `apps/customer-mobile/test/build-validation.test.ts` cover all guard rules. Run locally: `pnpm --filter @goldsmith/customer-mobile test`.
+Unit tests in `apps/customer-mobile/test/android-config.test.ts` and `apps/customer-mobile/test/build-validation.test.ts` cover the config guard rules. Run locally: `pnpm --filter @goldsmith/customer-mobile test`.
 
 _Runbook entries must stay actionable. If a section becomes prose rather than steps, split it or move it to architecture.md._
 
