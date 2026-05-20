@@ -137,13 +137,15 @@ export class ReviewsService {
     if (!UUID_RE.test(reviewId)) {
       throw new BadRequestException({ code: 'review.invalid_id' });
     }
-    const { shopId, userId } = tenantContext.requireCurrent();
+    const ctx = tenantContext.requireCurrent();
+    const shopId = ctx.shopId;
+    const actorId = ctx.authenticated ? ctx.userId : 'system';
     await this.repo.setVisibility(shopId, reviewId, visible);
     void auditLog(this.pool, {
       action:      AuditAction.REVIEW_MODERATED,
       subjectType: 'review',
       subjectId:   reviewId,
-      actorUserId: userId,
+      actorUserId: actorId,
       after:       { visible },
     }).catch(() => undefined);
   }
