@@ -13,6 +13,19 @@ export interface ReviewRow {
   customer_first_name: string | null;
 }
 
+export interface ModerationReviewRow {
+  id:                  string;
+  shop_id:             string;
+  product_id:          string;
+  product_name:        string | null;
+  customer_id:         string | null;
+  customer_first_name: string | null;
+  rating:              number;
+  review_text:         string | null;
+  is_publicly_visible: boolean;
+  created_at:          Date;
+}
+
 @Injectable()
 export class ReviewsRepository {
   constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
@@ -35,6 +48,35 @@ export class ReviewsRepository {
         [params.shopId, params.productId, params.customerId, params.rating, params.reviewText ?? null],
       );
       return rows[0]!;
+    });
+  }
+
+  async listAllForShop(shopId: string): Promise<ModerationReviewRow[]> {
+    return withShopTx(this.pool, shopId, async (tx) => {
+      const { rows } = await tx.query<ModerationReviewRow>(
+        `SELECT pr.id, pr.shop_id, pr.product_id,
+                p.name AS product_name,
+                pr.customer_id, pr.rating, pr.review_text,
+                pr.is_publicly_visible, pr.created_at,
+                COALESCE(split_part(c.name, ' ', 1), 'एक ग्राहक') AS customer_first_name
+           FROM product_reviews pr
+           LEFT JOIN products p ON p.id = pr.product_id AND p.shop_id = pr.shop_id
+           LEFT JOIN customers c ON c.id = pr.customer_id AND c.shop_id = pr.shop_id
+          WHERE pr.shop_id = $1
+          ORDER BY pr.created_at DESC
+          LIMIT 100`,
+        [shopId],
+      );
+      return rows;
+    });
+  }
+
+  async setVisibility(shopId: string, reviewId: string, visible: boolean): Promise<void> {
+    await withShopTx(this.pool, shopId, async (tx) => {
+      await tx.query(
+        `UPDATE product_reviews SET is_publicly_visible = $1 WHERE id = $2 AND shop_id = $3`,
+        [visible, reviewId, shopId],
+      );
     });
   }
 

@@ -16,12 +16,15 @@ vi.mock('@goldsmith/audit', () => ({
   auditLog: vi.fn(async () => undefined),
   AuditAction: {
     CUSTOMER_REVIEW_SUBMIT: 'CUSTOMER_REVIEW_SUBMIT',
+    REVIEW_MODERATED: 'REVIEW_MODERATED',
   },
 }));
 
 const mockRepo = {
-  insert:        vi.fn(),
-  listByProduct: vi.fn(),
+  insert:          vi.fn(),
+  listByProduct:   vi.fn(),
+  listAllForShop:  vi.fn(),
+  setVisibility:   vi.fn(),
 };
 
 const mockPool = {
@@ -32,9 +35,12 @@ const SHOP_ID    = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const PRODUCT_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const CUSTOMER_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
+const USER_ID = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+const REVIEW_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(tenantContext.requireCurrent).mockReturnValue({ shopId: SHOP_ID } as never);
+  vi.mocked(tenantContext.requireCurrent).mockReturnValue({ shopId: SHOP_ID, userId: USER_ID } as never);
 });
 
 describe('ReviewsService', () => {
@@ -151,6 +157,102 @@ describe('ReviewsService', () => {
 
       expect(result.averageRating).toBeNull();
       expect(result.total).toBe(0);
+    });
+  });
+
+  describe('listModerationReviews', () => {
+    it('calls listAllForShop with the current shopId and maps rows correctly', async () => {
+      const mockRows = [
+        {
+          id: REVIEW_ID,
+          shop_id: SHOP_ID,
+          product_id: PRODUCT_ID,
+          product_name: 'Gold Ring',
+          customer_id: CUSTOMER_ID,
+          customer_first_name: 'Priya',
+          rating: 5,
+          review_text: 'बहुत अच्छा',
+          is_publicly_visible: true,
+          created_at: new Date('2026-05-01T00:00:00Z'),
+        },
+        {
+          id: 'fefefefe-fefe-fefe-fefe-fefefefefefe',
+          shop_id: SHOP_ID,
+          product_id: PRODUCT_ID,
+          product_name: null,
+          customer_id: null,
+          customer_first_name: 'एक ग्राहक',
+          rating: 3,
+          review_text: null,
+          is_publicly_visible: false,
+          created_at: new Date('2026-04-15T00:00:00Z'),
+        },
+      ];
+      mockRepo.listAllForShop.mockResolvedValueOnce(mockRows);
+
+      const result = await svc.listModerationReviews();
+
+      expect(mockRepo.listAllForShop).toHaveBeenCalledWith(SHOP_ID);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({
+        id: REVIEW_ID,
+        productId: PRODUCT_ID,
+        productName: 'Gold Ring',
+        customerId: CUSTOMER_ID,
+        customerFirstName: 'Priya',
+        rating: 5,
+        reviewText: 'बहुत अच्छा',
+        isPubliclyVisible: true,
+        createdAt: '2026-05-01T00:00:00.000Z',
+      });
+      expect(result[1]).toMatchObject({
+        productName: null,
+        customerId: null,
+        customerFirstName: 'एक ग्राहक',
+        isPubliclyVisible: false,
+      });
+    });
+  });
+
+  describe('setReviewVisibility', () => {
+    it('calls setVisibility with correct args and fires audit log when approving', async () => {
+      mockRepo.setVisibility.mockResolvedValueOnce(undefined);
+
+      await svc.setReviewVisibility(REVIEW_ID, true);
+
+      expect(mockRepo.setVisibility).toHaveBeenCalledWith(SHOP_ID, REVIEW_ID, true);
+      expect(auditLog).toHaveBeenCalledWith(
+        mockPool,
+        expect.objectContaining({
+          action: 'REVIEW_MODERATED',
+          subjectType: 'review',
+          subjectId: REVIEW_ID,
+          actorUserId: USER_ID,
+          after: { visible: true },
+        }),
+      );
+    });
+
+    it('calls setVisibility with visible=false when rejecting', async () => {
+      mockRepo.setVisibility.mockResolvedValueOnce(undefined);
+
+      await svc.setReviewVisibility(REVIEW_ID, false);
+
+      expect(mockRepo.setVisibility).toHaveBeenCalledWith(SHOP_ID, REVIEW_ID, false);
+      expect(auditLog).toHaveBeenCalledWith(
+        mockPool,
+        expect.objectContaining({
+          after: { visible: false },
+        }),
+      );
+    });
+
+    it('throws BadRequestException for invalid UUID', async () => {
+      const { BadRequestException } = await import('@nestjs/common');
+      await expect(
+        svc.setReviewVisibility('not-a-valid-uuid', true),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(mockRepo.setVisibility).not.toHaveBeenCalled();
     });
   });
 });

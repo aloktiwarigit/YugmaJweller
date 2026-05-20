@@ -5,8 +5,10 @@ import {
   Inject,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Req,
+  UnauthorizedException,
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
@@ -17,9 +19,11 @@ import { SkipTenant } from '../../common/decorators/skip-tenant.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { CustomerAuthGuard, getCustomerCtx } from '../customer/customer-auth.guard';
 import { ReviewsService } from './reviews.service';
-import type { ListReviewsResponse, ReviewResponse } from './reviews.service';
+import type { ListReviewsResponse, ModerationReviewItem, ReviewResponse } from './reviews.service';
 import { tenantContext } from '@goldsmith/tenant-context';
-import type { AuthenticatedTenantContext, Tenant } from '@goldsmith/tenant-context';
+import { TenantContextDec } from '@goldsmith/tenant-context';
+import type { AuthenticatedTenantContext, Tenant, TenantContext } from '@goldsmith/tenant-context';
+import { Roles } from '../../common/decorators/roles.decorator';
 
 // customerId is NOT accepted from the client — always derived from authenticated context
 const CreateReviewSchema = z.object({
@@ -48,6 +52,27 @@ export class ReviewsController {
     return tenantContext.runWith(ctx, () =>
       this.svc.createReview({ ...body, customerId }),
     );
+  }
+
+  @Get()
+  @Roles('shop_admin', 'shop_manager')
+  async listModerationReviews(
+    @TenantContextDec() ctx: TenantContext,
+  ): Promise<ModerationReviewItem[]> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.svc.listModerationReviews();
+  }
+
+  @Patch(':id/visibility')
+  @Roles('shop_admin', 'shop_manager')
+  @UsePipes(new ZodValidationPipe(z.object({ visible: z.boolean() })))
+  async setVisibility(
+    @Param('id', ParseUUIDPipe) reviewId: string,
+    @Body() body: { visible: boolean },
+    @TenantContextDec() ctx: TenantContext,
+  ): Promise<void> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.svc.setReviewVisibility(reviewId, body.visible);
   }
 
   @Get('products/:productId')
