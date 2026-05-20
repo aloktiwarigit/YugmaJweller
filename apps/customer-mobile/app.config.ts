@@ -11,7 +11,8 @@ const devAuth      = process.env['EXPO_PUBLIC_DEV_AUTH'] === '1';
 // google-services.json lives at android/app/google-services.json (gitignored).
 // For dev builds the file may be absent; the Gradle build.gradle only requires
 // it when APP_ENV=production.
-const androidGoogleServicesFile = './google-services.json';
+const androidGoogleServicesFile = process.env['GOOGLE_SERVICES_JSON'] ?? './google-services.json';
+const iosGoogleServicesFile     = process.env['GOOGLE_SERVICES_PLIST'] ?? './GoogleService-Info.plist';
 
 function serviceFilePointsToDevPlaceholder(path: string): boolean {
   const filename = path.replace(/\\/g, '/').split('/').pop() ?? path;
@@ -72,6 +73,45 @@ function assertProductionApiBaseUrl(value: string): void {
   }
 }
 
+function productionServiceFileTargets(): { android: boolean; ios: boolean } {
+  const target = (
+    process.env['BUILD_TARGET_PLATFORM'] ??
+    process.env['EAS_BUILD_PLATFORM'] ??
+    ''
+  ).toLowerCase();
+
+  if (target === 'android') return { android: true, ios: false };
+  if (target === 'ios') return { android: false, ios: true };
+  return { android: true, ios: true };
+}
+
+function assertProductionFirebaseServiceFiles(): void {
+  const targets = productionServiceFileTargets();
+  const errors: string[] = [];
+
+  if (targets.android) {
+    if (!process.env['GOOGLE_SERVICES_JSON']) {
+      errors.push('GOOGLE_SERVICES_JSON is required for production Android builds.');
+    } else if (serviceFilePointsToDevPlaceholder(process.env['GOOGLE_SERVICES_JSON'])) {
+      errors.push('GOOGLE_SERVICES_JSON must point to a production Firebase file, not a .dev placeholder.');
+    }
+  }
+
+  if (targets.ios) {
+    if (!process.env['GOOGLE_SERVICES_PLIST']) {
+      errors.push('GOOGLE_SERVICES_PLIST is required for production iOS builds.');
+    } else if (serviceFilePointsToDevPlaceholder(process.env['GOOGLE_SERVICES_PLIST'])) {
+      errors.push('GOOGLE_SERVICES_PLIST must point to a production Firebase file, not a .dev placeholder.');
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(
+      `[app.config.ts] Production Firebase service files are invalid:\n  ${errors.join('\n  ')}`,
+    );
+  }
+}
+
 if (isProduction) {
   // Hard-fail on missing critical production config so a misconfigured build
   // is caught at build time, not discovered after submission.
@@ -81,6 +121,7 @@ if (isProduction) {
     ['EXPO_PUBLIC_API_BASE_URL',        process.env['EXPO_PUBLIC_API_BASE_URL']],
     ['EXPO_PUBLIC_SHOP_SLUG',           process.env['EXPO_PUBLIC_SHOP_SLUG']],
     ['EXPO_PUBLIC_ANDROID_PACKAGE',     process.env['EXPO_PUBLIC_ANDROID_PACKAGE']],
+    ['EXPO_PUBLIC_EAS_PROJECT_ID',      process.env['EXPO_PUBLIC_EAS_PROJECT_ID']],
   ];
 
   const missing = required.filter(([, v]) => !v).map(([k]) => k);
@@ -104,11 +145,7 @@ if (isProduction) {
   }
   assertBundleIdentifier(pkg, 'EXPO_PUBLIC_ANDROID_PACKAGE');
   assertProductionApiBaseUrl(process.env['EXPO_PUBLIC_API_BASE_URL'] ?? '');
-
-  const gsJsonPath = process.env['GOOGLE_SERVICES_JSON'] ?? '';
-  if (gsJsonPath && serviceFilePointsToDevPlaceholder(gsJsonPath)) {
-    throw new Error('[app.config.ts] Production GOOGLE_SERVICES_JSON must not point to a .dev file.');
-  }
+  assertProductionFirebaseServiceFiles();
 }
 
 const config: ExpoConfig = {
@@ -126,6 +163,16 @@ const config: ExpoConfig = {
     backgroundColor: '#F5EDDD',
   },
   plugins: [
+    [
+      'expo-build-properties',
+      {
+        android: {
+          buildToolsVersion: '35.0.0',
+          compileSdkVersion: 35,
+          targetSdkVersion: 35,
+        },
+      },
+    ],
     '@react-native-firebase/app',
     '@react-native-firebase/auth',
     ...(isProduction ? [] : ['expo-dev-client' as const]),
@@ -149,6 +196,7 @@ const config: ExpoConfig = {
   },
   ios: {
     bundleIdentifier: process.env['EXPO_PUBLIC_IOS_BUNDLE_ID'] ?? 'com.goldsmith.customer.dev',
+    googleServicesFile: iosGoogleServicesFile,
     supportsTablet: false,
   },
   extra: {
@@ -156,6 +204,7 @@ const config: ExpoConfig = {
     tenantSlug:        process.env['EXPO_PUBLIC_SHOP_SLUG'] ?? 'anchor-dev',
     devAuth,
     firebaseProjectId: process.env['EXPO_PUBLIC_FIREBASE_PROJECT_ID'] ?? 'goldsmith-dev',
+    eas: { projectId: process.env['EXPO_PUBLIC_EAS_PROJECT_ID'] },
     router: { origin: false },
   },
   experiments: { typedRoutes: true },

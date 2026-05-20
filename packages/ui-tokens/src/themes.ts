@@ -15,20 +15,9 @@
  * Phase 4 customer-customization workflow.
  */
 
-export type ThemeColors = {
-  primary:       string;
-  accent:        string;
-  bg:            string;
-  ink:           string;
-  inkMute:       string;
-  border:        string;
-  error:         string;
-  textPrimary:   string;
-  textSecondary: string;
-  primaryLight:  string;
-  white:         string;
-  background:    string;
-};
+import { colors } from './colors';
+
+export type ThemeColors = { [Key in keyof typeof colors]: string };
 
 export type ThemeId = 'yatra-one' | 'banaras-maroon';
 
@@ -45,20 +34,7 @@ export interface ThemePreset {
 export const YATRA_ONE: ThemePreset = {
   id:          'yatra-one',
   displayName: 'Yatra One Editorial (cream + aged gold)',
-  colors: {
-    primary:       '#B58A3C',
-    accent:        '#D4745A',
-    bg:            '#F5EDDD',
-    ink:           '#1E2440',
-    inkMute:       '#4A526E',
-    border:        '#D9C9A8',
-    error:         '#B1402B',
-    textPrimary:   '#1E2440',
-    textSecondary: '#4A526E',
-    primaryLight:  '#EFE3BE',
-    white:         '#FFFFFF',
-    background:    '#FFFFFF',
-  },
+  colors,
 };
 
 /**
@@ -77,6 +53,20 @@ export const BANARAS_MAROON: ThemePreset = {
     inkMute:       '#6B4F52',  // muted plum
     border:        '#D8C8B8',  // ivory border
     error:         '#9C1B1B',  // crimson
+    primaryDeep:     '#5D1620',
+    primaryWash:     '#E8C9A6',
+    accentWash:      '#F4D9AD',
+    surface:         '#FFFFFF',
+    surfaceElevated: '#FFF8EC',
+    surfaceRecessed: '#E6D8C8',
+    inkSoft:         '#785F62',
+    borderSubtle:    '#E8D8C7',
+    borderStrong:    '#B08A63',
+    successJade:     '#2F7D5B',
+    successWash:     '#DCEEE3',
+    warningSaffron:  '#C68A1F',
+    warningWash:     '#F8E9C6',
+    infoSky:         '#3B5C8A',
     textPrimary:   '#2A1417',
     textSecondary: '#6B4F52',
     primaryLight:  '#E8C9A6',  // brass tint

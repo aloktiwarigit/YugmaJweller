@@ -5,6 +5,7 @@ import { Yatra_One, Mukta, Hind } from 'next/font/google';
 import * as Sentry from '@sentry/nextjs';
 import './globals.css';
 import { fetchTenantConfig } from '@/lib/api';
+import { baseUrlFromHeaders } from '@/lib/storefront';
 import { resolveShopSlug } from '@/lib/tenant-slug';
 import { TenantProvider } from './TenantContext';
 import { StorefrontWrapper } from './StorefrontWrapper';
@@ -33,10 +34,13 @@ const hind = Hind({
 const fontClasses = `${yatraOne.variable} ${mukta.variable} ${hind.variable}`;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const slug = resolveShopSlug(headers());
+  const headersList = headers();
+  const metadataBase = new URL(baseUrlFromHeaders(headersList));
+  const slug = resolveShopSlug(headersList);
   if (!slug) return { title: 'आभूषण' };
   const config = await fetchTenantConfig(slug);
   return {
+    metadataBase,
     title: config?.appName ?? 'आभूषण',
     description: `${config?.appName ?? 'आभूषण'} — श्रेष्ठ आभूषण, विश्वसनीय सेवा`,
   };

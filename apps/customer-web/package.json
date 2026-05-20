@@ -19,6 +19,7 @@
     "@goldsmith/customer-shared": "workspace:*",
     "@goldsmith/ui-tokens": "workspace:*",
     "@goldsmith/ui-web": "workspace:*",
+    "@sentry/core": "8.55.2",
     "@sentry/nextjs": "^8.55.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
