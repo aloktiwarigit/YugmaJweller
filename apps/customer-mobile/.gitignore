@@ -12,9 +12,8 @@ expo-env.d.ts
 google-services.json
 GoogleService-Info.plist
 
-# Android keystores + signing properties — keep in secure storage, never commit.
+# Android keystores + iOS credentials — keep in secure storage, never commit.
 *.keystore
-android/app/key.properties
 *.p12
 *.mobileprovision
 
