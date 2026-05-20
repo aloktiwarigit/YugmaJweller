@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import { AnalyticsService } from './analytics.service';
+import type { CustomerViewItem } from './analytics.service';
 
 const SHOP    = 'aaaaaaaa-bbbb-4000-8000-000000000001';
 const PRODUCT = 'bbbbbbbb-cccc-4000-8000-000000000002';
@@ -207,5 +208,133 @@ describe('AnalyticsService.getProductViewSummary', () => {
 
     expect(result.avgDurationSeconds).toBeNull();
     expect(result.totalViews).toBe(0);
+  });
+});
+
+describe('AnalyticsService.getCustomerViewHistory', () => {
+  it('returns [] for invalid UUID', async () => {
+    const client = makeMockClient();
+    const svc = makeService(makePool(client));
+
+    const result = await svc.getCustomerViewHistory({
+      shopId: SHOP,
+      customerId: 'not-a-uuid',
+      limit: 10,
+    });
+
+    expect(result).toEqual([]);
+    // No DB calls should have been made
+    expect((client.query as Mock).mock.calls).toHaveLength(0);
+  });
+
+  it('returns [] when customer not found in shop (cross-tenant safety)', async () => {
+    const client = makeMockClient();
+    const q = client.query as Mock;
+    q.mockResolvedValueOnce(undefined)   // BEGIN
+     .mockResolvedValueOnce(undefined)   // SET LOCAL ROLE
+     .mockResolvedValueOnce(undefined)   // SET LOCAL shop_id
+     .mockResolvedValueOnce({ rows: [] }) // ownership SELECT → 0 rows → cross-tenant block
+     .mockResolvedValueOnce(undefined)   // COMMIT
+     .mockRejectedValue(new Error('unexpected extra query call')); // POISON
+
+    const svc = makeService(makePool(client));
+    const result = await svc.getCustomerViewHistory({
+      shopId: SHOP,
+      customerId: CUSTOMER,
+      limit: 10,
+    });
+
+    expect(result).toEqual([]);
+    const viewHistoryCall = (q as Mock).mock.calls.find(
+      (c: unknown[]) => typeof c[0] === 'string' && (c[0] as string).includes('product_views'),
+    );
+    expect(viewHistoryCall).toBeUndefined();
+  });
+
+  it('returns mapped items sorted by viewedAt DESC', async () => {
+    const client = makeMockClient();
+    const q = client.query as Mock;
+
+    const now = new Date('2026-05-19T10:00:00.000Z');
+    const earlier = new Date('2026-05-18T08:00:00.000Z');
+
+    q.mockResolvedValueOnce(undefined)                          // BEGIN
+     .mockResolvedValueOnce(undefined)                          // SET LOCAL ROLE
+     .mockResolvedValueOnce(undefined)                          // SET LOCAL shop_id
+     .mockResolvedValueOnce({ rows: [{ id: CUSTOMER }] })       // ownership SELECT
+     .mockResolvedValueOnce({
+       rows: [
+         {
+           product_id:        PRODUCT,
+           product_name:      'सोने की अंगूठी',
+           primary_image_url: 'https://cdn.example.com/ring.jpg',
+           viewed_at:         now,
+           duration_seconds:  45,
+         },
+         {
+           product_id:        'eeeeeeee-ffff-4000-8000-000000000005',
+           product_name:      'हार',
+           primary_image_url: null,
+           viewed_at:         earlier,
+           duration_seconds:  null,
+         },
+       ],
+     })                                                          // history SELECT
+     .mockResolvedValueOnce(undefined)                           // COMMIT
+     .mockRejectedValue(new Error('unexpected extra query call')); // POISON
+
+    const svc = makeService(makePool(client));
+    const result: CustomerViewItem[] = await svc.getCustomerViewHistory({
+      shopId: SHOP,
+      customerId: CUSTOMER,
+      limit: 10,
+    });
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({
+      productId:       PRODUCT,
+      productName:     'सोने की अंगूठी',
+      primaryImageUrl: 'https://cdn.example.com/ring.jpg',
+      viewedAt:        now.toISOString(),
+      durationSeconds: 45,
+    });
+    expect(result[1]).toMatchObject({
+      productId:       'eeeeeeee-ffff-4000-8000-000000000005',
+      productName:     'हार',
+      primaryImageUrl: null,
+      durationSeconds: null,
+    });
+  });
+
+  it('passes limit param to the SQL query', async () => {
+    const client = makeMockClient();
+    const q = client.query as Mock;
+    const now = new Date();
+
+    q.mockResolvedValueOnce(undefined)                          // BEGIN
+     .mockResolvedValueOnce(undefined)                          // SET LOCAL ROLE
+     .mockResolvedValueOnce(undefined)                          // SET LOCAL shop_id
+     .mockResolvedValueOnce({ rows: [{ id: CUSTOMER }] })       // ownership SELECT
+     .mockResolvedValueOnce({ rows: [
+       {
+         product_id: PRODUCT, product_name: 'उत्पाद',
+         primary_image_url: null, viewed_at: now, duration_seconds: null,
+       },
+     ] })                                                        // history SELECT
+     .mockResolvedValueOnce(undefined)                           // COMMIT
+     .mockRejectedValue(new Error('unexpected extra query call')); // POISON
+
+    const svc = makeService(makePool(client));
+    await svc.getCustomerViewHistory({ shopId: SHOP, customerId: CUSTOMER, limit: 5 });
+
+    const historyCall = (q as Mock).mock.calls.find(
+      (c: unknown[]) =>
+        typeof c[0] === 'string' &&
+        (c[0] as string).includes('product_views') &&
+        (c[0] as string).includes('LIMIT'),
+    );
+    expect(historyCall).toBeDefined();
+    // The limit value (5) must be passed as a bind parameter
+    expect(historyCall![1]).toContain(5);
   });
 });

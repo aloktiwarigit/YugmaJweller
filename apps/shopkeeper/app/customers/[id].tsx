@@ -20,6 +20,7 @@ import {
   OccasionsSection,
   type OccasionRow,
 } from '../../src/features/crm/components/OccasionsSection';
+import { CustomerViewingHistoryCard } from '../../src/features/crm/components/CustomerViewingHistoryCard';
 import { PurchaseHistoryList } from '../../src/features/crm/components/PurchaseHistoryList';
 
 interface CustomerSearchResult {
@@ -150,6 +151,10 @@ export default function CustomerDetailScreen(): JSX.Element {
 
         <View style={styles.section}>
           <PurchaseHistoryList customerId={customerId} />
+        </View>
+
+        <View style={styles.section}>
+          <CustomerViewingHistoryCard customerId={customerId} />
         </View>
 
         <View style={styles.section}>

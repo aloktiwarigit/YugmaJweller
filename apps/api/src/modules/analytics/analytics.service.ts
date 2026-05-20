@@ -18,6 +18,22 @@ export interface ViewSummary {
   avgDurationSeconds: number | null;
 }
 
+export interface CustomerViewItem {
+  productId: string;
+  productName: string;
+  primaryImageUrl: string | null;
+  viewedAt: string; // ISO 8601
+  durationSeconds: number | null;
+}
+
+interface ProductViewRow {
+  product_id: string;
+  product_name: string;
+  primary_image_url: string | null;
+  viewed_at: Date;
+  duration_seconds: number | null;
+}
+
 @Injectable()
 export class AnalyticsService {
   constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
@@ -109,6 +125,49 @@ export class AnalyticsService {
           ? parseFloat(row.avg_duration_seconds)
           : null,
       };
+    });
+  }
+
+  async getCustomerViewHistory(params: {
+    shopId: string;
+    customerId: string;
+    limit: number;
+  }): Promise<CustomerViewItem[]> {
+    if (!UUID_RE.test(params.shopId) || !UUID_RE.test(params.customerId)) {
+      return [];
+    }
+
+    return withShopTx(this.pool, params.shopId, async (tx) => {
+      // Cross-tenant ownership check: customer must belong to requesting shop.
+      const ownerCheck = await tx.query<{ id: string }>(
+        // nosemgrep: goldsmith.require-tenant-transaction
+        `SELECT id FROM customers WHERE id = $1 AND shop_id = $2 LIMIT 1`,
+        [params.customerId, params.shopId],
+      );
+      if (ownerCheck.rows.length === 0) return [];
+
+      const r = await tx.query<ProductViewRow>(
+        // nosemgrep: goldsmith.require-tenant-transaction
+        `SELECT pv.product_id,
+                COALESCE(p.name, 'उत्पाद') AS product_name,
+                p.primary_image_url,
+                pv.viewed_at,
+                pv.duration_seconds
+           FROM product_views pv
+           JOIN products p ON p.id = pv.product_id AND p.shop_id = pv.shop_id
+          WHERE pv.shop_id = $1 AND pv.customer_id = $2
+          ORDER BY pv.viewed_at DESC
+          LIMIT $3`,
+        [params.shopId, params.customerId, params.limit],
+      );
+
+      return r.rows.map((row) => ({
+        productId:       row.product_id,
+        productName:     row.product_name,
+        primaryImageUrl: row.primary_image_url,
+        viewedAt:        row.viewed_at.toISOString(),
+        durationSeconds: row.duration_seconds,
+      }));
     });
   }
 }
