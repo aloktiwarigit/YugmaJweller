@@ -119,7 +119,7 @@ export class ReviewsService {
 
   async listModerationReviews(): Promise<ModerationReviewItem[]> {
     const { shopId } = tenantContext.requireCurrent();
-    const rows = await this.repo.listAllForShop(shopId);
+    const rows = await this.repo.listAllForShop({ shopId });
     return rows.map((r) => ({
       id:                r.id,
       productId:         r.product_id,
@@ -140,7 +140,7 @@ export class ReviewsService {
     const ctx = tenantContext.requireCurrent();
     const shopId = ctx.shopId;
     const actorId = ctx.authenticated ? ctx.userId : 'system';
-    await this.repo.setVisibility(shopId, reviewId, visible);
+    await this.repo.setVisibility({ shopId, reviewId, visible });
     void auditLog(this.pool, {
       action:      AuditAction.REVIEW_MODERATED,
       subjectType: 'review',

@@ -102,7 +102,7 @@ describe('ReviewsRepository', () => {
       const pool = makePool(rows);
       const repo = new ReviewsRepository(pool as never);
 
-      const result = await repo.listAllForShop('shop-1');
+      const result = await repo.listAllForShop({ shopId: 'shop-1' });
 
       const sql = pool.query.mock.calls[0]?.[0] as string;
       // Must NOT filter by is_publicly_visible (shopkeeper sees all)
@@ -121,7 +121,7 @@ describe('ReviewsRepository', () => {
       const pool = makePool([]);
       const repo = new ReviewsRepository(pool as never);
 
-      await repo.listAllForShop('shop-abc');
+      await repo.listAllForShop({ shopId: 'shop-abc' });
 
       const params = pool.query.mock.calls[0]?.[1] as unknown[];
       expect(params).toContain('shop-abc');
@@ -133,7 +133,7 @@ describe('ReviewsRepository', () => {
       const pool = makePool([]);
       const repo = new ReviewsRepository(pool as never);
 
-      await repo.setVisibility('shop-1', 'review-uuid', false);
+      await repo.setVisibility({ shopId: 'shop-1', reviewId: 'review-uuid', visible: false });
 
       const sql = pool.query.mock.calls[0]?.[0] as string;
       expect(sql).toContain('UPDATE product_reviews');
@@ -148,7 +148,7 @@ describe('ReviewsRepository', () => {
       const pool = makePool([]);
       const repo = new ReviewsRepository(pool as never);
 
-      await repo.setVisibility('shop-2', 'review-xyz', true);
+      await repo.setVisibility({ shopId: 'shop-2', reviewId: 'review-xyz', visible: true });
 
       const params = pool.query.mock.calls[0]?.[1] as unknown[];
       expect(params[0]).toBe(true);

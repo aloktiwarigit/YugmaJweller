@@ -192,7 +192,7 @@ describe('ReviewsService', () => {
 
       const result = await svc.listModerationReviews();
 
-      expect(mockRepo.listAllForShop).toHaveBeenCalledWith(SHOP_ID);
+      expect(mockRepo.listAllForShop).toHaveBeenCalledWith({ shopId: SHOP_ID });
       expect(result).toHaveLength(2);
       expect(result[0]).toMatchObject({
         id: REVIEW_ID,
@@ -220,7 +220,7 @@ describe('ReviewsService', () => {
 
       await svc.setReviewVisibility(REVIEW_ID, true);
 
-      expect(mockRepo.setVisibility).toHaveBeenCalledWith(SHOP_ID, REVIEW_ID, true);
+      expect(mockRepo.setVisibility).toHaveBeenCalledWith({ shopId: SHOP_ID, reviewId: REVIEW_ID, visible: true });
       expect(auditLog).toHaveBeenCalledWith(
         mockPool,
         expect.objectContaining({
@@ -238,7 +238,7 @@ describe('ReviewsService', () => {
 
       await svc.setReviewVisibility(REVIEW_ID, false);
 
-      expect(mockRepo.setVisibility).toHaveBeenCalledWith(SHOP_ID, REVIEW_ID, false);
+      expect(mockRepo.setVisibility).toHaveBeenCalledWith({ shopId: SHOP_ID, reviewId: REVIEW_ID, visible: false });
       expect(auditLog).toHaveBeenCalledWith(
         mockPool,
         expect.objectContaining({

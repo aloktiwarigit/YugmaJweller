@@ -51,8 +51,8 @@ export class ReviewsRepository {
     });
   }
 
-  async listAllForShop(shopId: string): Promise<ModerationReviewRow[]> {
-    return withShopTx(this.pool, shopId, async (tx) => {
+  async listAllForShop(params: { shopId: string }): Promise<ModerationReviewRow[]> {
+    return withShopTx(this.pool, params.shopId, async (tx) => {
       const { rows } = await tx.query<ModerationReviewRow>(
         `SELECT pr.id, pr.shop_id, pr.product_id,
                 p.name AS product_name,
@@ -65,17 +65,17 @@ export class ReviewsRepository {
           WHERE pr.shop_id = $1
           ORDER BY pr.created_at DESC
           LIMIT 100`,
-        [shopId],
+        [params.shopId],
       );
       return rows;
     });
   }
 
-  async setVisibility(shopId: string, reviewId: string, visible: boolean): Promise<void> {
-    await withShopTx(this.pool, shopId, async (tx) => {
+  async setVisibility(params: { shopId: string; reviewId: string; visible: boolean }): Promise<void> {
+    await withShopTx(this.pool, params.shopId, async (tx) => {
       await tx.query(
         `UPDATE product_reviews SET is_publicly_visible = $1 WHERE id = $2 AND shop_id = $3`,
-        [visible, reviewId, shopId],
+        [params.visible, params.reviewId, params.shopId],
       );
     });
   }
