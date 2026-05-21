@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ServiceUnavailableException, type ExecutionContext } from '@nestjs/common';
 import {
   CustomerAuthGuard,
+  CUSTOMER_SELF_REGISTRATION_ACTOR_ID,
   DEV_MOCK_BEARER_PREFIX,
   DEV_MOCK_CUSTOMER_ID,
 } from './customer-auth.guard';
@@ -140,6 +141,31 @@ describe('CustomerAuthGuard', () => {
       2,
       `SELECT id FROM customers WHERE phone = $1 AND shop_id = $2 AND deleted_at IS NULL LIMIT 1`,
       ['+919876543210', SHOP_ID],
+    );
+    expect(req.customerCtx).toEqual({ customerId: CUSTOMER_ID, shopId: SHOP_ID });
+  });
+
+  it('creates a customer row on first Firebase login', async () => {
+    const verifyIdToken = vi.fn().mockResolvedValue({ phone_number: '+919876543210' });
+    const pool = makePool();
+    vi.mocked(pool.query)
+      .mockResolvedValueOnce({ rows: [{ status: 'ACTIVE' }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: CUSTOMER_ID }] } as never);
+    const req = makeRequest('Bearer firebase-token');
+    const guard = new CustomerAuthGuard(makeFirebase(verifyIdToken), pool);
+
+    await expect(guard.canActivate(makeExecutionContext(req))).resolves.toBe(true);
+
+    expect(pool.query).toHaveBeenNthCalledWith(
+      3,
+      `INSERT INTO customers (shop_id, phone, name, created_by_user_id)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (shop_id, phone) DO UPDATE
+           SET updated_at = customers.updated_at
+           WHERE customers.deleted_at IS NULL
+         RETURNING id`,
+      [SHOP_ID, '+919876543210', 'Mobile customer 3210', CUSTOMER_SELF_REGISTRATION_ACTOR_ID],
     );
     expect(req.customerCtx).toEqual({ customerId: CUSTOMER_ID, shopId: SHOP_ID });
   });

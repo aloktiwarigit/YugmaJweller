@@ -8,10 +8,12 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import type { Pool } from 'pg';
+import { withShopTx } from '@goldsmith/db';
 import { FirebaseAdminProvider } from '../auth/firebase-admin.provider';
 
 export const DEV_MOCK_BEARER_PREFIX = 'DEV-MOCK-';
 export const DEV_MOCK_CUSTOMER_ID   = '00000000-0000-4000-8000-000000000999';
+export const CUSTOMER_SELF_REGISTRATION_ACTOR_ID = '00000000-0000-4000-8000-000000000998';
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface CustomerContext {
@@ -73,14 +75,8 @@ export class CustomerAuthGuard implements CanActivate {
 
     await this.assertActiveShop(shopId);
 
-    // customers.phone stores E.164 format (same format Firebase phone_number claim uses)
-    const row = await this.pool.query<{ id: string }>(
-      `SELECT id FROM customers WHERE phone = $1 AND shop_id = $2 AND deleted_at IS NULL LIMIT 1`,
-      [phoneE164, shopId],
-    );
-    if (!row.rows[0]) throw new UnauthorizedException({ code: 'customer.not_found' });
-
-    req.customerCtx = { customerId: row.rows[0].id, shopId };
+    const customerId = await this.findOrCreateCustomer(shopId, phoneE164);
+    req.customerCtx = { customerId, shopId };
     return true;
   }
 
@@ -97,5 +93,31 @@ export class CustomerAuthGuard implements CanActivate {
     const shop = row.rows[0];
     if (!shop) throw new UnauthorizedException({ code: 'customer.shop_not_found' });
     if (shop.status !== 'ACTIVE') throw new ServiceUnavailableException({ code: 'tenant.inactive' });
+  }
+
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- guard boundary validates x-tenant-id before creating customer context
+  private async findOrCreateCustomer(shopId: string, phoneE164: string): Promise<string> {
+    return withShopTx(this.pool, shopId, async (tx) => {
+      // customers.phone stores E.164 format (same format Firebase phone_number claim uses).
+      const existing = await tx.query<{ id: string }>(
+        `SELECT id FROM customers WHERE phone = $1 AND shop_id = $2 AND deleted_at IS NULL LIMIT 1`,
+        [phoneE164, shopId],
+      );
+      if (existing.rows[0]) return existing.rows[0].id;
+
+      const last4 = phoneE164.slice(-4);
+      const inserted = await tx.query<{ id: string }>(
+        `INSERT INTO customers (shop_id, phone, name, created_by_user_id)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (shop_id, phone) DO UPDATE
+           SET updated_at = customers.updated_at
+           WHERE customers.deleted_at IS NULL
+         RETURNING id`,
+        [shopId, phoneE164, `Mobile customer ${last4}`, CUSTOMER_SELF_REGISTRATION_ACTOR_ID],
+      );
+      if (inserted.rows[0]) return inserted.rows[0].id;
+
+      throw new UnauthorizedException({ code: 'customer.deleted' });
+    });
   }
 }

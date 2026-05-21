@@ -1,5 +1,6 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import type { Pool } from 'pg';
+import { withShopTx } from '@goldsmith/db';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { tenantContext } from '@goldsmith/tenant-context';
 import { WishlistRepository } from './wishlist.repository';
@@ -26,10 +27,12 @@ export class WishlistService {
   async addToWishlist(params: { customerId: string; productId: string }): Promise<{ added: boolean }> {
     const { shopId } = tenantContext.requireCurrent();
 
-    // Verify product belongs to this shop
-    const { rows } = await this.pool.query<{ id: string }>(
-      `SELECT id FROM products WHERE id = $1 AND shop_id = $2`,
-      [params.productId, shopId],
+    // Verify product belongs to this shop under the same RLS tenant scope used by writes.
+    const { rows } = await withShopTx(this.pool, shopId, (tx) =>
+      tx.query<{ id: string }>(
+        `SELECT id FROM products WHERE id = $1 AND shop_id = $2`,
+        [params.productId, shopId],
+      ),
     );
     if (rows.length === 0) throw new NotFoundException({ code: 'product.not_found' });
 

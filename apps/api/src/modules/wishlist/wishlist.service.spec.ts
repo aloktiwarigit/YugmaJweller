@@ -4,12 +4,17 @@ import { NotFoundException } from '@nestjs/common';
 import { WishlistService } from './wishlist.service';
 import { WishlistRepository } from './wishlist.repository';
 import { tenantContext } from '@goldsmith/tenant-context';
+import { withShopTx } from '@goldsmith/db';
 import { auditLog } from '@goldsmith/audit';
 
 vi.mock('@goldsmith/tenant-context', () => ({
   tenantContext: {
     requireCurrent: vi.fn(),
   },
+}));
+
+vi.mock('@goldsmith/db', () => ({
+  withShopTx: vi.fn(async (pool: { query: unknown }, _shopId: string, fn: (tx: { query: unknown }) => unknown) => fn(pool)),
 }));
 
 vi.mock('@goldsmith/audit', () => ({
@@ -64,6 +69,7 @@ describe('WishlistService', () => {
 
       const result = await svc.addToWishlist({ customerId: CUSTOMER_ID, productId: PRODUCT_ID });
 
+      expect(withShopTx).toHaveBeenCalledWith(mockPool, SHOP_ID, expect.any(Function));
       expect(mockRepo.add).toHaveBeenCalledWith({ shopId: SHOP_ID, customerId: CUSTOMER_ID, productId: PRODUCT_ID });
       expect(result).toEqual({ added: true });
     });
