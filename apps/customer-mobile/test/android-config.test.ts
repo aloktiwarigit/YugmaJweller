@@ -83,10 +83,12 @@ describe('Android Expo SDK config', () => {
 
     expect(pkg.scripts['android']).toBe('expo run:android');
     expect(pkg.dependencies['expo-image']).toBe('~1.12.15');
+    expect(pkg.dependencies['expo-dev-client']).toBeUndefined();
     expect(pkg.dependencies['react-native']).toBe('0.74.0');
     expect(pkg.dependencies['react-native-safe-area-context']).toBe('4.10.0');
     expect(pkg.dependencies['react-native-screens']).toBe('3.31.0');
     expect(pkg.dependencies['react-native-svg']).toBe('~15.2.0');
+    expect(pkg.devDependencies['expo-dev-client']).toBe('~4.0.0');
     expect(pkg.devDependencies['typescript']).toBe('^5.4.0');
   });
 
@@ -118,6 +120,19 @@ describe('Android Expo SDK config', () => {
     expect(production.android?.buildType).toBe('app-bundle');
     expect(production.env?.BUILD_TARGET_PLATFORM).toBe('android');
     expect(JSON.stringify(production)).not.toContain('REPLACE_WITH_');
+  });
+
+  it('keeps the native Android launcher manifest production-neutral', () => {
+    const gradle = readFileSync(resolve(appRoot, 'android', 'app', 'build.gradle'), 'utf8');
+    const manifest = readFileSync(
+      resolve(appRoot, 'android', 'app', 'src', 'main', 'AndroidManifest.xml'),
+      'utf8',
+    );
+
+    expect(gradle).toContain("namespace 'com.goldsmith.customer'");
+    expect(gradle).not.toContain("namespace 'com.goldsmith.customer.dev'");
+    expect(manifest).toContain('android:name=".MainActivity"');
+    expect(manifest).not.toContain('exp+goldsmith-customer');
   });
 
   it('fails production config on EAS build workers when Firebase service files are missing', async () => {
@@ -206,5 +221,6 @@ describe('Android Expo SDK config', () => {
     expect(config.extra?.tenantSlug).toBe('anchor');
     expect(config.extra?.firebaseProjectId).toBe('goldsmith-prod');
     expect(config.extra?.eas?.projectId).toBe('11111111-1111-4111-8111-111111111111');
+    expect(config.plugins).not.toContain('expo-dev-client');
   });
 });

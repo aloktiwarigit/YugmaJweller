@@ -41,8 +41,12 @@ Specific ADB device serial to install on. Required when multiple devices are
 connected; optional when exactly one device is connected.
 
 .PARAMETER WorkspacePath
-Short filesystem path used for the build (default: C:\gs-release). Must have
+Short filesystem path used for the build (default: C:\g). Must have
 no spaces. The repo is xcopy'd here so Gradle/CMake succeed.
+
+.PARAMETER VirtualStoreDir
+Short pnpm virtual store path used inside the copied workspace install
+(default: .p). This keeps native CMake object paths below Windows limits.
 #>
 
 param(
@@ -50,7 +54,8 @@ param(
     [switch]$BuildOnly,
     [switch]$SkipCopy,
     [string]$DeviceSerial = "",
-    [string]$WorkspacePath = "C:\gs-release"
+    [string]$WorkspacePath = "C:\g",
+    [string]$VirtualStoreDir = ".p"
 )
 
 Set-StrictMode -Version Latest
@@ -121,9 +126,13 @@ $androidDir = Join-Path $wsAppDir "android"
 if ($WorkspacePath -match "\s") {
     Fail "WorkspacePath '$WorkspacePath' must not contain spaces."
 }
+if ($VirtualStoreDir -match "\s") {
+    Fail "VirtualStoreDir '$VirtualStoreDir' must not contain spaces."
+}
 
 # ── Load production env ────────────────────────────────────────────────────────
 $env:APP_ENV = "production"
+$env:NODE_ENV = "production"
 Import-DotEnv -Path (Join-Path $appDir ".env.production")
 
 $androidPackage = Assert-EnvValue "EXPO_PUBLIC_ANDROID_PACKAGE"
@@ -177,18 +186,29 @@ try {
         Write-Ok "Copied (node_modules and build dirs excluded)"
 
         $npmrc = Join-Path $WorkspacePath ".npmrc"
-        if (-not (Get-Content -LiteralPath $npmrc -ErrorAction SilentlyContinue | Select-String "public-hoist-pattern")) {
+        $npmrcLines = @(Get-Content -LiteralPath $npmrc -ErrorAction SilentlyContinue)
+        if (-not ($npmrcLines | Where-Object { $_.Trim() -eq "public-hoist-pattern[]=*" })) {
             Add-Content -LiteralPath $npmrc -Value "`npublic-hoist-pattern[]=*"
             Write-Ok "Added public-hoist-pattern to $npmrc"
+        }
+        $npmrcLines = @(Get-Content -LiteralPath $npmrc -ErrorAction SilentlyContinue)
+        if (-not ($npmrcLines | Select-String "virtual-store-dir")) {
+            Add-Content -LiteralPath $npmrc -Value "`nvirtual-store-dir=$VirtualStoreDir"
+            Write-Ok "Added short pnpm virtual-store-dir to $npmrc"
         }
 
         Write-Step "Installing dependencies in $WorkspacePath"
         Push-Location $WorkspacePath
+        $previousNodeEnv = $env:NODE_ENV
         try {
+            # Release bundling still needs build-time Babel/Metro tooling from devDependencies.
+            # Restore NODE_ENV=production before Gradle so the app bundle uses production config.
+            Remove-Item Env:NODE_ENV -ErrorAction SilentlyContinue
             # Run pnpm via cmd to avoid PowerShell 5.1 treating stderr as ErrorRecord
-            cmd /c "pnpm install --frozen-lockfile"
+            cmd /c "pnpm install --frozen-lockfile --prod=false"
             if ($LASTEXITCODE -ne 0) { Fail "pnpm install failed (exit $LASTEXITCODE)" }
         } finally {
+            $env:NODE_ENV = $previousNodeEnv
             Pop-Location
         }
         Write-Ok "Dependencies installed"
@@ -261,7 +281,8 @@ try {
             Fail "ADB install failed:`n$($out -join "`n")"
         }
         Write-Ok "Installed on $DeviceSerial"
-        adb -s $DeviceSerial shell monkey -p $androidPackage -c android.intent.category.LAUNCHER 1 2>&1 | Out-Null
+        cmd /c "adb -s $DeviceSerial shell monkey -p $androidPackage -c android.intent.category.LAUNCHER 1 >NUL 2>NUL"
+        if ($LASTEXITCODE -ne 0) { Fail "ADB launch failed for $androidPackage on $DeviceSerial." }
         Write-Ok "Launched $androidPackage"
     }
 

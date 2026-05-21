@@ -153,7 +153,7 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.goldsmith.customer.dev'
+    namespace 'com.goldsmith.customer'
     defaultConfig {
         applicationId androidApplicationId
         minSdkVersion rootProject.ext.minSdkVersion

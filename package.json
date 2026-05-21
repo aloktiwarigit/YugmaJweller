@@ -50,6 +50,9 @@
       "protobufjs",
       "unrs-resolver",
       "@nestjs/core"
-    ]
+    ],
+    "patchedDependencies": {
+      "expo-modules-core@1.12.26": "patches/expo-modules-core@1.12.26.patch"
+    }
   }
 }

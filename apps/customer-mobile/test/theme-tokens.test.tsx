@@ -36,6 +36,12 @@ vi.mock('../src/components/FilterSheet', () => ({
 
 vi.mock('../src/api/endpoints', () => ({
   getCatalogProducts:             vi.fn().mockResolvedValue({ items: [], total: 0, page: 1 }),
+  getCatalogProduct:              vi.fn().mockResolvedValue({
+    id: 'p1', sku: 'TST-001', metal: 'GOLD', purity: '22K',
+    categoryName: 'gold rings', grossWeightG: '5.000',
+    quantity: 1, huid: null, primaryImage: null,
+    priceAvailable: false, estimatedPrice: null,
+  }),
   getPublicRates:                 vi.fn().mockResolvedValue({}),
   createCustomerRateLockBooking:  vi.fn(),
   getRateLockPaymentToken:        vi.fn(),
@@ -202,5 +208,15 @@ describe('TryAtHomeScreen — theme token wiring', () => {
       fireEvent.click(await findByTestId('product-p1'));
     });
     expect(container.innerHTML).toContain(RGB_EMERALD);
+  });
+
+  it('preselects a product passed from PDP and keeps submit sticky', async () => {
+    vi.mocked(useLocalSearchParams).mockReturnValue({ productId: 'p1' });
+
+    const { findByTestId, getByTestId } = render(<TryAtHomeScreen />, { wrapper });
+    await findByTestId('product-p1');
+
+    expect(getByTestId('try-at-home-submit').textContent).toContain('(1/3)');
+    expect(getByTestId('try-at-home-submit-bar').getAttribute('style')).toContain('position: absolute');
   });
 });

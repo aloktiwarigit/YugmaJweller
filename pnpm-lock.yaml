@@ -6,6 +6,11 @@ settings:
 
 pnpmfileChecksum: qzedg2ypbqstaesbzw7625wkdq
 
+patchedDependencies:
+  expo-modules-core@1.12.26:
+    hash: yhvolzoklfrzmazhgb5dm6yk7q
+    path: patches/expo-modules-core@1.12.26.patch
+
 importers:
 
   .:
@@ -314,9 +319,6 @@ importers:
       expo-constants:
         specifier: ~16.0.0
         version: 16.0.2(expo@51.0.39(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0)))
-      expo-dev-client:
-        specifier: ~4.0.0
-        version: 4.0.29(expo@51.0.39(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0)))
       expo-font:
         specifier: ~12.0.0
         version: 12.0.10(expo@51.0.39(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0)))
@@ -402,6 +404,9 @@ importers:
       axios-mock-adapter:
         specifier: ^1.22.0
         version: 1.22.0(axios@1.15.0)
+      expo-dev-client:
+        specifier: ~4.0.0
+        version: 4.0.29(expo@51.0.39(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0)))
       jsdom:
         specifier: ^24.0.0
         version: 24.1.3
@@ -19266,7 +19271,7 @@ snapshots:
       require-from-string: 2.0.2
       resolve-from: 5.0.0
 
-  expo-modules-core@1.12.26:
+  expo-modules-core@1.12.26(patch_hash=yhvolzoklfrzmazhgb5dm6yk7q):
     dependencies:
       invariant: 2.2.4
 
@@ -19334,7 +19339,7 @@ snapshots:
       expo-font: 12.0.10(expo@51.0.39(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0)))
       expo-keep-awake: 13.0.2(expo@51.0.39(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0)))
       expo-modules-autolinking: 1.11.3
-      expo-modules-core: 1.12.26
+      expo-modules-core: 1.12.26(patch_hash=yhvolzoklfrzmazhgb5dm6yk7q)
       fbemitter: 3.0.0
       whatwg-url-without-unicode: 8.0.0-3
     transitivePeerDependencies:

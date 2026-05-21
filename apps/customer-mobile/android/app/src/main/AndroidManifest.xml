@@ -24,7 +24,6 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="goldsmithcustomer"/>
         <data android:scheme="${appAuthRedirectScheme}"/>
-        <data android:scheme="exp+goldsmith-customer"/>
       </intent-filter>
     </activity>
     <activity android:name="com.facebook.react.devsupport.DevSettingsActivity" android:exported="false"/>
