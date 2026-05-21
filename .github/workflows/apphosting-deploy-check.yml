@@ -30,7 +30,7 @@ jobs:
     name: Check apphosting.yaml placeholders
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Detect REPLACE_WITH_* placeholders
         id: detect
