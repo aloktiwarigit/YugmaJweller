@@ -7,6 +7,7 @@ import { SettingsService } from './settings.service';
 import { SettingsRepository } from './settings.repository';
 import { BlobStorageService } from './blob-storage.service';
 import { SettingsCache, FeatureFlagsCache } from '@goldsmith/tenant-config';
+import { createRedisClient } from '../../redis-client';
 
 @Module({
   imports: [AuthModule, TenantLookupModule],
@@ -17,7 +18,7 @@ import { SettingsCache, FeatureFlagsCache } from '@goldsmith/tenant-config';
     BlobStorageService,
     {
       provide: 'SETTINGS_REDIS',
-      useFactory: () => new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379'),
+      useFactory: () => createRedisClient('settings'),
     },
     {
       provide: SettingsCache,

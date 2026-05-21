@@ -26,6 +26,7 @@ import { ComplianceReportsService } from './compliance-reports.service';
 import { UrdService }        from './urd.service';
 import { CompliancePmlaProcessor } from '../../workers/compliance-pmla.processor';
 import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
+import { createRedisClient } from '../../redis-client';
 
 @Module({
   imports: [
@@ -86,7 +87,7 @@ import { GstrExportProcessor }     from '../../workers/gstr-export.processor';
     {
       provide: 'BILLING_REDIS',
       useFactory: () =>
-        new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
+        createRedisClient('billing', {
           maxRetriesPerRequest: 3,
         }),
     },

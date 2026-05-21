@@ -25,6 +25,8 @@ import { StockMovementRepository } from './stock-movement.repository';
 import { SyncModule } from '../sync/sync.module';
 import { PricingModule } from '../pricing/pricing.module';
 import { InventoryValuationService } from './inventory.valuation.service';
+import { areQueueWorkersEnabled } from '../../queue-runtime';
+import { createRedisClient } from '../../redis-client';
 
 const QUEUE_NAME = 'inventory-bulk-import';
 
@@ -58,7 +60,7 @@ const QUEUE_NAME = 'inventory-bulk-import';
       provide: 'INVENTORY_REDIS',
       // maxRetriesPerRequest: null is required by BullMQ Workers (blocking BZPOPMIN semantics).
       useFactory: () =>
-        new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
+        createRedisClient('inventory', {
           maxRetriesPerRequest: null,
         }),
     },
@@ -79,6 +81,7 @@ export class InventoryModule implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
+    if (!areQueueWorkersEnabled()) return;
     this.worker = createTenantWorker<BulkImportJobData>(
       QUEUE_NAME,
       (_ctx, data) => this.processor.handle(data),

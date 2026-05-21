@@ -8,6 +8,7 @@ import { LoyaltyService } from './loyalty.service';
 import { LoyaltyRepository } from './loyalty.repository';
 import { LoyaltyEventListener, LOYALTY_ACCRUAL_QUEUE } from './loyalty.event-listener';
 import { LoyaltyAccrualProcessor } from '../../workers/loyalty-accrual.processor';
+import { createRedisClient } from '../../redis-client';
 
 @Module({
   imports: [
@@ -31,7 +32,7 @@ import { LoyaltyAccrualProcessor } from '../../workers/loyalty-accrual.processor
     {
       provide: 'LOYALTY_REDIS',
       useFactory: () =>
-        new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
+        createRedisClient('loyalty', {
           maxRetriesPerRequest: 3,
         }),
     },

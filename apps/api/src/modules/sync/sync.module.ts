@@ -6,6 +6,7 @@ import type { Pool } from 'pg';
 import { AuthModule } from '../auth/auth.module';
 import { SyncController } from './sync.controller';
 import { SyncService } from './sync.service';
+import { createRedisClient } from '../../redis-client';
 
 @Module({
   imports: [AuthModule],
@@ -24,7 +25,7 @@ import { SyncService } from './sync.service';
     },
     {
       provide: 'SYNC_REDIS',
-      useFactory: () => new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379'),
+      useFactory: () => createRedisClient('sync'),
     },
   ],
   exports: [SyncService, SyncLogger],

@@ -1,12 +1,11 @@
 import { Module, type ExecutionContext, type CallHandler, Injectable, type NestInterceptor } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
-import Redis from 'ioredis';
-import { logger } from '@goldsmith/observability';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { Observable } from 'rxjs';
 import { TenantInterceptor } from '@goldsmith/tenant-context';
+import { PermissionsCache } from '@goldsmith/tenant-config';
 import { HealthController } from './health.controller';
 import { SKIP_TENANT } from './common/decorators/skip-tenant.decorator';
 import { HttpTenantResolver } from './tenant-resolver';
@@ -14,7 +13,6 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { FirebaseJwtGuard } from './common/guards/firebase-jwt.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { PolicyGuard } from './modules/auth/guards/policy.guard';
-import { PermissionsCache } from '@goldsmith/tenant-config';
 import { PermissionsRepository } from './modules/auth/permissions.repository';
 import { AuthModule } from './modules/auth/auth.module';
 import { TenantBootModule } from './modules/tenant-boot/tenant-boot.module';
@@ -22,7 +20,6 @@ import { TenantLookupModule } from './modules/tenant-lookup/tenant-lookup.module
 import { SettingsModule } from './modules/settings/settings.module';
 import { PricingModule } from './modules/pricing/pricing.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
-
 import { BillingModule } from './modules/billing/billing.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { SyncModule } from './modules/sync/sync.module';
@@ -42,6 +39,8 @@ import { TenantAuditReporter } from './modules/tenant-boot/tenant-audit-reporter
 import { ImpersonationSessionAdapter } from './modules/platform-admin/impersonation-session.adapter';
 import { PriceSnapshotRefreshProcessor, PRICE_SNAPSHOT_REFRESH_QUEUE } from './workers/price-snapshot-refresh.processor';
 import { SalesAndViewsRollupProcessor, SALES_AND_VIEWS_ROLLUP_QUEUE } from './workers/sales-and-views-rollup.processor';
+import { areQueueWorkersEnabled } from './queue-runtime';
+import { createRedisClient } from './redis-client';
 
 @Injectable()
 class ConditionalTenantInterceptor implements NestInterceptor {
@@ -49,6 +48,7 @@ class ConditionalTenantInterceptor implements NestInterceptor {
     private readonly reflector: Reflector,
     private readonly inner: TenantInterceptor,
   ) {}
+
   intercept(ctx: ExecutionContext, next: CallHandler): Observable<unknown> {
     const skip = this.reflector.getAllAndOverride<boolean>(SKIP_TENANT, [ctx.getHandler(), ctx.getClass()]);
     if (skip) return next.handle();
@@ -61,32 +61,8 @@ class ConditionalTenantInterceptor implements NestInterceptor {
     EventEmitterModule.forRoot({ wildcard: false }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     BullModule.forRoot({
-      // Use a shared ioredis instance so we can attach an error handler once.
-      // Without this, every BullMQ Queue/Worker created by NestJS emits unhandled
-      // 'error' events (e.g. Upstash rate-limit, transient connection issues) that
-      // crash the process before it can bind to port 8080.
-      connection: (() => {
-        const u = new URL(process.env['REDIS_URL'] ?? 'redis://localhost:6379');
-        const client = new Redis({
-          host: u.hostname,
-          port: Number(u.port || 6379),
-          ...(u.password ? { password: decodeURIComponent(u.password) } : {}),
-          ...(u.username ? { username: decodeURIComponent(u.username) } : {}),
-          ...(u.pathname && u.pathname !== '/' ? { db: Number(u.pathname.slice(1)) } : {}),
-          ...(u.protocol === 'rediss:' ? { tls: {} } : {}),
-          lazyConnect: true,
-          enableReadyCheck: false,
-          connectTimeout: 10000,
-          maxRetriesPerRequest: null,
-          retryStrategy: (times: number) => Math.min(times * 200, 5000),
-        });
-        // Absorb connection/command-level errors — degraded queue functionality
-        // should not crash the API process (catalog, auth, billing still work).
-        client.on('error', (err: Error) => {
-          logger.warn({ err }, 'redis.client_error — queue functionality degraded, API still running');
-        });
-        return client;
-      })(),
+      extraOptions: { manualRegistration: !areQueueWorkersEnabled() },
+      connection: createRedisClient('bullmq', { maxRetriesPerRequest: null }),
     }),
     AuthModule,
     TenantBootModule,
@@ -94,7 +70,6 @@ class ConditionalTenantInterceptor implements NestInterceptor {
     SettingsModule,
     InventoryModule,
     PricingModule,
-
     CatalogModule,
     SyncModule,
     BillingModule,

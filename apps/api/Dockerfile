@@ -14,6 +14,7 @@ WORKDIR /repo
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json turbo.json .npmrc* ./
 COPY tsconfig.base.json tsconfig.json* ./
+COPY patches/ patches/
 COPY packages/ packages/
 COPY apps/api/ apps/api/
 

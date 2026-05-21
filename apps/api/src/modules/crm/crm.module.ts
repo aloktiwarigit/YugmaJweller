@@ -26,6 +26,7 @@ import { DpdpaDeletionRepository } from './dpdpa-deletion.repository';
 import { DpdpaHardDeleteProcessor } from '../../workers/dpdpa-hard-delete.processor';
 import { ConsentService } from './consent.service';
 import { ConsentRepository } from './consent.repository';
+import { areQueueWorkersEnabled } from '../../queue-runtime';
 
 const OCCASION_REMINDER_CRON = '30 2 * * *';
 const DPDPA_SWEEP_CRON       = '30 20 * * *';
@@ -82,6 +83,7 @@ export class CrmModule implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    if (!areQueueWorkersEnabled()) return;
     try {
       await this.occasionQueue.upsertJobScheduler(
         'occasion-reminder-daily',

@@ -14,6 +14,7 @@ import { FirebaseAdminProvider } from './firebase-admin.provider';
 import { FirebaseJwtStrategy } from './firebase-jwt.strategy';
 import { MockSmsAdapter } from './sms/mock-sms.adapter';
 import { SMS_ADAPTER } from './sms/sms-adapter.interface';
+import { createRedisClient } from '../../redis-client';
 
 @Module({
   imports: [PassportModule],
@@ -25,7 +26,7 @@ import { SMS_ADAPTER } from './sms/sms-adapter.interface';
     },
     {
       provide: 'AUTH_REDIS',
-      useFactory: () => new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379'),
+      useFactory: () => createRedisClient('auth'),
     },
     {
       provide: PermissionsCache,

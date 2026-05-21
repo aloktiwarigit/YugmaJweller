@@ -1,13 +1,14 @@
 import { Module, OnModuleInit } from '@nestjs/common';
 import { BullModule, InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
-import { Redis } from '@goldsmith/cache';
 import { RazorpayAdapter, StubPaymentsAdapter } from '@goldsmith/integrations-payments';
 import { AuthModule }    from '../auth/auth.module';
 import { PricingModule } from '../pricing/pricing.module';
 import { RateLockBookingsController } from './rate-lock-bookings.controller';
 import { RateLockBookingsService }    from './rate-lock-bookings.service';
 import { RateLockExpiryProcessor, RATE_LOCK_EXPIRY_QUEUE } from '../../workers/rate-lock-expiry.processor';
+import { areQueueWorkersEnabled } from '../../queue-runtime';
+import { createRedisClient } from '../../redis-client';
 
 export function createRateLockPaymentsAdapter(): RazorpayAdapter | StubPaymentsAdapter {
   const adapter   = process.env['PAYMENTS_ADAPTER'] ?? '';
@@ -49,7 +50,7 @@ export function createRateLockPaymentsAdapter(): RazorpayAdapter | StubPaymentsA
     {
       provide: 'RATE_LOCK_REDIS',
       useFactory: () =>
-        new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
+        createRedisClient('rate-lock', {
           maxRetriesPerRequest: 3,
         }),
     },
@@ -62,6 +63,7 @@ export class RateLockBookingsModule implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    if (!areQueueWorkersEnabled()) return;
     try {
       await this.expiryQueue.add(
         'expire-stale',

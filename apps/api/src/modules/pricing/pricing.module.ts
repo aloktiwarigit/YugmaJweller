@@ -20,6 +20,8 @@ import {
   CircuitBreaker,
   LastKnownGoodCache,
 } from '@goldsmith/rates';
+import { areQueueWorkersEnabled } from '../../queue-runtime';
+import { createRedisClient } from '../../redis-client';
 
 // ---------------------------------------------------------------------------
 // IST trading hours cron patterns (UTC+5:30)
@@ -50,7 +52,7 @@ const OUTSIDE_HOURS_CRON  = '0 12-23,0-2 * * *';      // every hour at :00, UTC 
     // We use 'PG_POOL' which is provided and exported by AuthModule
     {
       provide: 'PRICING_REDIS',
-      useFactory: () => new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379'),
+      useFactory: () => createRedisClient('pricing'),
     },
     {
       provide: LastKnownGoodCache,
@@ -102,6 +104,7 @@ export class PricingModule implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    if (!areQueueWorkersEnabled()) return;
     // Register repeatable jobs — best-effort: Redis may be transiently unavailable at boot
     try {
       await this.queue.upsertJobScheduler(
