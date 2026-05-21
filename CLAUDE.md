@@ -508,9 +508,26 @@ Add `-SkipCopy` to reuse an existing `C:\g` workspace (skips the 90-second roboc
 Add `-Aab` to build an Android App Bundle instead of an APK (for Play Store upload; does not install on device).
 
 Prerequisites that must exist locally (all gitignored):
-- `apps/customer-mobile/.env.production` — API URL, package name, Firebase project ID, EAS project ID, Key Vault name
-- `apps/customer-mobile/android/app/google-services.json` — downloaded from Firebase Console for `com.goldsmith.customer`
+- `apps/customer-mobile/.env.production` — see below for required vars
+- `apps/customer-mobile/android/app/google-services.json` — gitignored; already registered in Firebase `goldsmith-dev` for `com.goldsmith.customer`
 - Azure CLI logged in (`az login` once per machine)
+
+**Required `.env.production` vars for the anchor-dev build:**
+```
+APP_ENV=production
+BUILD_TARGET_PLATFORM=android
+EXPO_PUBLIC_DEV_AUTH=0
+EXPO_PUBLIC_API_BASE_URL=https://goldsmith-api-528920018833.asia-south1.run.app
+EXPO_PUBLIC_SHOP_SLUG=anchor-dev
+EXPO_PUBLIC_APP_NAME=श्री राम ज्वैलर्स
+EXPO_PUBLIC_ANDROID_PACKAGE=com.goldsmith.customer
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=goldsmith-dev
+GOOGLE_SERVICES_JSON=./android/app/google-services.json
+EXPO_PUBLIC_EAS_PROJECT_ID=1ad93907-29f0-47c1-b014-bf0d7a5ae770
+AZURE_KEYVAULT_NAME=kv-writ-prod
+```
+`BUILD_TARGET_PLATFORM=android` is required — without it `app.config.ts` demands `GOOGLE_SERVICES_PLIST` for iOS too and fails the build.
+`EXPO_PUBLIC_EAS_PROJECT_ID` is a stable placeholder UUID; `app.config.ts` validates it exists in production mode even though no EAS builds are used.
 
 ### Critical: workspace must be C:\g (4 chars), not C:\gs or C:\gs-release
 
