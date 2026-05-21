@@ -491,4 +491,109 @@ Use Maestro, not Paparazzi, for customer-mobile screen review. Paparazzi is usef
 
 ---
 
+## Production release build — both apps on device (learned 2026-05-20)
+
+The deploy script `scripts/deploy-customer-release.ps1` handles the full customer-mobile release build pipeline. The shopkeeper uses a simpler local Gradle path. Read this section before touching either release build.
+
+### The one command to install customer mobile on a device
+
+```powershell
+.\scripts\deploy-customer-release.ps1 -DeviceSerial <serial> -WorkspacePath C:\g
+```
+
+What it does: fetches signing keystore from Azure Key Vault (`kv-writ-prod`), copies the repo to `C:\g`, runs pnpm install with hoisting, builds the release APK, installs via ADB.
+
+Add `-SkipCopy` to reuse an existing `C:\g` workspace (skips the 90-second robocopy + pnpm install when code hasn't changed since last run).
+
+Add `-Aab` to build an Android App Bundle instead of an APK (for Play Store upload; does not install on device).
+
+Prerequisites that must exist locally (all gitignored):
+- `apps/customer-mobile/.env.production` — API URL, package name, Firebase project ID, EAS project ID, Key Vault name
+- `apps/customer-mobile/android/app/google-services.json` — downloaded from Firebase Console for `com.goldsmith.customer`
+- Azure CLI logged in (`az login` once per machine)
+
+### Critical: workspace must be C:\g (4 chars), not C:\gs or C:\gs-release
+
+The pnpm virtual store path for `react-native` is:
+`.pnpm/react-native@0.74.0_@babel+core@7.29.0_@babel+preset-env@7.29.2_@babel+core@7.29.0__@types+react@18.2.79_react@18.2.0/node_modules/react-native/ReactAndroid/src/main/jni/react/turbomodule/ReactCommon/NativeMethodCallInvokerHolder.h`
+
+At `C:\gs-release` (11 chars) this path is 261 characters — 1 over the Windows limit. CMake/ninja resolve symlinks to real paths, so hoisting does not help. At `C:\g` (4 chars) the path is 252 characters — within the limit.
+
+**Never use `C:\gs-release` or any workspace path longer than 4-5 characters for release builds.**
+
+### Use robocopy, not xcopy, for the repo copy step
+
+`xcopy /EXCLUDE:file` reads the exclude file and the BOM written by PowerShell 5.1's `Set-Content -Encoding UTF8` causes it to silently misread all patterns. Result: nothing is excluded, the `.claude/worktrees/` deep paths cause xcopy to fail or skip the entire `android/` directory.
+
+`robocopy /XD .claude node_modules .git` excludes by directory name, works correctly with PS 5.1, and is already in the deploy script.
+
+### Run pnpm via cmd, not PowerShell, to avoid stderr ErrorRecord
+
+PowerShell 5.1 wraps every stderr line from a native executable as an `ErrorRecord`. The pnpm.ps1 wrapper writes a Node deprecation warning to stderr. With `$ErrorActionPreference = "Stop"`, this kills the script even though pnpm succeeded.
+
+**Fix already in deploy script:** `cmd /c "pnpm install --frozen-lockfile"`. The exit code is still checked; the PS wrapper's stderr wrapping is bypassed.
+
+### compileSdk/targetSdk must stay at 34 for Expo SDK 51
+
+`expo-modules-core@1.12.26` (ships with Expo 51) contains Kotlin code that does not compile cleanly against `compileSdk = 35`. Symptom:
+
+```
+e: PermissionsService.kt:166:36 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver
+```
+
+`android/gradle.properties` in both apps is pinned to `android.compileSdkVersion=34` and `android.targetSdkVersion=34`. Do not bump these until Expo SDK is upgraded.
+
+### Shopkeeper: JVM target mismatch with JDK 21
+
+JDK 21 (installed on this machine) defaults Kotlin compilation to JVM 21. Expo 51 Kotlin code targets JVM 17. This causes:
+
+```
+Inconsistent JVM-target compatibility detected for tasks 'compileReleaseJavaWithJavac' (17) and 'compileReleaseKotlin' (21)
+```
+
+followed by `expo-document-picker:compileReleaseKotlin FAILED` which cascades to `ExpoModulesPackageList.java: cannot access DocumentPickerModule`.
+
+**Fix already in `apps/shopkeeper/android/build.gradle`:**
+```groovy
+subprojects {
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+        kotlinOptions.jvmTarget = "17"
+    }
+}
+```
+
+Do not remove this block. Do not install JDK 17 as a workaround — the fix is in the repo.
+
+### Shopkeeper release build (no deploy script yet)
+
+The shopkeeper uses debug signing for release builds (no release keystore configured). To build and install:
+
+```powershell
+# Copy repo to C:\g first (robocopy + pnpm install) if not already done
+# Then from C:\g\apps\shopkeeper\android:
+$env:EXPO_PUBLIC_API_BASE_URL = "https://goldsmith-api-528920018833.asia-south1.run.app"
+$env:EXPO_PUBLIC_TENANT_SLUG  = "anchor-dev"
+Push-Location C:\g\apps\shopkeeper\android
+.\gradlew.bat :app:assembleRelease
+adb -s <serial> install -r app\build\outputs\apk\release\app-release.apk
+Pop-Location
+```
+
+The shopkeeper `android/` directory is now git-tracked (bare workflow, same as customer-mobile). Both `android/` directories must be kept in sync with any `expo prebuild` changes — do not run `expo prebuild` without re-committing the generated output.
+
+### Signing and secrets location
+
+| Secret | Where |
+|--------|-------|
+| Android keystore | Azure Key Vault `kv-writ-prod` → `goldsmith-customer-keystore-b64` (base64) |
+| Keystore password | Azure Key Vault `kv-writ-prod` → `goldsmith-customer-store-password` |
+| Key alias | `goldsmith-customer` |
+| Package name | `com.goldsmith.customer` |
+| Firebase app | `goldsmith-dev` project, app ID `1:528920018833:android:b7c84d45075149fde3e430` |
+| Signing SHA-1 | `6C:4C:45:39:76:73:EE:1B:97:67:07:7E:D2:28:FA:95:E3:40:0A:13` |
+
+The deploy script fetches the keystore at build time, writes a temp file, and deletes it after Gradle exits. No keystore file is ever committed or persisted on disk.
+
+---
+
 _When in doubt, read the PRD. Every design, architecture, and implementation decision should trace back to a specific FR or NFR._
