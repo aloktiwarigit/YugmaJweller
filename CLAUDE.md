@@ -1,6 +1,6 @@
 # Goldsmith — Claude Code Project Guide
 
-Project-level primer. Every Claude Code session should read this first. Updated 2026-05-04 (code-truth completion audit added; stack correction remains ADR-0015).
+Project-level primer. Every Claude Code session should read this first. Updated 2026-05-21 (truth pass: GCP Cloud Run hosting reality, FEATURE-COMPLETE + demo-closeout status, code-truth audit pointer replaced with `docs/current-implementation-status.md`, semgrep path corrected).
 
 ---
 
@@ -8,9 +8,9 @@ Project-level primer. Every Claude Code session should read this first. Updated 
 
 **Goldsmith** is a multi-tenant white-label jewellery platform for local Indian jewellers. Two apps (shopkeeper + customer-facing) sharing one backend and database, packaged as each jeweller's OWN brand.
 
-- **MVP anchor:** An Ayodhya (Uttar Pradesh, Hindi belt) jeweller — 2-5 staff, full-spectrum (gold, diamond, silver, bridal, wholesale), client-funded, cost-conscious.
-- **Productization:** After anchor launch, onboard 2nd-Nth jewellers via configuration (no custom code).
-- **Strategic model:** Anchor-customer-then-platform (not freemium-first). Multi-tenant architecture from Day 1.
+- **MVP anchor profile:** A typical Ayodhya (Uttar Pradesh, Hindi belt) jeweller — 2-5 staff, full-spectrum (gold, diamond, silver, bridal, wholesale), Hindi-first, no existing software. (Anchor *profile* drove FR contracts; anchor *signing* is no longer a prerequisite — see Delivery model below.)
+- **Productization:** Multi-tenant from Day 1. New jewellers onboard via configuration (theme + brand + seed data), not custom code.
+- **Delivery model (locked 2026-05-05):** **Demo-first, customer-customize.** Build a polished demo, pitch 10-15 jewellers in parallel, first signer becomes tenant-1. See §"Delivery model — demo-first" below — that section supersedes the older "anchor-customer-then-platform" framing in BMAD docs; read those docs for FR contracts, not GTM sequencing.
 
 ## Where the authoritative context lives
 
@@ -18,7 +18,7 @@ These documents are requirement/context sources, not completion proof. For compl
 
 | Document | Path | What's in it |
 |----------|------|--------------|
-| Code-truth completion audit | `docs/code-truth-completion-audit-2026-05-04.md` | Current code-first completion gaps, evidence rules, and future agent-context plan |
+| Current implementation status | `docs/current-implementation-status.md` + `docs/agent-context/current-state.json` | Live code-first completion state. **Always read these before claiming any FR/story is complete.** Regenerate the agent-context JSONs with `pnpm docs:context`; validate with `pnpm docs:validate`. |
 | PRD | `_bmad-output/planning-artifacts/prd.md` | 126 FRs + 70 NFRs + journeys + scoping (binding) |
 | Customer storefront addendum | `docs/prd-addendum-customer-storefront.md` | FR127-FR140 + customer storefront completion notes |
 | PRFAQ | `_bmad-output/planning-artifacts/prfaq-Goldsmith.md` | Vision, customer FAQs, verdict |
@@ -26,18 +26,17 @@ These documents are requirement/context sources, not completion proof. For compl
 | Domain Research | `_bmad-output/planning-artifacts/research/domain-indian-jewelry-retail-research-2026-04-15.md` | Market, regulatory, tech, competitive (650 lines, 180+ sources) |
 | Market Research | `_bmad-output/planning-artifacts/research/market-customer-insights-research-2026-04-16.md` | Customer archetypes, pain quotes, journey maps |
 | Implementation Readiness | `_bmad-output/planning-artifacts/implementation-readiness-report-2026-04-16.md` | PRD readiness 9.2/10; flagged risks for UX/CA/CE |
-| Approved plan | `C:\Users\alokt\.claude\plans\tingly-weaving-frog.md` | Phased roadmap (v2 anchor-customer pivot) |
+| Runbook | `docs/runbook.md` | Live ops manual — Cloud Run deploys (§17), incident playbooks, rollback, env vars |
 | Memory | `C:\Users\alokt\.claude\projects\C--Alok-Business-Projects-Goldsmith\memory\MEMORY.md` | Prior-session context only; never implementation proof |
 
 ## Code-truth audit rules
 
-- Start completion and gap-analysis sessions with `docs/code-truth-completion-audit-2026-05-04.md`.
+- Start completion and gap-analysis sessions with `docs/current-implementation-status.md` and `docs/agent-context/current-state.json`. If these look stale, regenerate with `pnpm docs:context` and validate with `pnpm docs:validate` before relying on them.
 - Treat BMAD docs, PRD, addenda, plans, specs, and review files as requirements or historical context only.
 - Do not mark a story/FR complete unless current code, migrations, reachable routes/UI, tests, or CI provide evidence.
 - If code exists but is not wired into app navigation or public/API routes, mark the feature partial.
 - If tests exist but are not wired into Turbo/CI or a known runnable command, mark the proof incomplete.
-- Future broad-context work should create or update `docs/agent-context/` machine-readable docs before spending tokens on long Markdown plans/reviews.
-- Target agent-context files: `project.context.json`, `traceability.json`, `decision-index.json`, `task-routing.json`, `doc-index.json`, and `acceptance-evidence.json`.
+- `docs/agent-context/` is the machine-readable layer the primer points to: `project.context.json`, `current-state.json`, `traceability.json`, `decision-index.json`, `task-routing.json`, `doc-index.json`, `acceptance-evidence.json`, `implementation-map.json`. Consult these before reading long-form Markdown.
 - Avoid default-reading memory, git history, long `docs/reviews/**`, BMAD research docs, and HTML prototypes unless the task specifically needs historical context.
 
 ## Tech stack (locked)
@@ -61,24 +60,32 @@ These documents are requirement/context sources, not completion proof. For compl
 | File storage | **Azure Blob Storage** (Central India / South India) + **ImageKit** CDN |
 | Auth | **Firebase Auth** (phone OTP) — see ADR-0015 |
 | Monorepo | **Turborepo** |
-| Hosting | **Azure Central India or South India** — data residency mandatory. Deferred until anchor SOW signed (see ADR-0015 + startup-economics feedback). |
+| Hosting | **GCP Cloud Run** (`asia-south1`, Mumbai) — data residency met. API service `goldsmith-api` in project `goldsmith-dev`; deploy via `cloudbuild.yaml` (see `docs/runbook.md` §17). Customer-web has its own `cloudbuild-customer-web.yaml`. Azure Key Vault `kv-writ-prod` still used **only** for Android signing secrets — not runtime hosting. (asia-east1 stack decommissioned 2026-05-17. The Azure hosting plan in ADR-0015 was never executed; a successor ADR for the GCP move is still to be written.) |
 
-## India vendor stack (locked)
+## India vendor stack
 
-- **Gold rates:** IBJA (primary) + Metals.dev (fallback)
-- **Payments:** Razorpay (primary) + Cashfree (secondary)
-- **WhatsApp:** AiSensy BSP (Rs 1,500/mo, unlimited agents) — onboard when anchor MRR justifies
-- **SMS/OTP:** **Firebase Auth** handles phone OTP end-to-end (free Spark tier for MVP; pay-as-you-go $0.06/SMS when exceeded). MSG91 deferred unless Firebase Auth cannot fit a specific flow.
-- **KYC/eSign (Phase 4+):** Digio
-- **Maps:** Ola Maps (5M calls/month free)
-- **Push:** Firebase Cloud Messaging (free)
-- **Analytics:** PostHog (data-residency-compliant deployment)
-- **Errors:** Sentry
-- **Support:** Zoho Desk Standard (WhatsApp-native)
-- **Email:** Resend (MVP) → Azure Communication Services Email at scale
-- **HUID verification:** Surepass API wrapper (consumer-facing)
+Two lists — **wired** (adapter implemented and in use) vs **planned / stub-only** (adapter not yet built, or only a stub for testing). All integrations must use the adapter pattern under `packages/integrations/<vendor>/` — swapping a vendor = adapter rewrite, not a data migration.
 
-All vendor integrations must use adapter pattern — swap = adapter rewrite only, not data migration.
+**Wired (live in code):**
+- **Gold rates:** IBJA (primary) + Metals.dev (fallback) — `packages/integrations/rates/` with circuit-breaker, fallback-chain, LKG cache
+- **Payments (primary):** Razorpay — `packages/integrations/payments/src/razorpay-adapter.ts`
+- **Auth + OTP:** Firebase Auth (phone OTP end-to-end; free Spark tier, pay-as-you-go $0.06/SMS over quota) — `apps/api/src/modules/auth/firebase-admin.provider.ts`. ADR-0016.
+- **Analytics:** PostHog — `packages/observability/src/posthog.ts`
+- **Errors:** Sentry — `packages/observability/src/sentry.ts` + per-app `sentry.{client,server,edge}.config.ts`
+- **Search:** Meilisearch (Hindi-first) — `packages/integrations/search/src/adapters/meilisearch.adapter.ts` (stub adapter throws `MeilisearchUnavailableError` in dev)
+- **File storage:** Azure Blob + ImageKit CDN — `packages/integrations/storage/` (default `STORAGE_ADAPTER=stub`; set `STORAGE_ADAPTER=azure-imagekit` to activate). The only Azure runtime dep in the stack.
+
+**Planned / not yet implemented (stub-only or no adapter):**
+- **Payments (secondary):** Cashfree — no adapter yet (only Razorpay + stub)
+- **WhatsApp BSP:** AiSensy (Rs 1,500/mo, unlimited agents) — **deferred to Epic 13**; current send-paths in `custom-orders.service.ts` and `billing/share.service.ts` are stubs
+- **KYC/eSign (Phase 4+):** Digio — no adapter yet
+- **Maps:** Ola Maps (5M calls/month free) — no adapter yet
+- **Push:** Firebase Cloud Messaging — no adapter; only an `sms.adapter.ts` TODO for MSG91 exists
+- **Email:** Resend (MVP) or a GCP-compatible alternative at scale — no adapter yet
+- **HUID verification:** Surepass API wrapper (consumer-facing) — no adapter yet
+- **Support:** Zoho Desk Standard (WhatsApp-native) — out-of-app vendor, no integration code
+
+If you're writing code that needs a "planned" vendor, you're **building the integration**: add the adapter under `packages/integrations/<vendor>/`, ship a stub adapter alongside it (`StubXAdapter` that throws `XUnavailableError`), and write tests against the stub first.
 
 ## Non-negotiable engineering rules
 
@@ -182,24 +189,22 @@ designing specific features. Every design must trace to one or more FRs.
 
 Prepend this priming to any frontend-design session on a new feature.
 
-## BMAD workflow status
+## Project status (live: 2026-05-21)
 
-- ✅ Domain Research — complete
-- ✅ Market Research — complete
-- ✅ PRFAQ Challenge — complete
-- ✅ Create PRD — complete (126 FRs, 70 NFRs)
-- ✅ Check Implementation Readiness — complete (9.2/10)
-- ✅ Create UX Design — complete (Direction 5 Hindi-First Editorial locked)
-- ✅ Create Architecture — complete (modular monolith, 12 ADRs)
-- ✅ Create Epics & Stories — complete (16 epics, 138 stories)
-- ✅ .bmad-readiness-passed — gate passed 2026-04-17
-- ⏭️ **Now in execution:** Sprint 1 — story-by-story dev cycle
+For live state, read `docs/current-implementation-status.md` and `docs/agent-context/current-state.json`. The BMAD planning phases (Domain Research, Market Research, PRFAQ, PRD, Implementation Readiness, UX, Architecture, Epics & Stories) all completed 2026-04-15 through 2026-04-17; readiness gate passed 2026-04-17.
+
+- ✅ **FEATURE-COMPLETE** since 2026-05-01 — all 126 PRD FRs + storefront FR127-FR140 coded; **17 ADRs** (0001-0017, latest `0017-customer-storefront-architecture.md`); migrations through `0075_customer_self_deletion_extensions.sql`.
+- ✅ **Storefront uplift Phases A-E** merged — image pipeline, header/tokens, 12-section home, filter/PDP, Lighthouse + Maestro E2E gates.
+- ✅ **Demo-closeout complete 2026-05-21** — demo-1 (reviews moderation) + demo-2 (FR65 customer viewing-history) shipped; release APKs (customer + shopkeeper) built locally with Azure Key Vault signing and installed on device.
+- ⏭️ **Next:** anchor SOW + tenant-1 onboarding. Pre-tenant-1 punch list tracked in user memory; promote to `docs/tenant-1-readiness.md` before first paying customer signs.
+
+> **Per-story review markers** (`.codex-review-passed`, `.security-review-passed`, `.claude-review-passed`, `.bmad-readiness-passed`) at repo root are **persistent receipts from the last shipping story**, not transient current-branch gates. Do not infer current branch state from their presence or mtime.
 
 ## Startup economics (startup-lean, revenue-first)
 
 Pre-revenue, engineering choices minimize recurring cost. Enterprise hardening waits until first paying tenant. See ADR-0015 + `memory/feedback_startup_economics_first.md`.
 
-Floor-cost MVP target: **≤ $20/month** (Firebase Auth free tier, Azure Postgres Flexible Burstable B1ms ~$12/mo once deployed, Azure Container Apps consumption scale-to-zero, Blob Storage pennies, Key Vault ~$1, GitHub + Sentry + PostHog free tiers).
+Floor-cost MVP target: **low-tens of $/month** on the current GCP Cloud Run (`asia-south1`) stack — Cloud Run scale-to-zero pays only for actual request-seconds; Postgres sized to anchor traffic (local Docker today, Cloud SQL or equivalent when tenant-1 deploys); Firebase Auth free tier; Cloud Storage / Azure Blob (env-toggle via `STORAGE_ADAPTER`) for images + ImageKit CDN; Azure Key Vault ~$1 (Android signing only); GitHub + Sentry + PostHog free tiers. Exact ledger lives in `docs/runbook.md` and the deployed Cloud Build pipeline.
 
 **Graduation triggers (ONLY then add enterprise infra):**
 - First paying anchor signs SOW + MRR confirmed
@@ -218,7 +223,17 @@ Everything in the original "Enterprise Floor" (Sentry + OTel + feature flags + S
 
 ## Working rules
 
-- When editing code, run typecheck + lint before committing.
+**Command bundle (use these — they exist in root `package.json`):**
+
+- **Pre-commit gate:** `pnpm typecheck && pnpm lint`. Don't commit without both green.
+- **Pre-push / pre-PR gate:** `pnpm test:ci` — runs `typecheck + lint + test:unit + test:integration + test:tenant-isolation + semgrep + docs:validate`. This is the CI command; run it locally before pushing.
+- **Semgrep alone:** `pnpm semgrep` (configs in `ops/semgrep/*.yaml`, ESLint custom rules in `ops/eslint-rules/`).
+- **Agent-context refresh:** `pnpm docs:context` regenerates `docs/agent-context/*.json` from current repo state; `pnpm docs:validate` checks consistency. Run `docs:context` after merging anything that changes FRs, migrations, ADRs, or routes.
+- **Seed data:** `pnpm seed:anchor` (anchor jeweller), `pnpm seed:anchor-dev-2` (second tenant for isolation tests), `pnpm seed:demo` (demo tenant), `pnpm seed:storefront-demo` (storefront preview content).
+- **Releases:** `pnpm deploy:customer-release` builds + installs the customer-mobile APK via the PowerShell script (Windows only — see §"Production release build" below). Shopkeeper release is manual Gradle, same section.
+
+**General discipline:**
+
 - Never amend a published commit; create a new one.
 - Never skip git hooks with `--no-verify` unless explicitly asked.
 - Do not add features, refactor, or abstract beyond what the task requires. Small bug fix ≠ excuse for restructuring the module.
@@ -281,7 +296,7 @@ Protocol:
    - Shopkeeper stories: emulator or device (Metro boot + golden-path flow). Memory `feedback_drive_smoke_headless.md` for headless walk via adb screencap + input.
    - API-only stories: `curl` round-trip against running service.
    - Web stories: browser render + golden-path flow.
-8. **Code-truth audit before claiming complete.** Grep current code for the FR's expected route/migration/test. No completion claim without code evidence. Memory + git logs are NOT proof. Per `docs/code-truth-completion-audit-2026-05-04.md`.
+8. **Code-truth audit before claiming complete.** Grep current code for the FR's expected route/migration/test. No completion claim without code evidence. Memory + git logs are NOT proof. Per `docs/current-implementation-status.md` + `docs/agent-context/current-state.json` (regenerate via `pnpm docs:context` if stale).
 9. `git push`
 
 **Cut from prior Class B ceremony (drop entirely, observed zero signal in WS-3A):**
@@ -290,7 +305,7 @@ Protocol:
 - Re-review of doc-only fix-ups
 - Brainstorm session for stories that follow a locked template
 
-**Codified recurring patterns are caught by Semgrep/ESLint, NOT manual review.** See `tools/semgrep/goldsmith-*.yml` (current set) and `.eslintrc.cjs` overrides. Every reviewer-caught pattern that recurs more than once gets codified before the next story. Manual reviewers must NOT spend time on patterns that have automated rules.
+**Codified recurring patterns are caught by Semgrep/ESLint, NOT manual review.** See `ops/semgrep/*.yaml` (run via `pnpm semgrep`) and `ops/eslint-rules/` + `.eslintrc.cjs` overrides. Every reviewer-caught pattern that recurs more than once gets codified before the next story. Manual reviewers must NOT spend time on patterns that have automated rules.
 
 ### Class C — minimal ceremony (updated 2026-05-05)
 Applies to: copy tweaks, color/spacing, config toggles, doc-only, refactors < 50 LOC, dep bumps, **nav-edge wiring** (adding a `Stack.Screen` + main-tab link to existing surfaces), **seed-data scripts**, **Semgrep/ESLint rule additions**, **CLAUDE.md / agent-context doc updates**.
@@ -327,7 +342,7 @@ Each worktree gets its own implementer + reviewer cycle. Merge order respects mi
 
 ### Code-truth audit gate — no completion claim without code evidence (2026-05-05)
 
-Per `docs/code-truth-completion-audit-2026-05-04.md`, every claim that a story / FR / acceptance criterion is "complete" MUST be backed by a `git grep` or file-existence check against current code. Memory, prior session summaries, commit logs, and review markers are **not proof**.
+Per `docs/current-implementation-status.md` + `docs/agent-context/current-state.json`, every claim that a story / FR / acceptance criterion is "complete" MUST be backed by a `git grep` or file-existence check against current code. Memory, prior session summaries, commit logs, and review markers are **not proof**.
 
 Before a story's commit message says "complete", run (or have an agent run) the audit checklist:
 - The expected route is registered (`grep '<route>' apps/api/src/...`)
@@ -550,15 +565,17 @@ PowerShell 5.1 wraps every stderr line from a native executable as an `ErrorReco
 
 **Fix already in deploy script:** `cmd /c "pnpm install --frozen-lockfile"`. The exit code is still checked; the PS wrapper's stderr wrapping is bypassed.
 
-### compileSdk/targetSdk must stay at 34 for Expo SDK 51
+### compileSdk asymmetry: customer-mobile = 35 (with workaround), shopkeeper = 34
 
-`expo-modules-core@1.12.26` (ships with Expo 51) contains Kotlin code that does not compile cleanly against `compileSdk = 35`. Symptom:
+`expo-modules-core@1.12.26` (ships with Expo 51) emits a Kotlin compile warning against `compileSdk = 35`:
 
 ```
 e: PermissionsService.kt:166:36 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver
 ```
 
-`android/gradle.properties` in both apps is pinned to `android.compileSdkVersion=34` and `android.targetSdkVersion=34`. Do not bump these until Expo SDK is upgraded.
+**Customer-mobile** is on `android.compileSdkVersion=35` / `android.targetSdkVersion=35` / `buildToolsVersion=35.0.0`, with `android.suppressUnsupportedCompileSdk=35` in `gradle.properties` to silence the AGP warning and `patches/expo-modules-core@1.12.26.patch` to handle the Kotlin nullable-receiver case. JVM heap is bumped to `-Xmx4096m` with `MaxMetaspaceSize=1024m` to survive release builds with the SDK 35 toolchain.
+
+**Shopkeeper** is still on `compileSdk=34` / `targetSdk=34`. It hasn't needed the bump and the JDK-17 Kotlin pin in `apps/shopkeeper/android/build.gradle` is enough for it. Do not bump shopkeeper to 35 speculatively — wait for a concrete driver.
 
 ### Shopkeeper: JVM target mismatch with JDK 21
 
