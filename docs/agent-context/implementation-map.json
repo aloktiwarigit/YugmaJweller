@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-18T02:13:46.375Z",
+  "generated": "2026-05-21T11:11:12.707Z",
   "apps": [
     {
       "name": "@goldsmith/api",
@@ -329,6 +329,10 @@
         {
           "method": "GET",
           "path": "/api/v1/analytics/products/:id/views"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/analytics/customers/:customerId/views"
         }
       ]
     },
@@ -1031,6 +1035,14 @@
         },
         {
           "method": "GET",
+          "path": "/api/v1/reviews"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/reviews/:id/visibility"
+        },
+        {
+          "method": "GET",
           "path": "/api/v1/reviews/products/:productId"
         }
       ]
@@ -1417,6 +1429,18 @@
         "route": "/reports/stock-aging"
       },
       {
+        "file": "apps/shopkeeper/app/reviews/[id].tsx",
+        "route": "/reviews/[id]"
+      },
+      {
+        "file": "apps/shopkeeper/app/reviews/_layout.tsx",
+        "route": "/reviews/_layout"
+      },
+      {
+        "file": "apps/shopkeeper/app/reviews/index.tsx",
+        "route": "/reviews"
+      },
+      {
         "file": "apps/shopkeeper/app/settings/_layout.tsx",
         "route": "/settings/_layout"
       },
@@ -1559,20 +1583,12 @@
         "route": "/loyalty"
       },
       {
-        "file": "apps/customer-mobile/app/profile/addresses.tsx",
-        "route": "/profile/addresses"
-      },
-      {
         "file": "apps/customer-mobile/app/profile/delete-account-done.tsx",
         "route": "/profile/delete-account-done"
       },
       {
         "file": "apps/customer-mobile/app/profile/delete-account.tsx",
         "route": "/profile/delete-account"
-      },
-      {
-        "file": "apps/customer-mobile/app/profile/referral.tsx",
-        "route": "/profile/referral"
       },
       {
         "file": "apps/customer-mobile/app/rate-lock/index.tsx",
@@ -1661,6 +1677,10 @@
         "route": "/shipping-policy"
       },
       {
+        "file": "apps/customer-web/app/sign-in/page.tsx",
+        "route": "/sign-in"
+      },
+      {
         "file": "apps/customer-web/app/size-guide/[category]/page.tsx",
         "route": "/size-guide/[category]"
       },
@@ -1703,6 +1723,7 @@
     "test:integration": "turbo run test:integration",
     "test:tenant-isolation": "turbo run test:tenant-isolation",
     "build": "turbo run build",
+    "deploy:customer-release": "powershell -ExecutionPolicy Bypass -File scripts/deploy-customer-release.ps1",
     "db:reset": "bash scripts/db-reset.sh",
     "db:generate-rls": "tsx packages/db/src/codegen/generate-rls.ts",
     "db:assert-marked": "tsx packages/db/src/codegen/assert-all-tables-marked.ts",

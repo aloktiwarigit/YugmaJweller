@@ -1,10 +1,10 @@
 {
-  "generated": "2026-05-18T02:13:43.512Z",
+  "generated": "2026-05-21T11:11:11.473Z",
   "summary": {
     "total": 140,
-    "complete": 0,
+    "complete": 4,
     "partial": 3,
-    "missing": 137,
+    "missing": 133,
     "planned": 0
   },
   "frs": [
@@ -63,15 +63,15 @@
     {
       "id": "FR5",
       "title": "Shopkeeper OTP login and session",
-      "epic": "",
-      "story": "",
-      "status": "missing",
-      "evidence": "missing",
+      "epic": "E1",
+      "story": "1.1",
+      "status": "complete",
+      "evidence": "code-verified",
       "wave": null,
-      "specFile": null,
-      "codeModule": null,
-      "testFile": null,
-      "ciJob": null
+      "specFile": "docs/superpowers/specs/2026-04-18-story-1.1-auth-and-dashboard-design.md",
+      "codeModule": "apps/api/src/modules/auth",
+      "testFile": "apps/api/test/_auth-test-setup.ts",
+      "ciJob": "integration"
     },
     {
       "id": "FR6",
@@ -102,15 +102,15 @@
     {
       "id": "FR8",
       "title": "Shop profile configuration",
-      "epic": "",
-      "story": "",
-      "status": "missing",
-      "evidence": "missing",
+      "epic": "E1",
+      "story": "1.1",
+      "status": "complete",
+      "evidence": "code-verified",
       "wave": null,
-      "specFile": null,
-      "codeModule": null,
-      "testFile": null,
-      "ciJob": null
+      "specFile": "docs/superpowers/specs/2026-04-18-story-1.1-auth-and-dashboard-design.md",
+      "codeModule": "apps/api/src/modules/auth",
+      "testFile": "apps/api/test/_auth-test-setup.ts",
+      "ciJob": "integration"
     },
     {
       "id": "FR9",
@@ -128,15 +128,15 @@
     {
       "id": "FR10",
       "title": "Wastage percentage configuration",
-      "epic": "",
-      "story": "",
-      "status": "missing",
-      "evidence": "missing",
+      "epic": "E1",
+      "story": "1.1",
+      "status": "complete",
+      "evidence": "code-verified",
       "wave": null,
-      "specFile": null,
-      "codeModule": null,
-      "testFile": null,
-      "ciJob": null
+      "specFile": "docs/superpowers/specs/2026-04-18-story-1.1-auth-and-dashboard-design.md",
+      "codeModule": "apps/api/src/modules/auth",
+      "testFile": "apps/api/test/_auth-test-setup.ts",
+      "ciJob": "integration"
     },
     {
       "id": "FR11",
@@ -154,15 +154,15 @@
     {
       "id": "FR12",
       "title": "Try-at-home toggle and piece count",
-      "epic": "",
-      "story": "",
-      "status": "missing",
-      "evidence": "missing",
+      "epic": "E1",
+      "story": "1.2",
+      "status": "complete",
+      "evidence": "code-verified",
       "wave": null,
-      "specFile": null,
-      "codeModule": null,
-      "testFile": null,
-      "ciJob": null
+      "specFile": "docs/superpowers/specs/2026-04-19-story-1.2-staff-invite-design.md",
+      "codeModule": "apps/api/src/modules/auth",
+      "testFile": "apps/api/test/_auth-test-setup.ts",
+      "ciJob": "integration"
     },
     {
       "id": "FR13",
@@ -1883,19 +1883,6 @@
       "ciJob": null
     },
     {
-      "id": "FR5",
-      "title": "Shopkeeper OTP login and session",
-      "epic": "",
-      "story": "",
-      "status": "missing",
-      "evidence": "missing",
-      "wave": null,
-      "specFile": null,
-      "codeModule": null,
-      "testFile": null,
-      "ciJob": null
-    },
-    {
       "id": "FR6",
       "title": "Staff OTP login",
       "epic": "",
@@ -1922,19 +1909,6 @@
       "ciJob": null
     },
     {
-      "id": "FR8",
-      "title": "Shop profile configuration",
-      "epic": "",
-      "story": "",
-      "status": "missing",
-      "evidence": "missing",
-      "wave": null,
-      "specFile": null,
-      "codeModule": null,
-      "testFile": null,
-      "ciJob": null
-    },
-    {
       "id": "FR9",
       "title": "Making charges configuration",
       "epic": "",
@@ -1948,34 +1922,8 @@
       "ciJob": null
     },
     {
-      "id": "FR10",
-      "title": "Wastage percentage configuration",
-      "epic": "",
-      "story": "",
-      "status": "missing",
-      "evidence": "missing",
-      "wave": null,
-      "specFile": null,
-      "codeModule": null,
-      "testFile": null,
-      "ciJob": null
-    },
-    {
       "id": "FR11",
       "title": "Rate-lock duration configuration",
-      "epic": "",
-      "story": "",
-      "status": "missing",
-      "evidence": "missing",
-      "wave": null,
-      "specFile": null,
-      "codeModule": null,
-      "testFile": null,
-      "ciJob": null
-    },
-    {
-      "id": "FR12",
-      "title": "Try-at-home toggle and piece count",
       "epic": "",
       "story": "",
       "status": "missing",

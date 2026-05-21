@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-18T02:13:44.355Z",
+  "generated": "2026-05-21T11:11:11.838Z",
   "docs": [
     {
       "path": "_bmad-output/planning-artifacts/adr/0001-auth-provider-supabase.md",
@@ -466,6 +466,14 @@
       "supersededBy": null
     },
     {
+      "path": "docs/customer-mobile-internal-testing-manual-qa-checklist.md",
+      "kind": "other",
+      "estimatedTokens": 420,
+      "readWhen": "reference only",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
       "path": "docs/customer-storefront-gap-analysis-2026-05-01.md",
       "kind": "other",
       "estimatedTokens": 4410,
@@ -772,7 +780,7 @@
     {
       "path": "docs/runbook.md",
       "kind": "other",
-      "estimatedTokens": 11200,
+      "estimatedTokens": 11320,
       "readWhen": "reference only",
       "avoidByDefault": false,
       "supersededBy": null
@@ -1146,9 +1154,57 @@
       "supersededBy": null
     },
     {
+      "path": "docs/superpowers/plans/2026-05-18-story-19.15-posthog.md",
+      "kind": "plan",
+      "estimatedTokens": 14650,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/plans/2026-05-18-story-19.9-profile-web.md",
+      "kind": "plan",
+      "estimatedTokens": 16790,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/plans/2026-05-19-demo-closeout-session-prompt.md",
+      "kind": "plan",
+      "estimatedTokens": 1390,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/plans/2026-05-19-story-demo-1-reviews-moderation.md",
+      "kind": "plan",
+      "estimatedTokens": 1380,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/plans/2026-05-19-story-demo-2-fr65-viewing-history.md",
+      "kind": "plan",
+      "estimatedTokens": 1590,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
       "path": "docs/superpowers/plans/_TEMPLATE-work-stream.md",
       "kind": "plan",
       "estimatedTokens": 1400,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/plans/story-19.11-plan.md",
+      "kind": "plan",
+      "estimatedTokens": 580,
       "readWhen": "executing a specific story — read only that story's plan",
       "avoidByDefault": true,
       "supersededBy": null
