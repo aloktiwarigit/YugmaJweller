@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, Pressable, ActivityIndicator, FlatList,
 } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 import { purityLabel } from '@goldsmith/customer-shared';
 import { TenantBrandHeader } from '../../src/components/TenantBrandHeader';
@@ -10,8 +12,9 @@ import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import {
   listPublicProducts,
   createCustomerTryAtHomeBooking,
+  getCatalogProduct,
 } from '../../src/api/endpoints';
-import type { PublicProduct, TryAtHomeBookingResponse } from '../../src/api/endpoints';
+import type { TryAtHomeBookingResponse } from '../../src/api/endpoints';
 import { useTenantStore } from '../../src/stores/tenantStore';
 import { captureEvent } from '../../src/lib/posthog';
 
@@ -52,15 +55,25 @@ function localizedCategoryName(categoryName: string | null | undefined): string 
   return known[categoryName.trim().toLowerCase()] ?? categoryName;
 }
 
-function productPrimaryLabel(p: PublicProduct): string {
+function productPrimaryLabel(p: TryAtHomeProduct): string {
   return purityLabel(p.purity, p.metal) || (METAL_HI[p.metal] ?? p.metal);
 }
 
-function productSecondaryLabel(p: PublicProduct): string {
+function productSecondaryLabel(p: TryAtHomeProduct): string {
   return `${localizedCategoryName(p.categoryName)} · ${formatWeight(p.grossWeightG)} · ${p.sku}`;
 }
 
 const MAX_PIECES_FALLBACK = 3;
+
+interface TryAtHomeProduct {
+  id: string;
+  sku: string;
+  metal: string;
+  purity: string;
+  categoryName: string | null;
+  grossWeightG: string;
+  quantity: number;
+}
 
 function ConfirmedCard({
   booking,
@@ -121,17 +134,60 @@ function ConfirmedCard({
 export default function TryAtHomeScreen(): React.ReactElement {
   const branding     = useTenantStore((s) => s.tenant?.branding);
   const primaryColor = branding?.primaryColor ?? colors.primary;
+  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ productId?: string | string[] }>();
+  const preselectedProductId = Array.isArray(params.productId)
+    ? params.productId[0]
+    : params.productId;
 
   const { customer, isAuthenticated } = useCustomerSession();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(preselectedProductId ? [preselectedProductId] : []),
+  );
   const [booking, setBooking]   = useState<TryAtHomeBookingResponse | null>(null);
   const maxPieces = MAX_PIECES_FALLBACK;
+
+  useEffect(() => {
+    if (!preselectedProductId) return;
+    setSelected((prev) => {
+      if (prev.has(preselectedProductId) || prev.size >= maxPieces) return prev;
+      return new Set([...prev, preselectedProductId]);
+    });
+  }, [preselectedProductId, maxPieces]);
 
   const { data: productsData, isLoading: productsLoading } = useQuery({
     queryKey: ['public-products-tah'],
     queryFn:  () => listPublicProducts({ limit: 30 }),
     staleTime: 60_000,
   });
+
+  const { data: preselectedProduct, isLoading: preselectedLoading } = useQuery({
+    queryKey: ['public-products-tah-selected', preselectedProductId],
+    queryFn:  () => getCatalogProduct(preselectedProductId!),
+    enabled:  !!preselectedProductId,
+    retry:    false,
+    staleTime: 60_000,
+  });
+
+  const selectableProducts = useMemo<TryAtHomeProduct[]>(() => {
+    const base = (productsData?.items ?? []).filter((p) => p.quantity > 0);
+    const selectedDetail = preselectedProduct && preselectedProduct.quantity > 0
+      ? [preselectedProduct]
+      : [];
+    const byId = new Map<string, TryAtHomeProduct>();
+    for (const product of [...selectedDetail, ...base]) {
+      byId.set(product.id, {
+        id: product.id,
+        sku: product.sku,
+        metal: product.metal,
+        purity: product.purity,
+        categoryName: product.categoryName ?? null,
+        grossWeightG: product.grossWeightG,
+        quantity: product.quantity,
+      });
+    }
+    return [...byId.values()];
+  }, [preselectedProduct, productsData?.items]);
 
   const { mutate: submit, isPending, isError, error } = useMutation({
     mutationFn: (ids: string[]) => createCustomerTryAtHomeBooking(ids),
@@ -191,7 +247,7 @@ export default function TryAtHomeScreen(): React.ReactElement {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <TenantBrandHeader />
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: booking ? 40 : 136 + insets.bottom }}>
         <Text
           style={{
             fontFamily: typography.display.family,
@@ -217,11 +273,11 @@ export default function TryAtHomeScreen(): React.ReactElement {
           <ConfirmedCard booking={booking} primaryColor={primaryColor} />
         ) : (
           <>
-            {productsLoading ? (
+            {productsLoading || preselectedLoading ? (
               <ActivityIndicator color={colors.ink} style={{ marginTop: spacing.xl }} />
             ) : (
               <ProductList
-                items={(productsData?.items ?? []).filter((p) => p.quantity > 0)}
+                items={selectableProducts}
                 selected={selected}
                 maxPieces={maxPieces}
                 onToggle={toggleProduct}
@@ -229,55 +285,71 @@ export default function TryAtHomeScreen(): React.ReactElement {
               />
             )}
 
-            {apiError ? (
-              <Text
-                style={{
-                  fontFamily: typography.body.family,
-                  fontSize: 14,
-                  color: '#DC2626',
-                  marginVertical: spacing.sm,
-                }}
-                accessibilityRole="alert"
-              >
-                {apiError}
-              </Text>
-            ) : null}
-
-            <Pressable
-              testID="try-at-home-submit"
-              onPress={handleSubmit}
-              disabled={isPending || selected.size === 0}
-              style={{
-                backgroundColor: colors.ink,
-                borderRadius: radii.sm,
-                paddingVertical: spacing.md,
-                alignItems: 'center',
-                minHeight: 52,
-                justifyContent: 'center',
-                marginTop: spacing.md,
-                opacity: (isPending || selected.size === 0) ? 0.5 : 1,
-              }}
-              accessibilityLabel="घर पर भेजने का अनुरोध करें"
-              accessibilityRole="button"
-            >
-              {isPending ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <Text
-                  style={{
-                    fontFamily: typography.body.family,
-                    fontSize: 17,
-                    color: colors.white,
-                    fontWeight: '700',
-                  }}
-                >
-                  अनुरोध करें ({selected.size}/{maxPieces})
-                </Text>
-              )}
-            </Pressable>
           </>
         )}
       </ScrollView>
+      {!booking ? (
+        <View
+          testID="try-at-home-submit-bar"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: colors.bg,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.sm,
+            paddingBottom: spacing.sm + insets.bottom,
+          }}
+        >
+          {apiError ? (
+            <Text
+              style={{
+                fontFamily: typography.body.family,
+                fontSize: 13,
+                color: '#DC2626',
+                marginBottom: spacing.xs,
+              }}
+              accessibilityRole="alert"
+            >
+              {apiError}
+            </Text>
+          ) : null}
+          <Pressable
+            testID="try-at-home-submit"
+            onPress={handleSubmit}
+            disabled={isPending || selected.size === 0}
+            style={{
+              backgroundColor: colors.ink,
+              borderRadius: radii.sm,
+              paddingVertical: spacing.md,
+              alignItems: 'center',
+              minHeight: 52,
+              justifyContent: 'center',
+              opacity: (isPending || selected.size === 0) ? 0.5 : 1,
+            }}
+            accessibilityLabel="घर पर भेजने का अनुरोध करें"
+            accessibilityRole="button"
+          >
+            {isPending ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text
+                style={{
+                  fontFamily: typography.body.family,
+                  fontSize: 17,
+                  color: colors.white,
+                  fontWeight: '700',
+                }}
+              >
+                अनुरोध करें ({selected.size}/{maxPieces})
+              </Text>
+            )}
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -289,7 +361,7 @@ function ProductList({
   onToggle,
   primaryColor,
 }: {
-  items:         PublicProduct[];
+  items:         TryAtHomeProduct[];
   selected:      Set<string>;
   maxPieces:     number;
   onToggle:      (id: string) => void;

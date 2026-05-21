@@ -58,4 +58,16 @@ describe('api client', () => {
     expect(useCustomerSessionStore.getState().customer).toEqual(customer);
     expect(useCustomerSessionStore.getState().bearer).toBe(bearer);
   });
+
+  it('does not force-refresh tokens for non-token customer 401 responses', async () => {
+    const customer = makeCustomer();
+    useCustomerSessionStore.setState({ customer, bearer: 'stale-but-present' });
+    mock.onGet('/api/v1/wishlist').reply(401, { code: 'customer.not_found' });
+
+    await expect(api.get('/api/v1/wishlist')).rejects.toBeDefined();
+
+    expect(useCustomerSessionStore.getState().customer).toEqual(customer);
+    expect(useCustomerSessionStore.getState().bearer).toBe('stale-but-present');
+    expect(mock.history.get).toHaveLength(1);
+  });
 });

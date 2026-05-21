@@ -67,13 +67,13 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
     }
 
     // ── Production Firebase auth path ────────────────────────────────────────────
-    // onIdTokenChanged fires at app start, sign-in/sign-out, and token refresh.
-    // When a user is authenticated the current ID token is used as the API bearer.
-    // The API guard (customer-auth.guard.ts) verifies the token server-side and
-    // resolves the customer record by phone + shop_id.
+    // onAuthStateChanged fires at app start, sign-in, and sign-out. We avoid
+    // onIdTokenChanged here because reading the token inside that listener can
+    // create a noisy native token-listener loop on Android. Token refresh is
+    // still handled by the API 401 interceptor in src/api/client.ts.
     let bootstrapped = false;
 
-    const unsubscribe = auth().onIdTokenChanged(async (firebaseUser) => {
+    const unsubscribe = auth().onAuthStateChanged(async (firebaseUser) => {
       try {
         if (!firebaseUser) {
           // Clear any stale session (including stale DEV-MOCK sessions from prior dev runs).

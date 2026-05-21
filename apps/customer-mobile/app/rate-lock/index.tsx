@@ -180,7 +180,10 @@ export default function RateLockScreen(): React.ReactElement {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <TenantBrandHeader />
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}
+      >
         <Text
           style={{
             fontFamily: typography.display.family,

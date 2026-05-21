@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -7,57 +7,65 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { colors, typography } from '@goldsmith/ui-tokens';
 import { TenantBrandHeader } from '../../src/components/TenantBrandHeader';
 import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import { getWishlist, removeFromWishlist } from '../../src/api/endpoints';
 import type { WishlistItem } from '../../src/api/endpoints';
 import { captureEvent } from '../../src/lib/posthog';
+import {
+  removeWishlistItem,
+  wishlistQueryKey,
+} from '../../src/lib/wishlist-cache';
 
 export default function Wishlist(): React.ReactElement {
-  const { customer } = useCustomerSession();
-  const [items, setItems] = useState<WishlistItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [removeError, setRemoveError] = useState<string | null>(null);
-  const [removing, setRemoving] = useState<string | null>(null);
+  const { customer, isAuthenticated } = useCustomerSession();
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async () => {
-    if (!customer) { setLoading(false); return; }
-    try {
-      setLoading(true);
-      setLoadError(null);
-      const data = await getWishlist();
-      setItems(data);
-    } catch {
-      setLoadError('इच्छा सूची लोड नहीं हो सकी। कृपया फिर कोशिश करें।');
-    } finally {
-      setLoading(false);
-    }
-  }, [customer]);
+  const wishlistQuery = useQuery({
+    queryKey: wishlistQueryKey,
+    queryFn:  getWishlist,
+    enabled:  isAuthenticated,
+    retry:    false,
+    refetchOnMount: 'always',
+    staleTime: 30_000,
+  });
 
-  useEffect(() => { void load(); }, [load]);
+  const removeMutation = useMutation({
+    mutationFn: removeFromWishlist,
+    onMutate: async (productId: string) => {
+      await queryClient.cancelQueries({ queryKey: wishlistQueryKey });
+      const previous = queryClient.getQueryData<WishlistItem[]>(wishlistQueryKey) ?? [];
+      queryClient.setQueryData<WishlistItem[]>(wishlistQueryKey, (old = []) =>
+        removeWishlistItem(old, productId),
+      );
+      return { previous };
+    },
+    onSuccess: (_result, productId) => {
+      captureEvent('wishlist_remove', { productId, shopId: customer?.shopId });
+    },
+    onError: (_err, _productId, ctx) => {
+      queryClient.setQueryData<WishlistItem[]>(wishlistQueryKey, ctx?.previous);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: wishlistQueryKey });
+    },
+  });
 
-  const handleRemove = async (productId: string): Promise<void> => {
-    if (!customer) return;
-    setRemoving(productId);
-    setRemoveError(null);
-    try {
-      await removeFromWishlist(productId);
-      captureEvent('wishlist_remove', { productId, shopId: customer.shopId });
-      setItems((prev) => prev.filter((i) => i.productId !== productId));
-    } catch {
-      setRemoveError('उत्पाद हटाया नहीं जा सका। कृपया फिर कोशिश करें।');
-    } finally {
-      setRemoving(null);
-    }
-  };
+  const items = wishlistQuery.data ?? [];
+  const loadError = wishlistQuery.isError
+    ? 'इच्छा सूची लोड नहीं हो सकी। कृपया फिर कोशिश करें।'
+    : null;
+  const removeError = removeMutation.isError
+    ? 'उत्पाद हटाया नहीं जा सका। कृपया फिर कोशिश करें।'
+    : null;
 
   return (
     <View style={styles.root}>
       <TenantBrandHeader />
 
-      {loading ? (
+      {wishlistQuery.isLoading || (wishlistQuery.isFetching && items.length === 0) ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -69,7 +77,7 @@ export default function Wishlist(): React.ReactElement {
           </Text>
           {loadError ? (
             <TouchableOpacity
-              onPress={() => { void load(); }}
+              onPress={() => { void wishlistQuery.refetch(); }}
               style={styles.retryBtn}
               accessibilityRole="button"
               accessibilityLabel="इच्छा सूची फिर से लोड करें"
@@ -98,12 +106,12 @@ export default function Wishlist(): React.ReactElement {
                 </Text>
               </View>
               <TouchableOpacity
-                onPress={() => void handleRemove(item.productId)}
-                disabled={removing === item.productId}
+                onPress={() => removeMutation.mutate(item.productId)}
+                disabled={removeMutation.isPending && removeMutation.variables === item.productId}
                 style={styles.removeBtn}
                 accessibilityLabel="इच्छा सूची से हटाएं"
               >
-                {removing === item.productId ? (
+                {removeMutation.isPending && removeMutation.variables === item.productId ? (
                   <ActivityIndicator size="small" color={colors.error} />
                 ) : (
                   <Text style={styles.removeBtnText}>पसंदीदा से हटाएं</Text>

@@ -26,6 +26,11 @@ import { ReviewSubmitForm } from '../../src/components/ReviewSubmitForm';
 import { useProductImages } from '../../src/hooks/useProductImages';
 import { purityLabel } from '@goldsmith/customer-shared';
 import { imageForCategoryName } from '../../src/assets/storefrontImages';
+import {
+  optimisticallySetWishlist,
+  wishlistItemFromProduct,
+  wishlistQueryKey,
+} from '../../src/lib/wishlist-cache';
 
 // ─── Colour tokens not yet on origin/main (land with D1D2D5) ───────────────────
 const SURFACE_ELEVATED = '#FFFBF2';
@@ -340,9 +345,10 @@ export default function ProductDetailScreen(): React.ReactElement {
   const queryClient = useQueryClient();
 
   const { data: wishlistData } = useQuery({
-    queryKey: ['wishlist'],
+    queryKey: wishlistQueryKey,
     queryFn:  getWishlist,
     enabled:  !!id && isAuthenticated,
+    retry:    false,
     staleTime: 2 * 60 * 1000,
   });
 
@@ -351,23 +357,13 @@ export default function ProductDetailScreen(): React.ReactElement {
   const wishlistMutation = useMutation({
     mutationFn: (add: boolean) =>
       add ? addToWishlist(id!) : removeFromWishlist(id!),
-    onMutate: async (add) => {
-      await queryClient.cancelQueries({ queryKey: ['wishlist'] });
-      const previous = queryClient.getQueryData<WishlistItem[]>(['wishlist']) ?? [];
-      queryClient.setQueryData<WishlistItem[]>(['wishlist'], (old = []) =>
-        add
-          ? (old.some((w) => w.productId === id)
-              ? old
-              : [...old, { productId: id!, sku: '', purity: '', metal: '', grossWeightG: '', netWeightG: '', huid: null, addedAt: new Date().toISOString() }])
-          : old.filter((w) => w.productId !== id),
-      );
-      return { previous };
-    },
+    onMutate: (add) =>
+      optimisticallySetWishlist(queryClient, wishlistItemFromProduct(product ?? { id: id! }), add),
     onError: (_err, _vars, ctx) => {
-      queryClient.setQueryData<WishlistItem[]>(['wishlist'], ctx?.previous);
+      queryClient.setQueryData<WishlistItem[]>(wishlistQueryKey, ctx?.previous);
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['wishlist'] });
+      void queryClient.invalidateQueries({ queryKey: wishlistQueryKey });
     },
   });
 
@@ -385,6 +381,14 @@ export default function ProductDetailScreen(): React.ReactElement {
   const recommendations = recommendationsData?.items ?? [];
   const reviews         = reviewsData?.items ?? [];
   const visibleReviews  = reviewsExpanded ? reviews : reviews.slice(0, 6);
+
+  const openTryAtHome = (): void => {
+    if (!id) return;
+    router.push({
+      pathname: '/try-at-home',
+      params: { productId: id },
+    } as Parameters<typeof router.push>[0]);
+  };
 
   if (isLoading) {
     return (
@@ -617,8 +621,7 @@ export default function ProductDetailScreen(): React.ReactElement {
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              onPress={() => router.push('/try-at-home' as any)}
+              onPress={openTryAtHome}
               style={{ backgroundColor: colors.white, borderRadius: radii.md, borderWidth: 1, borderColor: colors.primary, paddingVertical: spacing.md, alignItems: 'center', minHeight: 48 }}
               accessibilityLabel="घर पर कोशिश करने की जानकारी"
               accessibilityRole="button"
@@ -823,8 +826,7 @@ export default function ProductDetailScreen(): React.ReactElement {
           {/* Primary CTA */}
           {!isUnavailable && (
             <TouchableOpacity
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              onPress={() => router.push('/try-at-home' as any)}
+              onPress={openTryAtHome}
               style={{
                 backgroundColor: colors.primary,
                 borderRadius: radii.md,

@@ -16,6 +16,13 @@ const baseURL =
 export const api: AxiosInstance = axios.create({ baseURL, timeout: 15_000 });
 
 type AuthRetryConfig = InternalAxiosRequestConfig & { _authRetry?: boolean };
+type ApiErrorBody = { code?: string };
+
+const TOKEN_REFRESHABLE_401_CODES = new Set([
+  'customer.token_invalid',
+  'auth.token_invalid',
+  'auth.token_expired',
+]);
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const tenant = useTenantStore.getState().tenant;
@@ -33,7 +40,12 @@ api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const original = error.config as AuthRetryConfig | undefined;
-    if (error.response?.status !== 401 || !original || original._authRetry) {
+    const code = (error.response?.data as ApiErrorBody | undefined)?.code;
+    const shouldRefreshToken =
+      error.response?.status === 401 &&
+      TOKEN_REFRESHABLE_401_CODES.has(code ?? '');
+
+    if (!shouldRefreshToken || !original || original._authRetry) {
       throw error;
     }
 

@@ -27,6 +27,11 @@ import type { WishlistItem } from '../../src/api/endpoints';
 import { useTenantStore } from '../../src/stores/tenantStore';
 import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import type { CatalogProductCard } from '@goldsmith/customer-shared';
+import {
+  optimisticallySetWishlist,
+  wishlistItemFromProduct,
+  wishlistQueryKey,
+} from '../../src/lib/wishlist-cache';
 
 // ── Section heading ────────────────────────────────────────────────────────────
 
@@ -304,34 +309,24 @@ export default function Home(): React.ReactElement {
   const queryClient = useQueryClient();
 
   const { data: wishlistData } = useQuery({
-    queryKey: ['wishlist'],
+    queryKey: wishlistQueryKey,
     queryFn:  getWishlist,
     enabled:  isAuthenticated,
+    retry:    false,
     staleTime: 2 * 60 * 1000,
   });
 
   const wishlistedIds = new Set((wishlistData ?? []).map((w: WishlistItem) => w.productId));
 
   const wishlistMutation = useMutation({
-    mutationFn: ({ productId, add }: { productId: string; add: boolean }) =>
+    mutationFn: ({ productId, add }: { productId: string; add: boolean; item: WishlistItem }) =>
       add ? addToWishlist(productId) : removeFromWishlist(productId),
-    onMutate: async ({ productId, add }) => {
-      await queryClient.cancelQueries({ queryKey: ['wishlist'] });
-      const previous = queryClient.getQueryData<WishlistItem[]>(['wishlist']) ?? [];
-      queryClient.setQueryData<WishlistItem[]>(['wishlist'], (old = []) =>
-        add
-          ? (old.some((w) => w.productId === productId)
-              ? old
-              : [...old, { productId, sku: '', purity: '', metal: '', grossWeightG: '', netWeightG: '', huid: null, addedAt: new Date().toISOString() }])
-          : old.filter((w) => w.productId !== productId),
-      );
-      return { previous };
-    },
+    onMutate: ({ add, item }) => optimisticallySetWishlist(queryClient, item, add),
     onError: (_err, _vars, ctx) => {
-      queryClient.setQueryData<WishlistItem[]>(['wishlist'], ctx?.previous);
+      queryClient.setQueryData<WishlistItem[]>(wishlistQueryKey, ctx?.previous);
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['wishlist'] });
+      void queryClient.invalidateQueries({ queryKey: wishlistQueryKey });
     },
   });
 
@@ -354,7 +349,14 @@ export default function Home(): React.ReactElement {
 
   const handleWishlistToggle = (productId: string, nowWishlisted: boolean): void => {
     if (!isAuthenticated) return;
-    wishlistMutation.mutate({ productId, add: nowWishlisted });
+    const product =
+      newArrivalItems.find((item) => item.id === productId) ??
+      topSellerItems.find((item) => item.id === productId);
+    wishlistMutation.mutate({
+      productId,
+      add: nowWishlisted,
+      item: wishlistItemFromProduct(product ?? { id: productId }),
+    });
   };
 
   return (
