@@ -8,6 +8,31 @@ import { BarcodeLabel, encodeCode128B } from '@goldsmith/ui-mobile';
 import type { BarcodeData, ProductResponse } from '@goldsmith/shared';
 import { api } from '../../src/api/client';
 
+const PRODUCT_METAL_LABEL: Record<ProductResponse['metal'], string> = {
+  GOLD: 'सोना',
+  SILVER: 'चांदी',
+  PLATINUM: 'प्लैटिनम',
+};
+
+function localizeMetal(metal: string): string {
+  if (metal === 'GOLD') return 'सोना';
+  if (metal === 'SILVER') return 'चांदी';
+  if (metal === 'PLATINUM') return 'प्लैटिनम';
+  return metal;
+}
+
+function localizeWeight(weightDisplay: string): string {
+  return weightDisplay.replace(/\s?g\b/i, ' ग्राम');
+}
+
+function localizeBarcodeItem(item: BarcodeData): BarcodeData {
+  return {
+    ...item,
+    metal: localizeMetal(item.metal),
+    weightDisplay: localizeWeight(item.weightDisplay),
+  };
+}
+
 function barcodeSvg(value: string, height: number): string {
   let widths: number[];
   try {
@@ -26,7 +51,7 @@ function barcodeSvg(value: string, height: number): string {
     x += w * moduleWidth;
   });
   const totalWidth = x.toFixed(2);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${height}" viewBox="0 0 ${totalWidth} ${height}">${bars.join('')}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="${height}" viewBox="0 0 ${totalWidth} ${height}" preserveAspectRatio="none">${bars.join('')}</svg>`;
 }
 
 function buildPrintHtml(items: BarcodeData[]): string {
@@ -64,8 +89,8 @@ function buildPrintHtml(items: BarcodeData[]): string {
     box-sizing: border-box;
     overflow: hidden;
   }
-  .barcode { display: flex; justify-content: center; margin-bottom: 1mm; }
-  .barcode svg { max-width: 100%; }
+  .barcode { display: block; width: 100%; overflow: hidden; margin-bottom: 1mm; }
+  .barcode svg { display: block; width: 100%; max-width: 100%; height: 12mm; }
   .sku-row { display: flex; justify-content: space-between; align-items: baseline; }
   .sku { font-size: 9pt; font-weight: bold; }
   .weight { font-size: 8pt; color: #555; }
@@ -172,11 +197,16 @@ export default function PrintLabelsScreen(): React.JSX.Element {
     );
   };
 
+  const displayBarcodes = useMemo(
+    () => barcodes.map(localizeBarcodeItem),
+    [barcodes],
+  );
+
   const handlePrint = async (): Promise<void> => {
-    if (barcodes.length === 0) return;
+    if (displayBarcodes.length === 0) return;
     setPrinting(true);
     try {
-      const html = buildPrintHtml(barcodes);
+      const html = buildPrintHtml(displayBarcodes);
       await Print.printAsync({ html });
     } finally {
       setPrinting(false);
@@ -204,47 +234,51 @@ export default function PrintLabelsScreen(): React.JSX.Element {
 
       {barcodes.length === 0 ? (
         productIds.length === 0 ? (
-          <ScrollView contentContainerStyle={styles.selectorContent}>
-            <Text style={styles.readyText}>Select products for label printing</Text>
-            {productsLoading ? (
-              <ActivityIndicator size="small" color="#8B5E3C" />
-            ) : products.length === 0 ? (
-              <Text style={styles.emptyText}>No in-stock products available.</Text>
-            ) : (
-              products.map((product) => {
-                const selected = selectedProductIds.includes(product.id);
-                return (
-                  <Pressable
-                    key={product.id}
-                    style={[styles.productRow, selected && styles.productRowSelected]}
-                    onPress={() => toggleProduct(product.id)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`Select ${product.sku}`}
-                  >
-                    <View style={styles.productInfo}>
-                      <Text style={styles.productSku}>{product.sku}</Text>
-                      <Text style={styles.productMeta}>
-                        {product.metal} {product.purity} - {product.netWeightG}g
-                      </Text>
-                    </View>
-                    <Text style={styles.productSelectText}>{selected ? 'Selected' : 'Select'}</Text>
-                  </Pressable>
-                );
-              })
-            )}
-            <Pressable
-              style={[styles.printButton, selectedProductIds.length === 0 && styles.printButtonDisabled]}
-              onPress={() => void loadBarcodes(selectedProductIds)}
-              disabled={selectedProductIds.length === 0}
-              accessibilityRole="button"
-              accessibilityLabel="Generate labels"
-            >
-              <Text style={styles.printButtonText}>
-                Generate {selectedProductIds.length} labels
-              </Text>
-            </Pressable>
-          </ScrollView>
+          <>
+            <ScrollView style={styles.productList} contentContainerStyle={styles.selectorContent}>
+              <Text style={styles.readyText}>लेबल प्रिंट के लिए उत्पाद चुनें</Text>
+              {productsLoading ? (
+                <ActivityIndicator size="small" color="#8B5E3C" />
+              ) : products.length === 0 ? (
+                <Text style={styles.emptyText}>स्टॉक में कोई उत्पाद उपलब्ध नहीं है।</Text>
+              ) : (
+                products.map((product) => {
+                  const selected = selectedProductIds.includes(product.id);
+                  return (
+                    <Pressable
+                      key={product.id}
+                      style={[styles.productRow, selected && styles.productRowSelected]}
+                      onPress={() => toggleProduct(product.id)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={`${product.sku} चुनें`}
+                    >
+                      <View style={styles.productInfo}>
+                        <Text style={styles.productSku}>{product.sku}</Text>
+                        <Text style={styles.productMeta}>
+                          {PRODUCT_METAL_LABEL[product.metal]} {product.purity} · {product.netWeightG} ग्राम
+                        </Text>
+                      </View>
+                      <Text style={styles.productSelectText}>{selected ? 'चुना गया' : 'चुनें'}</Text>
+                    </Pressable>
+                  );
+                })
+              )}
+            </ScrollView>
+            <View style={styles.actionBar}>
+              <Pressable
+                style={[styles.printButton, selectedProductIds.length === 0 && styles.printButtonDisabled]}
+                onPress={() => void loadBarcodes(selectedProductIds)}
+                disabled={selectedProductIds.length === 0}
+                accessibilityRole="button"
+                accessibilityLabel="लेबल बनाएं"
+              >
+                <Text style={styles.printButtonText}>
+                  {selectedProductIds.length} लेबल बनाएं
+                </Text>
+              </Pressable>
+            </View>
+          </>
         ) : (
           <View style={styles.center}>
             <Text style={styles.emptyText}>कोई लेबल उपलब्ध नहीं है।</Text>
@@ -252,23 +286,25 @@ export default function PrintLabelsScreen(): React.JSX.Element {
         )
       ) : (
         <>
-          <Text style={styles.readyText}>प्रिंट के लिए तैयार — {barcodes.length} लेबल</Text>
-          <ScrollView contentContainerStyle={styles.grid}>
-            {barcodes.map((item) => (
+          <Text style={styles.readyText}>प्रिंट के लिए तैयार — {displayBarcodes.length} लेबल</Text>
+          <ScrollView style={styles.labelScroll} contentContainerStyle={styles.grid}>
+            {displayBarcodes.map((item) => (
               <BarcodeLabel key={item.barcodeValue} {...item} testID={`label-${item.sku}`} />
             ))}
           </ScrollView>
-          <Pressable
-            style={[styles.printButton, printing && styles.printButtonDisabled]}
-            onPress={() => void handlePrint()}
-            disabled={printing}
-            accessibilityRole="button"
-            accessibilityLabel="लेबल प्रिंट करें"
-          >
-            <Text style={styles.printButtonText}>
-              {printing ? 'प्रिंट हो रहा है...' : 'लेबल प्रिंट करें'}
-            </Text>
-          </Pressable>
+          <View style={styles.actionBar}>
+            <Pressable
+              style={[styles.printButton, printing && styles.printButtonDisabled]}
+              onPress={() => void handlePrint()}
+              disabled={printing}
+              accessibilityRole="button"
+              accessibilityLabel="लेबल प्रिंट करें"
+            >
+              <Text style={styles.printButtonText}>
+                {printing ? 'प्रिंट हो रहा है...' : 'लेबल प्रिंट करें'}
+              </Text>
+            </Pressable>
+          </View>
         </>
       )}
     </View>
@@ -309,9 +345,15 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     padding: 8,
   },
+  productList: {
+    flex: 1,
+  },
+  labelScroll: {
+    flex: 1,
+  },
   selectorContent: {
     padding: 12,
-    paddingBottom: 32,
+    paddingBottom: 12,
   },
   productRow: {
     minHeight: 56,
@@ -361,13 +403,20 @@ const styles = StyleSheet.create({
     fontFamily: 'NotoSansDevanagari',
   },
   printButton: {
-    margin: 16,
     backgroundColor: '#8B5E3C',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
     minHeight: 56,
     justifyContent: 'center',
+  },
+  actionBar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#D9C9A8',
+    backgroundColor: '#F5EDDD',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 16,
   },
   printButtonDisabled: {
     opacity: 0.5,

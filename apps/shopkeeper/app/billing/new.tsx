@@ -49,6 +49,15 @@ function extractTotalPaise(errorBody: unknown): bigint {
   return 0n;
 }
 
+function hasDuplicateProductLine(lines: DraftLine[]): boolean {
+  const seen = new Set<string>();
+  for (const line of lines) {
+    if (seen.has(line.productId)) return true;
+    seen.add(line.productId);
+  }
+  return false;
+}
+
 export default function NewInvoiceScreen(): JSX.Element {
   const params = useLocalSearchParams<{ productId?: string }>();
   const initialProductId = typeof params.productId === 'string' ? params.productId : '';
@@ -103,6 +112,11 @@ export default function NewInvoiceScreen(): JSX.Element {
         return;
       }
 
+      if (status === 422 && code === 'invoice.insufficient_quantity') {
+        Alert.alert('स्टॉक उपलब्ध नहीं', 'इस उत्पाद की उपलब्ध मात्रा से अधिक बिल में जोड़ा गया है।');
+        return;
+      }
+
       const message = (body as { detail?: string } | null | undefined)?.detail
         ?? (err instanceof Error ? err.message : 'कुछ गलत हो गया');
       Alert.alert('बिल नहीं बना', message);
@@ -153,17 +167,24 @@ export default function NewInvoiceScreen(): JSX.Element {
   }, []);
 
   const onAddProduct = useCallback((draft: BillingProductDraft) => {
-    setLines((curr) => [
-      ...curr,
-      {
-        productId: draft.product.id,
-        description: draft.product.description,
-        huid: draft.product.huid,
-        makingChargePct: draft.makingChargePct,
-        product: draft.product,
-        ratePerGramPaise: draft.ratePerGramPaise,
-      },
-    ]);
+    setLines((curr) => {
+      if (curr.some((line) => line.productId === draft.product.id)) {
+        Alert.alert('उत्पाद पहले से जोड़ा गया', 'एक ही स्टॉक आइटम को बिल में दोबारा नहीं जोड़ सकते।');
+        return curr;
+      }
+
+      return [
+        ...curr,
+        {
+          productId: draft.product.id,
+          description: draft.product.description,
+          huid: draft.product.huid,
+          makingChargePct: draft.makingChargePct,
+          product: draft.product,
+          ratePerGramPaise: draft.ratePerGramPaise,
+        },
+      ];
+    });
   }, []);
 
   const onRemoveLine = useCallback((index: number) => {
@@ -196,6 +217,10 @@ export default function NewInvoiceScreen(): JSX.Element {
     }
     if (lines.length === 0) {
       Alert.alert('कम से कम एक आइटम जोड़ें');
+      return;
+    }
+    if (hasDuplicateProductLine(lines)) {
+      Alert.alert('उत्पाद पहले से जोड़ा गया', 'डुप्लिकेट स्टॉक आइटम हटाकर फिर बिल बनाएं।');
       return;
     }
     createInvoice.mutate(buildDto());

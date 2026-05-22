@@ -17,7 +17,6 @@
  * Offline events are queued by the SDK's built-in transport (no extra config needed).
  */
 
-import * as Sentry from '@sentry/react-native';
 import type { Event } from '@sentry/react-native';
 
 /** Inline type matching @sentry/types EventHint — avoids direct @sentry/types dep resolution issues */
@@ -26,6 +25,79 @@ interface SentryEventHint {
   event_id?: string;
   data?: unknown;
 }
+
+type SentryUser = Record<string, unknown> | null;
+
+interface SentryScope {
+  setTag: (key: string, value: string) => void;
+  setExtra: (key: string, value: unknown) => void;
+  setUser: (user: SentryUser) => void;
+}
+
+interface SentryModule {
+  init: (options: Record<string, unknown>) => void;
+  captureException: (error: unknown) => void;
+  captureMessage: (message: string) => void;
+  withScope: (callback: (scope: SentryScope) => void) => void;
+  setTag: (key: string, value: string) => void;
+  setExtra: (key: string, value: unknown) => void;
+  setUser: (user: SentryUser) => void;
+  wrap: <T>(component: T) => T;
+}
+
+let sentryModule: SentryModule | null | undefined;
+
+function loadSentry(): SentryModule | null {
+  if (sentryModule !== undefined) {
+    return sentryModule;
+  }
+
+  try {
+    // Keep Sentry out of the startup path when no DSN is configured.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    sentryModule = require('@sentry/react-native') as SentryModule;
+  } catch {
+    sentryModule = null;
+  }
+
+  return sentryModule;
+}
+
+const noopScope: SentryScope = {
+  setTag: () => undefined,
+  setExtra: () => undefined,
+  setUser: () => undefined,
+};
+
+export const Sentry: SentryModule = {
+  init: (options) => {
+    loadSentry()?.init(options);
+  },
+  captureException: (error) => {
+    loadSentry()?.captureException(error);
+  },
+  captureMessage: (message) => {
+    loadSentry()?.captureMessage(message);
+  },
+  withScope: (callback) => {
+    const sdk = loadSentry();
+    if (sdk) {
+      sdk.withScope(callback);
+      return;
+    }
+    callback(noopScope);
+  },
+  setTag: (key, value) => {
+    loadSentry()?.setTag(key, value);
+  },
+  setExtra: (key, value) => {
+    loadSentry()?.setExtra(key, value);
+  },
+  setUser: (user) => {
+    loadSentry()?.setUser(user);
+  },
+  wrap: (component) => loadSentry()?.wrap(component) ?? component,
+};
 
 // ── PII scrubbing ────────────────────────────────────────────────────────────
 
@@ -169,6 +241,10 @@ export async function setSentryTenantContext(
 export function initSentry(): void {
   const dsn = process.env['EXPO_PUBLIC_SENTRY_DSN'];
 
+  if (!dsn) {
+    return;
+  }
+
   Sentry.init({
     dsn: dsn ?? '',          // empty string → SDK runs but drops all events
     enabled: Boolean(dsn),  // explicitly disable when no DSN so SDK is a no-op
@@ -182,5 +258,3 @@ export function initSentry(): void {
   });
 }
 
-// Re-export Sentry namespace so callers only need to import from this module
-export { Sentry };

@@ -8,8 +8,8 @@ export default function BillingBarcodeScanScreen(): JSX.Element {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Barcode lookup</Text>
-        <Text style={styles.subtitle}>Search or enter the SKU/HUID printed on the label.</Text>
+        <Text style={styles.title}>बारकोड खोज</Text>
+        <Text style={styles.subtitle}>लेबल बारकोड, SKU या HUID दर्ज करें।</Text>
       </View>
       <View style={styles.searchPanel}>
         <InventorySearch
@@ -18,7 +18,7 @@ export default function BillingBarcodeScanScreen(): JSX.Element {
         />
       </View>
       <Pressable style={styles.backButton} onPress={() => router.back()} accessibilityRole="button">
-        <Text style={styles.backText}>Back</Text>
+        <Text style={styles.backText}>वापस</Text>
       </Pressable>
     </View>
   );

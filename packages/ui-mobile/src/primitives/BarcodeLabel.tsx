@@ -15,35 +15,42 @@ export interface BarcodeLabelProps {
 }
 
 const MODULE_WIDTH = 1.2; // px per module unit
+const CARD_WIDTH = 178; // ~63mm at 72dpi
+const CARD_PADDING_STANDARD = 6;
+const CARD_PADDING_COMPACT = 4;
 const BAR_HEIGHT_STANDARD = 40;
 const BAR_HEIGHT_COMPACT = 24;
 
 function BarcodeStrip({
   value,
   barHeight,
+  maxWidth,
 }: {
   value: string;
   barHeight: number;
+  maxWidth: number;
 }): React.JSX.Element {
-  const widths = useMemo(() => {
+  const encoded = useMemo(() => {
     try {
-      return encodeCode128B(value).widths;
+      return encodeCode128B(value);
     } catch {
-      return [];
+      return null;
     }
   }, [value]);
 
-  if (widths.length === 0) {
+  if (encoded == null || encoded.widths.length === 0) {
     return <View style={[styles.stripError, { height: barHeight }]} />;
   }
 
+  const moduleWidth = Math.min(MODULE_WIDTH, maxWidth / encoded.totalModules);
+
   return (
-    <View style={[styles.stripRow, { height: barHeight }]} accessibilityLabel={`Barcode: ${value}`}>
-      {widths.map((w, i) => (
+    <View style={[styles.stripRow, { width: maxWidth, height: barHeight }]} accessibilityLabel={`Barcode: ${value}`}>
+      {encoded.widths.map((w, i) => (
         <View
           key={i}
           style={{
-            width: w * MODULE_WIDTH,
+            width: w * moduleWidth,
             height: barHeight,
             backgroundColor: i % 2 === 0 ? '#000000' : '#FFFFFF',
           }}
@@ -66,10 +73,12 @@ export function BarcodeLabel({
 }: BarcodeLabelProps): React.JSX.Element {
   const isCompact = size === 'compact';
   const barHeight = isCompact ? BAR_HEIGHT_COMPACT : BAR_HEIGHT_STANDARD;
+  const horizontalPadding = isCompact ? CARD_PADDING_COMPACT : CARD_PADDING_STANDARD;
+  const maxBarcodeWidth = CARD_WIDTH - horizontalPadding * 2;
 
   return (
     <View style={[styles.card, isCompact && styles.cardCompact]} testID={testID}>
-      <BarcodeStrip value={barcodeValue} barHeight={barHeight} />
+      <BarcodeStrip value={barcodeValue} barHeight={barHeight} maxWidth={maxBarcodeWidth} />
 
       <View style={styles.labelRow}>
         <Text style={styles.skuText} numberOfLines={1}>
@@ -101,16 +110,16 @@ export function BarcodeLabel({
 
 const styles = StyleSheet.create({
   card: {
-    width: 178, // ~63mm at 72dpi
+    width: CARD_WIDTH,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#D0C8B8',
     borderRadius: 4,
-    padding: 6,
+    padding: CARD_PADDING_STANDARD,
     margin: 4,
   },
   cardCompact: {
-    padding: 4,
+    padding: CARD_PADDING_COMPACT,
   },
   stripRow: {
     flexDirection: 'row',

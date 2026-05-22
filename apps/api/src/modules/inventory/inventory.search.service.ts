@@ -5,6 +5,23 @@ import { MeilisearchUnavailableError } from '@goldsmith/integrations-search';
 import type { Pool } from 'pg';
 import type { TenantContext } from '@goldsmith/tenant-context';
 
+interface GeneratedBarcodeParts {
+  shopPrefix: string;
+  productPrefix: string;
+}
+
+const GENERATED_BARCODE_PATTERN = /^GS-([0-9a-f]{6})-([0-9a-f]{12})$/i;
+
+function parseGeneratedBarcodeValue(q: string): GeneratedBarcodeParts | null {
+  const match = q.trim().match(GENERATED_BARCODE_PATTERN);
+  if (!match) return null;
+
+  return {
+    shopPrefix: match[1].toLowerCase(),
+    productPrefix: match[2].toLowerCase(),
+  };
+}
+
 @Injectable()
 export class InventorySearchService {
   private readonly logger = new Logger(InventorySearchService.name);
@@ -15,6 +32,12 @@ export class InventorySearchService {
   ) {}
 
   async search(ctx: TenantContext, query: SearchQuery): Promise<SearchResult> {
+    const barcodeParts = parseGeneratedBarcodeValue(query.q);
+
+    if (barcodeParts) {
+      return this.postgresSearch(ctx.shopId, query, barcodeParts);
+    }
+
     if (!ctx.authenticated) {
       // Unauthenticated should not reach here at the controller level, but guard defensively
       return this.postgresSearch(ctx.shopId, query);
@@ -36,13 +59,25 @@ export class InventorySearchService {
     }
   }
 
-  private async postgresSearch(shopId: string, query: SearchQuery): Promise<SearchResult> {
+  private async postgresSearch(
+    shopId: string,
+    query: SearchQuery,
+    barcodeParts?: GeneratedBarcodeParts,
+  ): Promise<SearchResult> {
     const { q, filters, limit, offset } = query;
     const conditions: string[] = ['p.shop_id = $1'];
     const params: unknown[] = [shopId];
     let idx = 2;
 
-    if (q) {
+    if (barcodeParts) {
+      conditions.push(`left(lower(replace(p.shop_id::text, '-', '')), 6) = $${idx}`);
+      params.push(barcodeParts.shopPrefix);
+      idx++;
+
+      conditions.push(`left(lower(replace(p.id::text, '-', '')), 12) = $${idx}`);
+      params.push(barcodeParts.productPrefix);
+      idx++;
+    } else if (q) {
       conditions.push(
         `(p.sku ILIKE $${idx} OR p.huid ILIKE $${idx} OR p.metal ILIKE $${idx} OR p.purity ILIKE $${idx})`,
       );

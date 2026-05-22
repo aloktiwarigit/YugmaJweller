@@ -99,6 +99,45 @@ describe('InventorySearchService', () => {
       expect(result.hits[0]?.id).toBe(PRODUCT_ID);
     });
 
+    it('resolves generated barcode values through Postgres without calling adapter', async () => {
+      const searchPort = makeSearchPortMock();
+      const barcodeShopId = 'aabbccdd-0000-0000-0000-000000000000';
+      const barcodeProductId = '11223344-5566-7788-99aa-bbccddee0000';
+      const pgRow = {
+        id: barcodeProductId,
+        sku: 'RING-001',
+        metal: 'GOLD',
+        purity: '22K',
+        huid: 'AB1234',
+        status: 'IN_STOCK',
+        weightG: '10.5000',
+        category: 'Rings',
+        published: true,
+        updatedAt: '1714000000000',
+        total_count: '1',
+      };
+      const pool = makePoolMock([pgRow], 1);
+      const { svc } = makeService(searchPort, pool);
+
+      const result = await svc.search(
+        { ...makeAuthCtx(), shopId: barcodeShopId },
+        { q: 'GS-AABBCC-112233445566', filters: {}, limit: 10, offset: 0 },
+      );
+
+      expect(searchPort.search).not.toHaveBeenCalled();
+      expect(result.source).toBe('postgres');
+      expect(result.hits).toHaveLength(1);
+      expect(result.hits[0]?.id).toBe(barcodeProductId);
+
+      const [sql, params] = (pool._client.query as ReturnType<typeof vi.fn>).mock
+        .calls[0] as [string, unknown[]];
+
+      expect(sql).toContain('p.shop_id = $1');
+      expect(sql).toContain(`left(lower(replace(p.shop_id::text, '-', '')), 6) = $2`);
+      expect(sql).toContain(`left(lower(replace(p.id::text, '-', '')), 12) = $3`);
+      expect(params.slice(0, 3)).toEqual([barcodeShopId, 'aabbcc', '112233445566']);
+    });
+
     it('falls back to Postgres when adapter throws MeilisearchUnavailableError', async () => {
       const searchPort = makeSearchPortMock();
       searchPort.search.mockRejectedValueOnce(new MeilisearchUnavailableError('down'));

@@ -28,6 +28,8 @@ interface FormState {
 }
 
 interface FormErrors {
+  metal?: string;
+  purity?: string;
   sku?: string;
   grossWeightG?: string;
   netWeightG?: string;
@@ -35,12 +37,23 @@ interface FormErrors {
   huid?: string;
 }
 
+const REQUIRED_METAL_ERROR = 'पहले धातु चुनें।';
+const REQUIRED_PURITY_ERROR = 'शुद्धता चुनें।';
+const REQUIRED_METAL_FOR_PURITY_ERROR = 'धातु चुनने के बाद शुद्धता चुनें।';
+const PURITY_HELPER_TEXT = 'शुद्धता चुनने के लिए पहले धातु चुनें।';
+
 function validateForm(form: FormState): FormErrors {
   const errors: FormErrors = {};
   const gw = parseFloat(form.grossWeightG);
   const nw = parseFloat(form.netWeightG);
   const sw = parseFloat(form.stoneWeightG || '0');
 
+  if (!form.metal) {
+    errors.metal = REQUIRED_METAL_ERROR;
+    errors.purity = REQUIRED_METAL_FOR_PURITY_ERROR;
+  } else if (!form.purity) {
+    errors.purity = REQUIRED_PURITY_ERROR;
+  }
   if (!form.sku.trim()) errors.sku = t('inventory.error_sku_required');
   if (isNaN(gw)) errors.grossWeightG = t('inventory.error_weight_format');
   if (isNaN(nw)) errors.netWeightG = t('inventory.error_weight_format');
@@ -97,15 +110,33 @@ export default function NewProductScreen(): React.ReactElement {
       <Text style={styles.sectionLabel}>{t('inventory.label_metal')}</Text>
       <MetalSelector
         value={form.metal}
-        onChange={(m) => setForm((p) => ({ ...p, metal: m, purity: '' }))}
+        onChange={(m) => {
+          setForm((p) => ({ ...p, metal: m, purity: '' }));
+          setErrors(({ metal: _metal, purity: _purity, ...rest }) => rest);
+        }}
       />
+      {errors.metal ? <Text style={styles.errorText} accessibilityRole="alert">{errors.metal}</Text> : null}
 
       <Text style={styles.sectionLabel}>{t('inventory.label_purity')}</Text>
-      <PuritySelector
-        metal={form.metal}
-        value={form.purity}
-        onChange={(p) => setForm((prev) => ({ ...prev, purity: p }))}
-      />
+      {form.metal ? (
+        <>
+          <PuritySelector
+            metal={form.metal}
+            value={form.purity}
+            onChange={(p) => {
+              setForm((prev) => ({ ...prev, purity: p }));
+              setErrors(({ purity: _purity, ...rest }) => rest);
+            }}
+          />
+          {errors.purity ? <Text style={styles.errorText} accessibilityRole="alert">{errors.purity}</Text> : null}
+        </>
+      ) : (
+        <View style={[styles.helperBox, errors.purity ? styles.helperBoxError : null]}>
+          <Text style={[styles.helperText, errors.purity ? styles.helperTextError : null]}>
+            {errors.purity ?? PURITY_HELPER_TEXT}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.fieldContainer}>
         <Text style={styles.sectionLabel}>{t('inventory.label_sku')}</Text>
@@ -184,4 +215,15 @@ const styles = StyleSheet.create({
   },
   inputError: { borderColor: colors.error },
   errorText: { color: colors.error, fontSize: 13, marginTop: spacing.xs },
+  helperBox: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.white,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  helperBoxError: { borderColor: colors.error },
+  helperText: { ...typography.body, color: colors.textSecondary, fontSize: 14 },
+  helperTextError: { color: colors.error },
 });

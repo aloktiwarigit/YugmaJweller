@@ -31,6 +31,36 @@ import type { RecordMovementBodyDto, StockMovementResponse } from '@goldsmith/sh
 import { InventoryValuationService } from './inventory.valuation.service';
 import type { ValuationSummary } from './inventory.valuation.service';
 
+interface ValuationHttpResponse {
+  categories: Array<{
+    category: string;
+    productCount: number;
+    totalWeightG: string;
+    marketValuePaise: string;
+    formattedValue: string;
+    primaryMetal: string | null;
+  }>;
+  grandTotalPaise: string;
+  grandTotalFormatted: string;
+  ratesFreshAt: string;
+  ratesStale: boolean;
+  computedAt: string;
+}
+
+function toValuationHttpResponse(summary: ValuationSummary): ValuationHttpResponse {
+  return {
+    categories: summary.categories.map((category) => ({
+      ...category,
+      marketValuePaise: category.marketValuePaise.toString(),
+    })),
+    grandTotalPaise: summary.grandTotalPaise.toString(),
+    grandTotalFormatted: summary.grandTotalFormatted,
+    ratesFreshAt: summary.ratesFreshAt.toISOString(),
+    ratesStale: summary.ratesStale,
+    computedAt: summary.computedAt.toISOString(),
+  };
+}
+
 @Controller('/api/v1/inventory')
 export class InventoryController {
   constructor(
@@ -47,9 +77,10 @@ export class InventoryController {
   @Roles('shop_admin', 'shop_manager')
   async getValuation(
     @TenantContextDec() ctx: TenantContext,
-  ): Promise<ValuationSummary> {
+  ): Promise<ValuationHttpResponse> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
-    return this.valuationSvc.computeValuation(ctx);
+    const summary = await this.valuationSvc.computeValuation(ctx);
+    return toValuationHttpResponse(summary);
   }
 
   @Get('/search')

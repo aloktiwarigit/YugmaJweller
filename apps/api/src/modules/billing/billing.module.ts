@@ -95,6 +95,14 @@ import { createRedisClient } from '../../redis-client';
       provide: 'KMS_ADAPTER',
       useFactory: () => {
         const secret = process.env['KMS_MASTER_SECRET'];
+        const isProduction = process.env['NODE_ENV'] === 'production';
+        const hasAzureKv = Boolean(process.env['AZURE_KEY_VAULT_URL']);
+        if (isProduction && !hasAzureKv && !secret) {
+          throw new Error(
+            'Production requires AZURE_KEY_VAULT_URL or KMS_MASTER_SECRET. ' +
+            'LocalKMS is ephemeral and must not run in production.',
+          );
+        }
         // DevKmsAdapter survives restarts via HKDF-derived keys.
         // LocalKMS is an in-memory fallback for local dev only — restart loses keys.
         return secret ? new DevKmsAdapter(secret) : new LocalKMS();

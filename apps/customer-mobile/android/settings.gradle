@@ -44,7 +44,7 @@ if (getRNMinorVersion() >= 75) {
   }
 }
 
-rootProject.name = 'अयोध्या स्वर्णकार'
+rootProject.name = 'श्री राम ज्वैलर्स'
 
 dependencyResolutionManagement {
   versionCatalogs {
