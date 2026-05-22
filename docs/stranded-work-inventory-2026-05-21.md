@@ -399,3 +399,40 @@ All 5 originally-identified items remain protected by tags (`stranded/*-2026-05-
 This inventory is now complete and final. No tags were created (none needed). No doc sections were updated beyond this closure section.
 
 Closure audit performed 2026-05-22 by Claude Sonnet 4.6.
+
+---
+
+## Recovery completion — 2026-05-22
+
+Recovery session performed by Claude Sonnet 4.6.
+
+| Item | Status | Outcome | Main commit(s) |
+|---|---|---|---|
+| Item 1 — goldapi.io adapter | ⏳ **AWAITING** Codex review + live smoke | Branch `feat/rates-goldapi-recovery` committed at SHA 9630d6c, not yet merged to main — blocked on Class A Codex gate | — |
+| Item 2 — customer-mobile demo P0s | ✅ Verified already on main | All 3 fixes (Devanagari fonts, PDP product image, 'use client' removal) confirmed incorporated into main through subsequent development. Minor import reorder merged. | a490b76 |
+| Item 3 — customer-web SEO | ⏭️ Deferred | Not demo-critical; tag `stranded/customer-web-demo-p0s-2026-05-21` preserved. Recover before public storefront launch. | — |
+| Item 4 — shopkeeper demo polish | ✅ Verified already on main | All polish (CTA wiring, Pressable settings icon, Hindi labels) confirmed incorporated into main. No net changes to apply. | — |
+| Item 5 — public repo safety cleanup | ✅ Recovered | gitleaks CI workflow, .gitignore hardening, flow-more-settings.{png,xml} deleted. actions/checkout bumped to @v6. | 2d2fd00 |
+
+**Note on Items 2 & 4:** The original stashed commits were written ~275 commits behind the main used for recovery. All their targeted changes (font fixes, CTA wiring, Hindi labels) had been incorporated into main through the Phase 1 storefront uplift and demo-closeout work. Zero functional gaps remain.
+
+**Note on Item 1:** Class A gate — Codex review required before push to main. Pre-push action:
+```
+codex review --base main  # on branch feat/rates-goldapi-recovery
+```
+Also verify GOLDAPI_KEY is live:
+```
+curl -H "x-access-token: <KEY>" https://www.goldapi.io/api/XAU/INR
+```
+Post-merge: verify Cloud Run returns `"source": "ibja"` (not `"metalsdev"`) within 2 min of deploy.
+
+**Source branches / stash:** To be dropped after Item 1 is confirmed merged + CI green:
+```bash
+git stash drop stash@{0}                         # goldapi stash (tag preserves SHA)
+git branch -D feat/customer-mobile-demo-p0s      # verified already on main
+git branch -D feat/phase-1-polish                # verified already on main
+git branch -D chore/public-repo-safety-cleanup   # already merged via recovery branch
+git branch -D feat/rates-goldapi-recovery        # after Codex review confirms merge
+```
+
+Tags STAY — they are the permanent receipts.
