@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-21T11:11:11.838Z",
+  "generated": "2026-05-22T23:35:36.445Z",
   "docs": [
     {
       "path": "_bmad-output/planning-artifacts/adr/0001-auth-provider-supabase.md",
@@ -514,6 +514,14 @@
       "supersededBy": null
     },
     {
+      "path": "docs/maestro-qa-guide.md",
+      "kind": "other",
+      "estimatedTokens": 840,
+      "readWhen": "reference only",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
       "path": "docs/prd-addendum-customer-storefront.md",
       "kind": "requirements",
       "estimatedTokens": 1410,
@@ -542,6 +550,14 @@
       "kind": "audit",
       "estimatedTokens": 2110,
       "readWhen": "gap analysis or completion assessment",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/release-build-guide.md",
+      "kind": "other",
+      "estimatedTokens": 1040,
+      "readWhen": "reference only",
       "avoidByDefault": false,
       "supersededBy": null
     },
@@ -821,6 +837,14 @@
       "path": "docs/story-classification-summary-2026-04-18.md",
       "kind": "other",
       "estimatedTokens": 1030,
+      "readWhen": "reference only",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/stranded-work-inventory-2026-05-21.md",
+      "kind": "other",
+      "estimatedTokens": 4390,
       "readWhen": "reference only",
       "avoidByDefault": false,
       "supersededBy": null
@@ -1162,6 +1186,14 @@
       "supersededBy": null
     },
     {
+      "path": "docs/superpowers/plans/2026-05-18-story-19.8-wishlist-web.md",
+      "kind": "plan",
+      "estimatedTokens": 12900,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
       "path": "docs/superpowers/plans/2026-05-18-story-19.9-profile-web.md",
       "kind": "plan",
       "estimatedTokens": 16790,
@@ -1429,6 +1461,14 @@
       "path": "docs/verification/local-qa-checklist.md",
       "kind": "other",
       "estimatedTokens": 1110,
+      "readWhen": "reference only",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/windows-android-dev.md",
+      "kind": "other",
+      "estimatedTokens": 760,
       "readWhen": "reference only",
       "avoidByDefault": false,
       "supersededBy": null

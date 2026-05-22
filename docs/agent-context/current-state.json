@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-21T11:11:12.386Z",
+  "generated": "2026-05-22T23:35:38.107Z",
   "verifiedDate": "2026-05-06",
   "authority": "Current source, migrations, reachable app routes, tests, and CI gates. BMAD docs are requirements, not completion proof.",
   "deliveryTarget": "demo-ready, customer-customize, then deploy for the first paying jeweller",
