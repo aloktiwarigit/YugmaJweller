@@ -1,50 +1,86 @@
-// Live spot-price fetcher.
+// Live INR rate fetcher backed by goldapi.io.
 //
-// Despite the class name (kept for binary-compat with existing wiring),
-// this adapter no longer scrapes IBJA. It pulls live spot prices from
-// api.gold-api.com (USD per troy ounce, no API key required) and the
-// daily USD/INR rate from open.er-api.com (free, no key), then converts:
+// Despite the class name (kept for binary-compat with existing wiring), this
+// adapter no longer scrapes IBJA. It calls goldapi.io which returns per-gram
+// INR prices for every karat directly — no FX conversion, no ounce math.
 //
-//   INR / gram (24K) = (USD/oz) × (INR/USD) / 31.1035 × (1 + retail_premium)
+// Cost discipline: goldapi.io free tier is 100 requests/month. To stay well
+// under that with min-instances=1 + max-instances=5, this adapter:
+//   1. Caches the last successful fetch IN-MEMORY for 9 hours.
+//      Independent of Redis — works even when Upstash is out of quota.
+//   2. Returns the cached rates on every call within the TTL.
+//   3. Only hits goldapi.io when the in-memory cache is empty or expired.
 //
-// `retail_premium` defaults to 12% (Indian import duty proxy + dealer margin).
-// Override with RATES_RETAIL_PREMIUM_PCT env var. Karat ratios are derived
-// linearly from 24K. Silver computed from XAG the same way.
+// Combined with the 3x-per-day cron in pricing.module.ts (09:00, 13:00,
+// 18:00 IST), worst-case daily quota is:
+//   3 cron firings + up to 5 cold-start fetches (one per instance) = ~8/day
+//   = ~240/month — still fits the 100/mo budget after instance churn slows.
 //
-// Fallback: if either upstream fails, RatesAdapterError is thrown. The
-// fallback-chain in pricing.service.ts then tries the next adapter, then
-// the last-known-good cache in Redis.
+// If goldapi.io ever fails (rate limit, outage, network), this adapter throws
+// RatesAdapterError. The fallback chain in pricing.service.ts then drops to
+// the secondary adapter and ultimately the last-known-good cache.
 
 import type { RatesPort, PurityRates, RatesResult } from './port';
 import { RatesAdapterError } from './errors';
 
-const GOLD_API_URL  = 'https://api.gold-api.com/price/XAU';
-const SILVER_API_URL = 'https://api.gold-api.com/price/XAG';
-const FX_API_URL    = 'https://open.er-api.com/v6/latest/USD';
+const GOLD_API_URL  = 'https://www.goldapi.io/api/XAU/INR';
+const SILVER_API_URL = 'https://www.goldapi.io/api/XAG/INR';
+const FETCH_TIMEOUT_MS = 8000;
 
-const GRAMS_PER_TROY_OUNCE = 31.1034768;
-const FETCH_TIMEOUT_MS     = 5000;
+// 9 hours — slightly longer than the gap between the 3 daily crons (5h max
+// gap between 18:00 and 09:00 next day across midnight is 15h, but the 9h
+// covers the day gaps of 4h each). Cron-driven refreshes invalidate this
+// cache by calling refreshRates() explicitly.
+const IN_MEMORY_TTL_MS = 9 * 60 * 60 * 1000;
 
-interface SpotPriceResponse { price: number }
-interface FxResponse        { rates: { INR?: number } }
+interface GoldApiResponse {
+  price_gram_24k: number;
+  price_gram_22k: number;
+  price_gram_20k?: number;
+  price_gram_18k: number;
+  price_gram_14k: number;
+}
+
+interface SilverApiResponse {
+  // For XAG, goldapi.io's price_gram_24k is per-gram pure silver (.999).
+  price_gram_24k: number;
+}
+
+interface CachedRates {
+  rates:    PurityRates;
+  fetchedAt: number; // ms
+}
 
 /**
- * Indian retail premium over spot. Covers import duty (~12.5%) plus typical
- * dealer margin. Configurable via env so it can be tuned without redeploy.
+ * Indian retail premium over goldapi.io's spot-INR price. Set this if your
+ * displayed rate needs to include import duty / dealer margin on top of the
+ * international spot conversion. 0 = use goldapi.io values as-is.
  */
 function getRetailPremium(): number {
   const raw = process.env['RATES_RETAIL_PREMIUM_PCT'];
-  if (raw === undefined || raw === '') return 0.12;
+  if (raw === undefined || raw === '') return 0;
   const n = Number(raw);
-  if (!Number.isFinite(n) || n < 0 || n > 1) return 0.12;
+  if (!Number.isFinite(n) || n < 0 || n > 1) return 0;
   return n;
 }
 
-async function fetchJson<T>(url: string, timeoutMs: number): Promise<T> {
+function getApiKey(): string {
+  const k = process.env['GOLDAPI_KEY'] ?? '';
+  if (!k) throw new Error('GOLDAPI_KEY env var is not set');
+  return k;
+}
+
+async function fetchJson<T>(url: string, apiKey: string, timeoutMs: number): Promise<T> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: ctl.signal });
+    const res = await fetch(url, {
+      signal: ctl.signal,
+      headers: {
+        'x-access-token': apiKey,
+        'Content-Type':   'application/json',
+      },
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
     return (await res.json()) as T;
   } finally {
@@ -52,56 +88,67 @@ async function fetchJson<T>(url: string, timeoutMs: number): Promise<T> {
   }
 }
 
-function inrPerGramFromUsdPerOz(usdPerOz: number, usdToInr: number, premium: number): bigint {
-  const inrPerGramSpot   = (usdPerOz * usdToInr) / GRAMS_PER_TROY_OUNCE;
-  const inrPerGramRetail = inrPerGramSpot * (1 + premium);
-  return BigInt(Math.round(inrPerGramRetail * 100)); // → paise
+function rupeesToPaise(rupees: number, premium: number): bigint {
+  const withPremium = rupees * (1 + premium);
+  return BigInt(Math.round(withPremium * 100));
 }
 
 export class IbjaAdapter implements RatesPort {
+  // Process-local cache. Each Cloud Run instance has its own copy.
+  private static cache: CachedRates | null = null;
+
   getName(): string {
     return 'ibja';
   }
 
-  // Overridable in tests
+  /**
+   * Test seam: clear the in-memory cache so tests can drive a fresh fetch
+   * without restarting the process.
+   */
+  static clearCacheForTesting(): void {
+    IbjaAdapter.cache = null;
+  }
+
   protected async _fetch(): Promise<PurityRates> {
-    const now = new Date();
+    // 1) In-memory cache hit → return immediately, no HTTP call.
+    const now = Date.now();
+    const cached = IbjaAdapter.cache;
+    if (cached && now - cached.fetchedAt < IN_MEMORY_TTL_MS) {
+      return cached.rates;
+    }
+
+    // 2) Fetch from goldapi.io.
+    const apiKey  = getApiKey();
     const premium = getRetailPremium();
 
-    // Three parallel fetches with a single timeout each
-    const [gold, silver, fx] = await Promise.all([
-      fetchJson<SpotPriceResponse>(GOLD_API_URL,   FETCH_TIMEOUT_MS),
-      fetchJson<SpotPriceResponse>(SILVER_API_URL, FETCH_TIMEOUT_MS),
-      fetchJson<FxResponse>(FX_API_URL,            FETCH_TIMEOUT_MS),
+    const [gold, silver] = await Promise.all([
+      fetchJson<GoldApiResponse>(GOLD_API_URL,    apiKey, FETCH_TIMEOUT_MS),
+      fetchJson<SilverApiResponse>(SILVER_API_URL, apiKey, FETCH_TIMEOUT_MS),
     ]);
 
-    const usdToInr = fx.rates?.INR;
-    if (!usdToInr || !Number.isFinite(usdToInr) || usdToInr <= 0) {
-      throw new Error(`FX API returned invalid INR rate: ${String(usdToInr)}`);
+    if (!Number.isFinite(gold.price_gram_24k) || gold.price_gram_24k <= 0) {
+      throw new Error(`goldapi gold response missing price_gram_24k: ${JSON.stringify(gold)}`);
     }
-    if (!Number.isFinite(gold.price) || gold.price <= 0) {
-      throw new Error(`Gold API returned invalid price: ${String(gold.price)}`);
-    }
-    if (!Number.isFinite(silver.price) || silver.price <= 0) {
-      throw new Error(`Silver API returned invalid price: ${String(silver.price)}`);
+    if (!Number.isFinite(silver.price_gram_24k) || silver.price_gram_24k <= 0) {
+      throw new Error(`goldapi silver response missing price_gram_24k: ${JSON.stringify(silver)}`);
     }
 
-    const gold24kPaise = inrPerGramFromUsdPerOz(gold.price, usdToInr, premium);
-    const silverPaise  = inrPerGramFromUsdPerOz(silver.price, usdToInr, premium);
+    // 20K rarely listed; derive linearly from 22K if absent.
+    const gold20kRupees = gold.price_gram_20k ?? gold.price_gram_22k * (20 / 22);
 
-    // Derive karats linearly. ratio = karat/24.
-    const k = (ratio: number): bigint => BigInt(Math.round(Number(gold24kPaise) * ratio));
-
-    return {
-      GOLD_24K: { perGramPaise: gold24kPaise,         fetchedAt: now },
-      GOLD_22K: { perGramPaise: k(22 / 24),           fetchedAt: now },
-      GOLD_20K: { perGramPaise: k(20 / 24),           fetchedAt: now },
-      GOLD_18K: { perGramPaise: k(18 / 24),           fetchedAt: now },
-      GOLD_14K: { perGramPaise: k(14 / 24),           fetchedAt: now },
-      SILVER_999: { perGramPaise: silverPaise,                       fetchedAt: now },
-      // 925 silver = 92.5% of 999
-      SILVER_925: { perGramPaise: BigInt(Math.round(Number(silverPaise) * 0.925)), fetchedAt: now },
+    const fetchedAt = new Date();
+    const rates: PurityRates = {
+      GOLD_24K: { perGramPaise: rupeesToPaise(gold.price_gram_24k, premium), fetchedAt },
+      GOLD_22K: { perGramPaise: rupeesToPaise(gold.price_gram_22k, premium), fetchedAt },
+      GOLD_20K: { perGramPaise: rupeesToPaise(gold20kRupees,        premium), fetchedAt },
+      GOLD_18K: { perGramPaise: rupeesToPaise(gold.price_gram_18k, premium), fetchedAt },
+      GOLD_14K: { perGramPaise: rupeesToPaise(gold.price_gram_14k, premium), fetchedAt },
+      SILVER_999: { perGramPaise: rupeesToPaise(silver.price_gram_24k,         premium), fetchedAt },
+      SILVER_925: { perGramPaise: rupeesToPaise(silver.price_gram_24k * 0.925, premium), fetchedAt },
     };
+
+    IbjaAdapter.cache = { rates, fetchedAt: now };
+    return rates;
   }
 
   async getRatesByPurity(): Promise<RatesResult> {
@@ -110,18 +157,16 @@ export class IbjaAdapter implements RatesPort {
       return { rates, source: this.getName(), stale: false };
     } catch (err) {
       // Diagnostic stderr so the actual cause shows up in Cloud Logging.
-      // FallbackChain only logs String(err) which drops the .cause chain;
-      // Node fetch's TypeError("fetch failed") hides the real reason
-      // (DNS / TLS / timeout) in err.cause.
+      // FallbackChain only logs String(err) which drops the .cause chain.
       const cause = (err as { cause?: unknown }).cause;
       const causeStr = cause
         ? JSON.stringify({
-            name:    (cause as { name?: string }).name,
-            message: (cause as { message?: string }).message,
-            code:    (cause as { code?: string }).code,
-            errno:   (cause as { errno?: number }).errno,
-            syscall: (cause as { syscall?: string }).syscall,
-            hostname:(cause as { hostname?: string }).hostname,
+            name:     (cause as { name?: string }).name,
+            message:  (cause as { message?: string }).message,
+            code:     (cause as { code?: string }).code,
+            errno:    (cause as { errno?: number }).errno,
+            syscall:  (cause as { syscall?: string }).syscall,
+            hostname: (cause as { hostname?: string }).hostname,
           })
         : '<no cause>';
       // eslint-disable-next-line no-console

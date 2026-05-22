@@ -1,5 +1,5 @@
 export type { PurityRates, RatesPort, RatesResult } from './port';
-export { RatesAdapterError, CircuitOpenError, RatesUnavailableError } from './errors';
+export { RatesAdapterError, CircuitOpenError, RatesUnavailableError, MetalsDevUnavailableError } from './errors';
 export { IbjaAdapter } from './ibja-adapter';
 export { MetalsDevAdapter } from './metalsdev-adapter';
 export { CircuitBreaker } from './circuit-breaker';
