@@ -4,9 +4,9 @@ import {
   ActivityIndicator, Modal, Alert, TextInput,
   SafeAreaView, Share,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 import {
