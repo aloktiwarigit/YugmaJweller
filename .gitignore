@@ -34,6 +34,8 @@ GoogleService-Info.plist
 # Android keystores + iOS distribution credentials (per-tenant, never shared).
 # Upload via `eas credentials` to EAS Vault; never commit.
 *.keystore
+*.jks
+*.p8
 *.p12
 *.mobileprovision
 
@@ -58,9 +60,15 @@ Thumbs.db
 *.log
 npm-debug.log*
 pnpm-debug.log*
+firebase-debug.log*
 
 # Build artifacts
 *.tgz
+*.apk
+*.aab
+*.ipa
+*.xcarchive
+apps/*/release-artifacts/
 
 # Next.js build outputs (apps/customer-web — generated, never source)
 apps/customer-web/.next/
@@ -90,3 +98,9 @@ packages/*/test/**/*.js.map
 # capture dir; loose PNGs at repo root are typically demo screenshots.
 artifacts/
 /*.png
+*.har
+*.trace.zip
+
+# Raw mobile UI automation dumps often include personal device/account metadata.
+# Store-listing screenshots can be tracked after review; XML dumps should not be.
+apps/*/assets/play-store/screenshots/*.xml
