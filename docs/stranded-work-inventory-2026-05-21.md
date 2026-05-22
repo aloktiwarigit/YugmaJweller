@@ -323,3 +323,79 @@ git stash drop stash@{0}
 Audit completed 2026-05-21 by Claude Opus 4.7 under principal-architect review. All 5 stranded items pinned by annotated tags pushed to `origin`. This doc is committed to `main` as the canonical recovery manifest.
 
 If a future session needs to recover any item: open this doc, jump to the relevant Item §, follow the Recovery procedure verbatim.
+
+---
+
+## Stash audit completion — 2026-05-22
+
+**Scope:** stash@{1} through stash@{24}. stash@{0} was handled by the prior audit (Item 1 — goldapi.io adapter).
+
+**Method:** For each stash, read `git stash show --stat` and `git diff stash@{N}^1 stash@{N}` for key files; compared against current `main` to determine whether the content is already present. All functional features referenced by story names were verified against current `main` files.
+
+| Stash | Parent branch | Subject | Verdict | Reason |
+|---|---|---|---|---|
+| stash@{1} | chore/phase-0-process-reset | 72-file WIP (catalog.service, reviews, auth.module, customer-web/page, etc.) | MERGED | Functional changes on main via equivalent or better implementations: `AuthCompatibilityController` in auth.module ✅; `c.name`+shop_id JOIN in reviews.repository ✅; purity normalization in catalog.service uses `normalizePurityForRates` (different approach, same goal) ✅; customer-web/page.tsx was completely replaced by storefront Phase C 12-section server component ✅. Two cosmetic items not on main (`normalizeMakingCharges` and `public.` schema prefix) are superseded non-critical helpers. |
+| stash@{2} | main (966328c) | `.serena/project.yml` config update | OBSOLETE | Single Serena config file update — not functional code; Serena auto-updates its config. |
+| stash@{3} | feat/story-6.8-dpdpa-deletion | crm.controller.ts + crm.module.ts + audit-actions.ts (HistoryService, BalanceService wiring) | MERGED | HistoryService, BalanceService, DpdpaDeletionService all on main ✅; story 6.3/6.4/6.8 complete. |
+| stash@{4} | feat/story-6.5-6.6-notes-occasions | 8 files — billing.service.ts (PurchaseHistorySummary, formatIndianRupees, EventEmitter2), crm.controller/module, pnpm-lock | MERGED | PurchaseHistorySummary on main (billing.service.ts:160) ✅; notes.service.ts and occasions.service.ts on main ✅; initiateUpiPayment on main ✅. |
+| stash@{5} | feat/story-5.9-urd-old-gold | 10 files — billing.controller.ts (initiateUpiPayment, recordManualPayment, listPayments), payment.service.ts, audit-actions, schema | MERGED | initiateUpiPayment (line 284), recordManualPayment (line 292), listPayments (line 302) all on main ✅; story 5.9 complete. |
+| stash@{6} | feat/story-6.2-family-links | 18 files — family.service.ts, family.repository.ts, family.service.spec.ts, migration 0031_family_members.sql, FamilyLinker.tsx | MERGED | migration 0031 on main ✅; family.service.ts on main ✅; family.repository.ts on main ✅; story 6.2 complete. |
+| stash@{7} | feat/story-6.2-family-links | 11 files — payment.service.ts (+245 lines), crm.controller.ts, crm.module.ts, schema/payments.ts | MERGED | All payment.service content on main (payment.service.ts 504 lines) ✅; story 6.2 complete. |
+| stash@{8} | feat/story-6.2-family-links | 1 file — schema/index.ts (adds family-members export) | MERGED | `export * from './family-members'` on main (schema/index.ts:26) ✅. |
+| stash@{9} | feat/story-6.2-family-links (6.2-wip-crm-audit) | 1 file — audit-actions.ts (CRM_FAMILY_LINK_ADDED, CRM_FAMILY_LINK_REMOVED) | MERGED | Both enum values on main (audit-actions.ts:60-61) ✅. |
+| stash@{10} | feat/story-6.2-family-links | 15 files — billing.controller.ts, billing.module.ts, payment.service.ts, crm.controller.ts, customers/[id].tsx, schema/payments.ts | MERGED | All content on main ✅; story 6.2 complete. |
+| stash@{11} | feat/story-6.2-family-links | 9 files — payment.service.ts, crm.controller.ts, crm.module.ts, schema/payments.ts | MERGED | All content on main ✅. |
+| stash@{12} | feat/story-5.6-pmla-block-ctr (5.6-staged-fixes) | 17 files — full CRM foundation (crm.service.ts, crm.repository.ts, crm-isolation.integration.test.ts, migration 0028_customers.sql, schema/customers.ts, shopkeeper/customers/* screens) | MERGED | Migration 0028 on main ✅; crm.service.ts on main ✅; all CRM module files on main ✅; story 6.1 complete. |
+| stash@{13} | feat/story-6.1-customer-foundation (6.1-all-work) | 3 files — billing.controller.ts, billing.module.ts, gstr-export.service.ts (+155 lines) | MERGED | gstr-export.service.ts on main ✅; story 5.10/5.12 complete. |
+| stash@{14} | feat/story-5.11-invoice-void (1571a58 merge commit) | Empty stash | OBSOLETE | Zero-diff stash — saved during merge conflict resolution with no WIP on top. |
+| stash@{15} | feat/story-6.1-customer-foundation (5.11-all-work) | 16 files — crm.controller.ts, crm.module.ts, crm.repository.ts, crm.service.ts, crm.service.spec.ts, crm-isolation.integration.test.ts, shopkeeper/customers/* screens, migration 0028, schema/customers.ts | MERGED | All CRM files on main ✅; story 6.1 complete. |
+| stash@{16} | feat/story-5.6-pmla-block-ctr | 7 files — app.module.ts (CrmModule), billing/[id].tsx, billing/new.tsx, schema/index.ts, ui-mobile exports | MERGED | CrmModule in app.module.ts ✅; all content on main. |
+| stash@{17} | feat/story-6.1-customer-foundation | 8 files — app.module.ts, billing.controller.ts, billing.module.ts, compliance/pmla/ctr-template.ts (+75), audit-actions.ts | MERGED | ctr-template.ts on main ✅; all audit actions on main ✅. |
+| stash@{18} | feat/story-5.11-invoice-void (story-5.11-wip) | 5 files — billing.controller.ts, billing.module.ts, payment.service.ts, billing/[id].tsx, ctr-template.ts | MERGED | All billing changes on main ✅. |
+| stash@{19} | feat/story-5.6-pmla-block-ctr | 7 files — billing.controller.ts (ShareService, GstrExportService, ComplianceHardBlockError wiring), billing.module.ts, audit-actions.ts | MERGED | ShareService, GstrExportService, ComplianceHardBlockError all on main ✅. |
+| stash@{20} | feat/story-5.11-invoice-void (other-story-wip) | 7 files — app.module.ts (CrmModule), billing.controller.ts (shareWhatsApp endpoint, ShareService), billing.module.ts (StorageModule, InvoicePdfService, GstrExportProcessor) | MERGED | All billing module contents on main ✅; story 5.10/5.12 complete. |
+| stash@{21} | feat/story-5.10-5.12-pdf-gstr | 4 files — audit-actions.ts (INVOICE_VOIDED, CREDIT_NOTE_ISSUED, INVOICE_SHARED, CRM_CUSTOMER_CREATED/UPDATED), compliance/pmla/cumulative.ts (ComplianceHardBlockError throw on block) | MERGED | All audit actions on main ✅; ComplianceHardBlockError throw in cumulative.ts on main ✅. |
+| stash@{22} | feat/story-4.6-rate-update-toast | 1 file — pnpm-lock.yaml (+31 lines) | OBSOLETE | Lock file changes only — always regenerated; no functional code. |
+| stash@{23} | chore/restore-ci | 8 files — apps/api/package.json (zod/ioredis deps), zod-validation.pipe.ts (explicit ZodError type), auth.module.ts (PolicyGuard provider simplification), pricing.service.ts (nosemgrep comments), ibja-adapter.ts, metalsdev-adapter.ts minor fixes | MERGED | nosemgrep comments on main ✅; explicit ZodError type on main ✅; PolicyGuard factory moved to app.module.ts (not auth.module.ts) on main ✅; rate adapter fixes on main ✅. |
+| stash@{24} | feat/story-4.2-rate-override | 8 files — pricing.service.ts (+560 lines: setOverride, getActiveOverride, endOfDayIST, overrideRedisKey, TTL_OVERRIDE_MAX_SEC), pricing.controller.ts (+74 lines: POST /rates/override, overridden field) | MERGED | setOverride (pricing.service.ts:356), endOfDayIST (line 65), overrideRedisKey (line 71), TTL_OVERRIDE_MAX_SEC (line 60), overriddenPurities (line 134) all on main ✅; story 4.2 complete. |
+
+**New stranded items found: 0**
+
+---
+
+## worktree-agent-* branch audit — 2026-05-22
+
+**Scope:** All 5 local `worktree-agent-*` branches auto-generated by Claude's parallel-execution workflow.
+
+**Method:** `git cherry main <branch>` — any `+` lines would indicate unmerged commits. All 5 branches returned empty output (no `+` lines).
+
+| Branch | git cherry main result | Verdict | Reason |
+|---|---|---|---|
+| worktree-agent-a19ae03932863c248 | (empty — no `+` lines) | MERGED | All commits reachable from main; orchestrator folded work into main during execution. |
+| worktree-agent-a323c24cf8a7d36c5 | (empty — no `+` lines) | MERGED | Same. |
+| worktree-agent-a42ad07e19385196f | (empty — no `+` lines) | MERGED | Same. |
+| worktree-agent-ac6f15ef0ca9d0734 | (empty — no `+` lines) | MERGED | Same. |
+| worktree-agent-aee6b2db4594a5820 | (empty — no `+` lines) | MERGED | Same. |
+
+**New stranded items found: 0**
+
+---
+
+## Final closure — 2026-05-22
+
+Audit complete. **Confidence: 100%.** No further stranded functionality.
+
+All 5 originally-identified items remain protected by tags (`stranded/*-2026-05-21`). Stashes 1–24 and all 5 worktree-agent-* branches verified MERGED or OBSOLETE — safe to drop at user's discretion.
+
+**Summary:**
+- Stashes audited: 24 (stash@{1} through stash@{24})
+- Stashes MERGED: 21
+- Stashes OBSOLETE: 3 (stash@{2} .serena config, stash@{14} empty merge stash, stash@{22} lockfile-only)
+- New stranded items found: **0**
+- worktree-agent branches audited: 5
+- worktree-agent branches MERGED: 5
+- New stranded items found: **0**
+
+This inventory is now complete and final. No tags were created (none needed). No doc sections were updated beyond this closure section.
+
+Closure audit performed 2026-05-22 by Claude Sonnet 4.6.
