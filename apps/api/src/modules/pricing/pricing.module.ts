@@ -24,20 +24,17 @@ import { areQueueWorkersEnabled } from '../../queue-runtime';
 import { createRedisClient } from '../../redis-client';
 
 // ---------------------------------------------------------------------------
-// goldapi.io rate-limit budget: free tier is 100 requests/month. With three
-// fixed daily refreshes we use ~93/month, leaving margin for cold-start
-// fetches on instance startup. The in-memory cache in IbjaAdapter holds the
-// last fetch for 9h so on-demand requests between crons return the cached
-// value without making a new API call.
+// goldapi.io rate-limit budget: free tier is 100 requests/month.
+// Each refresh = 2 API calls (XAU/INR + XAG/INR fetched in parallel).
+// 1 cron/day × 2 calls × 31 days = 62 scheduled calls/month, leaving ~38
+// for cold-start fetches across Cloud Run instances. The 9h in-memory cache
+// covers the full day between crons so on-demand catalog/rates requests never
+// hit the API. IbjaAdapter.clearCache() is called by the processor before
+// each cron job so the daily refresh always fetches fresh data.
 //
-// Schedule (IST → UTC):
-//   09:00 IST = 03:30 UTC
-//   13:00 IST = 07:30 UTC
-//   18:00 IST = 12:30 UTC
+// Schedule (IST → UTC):  09:00 IST = 03:30 UTC
 // ---------------------------------------------------------------------------
-const REFRESH_MORNING_CRON  = '30 3 * * *';   // 09:00 IST daily
-const REFRESH_MIDDAY_CRON   = '30 7 * * *';   // 13:00 IST daily
-const REFRESH_EVENING_CRON  = '30 12 * * *';  // 18:00 IST daily
+const REFRESH_DAILY_CRON = '30 3 * * *';   // 09:00 IST daily
 
 @Module({
   imports: [
@@ -106,22 +103,15 @@ export class PricingModule implements OnModuleInit, OnModuleDestroy {
     // Best-effort cleanup of legacy job schedulers from the high-frequency cron era
     // (every-15-min + hourly = ~80/day). The IDs are kept short for log readability.
     try {
-      for (const legacy of ['refresh-trading-hours', 'refresh-weekend-midday', 'refresh-outside-hours']) {
+      for (const legacy of [
+        'refresh-trading-hours', 'refresh-weekend-midday', 'refresh-outside-hours',
+        'refresh-midday-ist', 'refresh-evening-ist',
+      ]) {
         await this.queue.removeJobScheduler(legacy).catch(() => undefined);
       }
       await this.queue.upsertJobScheduler(
         'refresh-morning-ist',
-        { pattern: REFRESH_MORNING_CRON, tz: 'UTC' },
-        { name: 'refresh' },
-      );
-      await this.queue.upsertJobScheduler(
-        'refresh-midday-ist',
-        { pattern: REFRESH_MIDDAY_CRON, tz: 'UTC' },
-        { name: 'refresh' },
-      );
-      await this.queue.upsertJobScheduler(
-        'refresh-evening-ist',
-        { pattern: REFRESH_EVENING_CRON, tz: 'UTC' },
+        { pattern: REFRESH_DAILY_CRON, tz: 'UTC' },
         { name: 'refresh' },
       );
     } catch (err) {

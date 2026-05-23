@@ -79,6 +79,21 @@ class AlwaysFailingIbjaAdapter extends IbjaAdapter {
   }
 }
 
+/** MetalsDev stub that returns fixed rates — MetalsDevAdapter now throws by default */
+class StubMetalsDevAdapter extends MetalsDevAdapter {
+  protected override async _fetch(): Promise<PurityRates> {
+    return {
+      GOLD_24K:   { perGramPaise: 735000n, fetchedAt: NOW },
+      GOLD_22K:   { perGramPaise: 673750n, fetchedAt: NOW },
+      GOLD_20K:   { perGramPaise: 612500n, fetchedAt: NOW },
+      GOLD_18K:   { perGramPaise: 551250n, fetchedAt: NOW },
+      GOLD_14K:   { perGramPaise: 428750n, fetchedAt: NOW },
+      SILVER_999: { perGramPaise: 9500n,   fetchedAt: NOW },
+      SILVER_925: { perGramPaise: 8788n,   fetchedAt: NOW },
+    };
+  }
+}
+
 /** MetalsDev-shaped adapter that always rejects */
 class AlwaysFailingMetalsDevAdapter extends MetalsDevAdapter {
   protected override async _fetch(): Promise<never> {
@@ -117,7 +132,7 @@ describe('Chaos: IBJA times out (5s) → MetalsDev fallback within 10s', () => {
   // not fake timers. vi.useFakeTimers() would prevent the elapsed-time assertion
   // (elapsedMs > 5000) from ever being true. Do NOT add fake timers to this test.
   it('returns MetalsDev rates within 10 seconds after IBJA 5s timeout fires', async () => {
-    const chain = buildChain(new SlowIbjaAdapter(), new MetalsDevAdapter());
+    const chain = buildChain(new SlowIbjaAdapter(), new StubMetalsDevAdapter());
 
     const start = Date.now();
     const result = await chain.getRatesByPurity();

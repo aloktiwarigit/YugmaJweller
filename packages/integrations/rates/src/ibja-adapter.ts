@@ -102,11 +102,17 @@ export class IbjaAdapter implements RatesPort {
   }
 
   /**
-   * Test seam: clear the in-memory cache so tests can drive a fresh fetch
-   * without restarting the process.
+   * Evict the in-memory cache. Call before a cron-driven refresh so the
+   * scheduler always fetches fresh data instead of returning cached rates.
+   * Also used as a test seam.
    */
-  static clearCacheForTesting(): void {
+  static clearCache(): void {
     IbjaAdapter.cache = null;
+  }
+
+  /** @deprecated Use clearCache() */
+  static clearCacheForTesting(): void {
+    IbjaAdapter.clearCache();
   }
 
   protected async _fetch(): Promise<PurityRates> {

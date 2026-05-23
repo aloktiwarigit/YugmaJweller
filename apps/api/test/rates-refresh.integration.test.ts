@@ -48,6 +48,23 @@ class FailingIbjaAdapter extends IbjaAdapter {
   }
 }
 
+// MetalsDevAdapter now throws MetalsDevUnavailableError by default (stub removed).
+// Tests that need a deterministic fallback use this stub instead of the real adapter.
+class StubMetalsDevAdapter extends MetalsDevAdapter {
+  protected override async _fetch(): Promise<PurityRates> {
+    const now = new Date();
+    return {
+      GOLD_24K:   { perGramPaise: 735000n, fetchedAt: now },
+      GOLD_22K:   { perGramPaise: 673750n, fetchedAt: now },
+      GOLD_20K:   { perGramPaise: 612500n, fetchedAt: now },
+      GOLD_18K:   { perGramPaise: 551250n, fetchedAt: now },
+      GOLD_14K:   { perGramPaise: 428750n, fetchedAt: now },
+      SILVER_999: { perGramPaise: 9500n,   fetchedAt: now },
+      SILVER_925: { perGramPaise: 8788n,   fetchedAt: now },
+    };
+  }
+}
+
 // Deterministic stub used by happy-path tests. The real IbjaAdapter is no
 // longer a stub — it hits api.gold-api.com + open.er-api.com and returns
 // live market rates. For integration tests that pin expected paise values,
@@ -95,11 +112,12 @@ afterAll(async () => {
 
 function buildService(
   ibjaOverride?: IbjaAdapter,
+  metalsdevOverride?: MetalsDevAdapter,
 ): PricingService {
   const redis = sharedRedis;
   const lkg = new LastKnownGoodCache(redis as never);
   const ibja = ibjaOverride ?? new IbjaAdapter();
-  const metalsdev = new MetalsDevAdapter();
+  const metalsdev = metalsdevOverride ?? new StubMetalsDevAdapter();
   const ibjaCb = new CircuitBreaker(ibja, redis as never);
   const metalsdevCb = new CircuitBreaker(metalsdev, redis as never);
   const chain = new FallbackChain(ibjaCb, metalsdevCb, lkg, console);
@@ -265,7 +283,7 @@ describe('CircuitBreaker integration — IBJA opens after 5 failures', () => {
   it('IBJA CB is OPEN in Redis after 5 consecutive failures; MetalsDev continues to serve', async () => {
     const redis = sharedRedis;
     const ibja = new FailingIbjaAdapter();
-    const metalsdev = new MetalsDevAdapter();
+    const metalsdev = new StubMetalsDevAdapter();
     const ibjaCb = new CircuitBreaker(ibja, redis as never);
     const metalsdevCb = new CircuitBreaker(metalsdev, redis as never);
     const lkg = new LastKnownGoodCache(redis as never);
