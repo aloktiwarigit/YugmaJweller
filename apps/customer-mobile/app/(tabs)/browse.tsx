@@ -252,7 +252,7 @@ export default function Browse(): React.ReactElement {
       page,
       limit: 12,
     }),
-    retry: false,
+    retry: 2,
   });
 
   const products  = data?.items ?? [];

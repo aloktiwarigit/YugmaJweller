@@ -11,7 +11,7 @@ export function ProductGrid(): React.ReactElement {
   const q = useQuery({
     queryKey: ['catalog-products', slug, 6],
     queryFn: () => getCatalogProducts({ limit: 6 }),
-    retry: false,
+    retry: 2,
   });
 
   if (q.isLoading) return <ActivityIndicator style={{ marginVertical: spacing.lg }} />;

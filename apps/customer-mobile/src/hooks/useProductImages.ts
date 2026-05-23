@@ -18,7 +18,7 @@ export function useProductImages(productId: string | undefined): {
     queryFn:  () => getProductImages(productId!),
     enabled:  Boolean(productId),
     staleTime: 60_000,
-    retry: false,
+    retry: 2,
   });
 
   return {

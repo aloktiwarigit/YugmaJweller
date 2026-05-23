@@ -322,7 +322,7 @@ export default function ProductDetailScreen(): React.ReactElement {
     queryKey: ['catalog-product', id],
     queryFn:  () => getCatalogProduct(id!),
     enabled:  !!id,
-    retry: false,
+    retry: 2,
   });
 
   const { data: productImages } = useProductImages(id);
@@ -331,14 +331,14 @@ export default function ProductDetailScreen(): React.ReactElement {
     queryKey: ['product-recommendations', id],
     queryFn:  () => getProductRecommendations(id!),
     enabled:  !!id,
-    retry: false,
+    retry: 2,
   });
 
   const { data: reviewsData } = useQuery({
     queryKey: ['product-reviews-public', id],
     queryFn:  () => getCatalogProductReviews(id!),
     enabled:  !!id,
-    retry: false,
+    retry: 2,
   });
 
   const { isAuthenticated, customer } = useCustomerSession();

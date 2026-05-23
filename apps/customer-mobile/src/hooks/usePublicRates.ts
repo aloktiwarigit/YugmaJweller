@@ -12,7 +12,8 @@ export function usePublicRates(): {
     queryKey: ['public-rates', slug],
     queryFn: getPublicRates,
     staleTime: 60_000,
-    retry: false,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
   return { data: q.data, isLoading: q.isLoading, isError: q.isError };
 }

@@ -333,14 +333,14 @@ export default function Home(): React.ReactElement {
   const newArrivals = useQuery({
     queryKey: ['catalog-new-arrivals', slug],
     queryFn:  () => getNewArrivalProducts(8),
-    retry:    false,
+    retry:    2,
     staleTime: 5 * 60 * 1000,
   });
 
   const topSellers = useQuery({
     queryKey: ['catalog-top-sellers', slug],
     queryFn:  () => getTopSellerProducts(8),
-    retry:    false,
+    retry:    2,
     staleTime: 5 * 60 * 1000,
   });
 
