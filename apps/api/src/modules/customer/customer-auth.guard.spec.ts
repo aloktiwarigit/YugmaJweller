@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ServiceUnavailableException, type ExecutionContext } from '@nestjs/common';
 import {
   CustomerAuthGuard,
-  CUSTOMER_SELF_REGISTRATION_ACTOR_ID,
   DEV_MOCK_BEARER_PREFIX,
   DEV_MOCK_CUSTOMER_ID,
 } from './customer-auth.guard';
