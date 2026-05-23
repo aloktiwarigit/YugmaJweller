@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-22T23:35:38.693Z",
+  "generated": "2026-05-23T16:55:23.142Z",
   "apps": [
     {
       "name": "@goldsmith/api",
@@ -698,6 +698,21 @@
         {
           "method": "POST",
           "path": "/api/v1/custom-orders/webhook/razorpay"
+        }
+      ]
+    },
+    {
+      "module": "customer",
+      "file": "apps/api/src/modules/customer/customer-session.controller.ts",
+      "basePath": "/api/v1/customer",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/v1/customer/auth/session"
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/v1/customer/profile/phone"
         }
       ]
     },
@@ -1531,6 +1546,10 @@
         "route": "/_layout"
       },
       {
+        "file": "apps/customer-mobile/app/(auth)/email-auth.tsx",
+        "route": "/email-auth"
+      },
+      {
         "file": "apps/customer-mobile/app/(auth)/welcome.tsx",
         "route": "/welcome"
       },
@@ -1699,11 +1718,10 @@
     ]
   },
   "migrations": {
-    "count": 65,
-    "current": "0075",
-    "latest": "packages/db/src/migrations/0075_customer_self_deletion_extensions.sql",
+    "count": 66,
+    "current": "0076",
+    "latest": "packages/db/src/migrations/0076_customers_auth_identity.sql",
     "recent": [
-      "packages/db/src/migrations/0060_products_cost_paise.sql",
       "packages/db/src/migrations/0066_products_storefront_columns.sql",
       "packages/db/src/migrations/0067_collections.sql",
       "packages/db/src/migrations/0068_products_primary_image.sql",
@@ -1712,7 +1730,8 @@
       "packages/db/src/migrations/0072_reports_pdf_exports.sql",
       "packages/db/src/migrations/0073_security_definer_schema_resolution.sql",
       "packages/db/src/migrations/0074_payment_sessions.sql",
-      "packages/db/src/migrations/0075_customer_self_deletion_extensions.sql"
+      "packages/db/src/migrations/0075_customer_self_deletion_extensions.sql",
+      "packages/db/src/migrations/0076_customers_auth_identity.sql"
     ]
   },
   "rootScripts": {
