@@ -19,3 +19,10 @@ export class RatesUnavailableError extends Error {
     this.name = 'RatesUnavailableError';
   }
 }
+
+export class MetalsDevUnavailableError extends RatesAdapterError {
+  constructor() {
+    super('metalsdev', new Error('METALSDEV_KEY is not configured — stub disabled to prevent silent masking'));
+    this.name = 'MetalsDevUnavailableError';
+  }
+}

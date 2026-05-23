@@ -1,26 +1,19 @@
-// STUB: replace with real Metals.dev API when credentials obtained
-// See: https://metals.dev/ for API onboarding
-// GOLD_24K ≈ ₹7,350/g → 735000 paise
+// Placeholder adapter for Metals.dev (credentials not yet obtained).
+// Throws MetalsDevUnavailableError rather than returning a hardcoded value
+// so the FallbackChain always falls through to the LKG cache instead of
+// silently serving stale stub data.
+// See: https://metals.dev/ for API onboarding.
 import type { RatesPort, PurityRates, RatesResult } from './port';
-import { RatesAdapterError } from './errors';
+import { RatesAdapterError, MetalsDevUnavailableError } from './errors';
 
 export class MetalsDevAdapter implements RatesPort {
   getName(): string {
     return 'metalsdev';
   }
 
-  // Overridable in tests to simulate fetch failures
+  // Overridable in tests to simulate specific failure modes
   protected async _fetch(): Promise<PurityRates> {
-    const now = new Date();
-    return {
-      GOLD_24K: { perGramPaise: 735000n, fetchedAt: now },
-      GOLD_22K: { perGramPaise: 673750n, fetchedAt: now },
-      GOLD_20K: { perGramPaise: 612500n, fetchedAt: now },
-      GOLD_18K: { perGramPaise: 551250n, fetchedAt: now },
-      GOLD_14K: { perGramPaise: 428750n, fetchedAt: now },
-      SILVER_999: { perGramPaise: 9500n, fetchedAt: now },
-      SILVER_925: { perGramPaise: 8788n, fetchedAt: now },
-    };
+    throw new MetalsDevUnavailableError();
   }
 
   async getRatesByPurity(): Promise<RatesResult> {

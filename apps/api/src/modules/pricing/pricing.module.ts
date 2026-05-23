@@ -24,23 +24,17 @@ import { areQueueWorkersEnabled } from '../../queue-runtime';
 import { createRedisClient } from '../../redis-client';
 
 // ---------------------------------------------------------------------------
-// IST trading hours cron patterns (UTC+5:30)
-// Note: cron pattern '3-11' fires from 03:00 UTC (= 08:30 IST), 30 min before IBJA's
-// 09:00 IST open. Pre-market fetches are harmless — stub/real adapter returns current rate.
+// goldapi.io rate-limit budget: free tier is 100 requests/month.
+// Each refresh = 2 API calls (XAU/INR + XAG/INR fetched in parallel).
+// 1 cron/day × 2 calls × 31 days = 62 scheduled calls/month, leaving ~38
+// for cold-start fetches across Cloud Run instances. The 9h in-memory cache
+// covers the full day between crons so on-demand catalog/rates requests never
+// hit the API. IbjaAdapter.clearCache() is called by the processor before
+// each cron job so the daily refresh always fetches fresh data.
 //
-// Three mutually exclusive patterns:
-//   Trading hours   — every 15 min, Mon–Fri, UTC hours 03:00–11:59 (08:30–17:29 IST)
-//   Weekend midday  — every hour at :00, Sat+Sun, UTC hours 03:00–11:59 (08:30–17:29 IST)
-//   Outside hours   — every hour at :00, UTC hours 12–23 and 0–2 (daily incl. weekends)
-//
-// The patterns share no overlap:
-//   TRADING_HOURS_CRON covers hours 3–11 on weekdays only.
-//   WEEKEND_MIDDAY_CRON covers hours 3–11 on weekends only (was previously a gap — no refresh for ~8 hrs IST).
-//   OUTSIDE_HOURS_CRON covers hours 12–23 and 0–2 every day (weekday+weekend hours 3–11 are absent).
+// Schedule (IST → UTC):  09:00 IST = 03:30 UTC
 // ---------------------------------------------------------------------------
-const TRADING_HOURS_CRON  = '*/15 3-11 * * 1-5';      // every 15 min, Mon–Fri, UTC 03:00–11:59
-const WEEKEND_MIDDAY_CRON = '0 3-11 * * 0,6';         // every hour at :00, Sat+Sun, UTC 03:00–11:59
-const OUTSIDE_HOURS_CRON  = '0 12-23,0-2 * * *';      // every hour at :00, UTC 12–23 and 0–2, daily
+const REFRESH_DAILY_CRON = '30 3 * * *';   // 09:00 IST daily
 
 @Module({
   imports: [
@@ -105,21 +99,19 @@ export class PricingModule implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit(): Promise<void> {
     if (!areQueueWorkersEnabled()) return;
-    // Register repeatable jobs — best-effort: Redis may be transiently unavailable at boot
+    // Register repeatable jobs — best-effort: Redis may be transiently unavailable at boot.
+    // Best-effort cleanup of legacy job schedulers from the high-frequency cron era
+    // (every-15-min + hourly = ~80/day). The IDs are kept short for log readability.
     try {
+      for (const legacy of [
+        'refresh-trading-hours', 'refresh-weekend-midday', 'refresh-outside-hours',
+        'refresh-midday-ist', 'refresh-evening-ist',
+      ]) {
+        await this.queue.removeJobScheduler(legacy).catch(() => undefined);
+      }
       await this.queue.upsertJobScheduler(
-        'refresh-trading-hours',
-        { pattern: TRADING_HOURS_CRON, tz: 'UTC' },
-        { name: 'refresh' },
-      );
-      await this.queue.upsertJobScheduler(
-        'refresh-weekend-midday',
-        { pattern: WEEKEND_MIDDAY_CRON, tz: 'UTC' },
-        { name: 'refresh' },
-      );
-      await this.queue.upsertJobScheduler(
-        'refresh-outside-hours',
-        { pattern: OUTSIDE_HOURS_CRON, tz: 'UTC' },
+        'refresh-morning-ist',
+        { pattern: REFRESH_DAILY_CRON, tz: 'UTC' },
         { name: 'refresh' },
       );
     } catch (err) {

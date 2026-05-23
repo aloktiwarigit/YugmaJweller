@@ -3,6 +3,7 @@ import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import type { Job } from '@goldsmith/queue';
 import type { Pool } from 'pg';
 import { AuditAction } from '@goldsmith/audit';
+import { IbjaAdapter } from '@goldsmith/rates';
 import { PricingService } from '../modules/pricing/pricing.service';
 
 @Processor('rates-refresh')
@@ -19,6 +20,9 @@ export class RatesRefreshProcessor extends WorkerHost {
   async process(job: Job): Promise<void> {
     if (job.name === 'refresh') {
       this.logger.log(`Processing rates-refresh job id=${job.id}`);
+      // Evict the in-memory cache so this cron always fetches from goldapi.io
+      // rather than returning the 9h cached result from the previous cron.
+      IbjaAdapter.clearCache();
       await this.pricingService.refreshRates();
     }
   }
