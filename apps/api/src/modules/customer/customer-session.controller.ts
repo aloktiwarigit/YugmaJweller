@@ -38,7 +38,7 @@ export class CustomerSessionController {
 
     const bearer = raw.replace(/^Bearer\s+/i, '');
 
-    let decoded: { uid: string; phone_number?: string; email?: string; name?: string };
+    let decoded: { uid: string; phone_number?: string; email?: string; email_verified?: boolean; name?: string };
     try {
       decoded = await this.firebase.admin().auth().verifyIdToken(bearer, true);
     } catch {

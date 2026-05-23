@@ -5,10 +5,11 @@ import { AuditAction } from '@goldsmith/audit';
 import { CUSTOMER_SELF_REGISTRATION_ACTOR_ID } from './customer-auth.guard';
 
 export interface DecodedFirebaseToken {
-  uid:           string;
-  phone_number?: string;
-  email?:        string;
-  name?:         string;
+  uid:             string;
+  phone_number?:   string;
+  email?:          string;
+  email_verified?: boolean;
+  name?:           string;
 }
 
 export interface CustomerSessionResult {
@@ -84,8 +85,12 @@ export class CustomerSessionService {
         }
       }
 
-      // Path 3 — existing email customer (link firebase_uid)
-      if (email) {
+      // Path 3 — existing email customer (link firebase_uid).
+      // Guard: only link when the email is verified in Firebase — prevents account takeover via
+      // unverified email/password accounts (attacker creates account for victim's email, gets
+      // a valid token with email_verified=false, and would otherwise hijack the DB record).
+      // Google Sign-In always has email_verified=true; phone-OTP goes through Path 2, not here.
+      if (email && decoded.email_verified) {
         const byEmail = await tx.query<{ id: string; name: string; phone: string | null; auth_provider: string }>(
           `SELECT id, name, phone, auth_provider FROM customers
            WHERE shop_id = $1 AND lower(email) = lower($2) AND deleted_at IS NULL

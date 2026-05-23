@@ -84,19 +84,36 @@ describe('CustomerSessionService.findOrCreateCustomerByFirebaseToken', () => {
     expect(result.isNewUser).toBe(false);
   });
 
-  it('Path 3 — links existing email customer when firebase_uid and phone not found but email matches', async () => {
+  it('Path 3 — links existing email customer when firebase_uid and phone not found but email matches and email_verified=true', async () => {
     const emailRow = { id: 'db-uuid-3', name: 'Ananya', phone: null, auth_provider: 'email_password' };
     const pool = makePool(withTxSetup([
-      [],                     // SELECT WHERE firebase_uid = $uid → not found
+      [],        // SELECT WHERE firebase_uid = $uid → not found
       // no phone in token — phone path skipped entirely
-      [emailRow],             // SELECT WHERE lower(email) = lower($email) → found
-      [{ id: 'db-uuid-3' }], // UPDATE SET firebase_uid RETURNING id
-      [],                     // audit INSERT
+      [emailRow], // SELECT WHERE lower(email) = lower($email) → found
+      [],         // UPDATE SET firebase_uid
+      [],         // audit INSERT
     ]));
-    const token: DecodedFirebaseToken = { ...TOKEN_BASE, email: 'ananya@example.com', name: 'Ananya' };
+    const token: DecodedFirebaseToken = { ...TOKEN_BASE, email: 'ananya@example.com', email_verified: true, name: 'Ananya' };
     const result = await svc.findOrCreateCustomerByFirebaseToken(pool, SHOP_ID, token);
     expect(result.customerId).toBe('db-uuid-3');
     expect(result.isNewUser).toBe(false);
+  });
+
+  it('Path 3 — skips email link when email_verified is false (prevents account takeover)', async () => {
+    // Attacker creates Firebase email/password account for victim's email without verifying it.
+    // Path 3 must NOT link in this case; falls through to Path 4 (new customer created).
+    const newRow = { id: 'db-uuid-attacker' };
+    const pool = makePool(withTxSetup([
+      [],       // SELECT WHERE firebase_uid → not found
+      // email path skipped because email_verified=false
+      [newRow], // INSERT new customer (attacker gets their own separate record)
+      [],       // audit INSERT
+    ]));
+    const token: DecodedFirebaseToken = { ...TOKEN_BASE, email: 'victim@example.com', email_verified: false };
+    const result = await svc.findOrCreateCustomerByFirebaseToken(pool, SHOP_ID, token);
+    // Attacker gets a new record, NOT the victim's record
+    expect(result.customerId).toBe('db-uuid-attacker');
+    expect(result.isNewUser).toBe(true);
   });
 
   it('Path 4 — creates new customer when no existing record matches', async () => {
