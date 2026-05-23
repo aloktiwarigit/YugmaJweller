@@ -7,9 +7,12 @@ const bytea = customType<{ data: Buffer }>({
 
 export const customers = tenantScopedTable('customers', {
   id:              uuid('id').primaryKey().defaultRandom(),
-  phone:           text('phone').notNull(),
+  phone:           text('phone'),
   name:            text('name').notNull(),
   email:           text('email'),
+  firebaseUid:     text('firebase_uid'),
+  displayName:     text('display_name'),
+  authProvider:    text('auth_provider').$type<'phone' | 'google' | 'email_password'>().notNull().default('phone'),
   addressLine1:    text('address_line1'),
   addressLine2:    text('address_line2'),
   city:            text('city'),
