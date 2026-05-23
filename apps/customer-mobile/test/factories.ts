@@ -22,6 +22,7 @@ export function makeCustomer(overrides: Partial<Customer> = {}): Customer {
     shopId: '00000000-0000-4000-8000-000000000001',
     name: 'देव-मोड ग्राहक',
     phoneE164: '+919999999999',
+    email: null,
     ...overrides,
   };
 }

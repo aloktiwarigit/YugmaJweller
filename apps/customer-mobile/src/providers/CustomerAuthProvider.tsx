@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import axios from 'axios';
 import Constants from 'expo-constants';
 import auth from '@react-native-firebase/auth';
 import { useCustomerSessionStore } from '../stores/customerSessionStore';
@@ -21,6 +22,27 @@ const CustomerAuthBootstrapContext = createContext<CustomerAuthBootstrapValue>({
 
 export function useCustomerAuthBootstrap(): CustomerAuthBootstrapValue {
   return useContext(CustomerAuthBootstrapContext);
+}
+
+const baseURL =
+  (Constants.expoConfig?.extra?.['apiBaseUrl'] as string | undefined) ?? 'http://localhost:3001';
+
+interface SessionResponse {
+  customer:     { id: string; name: string; phoneE164: string | null; email: string | null };
+  isNewUser:    boolean;
+  authProvider: 'phone' | 'google' | 'email_password';
+}
+
+async function callSessionEndpoint(idToken: string, shopId: string): Promise<SessionResponse> {
+  const resp = await axios.post<SessionResponse>(
+    `${baseURL}/api/v1/customer/auth/session`,
+    {},
+    {
+      headers: { Authorization: `Bearer ${idToken}`, 'x-tenant-id': shopId },
+      timeout: 15_000,
+    },
+  );
+  return resp.data;
 }
 
 export function CustomerAuthProvider({ children }: { children: React.ReactNode }): React.ReactElement {
@@ -47,7 +69,8 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
           if (cancelled) return;
           if (persisted?.bearer.startsWith(DEV_MOCK_BEARER_PREFIX) && persisted.shopId === tenant.id) {
             setSession(
-              { id: persisted.customerId, shopId: persisted.shopId, name: DEV_MOCK_CUSTOMER_NAME, phoneE164: DEV_MOCK_CUSTOMER_PHONE },
+              { id: persisted.customerId, shopId: persisted.shopId,
+                name: DEV_MOCK_CUSTOMER_NAME, phoneE164: DEV_MOCK_CUSTOMER_PHONE, email: null },
               persisted.bearer,
             );
             void identifyPostHog(DEV_MOCK_CUSTOMER_PHONE, persisted.shopId);
@@ -57,8 +80,8 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
           const customer = buildDevMockCustomer(tenant);
           await saveSecureSession({ bearer, customerId: customer.id, shopId: customer.shopId });
           if (cancelled) return;
-          setSession(customer, bearer);
-          void identifyPostHog(customer.phoneE164, customer.shopId);
+          setSession({ ...customer, email: null }, bearer);
+          void identifyPostHog(DEV_MOCK_CUSTOMER_PHONE, customer.shopId);
         } finally {
           if (!cancelled) setReady(true);
         }
@@ -77,8 +100,6 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
       try {
         if (!firebaseUser) {
           // Clear any stale session (including stale DEV-MOCK sessions from prior dev runs).
-          // When devAuth is false we are in production Firebase auth path; any persisted
-          // bearer — real or mock — is invalid without a live Firebase user.
           const persisted = await loadSecureSession();
           if (persisted) {
             await clearSecureSession();
@@ -87,21 +108,33 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
           return;
         }
 
-        // Force-refresh only on first load; subsequent calls reuse cached token.
+        // Force-refresh only on first load; subsequent 401s use the api interceptor.
         const idToken = await firebaseUser.getIdToken(!bootstrapped);
-        const phone   = firebaseUser.phoneNumber ?? '';
+
+        // Call the session endpoint to provision/resolve the DB customer record.
+        // Source of truth for DB UUID — do NOT use firebaseUser.uid as customerId.
+        const session = await callSessionEndpoint(idToken, tenant.id);
+        const { customer: dbCustomer, isNewUser, authProvider } = session;
 
         await saveSecureSession({
           bearer:     idToken,
-          customerId: firebaseUser.uid,
+          customerId: dbCustomer.id,  // DB UUID, not Firebase UID
           shopId:     tenant.id,
         });
 
+        const isNewOAuth = isNewUser && authProvider !== 'phone';
         setSession(
-          { id: firebaseUser.uid, shopId: tenant.id, name: phone, phoneE164: phone },
+          {
+            id:        dbCustomer.id,
+            shopId:    tenant.id,
+            name:      dbCustomer.name,
+            phoneE164: dbCustomer.phoneE164,
+            email:     dbCustomer.email,
+          },
           idToken,
+          isNewOAuth,
         );
-        void identifyPostHog(phone, tenant.id);
+        void identifyPostHog(dbCustomer.phoneE164 ?? dbCustomer.email ?? dbCustomer.id, tenant.id);
       } finally {
         if (!bootstrapped) {
           bootstrapped = true;
