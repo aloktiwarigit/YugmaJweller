@@ -94,7 +94,7 @@ export default function EmailAuth(): React.ReactElement {
     }
   };
 
-  const inputStyle = (hasError?: boolean) => ({
+  const inputStyle = (hasError?: boolean): object => ({
     borderWidth:       1.5,
     borderColor:       hasError ? '#DC2626' : colors.border,
     borderRadius:      radii.sm,

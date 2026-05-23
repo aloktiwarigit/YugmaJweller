@@ -101,8 +101,8 @@ export class CustomerAuthGuard implements CanActivate {
     if (shop.status !== 'ACTIVE') throw new ServiceUnavailableException({ code: 'tenant.inactive' });
   }
 
-  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- guard boundary validates x-tenant-id before creating customer context
   private async resolveCustomer(
+    // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- guard boundary validates x-tenant-id before creating customer context
     shopId:         string,
     firebaseUid:    string,
     phoneFromToken: string | null,

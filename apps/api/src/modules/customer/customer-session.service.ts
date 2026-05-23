@@ -22,9 +22,9 @@ export interface CustomerSessionResult {
 
 @Injectable()
 export class CustomerSessionService {
-  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- session endpoint validates shopId before calling this
   async findOrCreateCustomerByFirebaseToken(
     pool:    Pool,
+    // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- session endpoint validates shopId before calling this
     shopId:  string,
     decoded: DecodedFirebaseToken,
   ): Promise<CustomerSessionResult> {

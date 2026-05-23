@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import type { Redis } from '@goldsmith/cache';
 import { trackEvent } from '@goldsmith/observability';
 import { FallbackChain } from '@goldsmith/rates';
-import type { PurityRates } from '@goldsmith/rates';
+import type { PurityRates, RatesResult } from '@goldsmith/rates';
 import { AuditAction } from '@goldsmith/audit';
 import { withTenantTx } from '@goldsmith/db';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
@@ -93,6 +93,18 @@ interface CachedCurrentRates {
   source: string;
 }
 
+interface SnapshotRatesRow {
+  fetched_at: Date | string;
+  source: string | null;
+  gold_24k_paise: bigint | string;
+  gold_22k_paise: bigint | string;
+  gold_20k_paise: bigint | string;
+  gold_18k_paise: bigint | string;
+  gold_14k_paise: bigint | string;
+  silver_999_paise: bigint | string;
+  silver_925_paise: bigint | string;
+}
+
 function serializeRates(
   rates: PurityRates,
   stale: boolean,
@@ -161,6 +173,45 @@ export class PricingService {
     );
   }
 
+  private async getLatestSnapshotRates(): Promise<CurrentRatesResult | null> {
+    const client = await this.pool.connect(); // nosemgrep: goldsmith.require-tenant-transaction -- ibja_rate_snapshots is platform-global
+    try {
+      const result = await client.query<SnapshotRatesRow>(
+        `SELECT fetched_at, source,
+                gold_24k_paise, gold_22k_paise, gold_20k_paise,
+                gold_18k_paise, gold_14k_paise, silver_999_paise, silver_925_paise
+           FROM ibja_rate_snapshots
+          ORDER BY fetched_at DESC
+          LIMIT 1`,
+      );
+      const row = result.rows[0];
+      if (!row) return null;
+
+      const fetchedAt = new Date(row.fetched_at);
+      const entry = (perGramPaise: bigint | string): { perGramPaise: bigint; fetchedAt: Date } => ({
+        perGramPaise: BigInt(perGramPaise),
+        fetchedAt,
+      });
+
+      return {
+        GOLD_24K: entry(row.gold_24k_paise),
+        GOLD_22K: entry(row.gold_22k_paise),
+        GOLD_20K: entry(row.gold_20k_paise),
+        GOLD_18K: entry(row.gold_18k_paise),
+        GOLD_14K: entry(row.gold_14k_paise),
+        SILVER_999: entry(row.silver_999_paise),
+        SILVER_925: entry(row.silver_925_paise),
+        stale: true,
+        source: row.source ? `snapshot:${row.source}` : 'snapshot',
+      };
+    } catch (err) {
+      this.logger.warn(`DB snapshot rates fallback failed: ${String(err)}`);
+      return null;
+    } finally {
+      client.release();
+    }
+  }
+
   // -------------------------------------------------------------------------
   // getCurrentRates — try Redis cache first, fall back to FallbackChain
   // -------------------------------------------------------------------------
@@ -213,7 +264,17 @@ export class PricingService {
     }
 
     // Cache miss — call FallbackChain (throws RatesUnavailableError if all sources fail)
-    const liveResult = await this.fallbackChain.getRatesByPurity();
+    let liveResult: RatesResult;
+    try {
+      liveResult = await this.fallbackChain.getRatesByPurity();
+    } catch (err) {
+      const snapshotRates = await this.getLatestSnapshotRates();
+      if (snapshotRates !== null) {
+        this.logger.warn(`Rates served from DB snapshot fallback: ${String(err)}`);
+        return snapshotRates;
+      }
+      throw err;
+    }
     const { rates: liveRates, source, stale } = liveResult;
 
     // Only cache live rates — skip Redis write for LKG; non-fatal if Redis write fails
