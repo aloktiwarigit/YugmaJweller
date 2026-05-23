@@ -72,7 +72,7 @@ export class CustomerAuthGuard implements CanActivate {
     let firebaseUid: string;
     let phoneFromToken: string | null;
     try {
-      const decoded = await this.firebase.admin().auth().verifyIdToken(bearer, false);
+      const decoded = await this.firebase.admin().auth().verifyIdToken(bearer, true);
       firebaseUid    = decoded.uid;
       phoneFromToken = (decoded['phone_number'] ?? decoded['phoneNumber'] ?? null) as string | null;
     } catch {

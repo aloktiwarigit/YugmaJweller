@@ -73,7 +73,13 @@ export function SignInPageClient({ rawReturnTo }: Props): JSX.Element {
   const afterSignIn = async (): Promise<void> => {
     if (tenant?.shopId) {
       const idToken = await getCustomerIdToken();
-      if (idToken) await callCustomerSessionEndpoint(idToken, tenant.shopId);
+      if (idToken) {
+        const session = await callCustomerSessionEndpoint(idToken, tenant.shopId);
+        if (!session) {
+          setError('साइन इन विफल। कृपया पुनः प्रयास करें।');
+          return;
+        }
+      }
     }
     router.replace(returnTo);
   };
