@@ -302,6 +302,35 @@ export async function fetchReturnPolicy(shopId: string): Promise<string | null> 
   }
 }
 
+// ── Customer session endpoint ─────────────────────────────────────────────────
+
+export interface CustomerSessionResponse {
+  customer:     { id: string; name: string; phoneE164: string | null; email: string | null };
+  isNewUser:    boolean;
+  authProvider: 'phone' | 'google' | 'email_password';
+}
+
+export async function callCustomerSessionEndpoint(
+  idToken: string,
+  shopId:  string,
+): Promise<CustomerSessionResponse | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/customer/auth/session`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${idToken}`,
+        'X-Tenant-Id':   shopId,
+      },
+      ...withTimeout(),
+    });
+    if (!res.ok) return null;
+    return res.json() as Promise<CustomerSessionResponse>;
+  } catch {
+    return null;
+  }
+}
+
 // ── Wishlist API — client-side only (requires Firebase ID token) ──────────────
 
 export interface WishlistItemResponse {

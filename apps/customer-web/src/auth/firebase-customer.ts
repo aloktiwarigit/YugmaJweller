@@ -13,6 +13,12 @@ import {
   onAuthStateChanged,
   signInWithPhoneNumber,
   RecaptchaVerifier,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  sendPasswordResetEmail,
   type Auth,
   type ConfirmationResult,
   type Unsubscribe,
@@ -20,28 +26,86 @@ import {
 } from 'firebase/auth';
 
 let app: FirebaseApp | null = null;
+let auth: Auth | null = null;
+let unavailableReason: string | null = null;
 
-function getFirebaseApp(): FirebaseApp {
-  if (app !== null) return app;
-  const existing = getApps();
-  if (existing.length > 0) {
-    app = existing[0]!;
-    return app;
+function cleanEnv(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function unavailable(error: unknown): null {
+  if (unavailableReason === null) {
+    unavailableReason = error instanceof Error ? error.message : String(error);
   }
-  app = initializeApp({
-    apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain:        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId:         process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  });
-  return app;
+  return null;
+}
+
+function firebaseConfig(): { apiKey: string; authDomain: string; projectId: string; appId?: string } | null {
+  const apiKey     = cleanEnv(process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
+  const authDomain = cleanEnv(process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN);
+  const projectId  = cleanEnv(process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
+  const appId      = cleanEnv(process.env.NEXT_PUBLIC_FIREBASE_APP_ID);
+
+  if (!apiKey || !authDomain || !projectId) {
+    return unavailable('missing customer Firebase web config');
+  }
+
+  return {
+    apiKey,
+    authDomain,
+    projectId,
+    ...(appId ? { appId } : {}),
+  };
+}
+
+function getFirebaseAppOrNull(): FirebaseApp | null {
+  if (app !== null) return app;
+  try {
+    const existing = getApps();
+    if (existing.length > 0) {
+      app = existing[0]!;
+      return app;
+    }
+    const config = firebaseConfig();
+    if (config === null) return null;
+    app = initializeApp(config);
+    return app;
+  } catch (error) {
+    return unavailable(error);
+  }
+}
+
+export function getCustomerAuthOrNull(): Auth | null {
+  if (auth !== null) return auth;
+  const firebaseApp = getFirebaseAppOrNull();
+  if (firebaseApp === null) return null;
+  try {
+    auth = getAuth(firebaseApp);
+    return auth;
+  } catch (error) {
+    return unavailable(error);
+  }
+}
+
+export function isCustomerFirebaseAuthAvailable(): boolean {
+  return getCustomerAuthOrNull() !== null;
 }
 
 export function getCustomerAuth(): Auth {
-  return getAuth(getFirebaseApp());
+  const customerAuth = getCustomerAuthOrNull();
+  if (customerAuth === null) {
+    throw new Error(unavailableReason ?? 'customer Firebase auth is unavailable');
+  }
+  return customerAuth;
 }
 
 export function createInvisibleRecaptcha(container: HTMLElement): RecaptchaVerifier {
-  return new RecaptchaVerifier(getCustomerAuth(), container, { size: 'invisible' });
+  const customerAuth = getCustomerAuthOrNull();
+  if (customerAuth === null) {
+    throw new Error(unavailableReason ?? 'customer Firebase auth is unavailable');
+  }
+  return new RecaptchaVerifier(customerAuth, container, { size: 'invisible' });
 }
 
 /**
@@ -61,13 +125,17 @@ function toE164(phone: string): string {
 }
 
 export async function sendOtp(phone: string, verifier: RecaptchaVerifier): Promise<ConfirmationResult> {
-  return signInWithPhoneNumber(getCustomerAuth(), toE164(phone), verifier);
+  const customerAuth = getCustomerAuthOrNull();
+  if (customerAuth === null) {
+    throw new Error(unavailableReason ?? 'customer Firebase auth is unavailable');
+  }
+  return signInWithPhoneNumber(customerAuth, toE164(phone), verifier);
 }
 
 export type { ConfirmationResult, User, RecaptchaVerifier };
 
 export async function getCustomerIdToken(): Promise<string | null> {
-  const user = getCustomerAuth().currentUser;
+  const user = getCustomerAuthOrNull()?.currentUser ?? null;
   if (!user) return null;
   try {
     return await user.getIdToken();
@@ -79,7 +147,49 @@ export async function getCustomerIdToken(): Promise<string | null> {
 export function onCustomerAuthChanged(
   cb: (user: User | null) => void,
 ): Unsubscribe {
-  return onAuthStateChanged(getCustomerAuth(), cb);
+  const customerAuth = getCustomerAuthOrNull();
+  if (customerAuth === null) {
+    queueMicrotask(() => cb(null));
+    return () => {};
+  }
+
+  try {
+    return onAuthStateChanged(
+      customerAuth,
+      cb,
+      (error) => {
+        unavailable(error);
+        cb(null);
+      },
+    );
+  } catch (error) {
+    unavailable(error);
+    cb(null);
+    return () => {};
+  }
 }
 
 export type { Unsubscribe };
+
+export async function signInWithGoogle(): Promise<void> {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  await signInWithPopup(getCustomerAuth(), provider);
+}
+
+export async function signInWithEmail(email: string, password: string): Promise<void> {
+  await signInWithEmailAndPassword(getCustomerAuth(), email, password);
+}
+
+export async function createEmailAccount(
+  email: string,
+  password: string,
+  displayName: string,
+): Promise<void> {
+  const cred = await createUserWithEmailAndPassword(getCustomerAuth(), email, password);
+  await updateProfile(cred.user, { displayName });
+}
+
+export async function sendPasswordReset(email: string): Promise<void> {
+  await sendPasswordResetEmail(getCustomerAuth(), email);
+}
