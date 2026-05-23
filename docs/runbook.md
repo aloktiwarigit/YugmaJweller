@@ -709,12 +709,18 @@ DB session rows are unaffected; running sessions must be re-started after rotati
 Deploys are triggered by submitting a Cloud Build job against `main`:
 
 ```bash
-# From repo root — Cloud Build builds + pushes image + deploys to Cloud Run atomically.
+# From repo root — MUST use --ignore-file=.gcloudignore-api (not the default .gcloudignore,
+# which is scoped to Firebase App Hosting and explicitly excludes apps/api/).
 gcloud builds submit \
   --config cloudbuild.yaml \
+  --ignore-file=.gcloudignore-api \
   --project goldsmith-dev \
   .
 ```
+
+> **⚠️ Common mistake:** Running without `--ignore-file=.gcloudignore-api` causes the build to fail with
+> `lstat apps/api: no such file or directory` because `.gcloudignore` (the Firebase App Hosting ignore
+> file) excludes `apps/api/`. Always use the flag above.
 
 A GitHub Cloud Build trigger can be wired to `main` to make this automatic on push.
 Until the trigger is configured, deploys are manual via the command above.
