@@ -175,6 +175,13 @@ const config: ExpoConfig = {
     ],
     '@react-native-firebase/app',
     '@react-native-firebase/auth',
+    [
+      '@react-native-google-signin/google-signin',
+      {
+        // iosUrlScheme is the reversed client ID for iOS — update when iOS build is needed.
+        // Android only needs the plugin registered; webClientId is set programmatically.
+      },
+    ],
     ...(isProduction ? [] : ['expo-dev-client' as const]),
     'expo-asset',
     'expo-font',
