@@ -1,2 +1,16 @@
-afca74a485903b3e72725f1e00035c57f01308f7 2026-05-17T21:48:32-0400
-Story 19.7 — /security-review skill returned 'No security vulnerabilities found.' Comprehensive scan covered PII handling (reasonText excluded from audit), SQL injection (all parameterised), tenant isolation (RLS + belt-and-suspenders shop_id scoping), Firebase OTP boundary, cross-tenant FK cascade safety, replay protection, JSON injection in audit, DOM XSS, SSR data leak.
+Story 19.9 — Customer Multi-Provider Auth
+Reviewer: Claude Sonnet 4.6 security-review skill
+Date: 2026-05-23
+Branch: feat/customer-multi-provider-auth
+HEAD: f373723
+
+Findings:
+- P0 FIXED: Email account takeover via unverified Firebase email (customer-session.service.ts Path 3).
+  Root cause: Path 3 email-link ran without checking email_verified claim.
+  Fix: `if (email && decoded.email_verified)` guard in findOrCreateCustomerByFirebaseToken.
+  Test: "skips email link when email_verified is false (prevents account takeover)" added.
+- P1 false positive: stale auth_provider — no current code branches on it for security decisions.
+- P1 false positive: checkRevoked=false — pre-existing code, hardening measure, not a new regression.
+- P2 false positive: PATCH /profile/phone E.164 validation — value comes from Firebase Admin SDK signed token.
+
+All SQL queries parameterized. RLS enforced via withShopTx. Cross-tenant scoping verified.
