@@ -1,4 +1,6 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { api } from './client';
 import type { Tenant, TenantBranding } from '../stores/tenantStore';
 import type {
@@ -10,6 +12,10 @@ import type {
   PublicReviewsResponse,
 } from '@goldsmith/customer-shared';
 import { catalogImageUriForHint } from '../assets/storefrontImages';
+import { demoShopImageUriForPath } from '../assets/demoShopImageResolver';
+import { DEV_MOCK_BEARER_PREFIX } from '../lib/dev-mock-session';
+import { useCustomerSessionStore } from '../stores/customerSessionStore';
+import { useTenantStore } from '../stores/tenantStore';
 
 // CatalogEstimatedPrice was the mobile-side name for EstimatedPrice.
 // Re-export as alias to avoid breaking existing mobile code that references it.
@@ -114,7 +120,9 @@ type CatalogProductWithImage = {
 
 function resolveApiAssetUrl(value: string): string {
   if (/^(?:https?|data|file|content|asset):/i.test(value)) return value;
-  if (value.startsWith('/demo-shop/')) return catalogImageUriForHint(value);
+  if (value.startsWith('/demo-shop/')) {
+    return demoShopImageUriForPath(value) ?? catalogImageUriForHint(value);
+  }
   const baseURL = api.defaults.baseURL;
   if (!baseURL) return value;
   try {
@@ -345,21 +353,88 @@ export interface WishlistItem {
   addedAt:      string;
 }
 
+const DEV_WISHLIST_CACHE_PREFIX = 'customer_mobile_dev_wishlist_v1:';
+
+function isDevMockSession(): boolean {
+  const devAuth = Boolean(Constants.expoConfig?.extra?.['devAuth']);
+  const bearer = useCustomerSessionStore.getState().bearer;
+  return devAuth && Boolean(bearer?.startsWith(DEV_MOCK_BEARER_PREFIX));
+}
+
+function devWishlistCacheKey(): string {
+  const shopId =
+    useTenantStore.getState().tenant?.id ??
+    useCustomerSessionStore.getState().customer?.shopId ??
+    'unknown';
+  return `${DEV_WISHLIST_CACHE_PREFIX}${shopId}`;
+}
+
+function normalizeWishlistItems(value: unknown): WishlistItem[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is WishlistItem =>
+    item !== null &&
+    typeof item === 'object' &&
+    typeof (item as { productId?: unknown }).productId === 'string',
+  );
+}
+
+async function readDevWishlist(): Promise<WishlistItem[]> {
+  try {
+    const raw = await AsyncStorage.getItem(devWishlistCacheKey());
+    if (!raw) return [];
+    return normalizeWishlistItems(JSON.parse(raw) as unknown);
+  } catch {
+    return [];
+  }
+}
+
+async function writeDevWishlist(items: WishlistItem[]): Promise<void> {
+  await AsyncStorage.setItem(devWishlistCacheKey(), JSON.stringify(items));
+}
+
+function emptyWishlistItem(productId: string): WishlistItem {
+  return {
+    productId,
+    sku: '',
+    purity: '',
+    metal: '',
+    grossWeightG: '',
+    netWeightG: '',
+    huid: null,
+    addedAt: new Date().toISOString(),
+  };
+}
+
 export async function getProductReviews(productId: string): Promise<ReviewsResponse> {
   const res = await api.get<ReviewsResponse>(`/api/v1/reviews/products/${productId}`);
   return res.data;
 }
 
 export async function getWishlist(): Promise<WishlistItem[]> {
+  if (isDevMockSession()) {
+    return readDevWishlist();
+  }
   const res = await api.get<WishlistItem[]>('/api/v1/wishlist');
   return res.data;
 }
 
-export async function addToWishlist(productId: string): Promise<void> {
+export async function addToWishlist(productId: string, item?: WishlistItem): Promise<void> {
+  if (isDevMockSession()) {
+    const current = await readDevWishlist();
+    if (!current.some((entry) => entry.productId === productId)) {
+      await writeDevWishlist([item ?? emptyWishlistItem(productId), ...current]);
+    }
+    return;
+  }
   await api.post('/api/v1/wishlist', { productId });
 }
 
 export async function removeFromWishlist(productId: string): Promise<void> {
+  if (isDevMockSession()) {
+    const current = await readDevWishlist();
+    await writeDevWishlist(current.filter((entry) => entry.productId !== productId));
+    return;
+  }
   await api.delete(`/api/v1/wishlist/${productId}`);
 }
 

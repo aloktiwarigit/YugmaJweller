@@ -2,16 +2,20 @@ import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Tabs, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@goldsmith/ui-tokens';
 import { useCustomerSession } from '../../src/hooks/useCustomerSession';
 import { useCustomerAuthBootstrap } from '../../src/providers/CustomerAuthProvider';
 import { useTenantStore } from '../../src/stores/tenantStore';
 
 export default function TabsLayout(): React.ReactElement {
+  const insets = useSafeAreaInsets();
   const { isAuthenticated } = useCustomerSession();
   const { ready } = useCustomerAuthBootstrap();
   const tenantError = useTenantStore((s) => s.error);
   const tenant = useTenantStore((s) => s.tenant);
+  const tabBarBottomPadding = Math.max(insets.bottom, 12);
+  const tabBarContentHeight = 62;
 
   // Wait for CustomerAuthProvider to finish rehydrating SecureStore before
   // deciding whether to redirect — otherwise a deep-link / cold-start onto a
@@ -42,9 +46,25 @@ export default function TabsLayout(): React.ReactElement {
         tabBarStyle: {
           backgroundColor: colors.background,
           borderTopColor: colors.border,
-          height: 60,
+          borderTopWidth: 1,
+          height: tabBarContentHeight + tabBarBottomPadding,
+          paddingTop: 8,
+          paddingBottom: tabBarBottomPadding,
         },
-        tabBarLabelStyle: { fontSize: 12 },
+        tabBarItemStyle: {
+          height: tabBarContentHeight,
+          paddingTop: 4,
+          paddingBottom: 6,
+        },
+        tabBarIconStyle: { marginBottom: 1 },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          lineHeight: 15,
+          fontWeight: '700',
+          marginTop: 0,
+          marginBottom: 0,
+        },
+        tabBarHideOnKeyboard: true,
         headerShown: false,
       }}
     >

@@ -77,7 +77,7 @@ interface ProductRowProps {
 
 function ProductRow({ products, wishlistedIds, onWishlistPress }: ProductRowProps): React.ReactElement {
   const { width } = useWindowDimensions();
-  const cardWidth = width * 0.44;
+  const cardWidth = Math.min(184, Math.max(156, width * 0.44));
 
   return (
     <FlatList
@@ -107,6 +107,14 @@ function ProductRow({ products, wishlistedIds, onWishlistPress }: ProductRowProp
         </TouchableOpacity>
       )}
     />
+  );
+}
+
+function ProductRailStatus({ message }: { message: string }): React.ReactElement {
+  return (
+    <View style={styles.railStatus}>
+      <Text style={styles.railStatusText}>{message}</Text>
+    </View>
   );
 }
 
@@ -319,8 +327,8 @@ export default function Home(): React.ReactElement {
   const wishlistedIds = new Set((wishlistData ?? []).map((w: WishlistItem) => w.productId));
 
   const wishlistMutation = useMutation({
-    mutationFn: ({ productId, add }: { productId: string; add: boolean; item: WishlistItem }) =>
-      add ? addToWishlist(productId) : removeFromWishlist(productId),
+    mutationFn: ({ productId, add, item }: { productId: string; add: boolean; item: WishlistItem }) =>
+      add ? addToWishlist(productId, item) : removeFromWishlist(productId),
     onMutate: ({ add, item }) => optimisticallySetWishlist(queryClient, item, add),
     onError: (_err, _vars, ctx) => {
       queryClient.setQueryData<WishlistItem[]>(wishlistQueryKey, ctx?.previous);
@@ -374,40 +382,48 @@ export default function Home(): React.ReactElement {
         {/* Section 1: Hero */}
         <HeroSection />
 
-        {/* Section 2: Rate strip */}
-        <View style={styles.sectionGap}>
-          <SectionHeading titleHi="आज की दर" eyebrowLabel="ताज़ा दरें" />
+        {/* Section 2: Live rate utility */}
+        <View style={styles.rateSection}>
           <RateStrip />
         </View>
 
-        {/* Section 3: Shop by category */}
+        {/* Section 3: Latest arrivals */}
+        <View style={styles.sectionGap}>
+          <SectionHeading
+            titleHi="नए आए डिज़ाइन"
+            eyebrowLabel="LATEST ARRIVALS"
+            onSeeAll={() => router.push('/(tabs)/browse?sort=newest' as Parameters<typeof router.push>[0])}
+          />
+          {newArrivals.isLoading ? (
+            <ProductRailStatus message="नई वस्तुएँ लोड हो रही हैं" />
+          ) : newArrivalItems.length > 0 ? (
+            <ProductRow products={newArrivalItems} wishlistedIds={wishlistedIds} onWishlistPress={handleWishlistToggle} />
+          ) : (
+            <ProductRailStatus message="अभी नई वस्तुएँ उपलब्ध नहीं हैं" />
+          )}
+        </View>
+
+        {/* Section 4: Spotlight — hidden until curation is configured */}
+        {/* hasCuration: false — rendered server-side once storefront-config ships (D4) */}
+
+        {/* Section 5: Shop by category */}
         <View style={styles.sectionGap}>
           <SectionHeading titleHi="श्रेणी अनुसार" eyebrowLabel="खरीदारी" />
           <CategoryTileGrid columns={4} />
         </View>
 
-        {/* Section 4: New arrivals */}
-        {newArrivalItems.length > 0 && (
-          <View style={styles.sectionGap}>
-            <SectionHeading
-              titleHi="नई कलेक्शन"
-              eyebrowLabel="नया आया"
-              onSeeAll={() => router.push('/(tabs)/browse' as Parameters<typeof router.push>[0])}
-            />
-            <ProductRow products={newArrivalItems} wishlistedIds={wishlistedIds} onWishlistPress={handleWishlistToggle} />
-          </View>
-        )}
+        {/* Section 6: Premium strip */}
+        <View style={styles.sectionGap}>
+          <PremiumStrip />
+        </View>
 
-        {/* Section 5: Spotlight — hidden until curation is configured */}
-        {/* hasCuration: false — rendered server-side once storefront-config ships (D4) */}
-
-        {/* Section 6: Gift personas */}
+        {/* Section 7: Gift personas */}
         <View style={styles.sectionGap}>
           <SectionHeading titleHi="प्रियजनों के लिए" eyebrowLabel="उपहार" />
           <GiftPersonasRow />
         </View>
 
-        {/* Section 7: Top sellers */}
+        {/* Section 8: Top sellers */}
         {topSellerItems.length > 0 && (
           <View style={styles.sectionGap}>
             <SectionHeading titleHi="टॉप सेलर" eyebrowLabel="लोकप्रिय" />
@@ -415,15 +431,10 @@ export default function Home(): React.ReactElement {
           </View>
         )}
 
-        {/* Section 8: Everyday collection */}
+        {/* Section 9: Everyday collection */}
         <View style={styles.sectionGap}>
           <SectionHeading titleHi="रोज़मर्रा की पसंद" eyebrowLabel="रोज़मर्रा" />
           <EverydayCollectionGrid />
-        </View>
-
-        {/* Section 9: Premium strip */}
-        <View style={styles.sectionGap}>
-          <PremiumStrip />
         </View>
 
         {/* Section 10: Recommended — hidden until API delivers data (D4) */}
@@ -456,6 +467,9 @@ const styles = StyleSheet.create({
   sectionGap: {
     marginTop: spacing.lg,
   },
+  rateSection: {
+    marginTop: spacing.md,
+  },
   // Section headings
   sectionHeader: {
     flexDirection:   'row',
@@ -484,6 +498,23 @@ const styles = StyleSheet.create({
   // Rate strip
   rateStripWrap: {
     paddingHorizontal: 0,
+  },
+  railStatus: {
+    marginHorizontal: spacing.lg,
+    minHeight:        132,
+    borderRadius:     radii.md,
+    borderWidth:      1,
+    borderColor:      colors.borderSubtle,
+    backgroundColor:  colors.surfaceElevated,
+    alignItems:       'center',
+    justifyContent:   'center',
+    padding:          spacing.lg,
+  },
+  railStatusText: {
+    fontFamily: typography.body.family,
+    fontSize:   13,
+    color:      colors.inkMute,
+    textAlign:  'center',
   },
   // Gift eyebrow
   giftEyebrow: {

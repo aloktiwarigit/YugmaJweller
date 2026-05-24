@@ -53,7 +53,7 @@ steps:
   # unhealthy (DB unreachable, bad env var, crash-loop), traffic stays on the
   # previous revision automatically.
   #
-  # Scaling: min-instances=0 (scale-to-zero, startup-lean ADR-0015);
+  # Scaling: min-instances=1 keeps tenant-config responsive for customer-web SSR;
   # max-instances=10 is a safety cap — raise when load justifies it.
   #
   # Traffic: 100% traffic is shifted immediately after a healthy startup.
@@ -73,7 +73,7 @@ steps:
       - --platform=managed
       - --allow-unauthenticated
       - --port=8080
-      - --min-instances=0
+      - --min-instances=1
       - --max-instances=10
       - --cpu=1
       - --memory=512Mi

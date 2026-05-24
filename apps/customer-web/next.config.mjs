@@ -41,11 +41,18 @@ const nextConfig = {
   ],
 
   images: {
+    // Avoid generating huge 3840px image variants on high-DPR desktops. The
+    // storefront is served directly from Cloud Run, so every oversized variant
+    // adds optimizer CPU time before the browser can paint.
+    deviceSizes: [360, 414, 640, 750, 828, 1080, 1200, 1600, 1920],
+    imageSizes: [48, 64, 96, 128, 256, 384],
     remotePatterns: [
       { protocol: 'https', hostname: '*.blob.core.windows.net' },
       { protocol: 'https', hostname: 'ik.imagekit.io' },
     ],
-    formats: ['image/avif', 'image/webp'],
+    // AVIF saves some bytes, but on-demand encoding is too slow on Cloud Run
+    // for hero/LCP images. WebP keeps payloads small with much lower latency.
+    formats: ['image/webp'],
     // Cache optimizer output for 1 year. Default is 60s, which forces browsers
     // to revalidate every visit — compounds with no-CDN Cloud Run into slow
     // image loads. Demo assets in /demo-shop are immutable.

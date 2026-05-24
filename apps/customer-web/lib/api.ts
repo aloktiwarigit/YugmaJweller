@@ -55,27 +55,67 @@ function resolveApiUrl(): string {
 
 const API_URL = resolveApiUrl();
 
-// Per-request timeout protects TTFB budget (<500ms) — slow API calls fall back
+type NextFetchInit = RequestInit & {
+  next?: {
+    revalidate?: number | false;
+    tags?: string[];
+  };
+};
+
+// Per-request timeout protects TTFB budget (<500ms) - slow API calls fall back
 // to graceful empty/unavailable states instead of blocking the page render.
 // Tuned to 1500ms: API p95 should be <300ms in prod; this leaves headroom
 // for cold starts without exceeding the LCP budget (<2500ms).
 // 5s, not 1.5s. Cloud Run cold starts (min-instances=0 environments) can take
-// 3-5s; a 1.5s SSR timeout caused intermittent "दुकान उपलब्ध नहीं है" failures
+// 3-5s; a 1.5s SSR timeout caused intermittent unavailable-shop failures
 // when the API container had idled out. min-instances=1 on goldsmith-api now
 // prevents most cold starts, but this is the second layer of defense.
 const FETCH_TIMEOUT_MS = 5000;
+// Tenant config gates every page. Give it room for a transient API cold start
+// or Cloud SQL attach, then retry once before showing the unavailable-shop UI.
+const TENANT_CONFIG_TIMEOUT_MS = 10000;
+const RETRY_DELAY_MS = 250;
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
-function withTimeout(): { signal: AbortSignal } {
-  return { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) };
+function withTimeout(timeoutMs = FETCH_TIMEOUT_MS): { signal: AbortSignal } {
+  return { signal: AbortSignal.timeout(timeoutMs) };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function fetchWithRetry(
+  input: string,
+  init: NextFetchInit,
+  options: { attempts: number; timeoutMs: number },
+): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < options.attempts; attempt += 1) {
+    try {
+      const res = await fetch(input, { ...init, ...withTimeout(options.timeoutMs) });
+      if (!RETRYABLE_STATUS.has(res.status) || attempt === options.attempts - 1) return res;
+    } catch (error) {
+      lastError = error;
+      if (attempt === options.attempts - 1) throw error;
+    }
+    await sleep(RETRY_DELAY_MS * (attempt + 1));
+  }
+  throw lastError instanceof Error ? lastError : new Error('fetch failed after retries');
 }
 
 export async function fetchTenantConfig(slug: string): Promise<TenantConfigResponse | null> {
   try {
-    const res = await fetch(`${API_URL}/api/v1/catalog/tenant-config`, {
-      headers: { 'X-Shop-Slug': slug },
-      next: { revalidate: 3600 },
-      ...withTimeout(),
-    });
+    const res = await fetchWithRetry(
+      `${API_URL}/api/v1/catalog/tenant-config`,
+      {
+        headers: { 'X-Shop-Slug': slug },
+        next: { revalidate: 3600 },
+      },
+      { attempts: 2, timeoutMs: TENANT_CONFIG_TIMEOUT_MS },
+    );
     if (!res.ok) return null;
     return res.json() as Promise<TenantConfigResponse>;
   } catch {

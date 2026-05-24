@@ -569,13 +569,13 @@ async function seed(client: PoolClient): Promise<void> {
     .filter((id): id is string => Boolean(id));
 
   const storefrontConfig = {
-    heroBanners: [
-      {
-        imageUrl: '/demo-shop/campaign-showroom-display.jpg',
-        headlineHi: 'Wedding-ready gold, curated for every occasion',
-        headlineEn: 'Wedding-ready gold',
-        ctaUrl: '/products?collection=bridal-edit',
-      },
+      heroBanners: [
+        {
+          imageUrl: '/demo-shop/campaign-necklace-showcase.jpg',
+          headlineHi: 'A signature necklace edit for every celebration',
+          headlineEn: 'Celebration-ready necklaces',
+          ctaUrl: '/products?collection=bridal-edit',
+        },
       {
         imageUrl: '/demo-shop/campaign-lifestyle-necklace.jpg',
         headlineHi: 'Lightweight daily-wear pieces for modern gifting',

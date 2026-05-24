@@ -43,6 +43,6 @@ describe('RateCard', () => {
     const { getByTestId } = render(<RateCard />, { wrapper });
     await waitFor(() => {
       expect(getByTestId('rate-card-error').textContent).toContain('दर अभी उपलब्ध नहीं है');
-    });
+    }, { timeout: 5000 });
   });
 });
