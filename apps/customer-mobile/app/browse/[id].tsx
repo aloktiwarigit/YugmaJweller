@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   ActivityIndicator, Modal, Alert, TextInput,
@@ -9,6 +9,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
+import { categoryToFallbackSvg } from '@goldsmith/customer-shared';
 import {
   getCatalogProduct,
   verifyHuid,
@@ -98,6 +99,11 @@ function StarRow({ rating }: { rating: number }): React.ReactElement {
 // ---------------------------------------------------------------------------
 
 function CompactProductCard({ product }: { product: CatalogProduct }): React.ReactElement {
+  const fallbackUri = useMemo(
+    () => `data:image/svg+xml;utf8,${encodeURIComponent(categoryToFallbackSvg(product.categoryName))}`,
+    [product.categoryName],
+  );
+  const displayName = purityLabel(product.purity);
   return (
     <TouchableOpacity
       onPress={() => router.push(`/browse/${product.id}`)}
