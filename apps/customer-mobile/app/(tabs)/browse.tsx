@@ -18,18 +18,34 @@ import {
   removeFilterChip,
 } from '../../src/lib/catalog-filter-utils';
 import type { ActiveFilters } from '../../src/lib/catalog-filter-utils';
-import { CATALOG_SORTS, purityLabel } from '@goldsmith/customer-shared';
+import { CATALOG_SORTS, productDisplayName, productMerchBadges, productSubtitle } from '@goldsmith/customer-shared';
 import type { CatalogSort } from '@goldsmith/customer-shared';
 import { imageForCategoryName } from '../../src/assets/storefrontImages';
 import { useTenantStore } from '../../src/stores/tenantStore';
 
 type SearchParamValue = string | string[] | undefined;
 type BrowseRouteParams = Record<string, SearchParamValue>;
+type ServiceMode = 'all' | 'tryAtHome' | 'storePickup' | 'fastDelivery';
+
+const SERVICE_CHIPS: Array<{ key: ServiceMode; label: string; hint: string }> = [
+  { key: 'all',          label: 'सभी',          hint: 'पूरा कैटलॉग' },
+  { key: 'tryAtHome',    label: 'घर पर ट्राय',  hint: 'उपलब्ध डिज़ाइन' },
+  { key: 'storePickup',  label: 'स्टोर में देखें', hint: 'दुकान पर उपलब्ध' },
+  { key: 'fastDelivery', label: 'फास्ट डिलीवरी', hint: 'जल्दी उपलब्ध' },
+];
+
+const DISCOVERY_CHIPS: Array<{ label: string; params: Partial<ActiveFilters> }> = [
+  { label: 'ब्राइडल', params: { style: ['BRIDAL'] } },
+  { label: 'डेली वियर', params: { style: ['DAILY_WEAR'] } },
+  { label: '₹50K तक', params: { priceMin: 0, priceMax: 5_000_000 } },
+  { label: '2-5g', params: { weightMinG: 2, weightMaxG: 5 } },
+];
 
 interface BrowseRouteState {
   filters: ActiveFilters;
   search: string;
   sort: CatalogSort | undefined;
+  collection: string | undefined;
   page: number;
   signature: string;
 }
@@ -71,6 +87,8 @@ function routeStateFromParams(params: BrowseRouteParams): BrowseRouteState {
     purity:      firstParam(params['purity']) ? [firstParam(params['purity'])!] : [],
     priceMin:    numericParam(params['priceMin']),
     priceMax:    numericParam(params['priceMax']),
+    weightMinG:  numericParam(params['weightMinG']),
+    weightMaxG:  numericParam(params['weightMaxG']),
     style:       style ? [style] : [],
     occasion:    occasion ? [occasion] : [],
     inStockOnly: boolParam(params['inStockOnly']),
@@ -86,6 +104,7 @@ function routeStateFromParams(params: BrowseRouteParams): BrowseRouteState {
     filters,
     search: firstParam(params['search']) ?? '',
     sort:   sortParam(params['sort']),
+    collection: firstParam(params['collection']),
     page:   pageParam(params['page']),
   };
 
@@ -102,7 +121,9 @@ function routeStateFromParams(params: BrowseRouteParams): BrowseRouteState {
 
 function BrowseProductCard({ product }: { product: CatalogProduct }): React.ReactElement {
   const isUnavailable = product.quantity === 0;
-  const label = purityLabel(product.purity, product.metal);
+  const label = productDisplayName(product);
+  const subtitle = product.subtitle ?? productSubtitle(product);
+  const badges = product.badges ?? productMerchBadges(product);
   const fallbackImage = useMemo(() => imageForCategoryName(product.categoryName), [product.categoryName]);
 
   return (
@@ -114,66 +135,84 @@ function BrowseProductCard({ product }: { product: CatalogProduct }): React.Reac
       onPress={() => router.push(`/browse/${product.id}`)}
       style={{
         flex: 1,
-        backgroundColor: colors.white,
+        backgroundColor: colors.surface,
         borderRadius: radii.md,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: colors.borderSubtle,
         overflow: 'hidden',
         opacity: isUnavailable ? 0.6 : 1,
       }}
       accessible
-      accessibilityLabel={`${label} — ${product.sku}${isUnavailable ? ', उपलब्ध नहीं' : ''}`}
+      accessibilityLabel={`${label}${isUnavailable ? ', उपलब्ध नहीं' : ''}`}
       accessibilityRole="button"
     >
-      {/* Image placeholder / primaryImage */}
-      {product.primaryImage ? (
-        <Image
-          source={{ uri: product.primaryImage.url }}
-          placeholder={{ uri: product.primaryImage.placeholderUrl }}
-          contentFit="cover"
-          transition={250}
-          style={{ aspectRatio: 4 / 5, backgroundColor: colors.border }}
-          accessibilityLabel={product.primaryImage.alt ?? label}
-        />
-      ) : (
-        <Image
-          source={fallbackImage}
-          contentFit="contain"
-          style={{ aspectRatio: 4 / 5, backgroundColor: colors.white }}
-          accessibilityLabel={label}
-        />
-      )}
+      <View style={{ position: 'relative', aspectRatio: 4 / 5, backgroundColor: product.primaryImage ? colors.border : colors.white }}>
+        {product.primaryImage ? (
+          <Image
+            source={{ uri: product.primaryImage.url }}
+            placeholder={{ uri: product.primaryImage.placeholderUrl }}
+            contentFit="cover"
+            transition={250}
+            style={{ width: '100%', height: '100%' }}
+            accessibilityLabel={product.primaryImage.alt ?? label}
+          />
+        ) : (
+          <Image
+            source={fallbackImage}
+            contentFit="contain"
+            style={{ width: '100%', height: '100%' }}
+            accessibilityLabel={label}
+          />
+        )}
 
-      <View style={{ padding: spacing.sm }}>
+        {badges.length > 0 && (
+          <View style={{ position: 'absolute', left: spacing.xs, right: spacing.xs, bottom: spacing.xs, flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+            {badges.slice(0, 2).map((badge) => (
+              <View
+                key={badge}
+                style={{
+                  backgroundColor: badge === 'HUID' ? colors.successWash : 'rgba(255,255,255,0.88)',
+                  borderRadius: radii.pill,
+                  paddingHorizontal: 6,
+                  paddingVertical: 2,
+                }}
+              >
+                <Text style={{ fontFamily: typography.body.family, fontSize: 10, color: badge === 'HUID' ? colors.successJade : colors.ink }}>
+                  {badge}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
+      <View style={{ padding: spacing.sm, minHeight: 112 }}>
         <Text
-          style={{ fontFamily: typography.body.family, fontSize: 14, color: colors.ink, fontWeight: '600' }}
-          numberOfLines={1}
+          style={{ fontFamily: typography.headingMid.family, fontSize: 14, color: colors.ink, lineHeight: 18 }}
+          numberOfLines={2}
         >
           {label}
         </Text>
         <Text
-          style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.inkMute, marginTop: 2 }}
+          style={{ fontFamily: typography.body.family, fontSize: 11, color: colors.inkMute, marginTop: 2 }}
           numberOfLines={1}
         >
-          {product.sku}
+          {subtitle}
         </Text>
-        {product.huid && (
-          <Text
-            style={{ fontFamily: typography.body.family, fontSize: 11, color: colors.primary, marginTop: 4 }}
-            numberOfLines={1}
-          >
-            हॉलमार्क ✓
-          </Text>
-        )}
         {product.priceAvailable && product.estimatedPrice ? (
           <Text
-            style={{ fontFamily: typography.body.family, fontSize: 13, color: colors.ink, fontWeight: '600', marginTop: 4 }}
+            style={{ fontFamily: typography.headingMid.family, fontSize: 15, color: colors.ink, marginTop: 6 }}
           >
             {product.estimatedPrice.totalFormatted}
           </Text>
         ) : (
           <Text style={{ fontFamily: typography.body.family, fontSize: 11, color: colors.inkMute, marginTop: 4 }}>
             मूल्य हेतु संपर्क करें
+          </Text>
+        )}
+        {!isUnavailable && (
+          <Text style={{ fontFamily: typography.body.family, fontSize: 11, color: colors.primaryDeep, marginTop: 4 }}>
+            घर पर ट्राय उपलब्ध
           </Text>
         )}
         {isUnavailable && (
@@ -206,6 +245,9 @@ export default function Browse(): React.ReactElement {
   const [filterSheetOpen, setFilterSheetOpen]   = useState(false);
   const [sortModalOpen, setSortModalOpen]        = useState(false);
   const [sort, setSort]                         = useState<CatalogSort | undefined>(routeState.sort);
+  const [collection, setCollection]             = useState<string | undefined>(routeState.collection);
+  const [serviceMode, setServiceMode]           = useState<ServiceMode>('all');
+  const [pincode, setPincode]                   = useState('');
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -217,6 +259,8 @@ export default function Browse(): React.ReactElement {
     setDebouncedSearch(routeState.search);
     setFilters(routeState.filters);
     setSort(routeState.sort);
+    setCollection(routeState.collection);
+    setServiceMode(routeState.filters.inStockOnly ? 'tryAtHome' : 'all');
     setPage(routeState.page);
   }, [routeState]);
 
@@ -237,17 +281,39 @@ export default function Browse(): React.ReactElement {
     setPage(1);
   }, []);
 
+  const handleServiceMode = useCallback((mode: ServiceMode) => {
+    setServiceMode(mode);
+    setPage(1);
+    setFilters((prev) => ({
+      ...prev,
+      inStockOnly: mode === 'all' ? false : true,
+    }));
+    if (mode === 'fastDelivery') setSort('newest');
+  }, []);
+
+  const handleDiscoveryChip = useCallback((params: Partial<ActiveFilters>) => {
+    setFilters((prev) => ({
+      ...prev,
+      ...params,
+    }));
+    setPage(1);
+  }, []);
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['catalog-products', filters, sort, debouncedSearch, page],
+    queryKey: ['catalog-products', filters, sort, debouncedSearch, collection, page],
     queryFn: () => getCatalogProducts({
       metal:       filters.metal || undefined,
       purity:      filters.purity.length === 1 ? filters.purity[0] : undefined,
       search:      debouncedSearch || undefined,
       priceMin:    filters.priceMin,
       priceMax:    filters.priceMax,
+      weightMinG:  filters.weightMinG,
+      weightMaxG:  filters.weightMaxG,
       inStockOnly: filters.inStockOnly || undefined,
       style:       filters.style.length === 1 ? filters.style[0] : undefined,
       occasion:    filters.occasion.length === 1 ? filters.occasion[0] : undefined,
+      giftPersona: firstParam(routeParams['giftPersona']),
+      collection,
       sort:        sort,
       page,
       limit: 12,
@@ -258,8 +324,11 @@ export default function Browse(): React.ReactElement {
   const products  = data?.items ?? [];
   const total     = data?.total ?? 0;
   const lastPage  = Math.max(1, Math.ceil(total / 12));
-  const filterCount = countActiveFilters(filters) + (sort ? 1 : 0);
+  const filterCount = countActiveFilters(filters) + (sort ? 1 : 0) + (collection ? 1 : 0);
   const chips     = activeFilterChips(filters);
+  const collectionLabel = collection
+    ? collection.split('-').filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
+    : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -295,6 +364,77 @@ export default function Browse(): React.ReactElement {
             accessibilityLabel="उत्पाद खोज"
             clearButtonMode="while-editing"
           />
+        </View>
+      </View>
+
+      {/* Market-leader service rail: mirrors pincode / TAH / store availability affordances. */}
+      <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: spacing.xs }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: spacing.xs }}
+        >
+          {SERVICE_CHIPS.map((chip) => {
+            const isActive = serviceMode === chip.key;
+            return (
+              <TouchableOpacity
+                key={chip.key}
+                onPress={() => handleServiceMode(chip.key)}
+                style={{
+                  backgroundColor: isActive ? colors.ink : colors.white,
+                  borderRadius: radii.pill,
+                  borderWidth: 1,
+                  borderColor: isActive ? colors.ink : colors.border,
+                  paddingHorizontal: spacing.md,
+                  minHeight: 40,
+                  justifyContent: 'center',
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
+                accessibilityLabel={chip.label}
+              >
+                <Text style={{
+                  fontFamily: typography.headingMid.family,
+                  fontSize: 12,
+                  color: isActive ? colors.white : colors.ink,
+                }}>
+                  {chip.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: colors.surfaceElevated,
+            borderRadius: radii.md,
+            borderWidth: 1,
+            borderColor: colors.borderSubtle,
+            paddingHorizontal: spacing.sm,
+            minHeight: 44,
+          }}
+        >
+          <Text style={{ fontSize: 15, marginRight: spacing.xs, color: colors.primaryDeep }}>⌖</Text>
+          <TextInput
+            value={pincode}
+            onChangeText={(value) => setPincode(value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="PIN code for store / home trial"
+            placeholderTextColor={colors.inkMute}
+            keyboardType="number-pad"
+            maxLength={6}
+            style={{
+              flex: 1,
+              fontFamily: typography.body.family,
+              fontSize: 13,
+              color: colors.ink,
+            }}
+            accessibilityLabel="PIN code availability"
+          />
+          <Text style={{ fontFamily: typography.body.family, fontSize: 11, color: pincode.length === 6 ? colors.successJade : colors.inkMute }}>
+            {pincode.length === 6 ? 'चेक होगा' : 'वैकल्पिक'}
+          </Text>
         </View>
       </View>
 
@@ -361,7 +501,7 @@ export default function Browse(): React.ReactElement {
       </View>
 
       {/* Active filter chips */}
-      {chips.length > 0 && (
+      {(chips.length > 0 || collectionLabel) && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -371,11 +511,40 @@ export default function Browse(): React.ReactElement {
             gap: spacing.xs,
           }}
         >
+          {collectionLabel && (
+            <TouchableOpacity
+              onPress={() => {
+                setCollection(undefined);
+                setPage(1);
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: primaryWash,
+                borderRadius: radii.pill,
+                paddingHorizontal: spacing.sm,
+                paddingVertical: spacing.xs,
+                gap: 4,
+                minHeight: 32,
+              }}
+              accessibilityLabel={`${collectionLabel} कलेक्शन हटाएं`}
+              accessibilityRole="button"
+            >
+              <Text style={{
+                fontFamily: typography.body.family, fontSize: 12,
+                color: primaryColor, fontWeight: '600',
+              }}>
+                {collectionLabel}
+              </Text>
+              <Text style={{ fontSize: 11, color: primaryColor }}>×</Text>
+            </TouchableOpacity>
+          )}
           {chips.map((chip) => (
             <TouchableOpacity
               key={chip.key}
               onPress={() => {
                 setFilters((prev) => removeFilterChip(prev, chip.key));
+                if (chip.key === 'inStock') setServiceMode('all');
                 setPage(1);
               }}
               style={{
@@ -403,7 +572,7 @@ export default function Browse(): React.ReactElement {
 
           {/* Clear all */}
           <TouchableOpacity
-            onPress={() => { setFilters(EMPTY_FILTERS); setSort(undefined); setPage(1); }}
+            onPress={() => { setFilters(EMPTY_FILTERS); setSort(undefined); setCollection(undefined); setServiceMode('all'); setPage(1); }}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -424,6 +593,46 @@ export default function Browse(): React.ReactElement {
           </TouchableOpacity>
         </ScrollView>
       )}
+
+      <View style={{ paddingHorizontal: spacing.md, paddingTop: spacing.xs }}>
+        <Text style={{ fontFamily: typography.body.family, fontSize: 11, color: colors.inkSoft, textTransform: 'uppercase' }}>
+          {collection ? 'Curated collection' : debouncedSearch ? 'Search results' : 'Catalogue'}
+        </Text>
+        <Text style={{ fontFamily: typography.display.family, fontSize: 24, lineHeight: 30, color: colors.ink }}>
+          {collection
+            ? collection.split('-').filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
+            : debouncedSearch
+              ? `"${debouncedSearch}"`
+              : 'Jewellery designs'}
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: spacing.xs, paddingTop: spacing.xs, paddingBottom: spacing.xs }}
+        >
+          {DISCOVERY_CHIPS.map((chip) => (
+            <TouchableOpacity
+              key={chip.label}
+              onPress={() => handleDiscoveryChip(chip.params)}
+              style={{
+                backgroundColor: colors.white,
+                borderRadius: radii.pill,
+                borderWidth: 1,
+                borderColor: colors.border,
+                paddingHorizontal: spacing.sm,
+                minHeight: 34,
+                justifyContent: 'center',
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${chip.label} फ़िल्टर लगाएं`}
+            >
+              <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.ink }}>
+                {chip.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
       {/* Result count */}
       <Text
@@ -457,7 +666,7 @@ export default function Browse(): React.ReactElement {
           </Text>
           {filterCount > 0 && (
             <TouchableOpacity
-              onPress={() => { setFilters(EMPTY_FILTERS); setSort(undefined); setPage(1); }}
+              onPress={() => { setFilters(EMPTY_FILTERS); setSort(undefined); setCollection(undefined); setServiceMode('all'); setPage(1); }}
               style={{ marginTop: spacing.md, minHeight: 44, justifyContent: 'center' }}
               accessibilityLabel="सभी फ़िल्टर हटाएं"
             >

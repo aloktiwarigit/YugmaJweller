@@ -72,6 +72,8 @@ export interface GetProductsParams {
   purity?:      string;
   priceMin?:    number;
   priceMax?:    number;
+  weightMinG?:  number;
+  weightMaxG?:  number;
   inStockOnly?: boolean;
   style?:       string;
   occasion?:    string;
@@ -255,7 +257,7 @@ export class CatalogService {
     Sentry.addBreadcrumb({ category: 'catalog', message: 'getProducts', data: { tenant_id: params.shopId, sort: params.sort }, level: 'info' });
     return withSpan('catalog.getProducts', { 'tenant.id': params.shopId, 'catalog.sort': params.sort ?? 'newest' }, async () => {
     const {
-      shopId, categoryId, search, metal, purity, priceMin, priceMax,
+      shopId, categoryId, search, metal, purity, priceMin, priceMax, weightMinG, weightMaxG,
       inStockOnly, style, occasion, giftPersona, collection, sort, page, limit,
     } = params;
     const safePage  = Math.max(1, page);
@@ -304,6 +306,14 @@ export class CatalogService {
         if (priceMax !== undefined) {
           queryParams.push(priceMax);
           whereExtra += ` AND p.price_snapshot_paise < $${queryParams.length}`;
+        }
+        if (weightMinG !== undefined) {
+          queryParams.push(weightMinG);
+          whereExtra += ` AND p.net_weight_g::numeric >= $${queryParams.length}`;
+        }
+        if (weightMaxG !== undefined) {
+          queryParams.push(weightMaxG);
+          whereExtra += ` AND p.net_weight_g::numeric < $${queryParams.length}`;
         }
         if (inStockOnly) {
           whereExtra += ` AND p.quantity > 0`;

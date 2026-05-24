@@ -7,6 +7,7 @@ import type {
   PublicRatesResponse,
   CatalogProduct,
   CatalogProductsResponse,
+  Collection,
   HuidVerifyResult,
   ReviewsResponse,
   PublicReviewsResponse,
@@ -25,6 +26,7 @@ export type {
   PublicRatesResponse,
   CatalogProduct,
   CatalogProductsResponse,
+  Collection,
   HuidVerifyResult,
   ReviewItem,
   ReviewsResponse,
@@ -118,6 +120,10 @@ type CatalogProductWithImage = {
   primaryImage: CatalogImageLike | null;
 };
 
+type CollectionWithImage = {
+  heroImage: CatalogImageLike | null;
+};
+
 function resolveApiAssetUrl(value: string): string {
   if (/^(?:https?|data|file|content|asset):/i.test(value)) return value;
   if (value.startsWith('/demo-shop/')) {
@@ -169,6 +175,13 @@ function normalizeCatalogProducts<T extends { items: CatalogProductWithImage[] }
   };
 }
 
+function normalizeCollection<T extends CollectionWithImage>(collection: T): T {
+  return {
+    ...collection,
+    heroImage: normalizeCatalogImage(collection.heroImage),
+  };
+}
+
 export async function getPublicRates(): Promise<PublicRatesResponse> {
   const res = await api.get<PublicRatesResponse>('/api/v1/catalog/rates');
   return res.data;
@@ -188,9 +201,13 @@ export async function getCatalogProducts(opts: {
   categoryId?:  string;
   priceMin?:    number;
   priceMax?:    number;
+  weightMinG?:  number;
+  weightMaxG?:  number;
   inStockOnly?: boolean;
   style?:       string;
   occasion?:    string;
+  giftPersona?: string;
+  collection?:  string;
   sort?:        string;
   page?:        number;
   limit?:       number;
@@ -202,9 +219,13 @@ export async function getCatalogProducts(opts: {
   if (opts.categoryId)               params['categoryId']  = opts.categoryId;
   if (opts.priceMin !== undefined)   params['priceMin']    = opts.priceMin;
   if (opts.priceMax !== undefined)   params['priceMax']    = opts.priceMax;
+  if (opts.weightMinG !== undefined) params['weightMinG']  = opts.weightMinG;
+  if (opts.weightMaxG !== undefined) params['weightMaxG']  = opts.weightMaxG;
   if (opts.inStockOnly)              params['inStockOnly'] = true;
   if (opts.style)                    params['style']       = opts.style;
   if (opts.occasion)                 params['occasion']    = opts.occasion;
+  if (opts.giftPersona)              params['giftPersona'] = opts.giftPersona;
+  if (opts.collection)               params['collection']  = opts.collection;
   if (opts.sort)                     params['sort']        = opts.sort;
   if (opts.page)                     params['page']        = opts.page;
   if (opts.limit)                    params['limit']       = opts.limit;
@@ -231,6 +252,11 @@ export async function getTopSellerProducts(limit = 8): Promise<CatalogProductsRe
     params: { limit },
   });
   return normalizeCatalogProducts(res.data);
+}
+
+export async function getCollections(): Promise<Collection[]> {
+  const res = await api.get<{ items: Collection[] }>('/api/v1/catalog/collections');
+  return (res.data.items ?? []).map(normalizeCollection);
 }
 
 export async function getCatalogProductReviews(productId: string): Promise<PublicReviewsResponse> {

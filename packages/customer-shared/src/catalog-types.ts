@@ -58,6 +58,9 @@ export interface EstimatedPrice {
 export interface CatalogProduct {
   id:                    string;
   sku:                   string;
+  displayName?:          string | null;
+  subtitle?:             string | null;
+  badges?:               string[];
   metal:                 string;
   purity:                string;
   categoryId:            string | null;
@@ -157,6 +160,9 @@ export interface CatalogImage {
 export interface CatalogProductCard {
   id:                    string;
   sku:                   string;
+  displayName?:          string | null;
+  subtitle?:             string | null;
+  badges?:               string[];
   metal:                 'GOLD' | 'SILVER' | 'PLATINUM' | string;
   purity:                string;
   categoryId:            string | null;

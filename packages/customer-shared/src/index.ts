@@ -26,6 +26,8 @@ export type {
 export {
   formatInrFromPaise,
   productDisplayName,
+  productMerchBadges,
+  productSubtitle,
 } from './format';
 
 export {
@@ -34,6 +36,7 @@ export {
   metalLabel,
   purityLabel,
   PRICE_BANDS,
+  WEIGHT_BANDS,
   PURITY_FILTERS,
   CATALOG_STYLES,
   CATALOG_OCCASIONS,
@@ -43,6 +46,7 @@ export {
 } from './catalog-filters';
 export type {
   PriceBand,
+  WeightBand,
   PurityFilter,
   CatalogSort,
   ProductsHrefParams,

@@ -476,6 +476,17 @@ describe('CatalogService.getProducts() — B1 filter SQL (WS-A)', () => {
     expect(params).toContain(5_000_000);
   });
 
+  it('appends net weight range filters when weightMinG and weightMaxG are provided', async () => {
+    const pool = makeFilterPool();
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', weightMinG: 2, weightMaxG: 5, page: 1, limit: 12 });
+    const sql    = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    const params = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][1] as unknown[];
+    expect(sql).toContain('p.net_weight_g::numeric >=');
+    expect(sql).toContain('p.net_weight_g::numeric <');
+    expect(params).toContain(2);
+    expect(params).toContain(5);
+  });
+
   it('appends collection EXISTS when collection is a UUID', async () => {
     const pool = makeFilterPool();
     const uuid = '11111111-1111-1111-1111-111111111111';

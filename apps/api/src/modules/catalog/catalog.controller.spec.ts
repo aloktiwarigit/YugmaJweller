@@ -160,6 +160,13 @@ describe('CatalogController', () => {
         .expect(400);
       expect(res.body).toMatchObject({ code: 'catalog.invalid_price_max' });
     });
+    it('weightMinG NaN → 400', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/catalog/products?weightMinG=abc')
+        .set('X-Tenant-Id', '11111111-1111-1111-1111-111111111111')
+        .expect(400);
+      expect(res.body).toMatchObject({ code: 'catalog.invalid_weight_min' });
+    });
     it('filtered cache header when B1 filter param present', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/v1/catalog/products?purity=GOLD_22K')

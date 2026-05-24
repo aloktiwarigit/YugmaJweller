@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
   FlatList,
   useWindowDimensions,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
@@ -22,11 +24,12 @@ import { HeroSection } from '../../src/components/sections/HeroSection';
 import { CategoryTileGrid } from '../../src/components/sections/CategoryTileGrid';
 import { StorefrontPromise } from '../../src/components/sections/StorefrontPromise';
 
-import { getNewArrivalProducts, getTopSellerProducts, addToWishlist, removeFromWishlist, getWishlist } from '../../src/api/endpoints';
+import { getNewArrivalProducts, getTopSellerProducts, getCollections, addToWishlist, removeFromWishlist, getWishlist } from '../../src/api/endpoints';
 import type { WishlistItem } from '../../src/api/endpoints';
 import { useTenantStore } from '../../src/stores/tenantStore';
 import { useCustomerSession } from '../../src/hooks/useCustomerSession';
-import type { CatalogProductCard } from '@goldsmith/customer-shared';
+import type { CatalogProductCard, Collection } from '@goldsmith/customer-shared';
+import { storefrontFallbackImage } from '../../src/assets/storefrontImages';
 import {
   optimisticallySetWishlist,
   wishlistItemFromProduct,
@@ -64,6 +67,87 @@ function RateStrip(): React.ReactElement {
     <View style={styles.rateStripWrap}>
       <RateCard />
     </View>
+  );
+}
+
+function HomeSearchBar(): React.ReactElement {
+  const [query, setQuery] = useState('');
+
+  function submitSearch(): void {
+    const trimmed = query.trim();
+    const destination = trimmed
+      ? `/(tabs)/browse?search=${encodeURIComponent(trimmed)}`
+      : '/(tabs)/browse';
+    router.push(destination as Parameters<typeof router.push>[0]);
+  }
+
+  return (
+    <View style={styles.searchWrap}>
+      <TouchableOpacity
+        onPress={submitSearch}
+        style={styles.searchIconButton}
+        accessibilityRole="button"
+        accessibilityLabel="खोजें"
+      >
+        <Text style={styles.searchIcon}>⌕</Text>
+      </TouchableOpacity>
+      <TextInput
+        value={query}
+        onChangeText={setQuery}
+        onSubmitEditing={submitSearch}
+        returnKeyType="search"
+        placeholder="अंगूठी, चूड़ी, 22K, ब्राइडल खोजें"
+        placeholderTextColor={colors.inkMute}
+        style={styles.searchInput}
+        accessibilityLabel="उत्पाद खोज"
+      />
+    </View>
+  );
+}
+
+const SERVICE_SHORTCUTS = [
+  {
+    label: 'घर पर ट्राय',
+    meta: '5 डिज़ाइन तक',
+    href: '/try-at-home' as Parameters<typeof router.push>[0],
+  },
+  {
+    label: 'स्टोर में देखें',
+    meta: 'उपलब्धता पूछें',
+    href: '/browse/support' as Parameters<typeof router.push>[0],
+  },
+  {
+    label: 'रेट लॉक',
+    meta: 'आज का भाव',
+    href: '/rate-lock' as Parameters<typeof router.push>[0],
+  },
+  {
+    label: 'BIS/HUID',
+    meta: 'विश्वास प्रमाण',
+    href: '/browse/policy' as Parameters<typeof router.push>[0],
+  },
+] as const;
+
+function ServiceShortcutRail(): React.ReactElement {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.serviceShortcutRail}
+    >
+      {SERVICE_SHORTCUTS.map((shortcut) => (
+        <TouchableOpacity
+          key={shortcut.label}
+          onPress={() => router.push(shortcut.href)}
+          style={styles.serviceShortcut}
+          accessibilityRole="button"
+          accessibilityLabel={shortcut.label}
+        >
+          <Text style={styles.serviceShortcutLabel}>{shortcut.label}</Text>
+          <Text style={styles.serviceShortcutMeta}>{shortcut.meta}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
   );
 }
 
@@ -115,6 +199,48 @@ function ProductRailStatus({ message }: { message: string }): React.ReactElement
     <View style={styles.railStatus}>
       <Text style={styles.railStatusText}>{message}</Text>
     </View>
+  );
+}
+
+function CollectionRail({ collections }: { collections: Collection[] }): React.ReactElement {
+  const featured = collections.filter((collection) => collection.heroImage).slice(0, 8);
+  if (featured.length === 0) return <ProductRailStatus message="कलेक्शन जल्द उपलब्ध होंगे" />;
+
+  return (
+    <FlatList
+      data={featured}
+      keyExtractor={(collection) => collection.id}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}
+      renderItem={({ item }) => (
+        <TouchableOpacity
+          onPress={() =>
+            router.push(
+              `/(tabs)/browse?collection=${encodeURIComponent(item.slug)}` as Parameters<typeof router.push>[0],
+            )
+          }
+          style={styles.collectionCard}
+          accessibilityRole="button"
+          accessibilityLabel={item.titleHi}
+        >
+          <Image
+            source={item.heroImage ? { uri: item.heroImage.url } : storefrontFallbackImage}
+            placeholder={item.heroImage?.placeholderUrl ? { uri: item.heroImage.placeholderUrl } : undefined}
+            contentFit="cover"
+            transition={250}
+            style={StyleSheet.absoluteFill}
+            accessibilityLabel={item.heroImage?.alt ?? item.titleHi}
+          />
+          <View style={styles.collectionScrim} />
+          <View style={styles.collectionMeta}>
+            <Text style={styles.collectionEyebrow}>{item.isPremium ? 'Premium edit' : 'Curated edit'}</Text>
+            <Text numberOfLines={2} style={styles.collectionTitle}>{item.titleHi}</Text>
+            <Text style={styles.collectionCount}>{item.productCount} designs</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+    />
   );
 }
 
@@ -200,28 +326,39 @@ const PREMIUM_LINKS = [
   { labelHi: 'स्टेटमेंट ज्वेलरी',  href: '/products?style=STATEMENT' },
 ] as const;
 
-function PremiumStrip(): React.ReactElement {
+function PremiumStrip({ collections }: { collections: Collection[] }): React.ReactElement {
+  const premiumCollections = collections
+    .filter((collection) => collection.isPremium && collection.heroImage)
+    .slice(0, 4);
+
   return (
     <View style={styles.premiumContainer}>
       <Text style={styles.premiumTitle}>प्रीमियम कलेक्शन</Text>
       <Text style={styles.premiumSubtitle}>खास मौकों के लिए बेहतरीन</Text>
       <View style={styles.premiumLinks}>
-        {PREMIUM_LINKS.map((link) => {
+        {(premiumCollections.length > 0 ? premiumCollections : PREMIUM_LINKS).map((link) => {
           function navigate(): void {
+            if ('slug' in link) {
+              router.push(`/(tabs)/browse?collection=${encodeURIComponent(link.slug)}` as Parameters<typeof router.push>[0]);
+              return;
+            }
             const mobilePath = link.href
-              .replace('/products?', '/(tabs)/browse?')
-              .replace('/products', '/(tabs)/browse');
-            router.push(mobilePath as Parameters<typeof router.push>[0]);
+                .replace('/products?', '/(tabs)/browse?')
+                .replace('/products', '/(tabs)/browse');
+              router.push(mobilePath as Parameters<typeof router.push>[0]);
           }
+          const label = 'titleHi' in link ? link.titleHi : link.labelHi;
+          const count = 'productCount' in link ? `${link.productCount} designs` : 'देखें';
           return (
             <TouchableOpacity
-              key={link.labelHi}
+              key={label}
               onPress={navigate}
               style={styles.premiumLink}
               accessibilityRole="button"
-              accessibilityLabel={link.labelHi}
+              accessibilityLabel={label}
             >
-              <Text style={styles.premiumLinkText}>{link.labelHi} →</Text>
+              <Text style={styles.premiumLinkText}>{label} →</Text>
+              <Text style={styles.premiumLinkMeta}>{count}</Text>
             </TouchableOpacity>
           );
         })}
@@ -352,8 +489,16 @@ export default function Home(): React.ReactElement {
     staleTime: 5 * 60 * 1000,
   });
 
+  const collections = useQuery({
+    queryKey: ['catalog-collections', slug],
+    queryFn:  getCollections,
+    retry:    2,
+    staleTime: 10 * 60 * 1000,
+  });
+
   const newArrivalItems = (newArrivals.data?.items ?? []) as CatalogProductCard[];
   const topSellerItems  = (topSellers.data?.items ?? []) as CatalogProductCard[];
+  const collectionItems  = collections.data ?? [];
 
   const handleWishlistToggle = (productId: string, nowWishlisted: boolean): void => {
     if (!isAuthenticated) return;
@@ -375,6 +520,9 @@ export default function Home(): React.ReactElement {
       {/* Section 0b: Persistent chip rail (above scroll) */}
       <CategoryChipRail onOpenDrawer={() => setDrawerOpen(true)} />
 
+      {/* Section 0c: Search entry (above scroll, app-store style) */}
+      <HomeSearchBar />
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -382,10 +530,25 @@ export default function Home(): React.ReactElement {
         {/* Section 1: Hero */}
         <HeroSection />
 
+        {/* Section 1b: Service shortcuts */}
+        <ServiceShortcutRail />
+
         {/* Section 2: Live rate utility */}
         <View style={styles.rateSection}>
           <RateStrip />
         </View>
+
+        {/* Section 2b: Curated collections */}
+        {collectionItems.length > 0 && (
+          <View style={styles.sectionGap}>
+            <SectionHeading
+              titleHi="क्यूरेटेड कलेक्शन"
+              eyebrowLabel="EDITOR'S PICKS"
+              onSeeAll={() => router.push('/(tabs)/browse?sort=bestseller' as Parameters<typeof router.push>[0])}
+            />
+            <CollectionRail collections={collectionItems} />
+          </View>
+        )}
 
         {/* Section 3: Latest arrivals */}
         <View style={styles.sectionGap}>
@@ -414,7 +577,7 @@ export default function Home(): React.ReactElement {
 
         {/* Section 6: Premium strip */}
         <View style={styles.sectionGap}>
-          <PremiumStrip />
+          <PremiumStrip collections={collectionItems} />
         </View>
 
         {/* Section 7: Gift personas */}
@@ -467,8 +630,65 @@ const styles = StyleSheet.create({
   sectionGap: {
     marginTop: spacing.lg,
   },
+  searchWrap: {
+    flexDirection:    'row',
+    alignItems:      'center',
+    marginHorizontal: spacing.md,
+    marginTop:       spacing.sm,
+    marginBottom:    spacing.xs,
+    minHeight:       48,
+    borderRadius:    radii.md,
+    borderWidth:     1,
+    borderColor:     colors.border,
+    backgroundColor: colors.surface,
+    overflow:        'hidden',
+  },
+  searchIconButton: {
+    width:          46,
+    minHeight:      48,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  searchIcon: {
+    fontSize:  20,
+    color:     colors.primaryDeep,
+  },
+  searchInput: {
+    flex:       1,
+    minHeight:  48,
+    fontFamily: typography.body.family,
+    fontSize:   14,
+    color:      colors.ink,
+    paddingRight: spacing.sm,
+  },
   rateSection: {
     marginTop: spacing.md,
+  },
+  serviceShortcutRail: {
+    paddingHorizontal: spacing.lg,
+    paddingTop:        spacing.sm,
+    gap:               spacing.sm,
+  },
+  serviceShortcut: {
+    width:           132,
+    minHeight:       66,
+    borderRadius:    radii.md,
+    borderWidth:     1,
+    borderColor:     colors.borderSubtle,
+    backgroundColor: colors.surfaceElevated,
+    padding:         spacing.sm,
+    justifyContent:  'center',
+  },
+  serviceShortcutLabel: {
+    fontFamily: typography.headingMid.family,
+    fontSize:   13,
+    color:      colors.ink,
+  },
+  serviceShortcutMeta: {
+    fontFamily: typography.body.family,
+    fontSize:   11,
+    color:      colors.inkMute,
+    marginTop:  2,
   },
   // Section headings
   sectionHeader: {
@@ -515,6 +735,44 @@ const styles = StyleSheet.create({
     fontSize:   13,
     color:      colors.inkMute,
     textAlign:  'center',
+  },
+  collectionCard: {
+    width:          216,
+    height:         156,
+    borderRadius:   radii.md,
+    overflow:       'hidden',
+    backgroundColor: colors.ink,
+    borderWidth:    1,
+    borderColor:    colors.borderSubtle,
+  },
+  collectionScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(22,24,36,0.28)',
+  },
+  collectionMeta: {
+    position:       'absolute',
+    left:           spacing.md,
+    right:          spacing.md,
+    bottom:         spacing.md,
+  },
+  collectionEyebrow: {
+    fontFamily:    typography.body.family,
+    fontSize:      10,
+    color:         'rgba(255,255,255,0.78)',
+    textTransform: 'uppercase',
+    marginBottom:  3,
+  },
+  collectionTitle: {
+    fontFamily: typography.display.family,
+    fontSize:   21,
+    lineHeight: 25,
+    color:      colors.white,
+  },
+  collectionCount: {
+    fontFamily: typography.body.family,
+    fontSize:   11,
+    color:      colors.primaryWash,
+    marginTop:  4,
   },
   // Gift eyebrow
   giftEyebrow: {
@@ -600,6 +858,12 @@ const styles = StyleSheet.create({
     fontFamily: typography.headingMid.family,
     fontSize:   14,
     color:      colors.primaryWash,
+  },
+  premiumLinkMeta: {
+    fontFamily: typography.body.family,
+    fontSize:   11,
+    color:      'rgba(245,237,221,0.62)',
+    marginTop:  2,
   },
   // Footer
   footer: {

@@ -16,6 +16,7 @@ import {
   getProductImages,
   getNewArrivalProducts,
   getTopSellerProducts,
+  getCollections,
   getWishlist,
   addToWishlist,
   removeFromWishlist,
@@ -156,6 +157,24 @@ describe('endpoints', () => {
     expect(r.items[0]?.primaryImage?.srcset).toContain(demoShopImageUris['ring-diamond.jpg']);
   });
 
+  it('passes gift persona, collection, and weight filters to catalog products', async () => {
+    mock.onGet('/api/v1/catalog/products').reply(200, { items: [], total: 0, page: 1 });
+
+    await getCatalogProducts({
+      giftPersona: 'BRIDE',
+      collection: 'bridal-edit',
+      weightMinG: 2,
+      weightMaxG: 5,
+    });
+
+    expect(mock.history['get']?.[0]?.params).toMatchObject({
+      giftPersona: 'BRIDE',
+      collection:  'bridal-edit',
+      weightMinG:  2,
+      weightMaxG:  5,
+    });
+  });
+
   it('normalizes relative PDP gallery image URLs against the API origin', async () => {
     mock.onGet('/api/v1/catalog/products/prod-1/images').reply(200, {
       images: [{
@@ -239,6 +258,31 @@ describe('new-arrivals and top-sellers endpoints', () => {
     const result = await getTopSellerProducts(8);
     expect(result.items).toEqual([]);
     expect(mock.history['get']?.[0]?.url).toBe('/api/v1/catalog/products/top-sellers');
+  });
+
+  it('getCollections calls /api/v1/catalog/collections and normalizes hero images', async () => {
+    mock.onGet('/api/v1/catalog/collections').reply(200, {
+      items: [{
+        id: 'collection-1',
+        slug: 'bridal-edit',
+        titleHi: 'Bridal Edit',
+        heroImage: {
+          url: '/demo-shop/campaign-necklace-showcase.jpg',
+          placeholderUrl: '/demo-shop/campaign-necklace-showcase.jpg',
+          srcset: '/demo-shop/campaign-necklace-showcase.jpg 640w',
+          width: 1200,
+          height: 800,
+          alt: 'Bridal edit',
+        },
+        productCount: 8,
+        isPremium: true,
+      }],
+    });
+
+    const result = await getCollections();
+
+    expect(mock.history['get']?.[0]?.url).toBe('/api/v1/catalog/collections');
+    expect(result[0]?.heroImage?.url).toContain('data:image/jpeg;base64,');
   });
 
   it('addToWishlist posts productId to /api/v1/wishlist', async () => {

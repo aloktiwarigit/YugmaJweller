@@ -10,27 +10,32 @@ interface Pillar {
 
 const PILLARS: Pillar[] = [
   {
-    icon:    '🏆',
+    icon:    '✓',
     titleHi: 'BIS / HUID',
-    descHi:  'हर उत्पाद हॉलमार्क प्रमाणित',
+    descHi:  'योग्य उत्पाद पर प्रमाणित हॉलमार्क',
   },
   {
-    icon:    '📊',
-    titleHi: 'पारदर्शी मूल्य',
-    descHi:  'आज की बाज़ार दर पर सटीक कीमत',
+    icon:    '₹',
+    titleHi: 'मूल्य ब्रेकअप',
+    descHi:  'धातु, बनाई और GST अलग-अलग',
   },
   {
-    icon:    '🔄',
-    titleHi: 'एक्सचेंज',
-    descHi:  'पुराने गहने बदलें, नए लें',
+    icon:    '↺',
+    titleHi: 'एक्सचेंज मार्गदर्शन',
+    descHi:  'दुकान की नीति साफ़ दिखेगी',
   },
   {
-    icon:    '🏠',
+    icon:    '⌂',
     titleHi: 'घर पर ट्राय',
-    descHi:  'पसंद आने पर ही खरीदें',
+    descHi:  'चुने हुए डिज़ाइन घर पर देखें',
   },
   {
-    icon:    '💬',
+    icon:    '⌖',
+    titleHi: 'स्टोर उपलब्धता',
+    descHi:  'दुकान से डिज़ाइन की पुष्टि',
+  },
+  {
+    icon:    '✆',
     titleHi: 'WhatsApp सहायता',
     descHi:  'दुकानदार से सीधे बात करें',
   },
@@ -82,7 +87,8 @@ const styles = StyleSheet.create({
     alignItems:      'center',
   },
   icon: {
-    fontSize:     24,
+    fontSize:     22,
+    color:        colors.primaryDeep,
     marginBottom: spacing.xs,
   },
   pillarTitle: {

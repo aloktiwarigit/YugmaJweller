@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import MockAdapter from 'axios-mock-adapter';
 import { render, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -7,7 +7,7 @@ import { api } from '../api/client';
 import { ProductGrid } from './ProductGrid';
 
 function wrap(): React.FC<{ children: React.ReactNode }> {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, retryDelay: 1 } } });
   return ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
@@ -16,6 +16,10 @@ describe('ProductGrid', () => {
 
   beforeEach(() => {
     mock = new MockAdapter(api);
+  });
+
+  afterEach(() => {
+    mock.restore();
   });
 
   it('shows empty-state copy when API returns no items', async () => {

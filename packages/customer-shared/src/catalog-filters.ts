@@ -29,6 +29,13 @@ export interface PriceBand {
   max?:    number;
 }
 
+export interface WeightBand {
+  labelHi: string;
+  labelEn: string;
+  minG:    number;
+  maxG?:   number;
+}
+
 export const PRICE_BANDS: PriceBand[] = [
   { labelHi: '₹10K तक',      labelEn: 'Under ₹10K',     min: 0,          max: 1_000_000  },
   { labelHi: '₹10K–₹25K',    labelEn: '₹10K–₹25K',      min: 1_000_000,  max: 2_500_000  },
@@ -36,6 +43,14 @@ export const PRICE_BANDS: PriceBand[] = [
   { labelHi: '₹50K–₹1L',     labelEn: '₹50K–₹1L',       min: 5_000_000,  max: 10_000_000 },
   { labelHi: '₹1L–₹5L',      labelEn: '₹1L–₹5L',        min: 10_000_000, max: 50_000_000 },
   { labelHi: '₹5L से ऊपर',   labelEn: 'Above ₹5L',      min: 50_000_000                  },
+];
+
+export const WEIGHT_BANDS: WeightBand[] = [
+  { labelHi: '0–2 g',     labelEn: '0-2 g',     minG: 0,  maxG: 2  },
+  { labelHi: '2–5 g',     labelEn: '2-5 g',     minG: 2,  maxG: 5  },
+  { labelHi: '5–10 g',    labelEn: '5-10 g',    minG: 5,  maxG: 10 },
+  { labelHi: '10–20 g',   labelEn: '10-20 g',   minG: 10, maxG: 20 },
+  { labelHi: '20 g से ऊपर', labelEn: 'Above 20 g', minG: 20        },
 ];
 
 export interface PurityFilter {
@@ -81,6 +96,8 @@ export interface ProductsHrefParams {
   giftPersona?: string;
   priceMin?:    number;
   priceMax?:    number;
+  weightMinG?:  number;
+  weightMaxG?:  number;
   inStockOnly?: boolean;
   sort?:        CatalogSort;
   page?:        number;
@@ -97,6 +114,8 @@ export function buildProductsHref(params: ProductsHrefParams): string {
   if (params.giftPersona) qs.set('giftPersona', params.giftPersona);
   if (params.priceMin !== undefined) qs.set('priceMin', String(params.priceMin));
   if (params.priceMax !== undefined) qs.set('priceMax', String(params.priceMax));
+  if (params.weightMinG !== undefined) qs.set('weightMinG', String(params.weightMinG));
+  if (params.weightMaxG !== undefined) qs.set('weightMaxG', String(params.weightMaxG));
   if (params.inStockOnly) qs.set('inStockOnly', 'true');
   if (params.sort)        qs.set('sort', params.sort);
   if (params.page && params.page > 1) qs.set('page', String(params.page));

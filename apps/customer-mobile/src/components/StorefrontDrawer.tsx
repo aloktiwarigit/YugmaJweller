@@ -55,10 +55,11 @@ export function StorefrontDrawer({ visible, onClose }: Props): React.ReactElemen
   function navigate(href: string): void {
     onClose();
     // Map web-style /products?... paths to expo-router browse tab
-    const mobilePath = href
-      .replace('/products?', '/(tabs)/browse?')
-      .replace('/products', '/(tabs)/browse')
-      .replace('/collections', '/(tabs)/browse');
+    const mobilePath = href === '/collections'
+      ? '/(tabs)/browse?sort=bestseller'
+      : href
+        .replace('/products?', '/(tabs)/browse?')
+        .replace('/products', '/(tabs)/browse');
     router.push(mobilePath as Parameters<typeof router.push>[0]);
   }
 

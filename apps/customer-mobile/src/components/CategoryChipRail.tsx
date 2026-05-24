@@ -13,10 +13,11 @@ export function CategoryChipRail({ onOpenDrawer }: Props): React.ReactElement {
 
   function handleChipPress(href: string, key: string): void {
     setActiveKey(key);
-    const mobilePath = href
-      .replace('/products?', '/(tabs)/browse?')
-      .replace('/products', '/(tabs)/browse')
-      .replace('/collections', '/(tabs)/browse');
+    const mobilePath = href === '/collections'
+      ? '/(tabs)/browse?sort=bestseller'
+      : href
+        .replace('/products?', '/(tabs)/browse?')
+        .replace('/products', '/(tabs)/browse');
     router.push(mobilePath as Parameters<typeof router.push>[0]);
   }
 

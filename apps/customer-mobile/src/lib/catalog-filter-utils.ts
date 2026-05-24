@@ -1,11 +1,13 @@
-import { PRICE_BANDS } from '@goldsmith/customer-shared';
-import type { PriceBand, CatalogSort } from '@goldsmith/customer-shared';
+import { PRICE_BANDS, WEIGHT_BANDS } from '@goldsmith/customer-shared';
+import type { PriceBand, WeightBand, CatalogSort } from '@goldsmith/customer-shared';
 
 export interface ActiveFilters {
   metal?:      string;
   purity:      string[];
   priceMin?:   number;
   priceMax?:   number;
+  weightMinG?: number;
+  weightMaxG?: number;
   style:       string[];
   occasion:    string[];
   inStockOnly: boolean;
@@ -72,12 +74,24 @@ export function findPriceBand(
   );
 }
 
+/** Returns the WEIGHT_BANDS entry matching weightMinG+weightMaxG, or undefined. */
+export function findWeightBand(
+  weightMinG?: number,
+  weightMaxG?: number,
+): WeightBand | undefined {
+  if (weightMinG === undefined && weightMaxG === undefined) return undefined;
+  return WEIGHT_BANDS.find(
+    (b) => b.minG === weightMinG && b.maxG === weightMaxG,
+  );
+}
+
 /** Total count of individual filter selections (used for badge). */
 export function countActiveFilters(filters: ActiveFilters): number {
   let n = 0;
   if (filters.metal)              n++;
   if (filters.purity.length)      n += filters.purity.length;
   if (filters.priceMin !== undefined || filters.priceMax !== undefined) n++;
+  if (filters.weightMinG !== undefined || filters.weightMaxG !== undefined) n++;
   if (filters.style.length)       n += filters.style.length;
   if (filters.occasion.length)    n += filters.occasion.length;
   if (filters.inStockOnly)        n++;
@@ -99,6 +113,10 @@ export function activeFilterChips(
   const band = findPriceBand(filters.priceMin, filters.priceMax);
   if (band) {
     chips.push({ key: 'price', labelHi: band.labelHi });
+  }
+  const weightBand = findWeightBand(filters.weightMinG, filters.weightMaxG);
+  if (weightBand) {
+    chips.push({ key: 'weight', labelHi: weightBand.labelHi });
   }
   for (const s of filters.style) {
     chips.push({ key: `style:${s}`, labelHi: STYLE_FILTER_LABELS[s] ?? s });
@@ -122,6 +140,7 @@ export function removeFilterChip(
     case 'metal':    return { ...filters, metal: undefined };
     case 'purity':   return { ...filters, purity: filters.purity.filter((p) => p !== value) };
     case 'price':    return { ...filters, priceMin: undefined, priceMax: undefined };
+    case 'weight':   return { ...filters, weightMinG: undefined, weightMaxG: undefined };
     case 'style':    return { ...filters, style: filters.style.filter((s) => s !== value) };
     case 'occasion': return { ...filters, occasion: filters.occasion.filter((o) => o !== value) };
     case 'inStock':  return { ...filters, inStockOnly: false };

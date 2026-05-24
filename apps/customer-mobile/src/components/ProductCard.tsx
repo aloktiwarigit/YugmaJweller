@@ -5,6 +5,8 @@ import { colors, typography, spacing, radii } from '@goldsmith/ui-tokens';
 import {
   productDisplayName,
   formatInrFromPaise,
+  productMerchBadges,
+  productSubtitle,
 } from '@goldsmith/customer-shared';
 import type { CatalogProductCard, CatalogImage } from '@goldsmith/customer-shared';
 import { imageForCategoryName } from '../assets/storefrontImages';
@@ -63,6 +65,8 @@ export function ProductCard({
   const ribbon = productRibbon(product);
   const isUnavailable = product.quantity === 0;
   const displayName   = productDisplayName(product);
+  const subtitle      = product.subtitle ?? productSubtitle(product);
+  const merchBadges   = product.badges ?? productMerchBadges(product);
   const img: CatalogImage | null = product.primaryImage;
 
   function handleWishlist(): void {
@@ -120,14 +124,16 @@ export function ProductCard({
 
         {/* Bottom-left: HUID + purity pills */}
         <View style={styles.badgeRow}>
-          {product.huid && (
-            <View style={[styles.badge, styles.badgeJade]}>
-              <Text style={[styles.badgeText, styles.badgeTextJade]}>HUID ✓</Text>
+          {merchBadges.map((badge, index) => (
+            <View
+              key={badge}
+              style={[styles.badge, index === 0 && product.huid ? styles.badgeJade : styles.badgeGold]}
+            >
+              <Text style={[styles.badgeText, index === 0 && product.huid ? styles.badgeTextJade : undefined]}>
+                {badge}
+              </Text>
             </View>
-          )}
-          <View style={[styles.badge, styles.badgeGold]}>
-            <Text style={styles.badgeText}>{product.purity.replace('_', ' ')}</Text>
-          </View>
+          ))}
         </View>
       </View>
 
@@ -141,7 +147,7 @@ export function ProductCard({
           {displayName}
         </Text>
         <Text numberOfLines={1} style={styles.sku}>
-          {product.sku}
+          {subtitle}
         </Text>
         {priceText && (
           <>

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   PRICE_BANDS,
+  WEIGHT_BANDS,
   CATALOG_STYLES,
   metalLabel,
   purityLabel,
@@ -17,6 +18,18 @@ describe('PRICE_BANDS', () => {
       expect(typeof band.labelHi).toBe('string');
       expect(typeof band.min).toBe('number');
     }
+  });
+});
+
+describe('WEIGHT_BANDS', () => {
+  it('covers lightweight and statement jewellery ranges', () => {
+    expect(WEIGHT_BANDS.map((band) => band.labelEn)).toEqual([
+      '0-2 g',
+      '2-5 g',
+      '5-10 g',
+      '10-20 g',
+      'Above 20 g',
+    ]);
   });
 });
 
@@ -101,5 +114,11 @@ describe('buildProductsHref', () => {
     const href = buildProductsHref({ priceMin: 100000, priceMax: 500000 });
     expect(href).toContain('priceMin=100000');
     expect(href).toContain('priceMax=500000');
+  });
+
+  it('serialises weightMinG and weightMaxG as strings', () => {
+    const href = buildProductsHref({ weightMinG: 2, weightMaxG: 5 });
+    expect(href).toContain('weightMinG=2');
+    expect(href).toContain('weightMaxG=5');
   });
 });

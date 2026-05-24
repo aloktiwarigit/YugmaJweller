@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { colors, spacing, radii, typography } from '@goldsmith/ui-tokens';
-import { PRICE_BANDS, CATALOG_STYLES, CATALOG_OCCASIONS, CATALOG_SORTS } from '@goldsmith/customer-shared';
+import { PRICE_BANDS, WEIGHT_BANDS, CATALOG_STYLES, CATALOG_OCCASIONS, CATALOG_SORTS } from '@goldsmith/customer-shared';
 import type { CatalogSort } from '@goldsmith/customer-shared';
 import {
   EMPTY_FILTERS,
@@ -81,6 +81,7 @@ type FilterAction =
   | { type: 'SET_METAL';    metal: string | undefined }
   | { type: 'TOGGLE_PURITY'; purity: string }
   | { type: 'SET_PRICE';    priceMin: number | undefined; priceMax: number | undefined }
+  | { type: 'SET_WEIGHT';   weightMinG: number | undefined; weightMaxG: number | undefined }
   | { type: 'TOGGLE_STYLE'; style: string }
   | { type: 'TOGGLE_OCCASION'; occasion: string }
   | { type: 'SET_IN_STOCK'; value: boolean }
@@ -98,6 +99,7 @@ function filterReducer(state: ActiveFilters, action: FilterAction): ActiveFilter
           : [...state.purity, action.purity],
       };
     case 'SET_PRICE':   return { ...state, priceMin: action.priceMin, priceMax: action.priceMax };
+    case 'SET_WEIGHT':  return { ...state, weightMinG: action.weightMinG, weightMaxG: action.weightMaxG };
     case 'TOGGLE_STYLE':
       return {
         ...state,
@@ -213,10 +215,10 @@ export interface FilterSheetProps {
   onApply:       (filters: ActiveFilters) => void;
 }
 
-type SectionKey = 'metal' | 'purity' | 'price' | 'style' | 'occasion' | 'inStock';
+type SectionKey = 'metal' | 'purity' | 'price' | 'weight' | 'style' | 'occasion' | 'inStock';
 
 const SECTION_DEFAULTS: Record<SectionKey, boolean> = {
-  metal: true, purity: false, price: false, style: false, occasion: false, inStock: false,
+  metal: true, purity: false, price: false, weight: false, style: false, occasion: false, inStock: false,
 };
 
 export function FilterSheet({
@@ -419,6 +421,50 @@ export function FilterSheet({
                     accessibilityRole="radio"
                     accessibilityState={{ selected: isSelected }}
                     accessibilityLabel={`मूल्य ${band.labelHi}`}
+                  >
+                    <Text style={{
+                      fontFamily: typography.body.family, fontSize: 13,
+                      color: isSelected ? '#FFFFFF' : colors.ink,
+                      fontWeight: isSelected ? '600' : '400',
+                    }}>
+                      {band.labelHi}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          {/* ── Weight ───────────────────────────────────────────────────── */}
+          <SectionHeader title="वज़न" isOpen={expanded.weight} onToggle={() => toggleSection('weight')} />
+          {expanded.weight && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, padding: spacing.md }}>
+              {WEIGHT_BANDS.map((band) => {
+                const isSelected =
+                  draft.weightMinG === band.minG && draft.weightMaxG === band.maxG;
+                return (
+                  <TouchableOpacity
+                    key={band.labelEn}
+                    onPress={() =>
+                      dispatch({
+                        type: 'SET_WEIGHT',
+                        weightMinG: isSelected ? undefined : band.minG,
+                        weightMaxG: isSelected ? undefined : band.maxG,
+                      })
+                    }
+                    style={{
+                      backgroundColor: isSelected ? PRIMARY_DEEP : colors.white,
+                      borderRadius: radii.pill,
+                      borderWidth: 1,
+                      borderColor: isSelected ? PRIMARY_DEEP : colors.border,
+                      paddingHorizontal: spacing.md,
+                      paddingVertical: spacing.xs + 2,
+                      minHeight: 44,
+                      justifyContent: 'center',
+                    }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isSelected }}
+                    accessibilityLabel={`वज़न ${band.labelHi}`}
                   >
                     <Text style={{
                       fontFamily: typography.body.family, fontSize: 13,
