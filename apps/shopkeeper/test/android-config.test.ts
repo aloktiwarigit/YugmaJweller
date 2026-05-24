@@ -11,6 +11,7 @@ const managedEnvKeys = [
   'EXPO_PUBLIC_FIREBASE_PROJECT_ID',
   'EXPO_PUBLIC_FIREBASE_API_KEY',
   'EXPO_PUBLIC_FIREBASE_APP_ID',
+  'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
   'EXPO_PUBLIC_ANDROID_PACKAGE',
   'EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER',
   'EXPO_PUBLIC_EAS_PROJECT_ID',
@@ -159,6 +160,7 @@ describe('Android Expo SDK config', () => {
     expect(config.extra?.apiBaseUrl).toBe('http://10.0.2.2:3000');
     expect(config.extra?.tenantSlug).toBe('anchor-dev');
     expect(config.extra?.firebaseProjectId).toBe('goldsmith-dev');
+    expect(config.extra?.googleWebClientId).toMatch(/\.apps\.googleusercontent\.com$/);
     expect(config.extra?.eas?.projectId).toBe('TBD-post-SOW');
   });
 
@@ -180,6 +182,10 @@ describe('Android Expo SDK config', () => {
     vi.stubEnv('EXPO_PUBLIC_FIREBASE_PROJECT_ID', 'goldsmith-prod');
     vi.stubEnv('EXPO_PUBLIC_FIREBASE_API_KEY', 'production-api-key');
     vi.stubEnv('EXPO_PUBLIC_FIREBASE_APP_ID', '1:1234567890:android:abcdef');
+    vi.stubEnv(
+      'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
+      '111111111111-production-web.apps.googleusercontent.com',
+    );
     vi.stubEnv('EXPO_PUBLIC_ANDROID_PACKAGE', 'com.goldsmith.shopkeeper');
     vi.stubEnv('EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER', 'com.goldsmith.shopkeeper');
     vi.stubEnv('EXPO_PUBLIC_EAS_PROJECT_ID', '11111111-1111-4111-8111-111111111111');
@@ -192,6 +198,9 @@ describe('Android Expo SDK config', () => {
     expect(config.extra?.apiBaseUrl).toBe('https://api.goldsmith.example.com');
     expect(config.extra?.tenantSlug).toBe('anchor');
     expect(config.extra?.firebaseProjectId).toBe('goldsmith-prod');
+    expect(config.extra?.googleWebClientId).toBe(
+      '111111111111-production-web.apps.googleusercontent.com',
+    );
     expect(config.extra?.eas?.projectId).toBe('11111111-1111-4111-8111-111111111111');
   });
 
@@ -202,6 +211,10 @@ describe('Android Expo SDK config', () => {
     vi.stubEnv('EXPO_PUBLIC_FIREBASE_PROJECT_ID', 'goldsmith-prod');
     vi.stubEnv('EXPO_PUBLIC_FIREBASE_API_KEY', 'production-api-key');
     vi.stubEnv('EXPO_PUBLIC_FIREBASE_APP_ID', '1:1234567890:android:abcdef');
+    vi.stubEnv(
+      'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
+      '111111111111-production-web.apps.googleusercontent.com',
+    );
     vi.stubEnv('EXPO_PUBLIC_ANDROID_PACKAGE', 'com.goldsmith.shopkeeper');
     vi.stubEnv('EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER', 'com.goldsmith.shopkeeper');
     vi.stubEnv('EXPO_PUBLIC_EAS_PROJECT_ID', '11111111-1111-4111-8111-111111111111');
@@ -217,6 +230,10 @@ describe('Android Expo SDK config', () => {
     vi.stubEnv('EXPO_PUBLIC_FIREBASE_PROJECT_ID', 'goldsmith-prod');
     vi.stubEnv('EXPO_PUBLIC_FIREBASE_API_KEY', 'production-api-key');
     vi.stubEnv('EXPO_PUBLIC_FIREBASE_APP_ID', '1:1234567890:android:abcdef');
+    vi.stubEnv(
+      'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
+      '111111111111-production-web.apps.googleusercontent.com',
+    );
     vi.stubEnv('EXPO_PUBLIC_ANDROID_PACKAGE', 'com.goldsmith.shopkeeper');
     vi.stubEnv('EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER', 'com.goldsmith.shopkeeper');
     vi.stubEnv('EXPO_PUBLIC_EAS_PROJECT_ID', '11111111-1111-4111-8111-111111111111');

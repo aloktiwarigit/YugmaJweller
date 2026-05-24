@@ -2,6 +2,7 @@ import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { router, type Href } from 'expo-router';
+import Constants from 'expo-constants';
 import axios from 'axios';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { auth } from '@goldsmith/auth-client';
@@ -14,7 +15,6 @@ import { postAuthSession } from '../../src/api/endpoints';
 import { assertAuthTenantMatchesApp } from '../../src/providers/AuthProvider';
 import { BrandMark } from '../../src/components/BrandMark';
 
-const WEB_CLIENT_ID = '528920018833-b2ua9n337u2blajt89t7f5qo5nj0d2rh.apps.googleusercontent.com';
 const fallbackDisplayName = 'अयोध्या स्वर्णकार';
 
 type BackendErrorBody = { code?: string; errorCode?: string };
@@ -114,6 +114,11 @@ function describeGoogleSignInError(error: unknown): string | null {
   return err.message ?? t('auth.email.errors.generic');
 }
 
+function configuredGoogleWebClientId(): string {
+  const value = Constants.expoConfig?.extra?.['googleWebClientId'];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 export default function LoginScreen(): React.ReactElement {
   const tenant = useTenantStore((s) => s.tenant);
   const displayName = tenant?.displayName ?? fallbackDisplayName;
@@ -122,14 +127,21 @@ export default function LoginScreen(): React.ReactElement {
   const setUser = useAuthStore((s) => s.setUser);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const googleWebClientId = configuredGoogleWebClientId();
 
   useEffect(() => {
-    GoogleSignin.configure({ webClientId: WEB_CLIENT_ID });
-  }, []);
+    if (googleWebClientId) {
+      GoogleSignin.configure({ webClientId: googleWebClientId });
+    }
+  }, [googleWebClientId]);
 
   const handleGoogleSignIn = async (): Promise<void> => {
     if (googleLoading) return;
     setErrorMsg(null);
+    if (!googleWebClientId) {
+      setErrorMsg(t('auth.login.google_setup_required'));
+      return;
+    }
     setGoogleLoading(true);
     try {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
