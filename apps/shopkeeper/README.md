@@ -27,6 +27,7 @@ Production builds fail fast when `EAS_BUILD_PROFILE=production` and any required
 - `EXPO_PUBLIC_FIREBASE_PROJECT_ID`: must be `goldsmith-prod`.
 - `EXPO_PUBLIC_FIREBASE_API_KEY`: Firebase web/native API key used by app runtime config.
 - `EXPO_PUBLIC_FIREBASE_APP_ID`: Firebase app ID used by app runtime config.
+- `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`: Type-3 Web OAuth client ID from `google-services.json`, used by Google Sign-In.
 - `EXPO_PUBLIC_ANDROID_PACKAGE`: production Android package, for example `com.goldsmith.shopkeeper`.
 - `EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER`: production iOS bundle identifier, for example `com.goldsmith.shopkeeper`.
 - `EXPO_PUBLIC_EAS_PROJECT_ID`: real EAS project UUID.

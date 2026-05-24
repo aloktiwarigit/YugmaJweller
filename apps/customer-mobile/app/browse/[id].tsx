@@ -356,7 +356,7 @@ export default function ProductDetailScreen(): React.ReactElement {
 
   const wishlistMutation = useMutation({
     mutationFn: (add: boolean) =>
-      add ? addToWishlist(id!) : removeFromWishlist(id!),
+      add ? addToWishlist(id!, wishlistItemFromProduct(product ?? { id: id! })) : removeFromWishlist(id!),
     onMutate: (add) =>
       optimisticallySetWishlist(queryClient, wishlistItemFromProduct(product ?? { id: id! }), add),
     onError: (_err, _vars, ctx) => {

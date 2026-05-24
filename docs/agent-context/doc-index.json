@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-22T23:35:36.445Z",
+  "generated": "2026-05-23T16:55:22.105Z",
   "docs": [
     {
       "path": "_bmad-output/planning-artifacts/adr/0001-auth-provider-supabase.md",
@@ -796,7 +796,7 @@
     {
       "path": "docs/runbook.md",
       "kind": "other",
-      "estimatedTokens": 11320,
+      "estimatedTokens": 11380,
       "readWhen": "reference only",
       "avoidByDefault": false,
       "supersededBy": null
@@ -1226,6 +1226,14 @@
       "supersededBy": null
     },
     {
+      "path": "docs/superpowers/plans/2026-05-23-customer-multi-provider-auth.md",
+      "kind": "plan",
+      "estimatedTokens": 25530,
+      "readWhen": "executing a specific story — read only that story's plan",
+      "avoidByDefault": true,
+      "supersededBy": null
+    },
+    {
       "path": "docs/superpowers/plans/_TEMPLATE-work-stream.md",
       "kind": "plan",
       "estimatedTokens": 1400,
@@ -1445,6 +1453,14 @@
       "path": "docs/superpowers/specs/2026-05-17-story-19.7-dpdpa-customer-self-deletion-design.md",
       "kind": "spec",
       "estimatedTokens": 3500,
+      "readWhen": "implementing or reviewing a specific story",
+      "avoidByDefault": false,
+      "supersededBy": null
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-23-customer-multi-provider-auth-design.md",
+      "kind": "spec",
+      "estimatedTokens": 3130,
       "readWhen": "implementing or reviewing a specific story",
       "avoidByDefault": false,
       "supersededBy": null

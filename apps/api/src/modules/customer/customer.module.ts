@@ -8,6 +8,8 @@ import { TryAtHomeBookingsModule } from '../try-at-home-bookings/try-at-home-boo
 import { CustomerController } from './customer.controller';
 import { PaymentController } from './payment.controller';
 import { CustomerAuthGuard } from './customer-auth.guard';
+import { CustomerSessionService } from './customer-session.service';
+import { CustomerSessionController } from './customer-session.controller';
 
 @Module({
   imports: [
@@ -18,7 +20,7 @@ import { CustomerAuthGuard } from './customer-auth.guard';
     RateLockBookingsModule,
     TryAtHomeBookingsModule,
   ],
-  controllers: [CustomerController, PaymentController],
-  providers:   [CustomerAuthGuard],
+  controllers: [CustomerController, PaymentController, CustomerSessionController],
+  providers:   [CustomerAuthGuard, CustomerSessionService],
 })
 export class CustomerModule {}

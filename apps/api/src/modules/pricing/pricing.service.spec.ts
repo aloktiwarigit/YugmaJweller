@@ -206,6 +206,32 @@ describe('PricingService', () => {
 
       await expect(service.getCurrentRates()).rejects.toThrow(RatesUnavailableError);
     });
+
+    it('falls back to the latest DB snapshot when live rates and Redis LKG are unavailable', async () => {
+      (redis.get as Mock).mockResolvedValue(null);
+      (fallbackChain.getRatesByPurity as Mock).mockRejectedValue(new RatesUnavailableError());
+      (pool._client.query as Mock).mockResolvedValueOnce({
+        rows: [{
+          fetched_at: NOW,
+          source: 'ibja',
+          gold_24k_paise: '735000',
+          gold_22k_paise: '673750',
+          gold_20k_paise: '612500',
+          gold_18k_paise: '551250',
+          gold_14k_paise: '428750',
+          silver_999_paise: '9500',
+          silver_925_paise: '8788',
+        }],
+        rowCount: 1,
+      });
+
+      const result = await service.getCurrentRates();
+
+      expect(result.GOLD_24K.perGramPaise).toBe(735000n);
+      expect(result.stale).toBe(true);
+      expect(result.source).toBe('snapshot:ibja');
+      expect(redis.setex).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------

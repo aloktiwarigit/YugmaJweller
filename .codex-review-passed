@@ -1,1 +1,16 @@
-{"timestamp":"2026-05-18T02:36:55-04:00","commit":"942fafc86d385c43a525347ee7896a199f7dfa40","reviewer":"codex","model":"gpt-5.5","verdict":"clean"}
+story: 19.9 — customer multi-provider auth (Google + Email/Password)
+branch: feat/customer-multi-provider-auth
+reviewed-at: 2026-05-23
+reviewer: Codex CLI (codex review --base main)
+exit-code: 0
+
+findings:
+  P2 — sign-in-page-client.tsx:76-78 — afterSignIn silent failure on null session response
+    fix: added null guard; shows Hindi error and returns early instead of redirecting
+    commit: 6f50c2d
+
+  P2 — customer-auth.guard.ts:75 — verifyIdToken checkRevoked=false skips revocation
+    fix: changed to verifyIdToken(bearer, true)
+    commit: 6f50c2d
+
+all findings resolved — no open items

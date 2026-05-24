@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import MockAdapter from 'axios-mock-adapter';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { api } from './client';
 import {
   getTenantBoot,
@@ -14,15 +16,24 @@ import {
   getProductImages,
   getNewArrivalProducts,
   getTopSellerProducts,
+  getWishlist,
   addToWishlist,
   removeFromWishlist,
 } from './endpoints';
+import { demoShopImageUris } from '../assets/demoShopImageData';
+import { DEV_MOCK_BEARER_PREFIX } from '../lib/dev-mock-session';
+import { useCustomerSessionStore } from '../stores/customerSessionStore';
+import { useTenantStore } from '../stores/tenantStore';
 
 describe('endpoints', () => {
   let mock: MockAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mock = new MockAdapter(api);
+    Constants.expoConfig!.extra!['devAuth'] = false;
+    useCustomerSessionStore.setState({ customer: null, bearer: null });
+    useTenantStore.setState({ slug: null, tenant: null, etag: null, loading: false, error: null });
+    await AsyncStorage.clear();
   });
 
   it('getTenantBoot maps snake_case API response (flat config keys) to mobile Tenant shape', async () => {
@@ -126,9 +137,9 @@ describe('endpoints', () => {
         priceAvailable: true,
         publishedAt: '2026-05-16T00:00:00.000Z',
         primaryImage: {
-          url: '/demo-shop/ring.jpg',
-          placeholderUrl: '/demo-shop/ring-small.jpg',
-          srcset: '/demo-shop/ring.jpg 320w, /demo-shop/ring@2x.jpg 640w',
+          url: '/demo-shop/ring-diamond.jpg',
+          placeholderUrl: '/demo-shop/ring-diamond.jpg',
+          srcset: '/demo-shop/ring-diamond.jpg 320w, /demo-shop/ring-diamond.jpg 640w',
           width: 1200,
           height: 1500,
           alt: 'Ring',
@@ -140,9 +151,9 @@ describe('endpoints', () => {
 
     const r = await getCatalogProducts();
 
-    expect(r.items[0]?.primaryImage?.url).toMatch(/^data:image\//);
-    expect(r.items[0]?.primaryImage?.placeholderUrl).toMatch(/^data:image\//);
-    expect(r.items[0]?.primaryImage?.srcset).toMatch(/^data:image\//);
+    expect(r.items[0]?.primaryImage?.url).toBe(demoShopImageUris['ring-diamond.jpg']);
+    expect(r.items[0]?.primaryImage?.placeholderUrl).toBe(demoShopImageUris['ring-diamond.jpg']);
+    expect(r.items[0]?.primaryImage?.srcset).toContain(demoShopImageUris['ring-diamond.jpg']);
   });
 
   it('normalizes relative PDP gallery image URLs against the API origin', async () => {
@@ -152,17 +163,17 @@ describe('endpoints', () => {
         alt_text: 'Ring',
         width: 1200,
         height: 1500,
-        default_url: '/demo-shop/ring.jpg',
-        placeholder_url: '/demo-shop/ring-small.jpg',
-        srcset: '/demo-shop/ring.jpg 320w',
+        default_url: '/demo-shop/ring-diamond.jpg',
+        placeholder_url: '/demo-shop/ring-diamond.jpg',
+        srcset: '/demo-shop/ring-diamond.jpg 320w',
       }],
     });
 
     const r = await getProductImages('prod-1');
 
-    expect(r[0]?.default_url).toMatch(/^data:image\//);
-    expect(r[0]?.placeholder_url).toMatch(/^data:image\//);
-    expect(r[0]?.srcset).toMatch(/^data:image\//);
+    expect(r[0]?.default_url).toBe(demoShopImageUris['ring-diamond.jpg']);
+    expect(r[0]?.placeholder_url).toBe(demoShopImageUris['ring-diamond.jpg']);
+    expect(r[0]?.srcset).toContain(demoShopImageUris['ring-diamond.jpg']);
   });
 
   it('customerSelfDelete sends DELETE /api/v1/crm/customer/me', async () => {
@@ -205,7 +216,13 @@ describe('endpoints', () => {
 
 describe('new-arrivals and top-sellers endpoints', () => {
   let mock: MockAdapter;
-  beforeEach(() => { mock = new MockAdapter(api); });
+  beforeEach(async () => {
+    mock = new MockAdapter(api);
+    Constants.expoConfig!.extra!['devAuth'] = false;
+    useCustomerSessionStore.setState({ customer: null, bearer: null });
+    useTenantStore.setState({ slug: null, tenant: null, etag: null, loading: false, error: null });
+    await AsyncStorage.clear();
+  });
   afterEach(() => mock.reset());
 
   it('getNewArrivalProducts calls /api/v1/catalog/products/new-arrivals', async () => {
@@ -235,6 +252,50 @@ describe('new-arrivals and top-sellers endpoints', () => {
     mock.onDelete('/api/v1/wishlist/prod-xyz').reply(200);
     await removeFromWishlist('prod-xyz');
     expect(mock.history['delete']?.[0]?.url).toBe('/api/v1/wishlist/prod-xyz');
+  });
+
+  it('uses a local wishlist store for dev mock customer sessions', async () => {
+    Constants.expoConfig!.extra!['devAuth'] = true;
+    useTenantStore.setState({
+      tenant: {
+        id: '71c84726-c351-46b8-9739-3278b054f9c5',
+        slug: 'anchor-dev-2',
+        displayName: 'Test Shop',
+        branding: {},
+      },
+    });
+    useCustomerSessionStore.setState({
+      customer: {
+        id: '00000000-0000-4000-8000-000000000999',
+        shopId: '71c84726-c351-46b8-9739-3278b054f9c5',
+        name: 'Dev Customer',
+        phoneE164: '+919999999999',
+        email: null,
+      },
+      bearer: `${DEV_MOCK_BEARER_PREFIX}test`,
+    });
+
+    await addToWishlist('prod-demo', {
+      productId: 'prod-demo',
+      sku: 'DMO-RG-001',
+      purity: '22K',
+      metal: 'GOLD',
+      grossWeightG: '4.000',
+      netWeightG: '3.800',
+      huid: null,
+      addedAt: '2026-05-23T00:00:00.000Z',
+    });
+
+    expect(await getWishlist()).toEqual([
+      expect.objectContaining({ productId: 'prod-demo', sku: 'DMO-RG-001' }),
+    ]);
+    expect(mock.history['post']).toHaveLength(0);
+    expect(mock.history['get']).toHaveLength(0);
+
+    await removeFromWishlist('prod-demo');
+
+    expect(await getWishlist()).toEqual([]);
+    expect(mock.history['delete']).toHaveLength(0);
   });
 });
 

@@ -11,22 +11,22 @@ export function HeroSection(): React.ReactElement {
 
   return (
     <ImageBackground
-        source={storefrontHeroImage}
-        resizeMode="cover"
-        imageStyle={styles.heroImage}
-        style={styles.container}
-      >
+      source={storefrontHeroImage}
+      resizeMode="cover"
+      imageStyle={styles.heroImage}
+      style={styles.container}
+    >
       <View style={styles.scrim} />
 
       {/* Shop name eyebrow */}
       <Text style={styles.eyebrow}>{shopName}</Text>
 
       {/* Display headline */}
-      <Text style={styles.headline}>आपके लिए बेहतरीन{'\n'}आभूषण</Text>
+      <Text style={styles.headline}>शादी से रोज़ाना तक{'\n'}नए डिज़ाइन</Text>
 
       {/* Subline */}
       <Text style={styles.subline}>
-        BIS हॉलमार्क · पारदर्शी मूल्य · विश्वसनीय सेवा
+        BIS हॉलमार्क · पारदर्शी भाव · घर पर ट्राय
       </Text>
 
       {/* CTA row */}
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
     marginTop:        spacing.md,
     borderRadius:     radii.lg,
     padding:          spacing.lg,
-    minHeight:        280,
+    minHeight:        300,
     justifyContent:   'flex-end',
     overflow:         'hidden',
     backgroundColor:  colors.ink,
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(30, 36, 64, 0.42)',
+    backgroundColor: 'rgba(22, 24, 36, 0.36)',
   },
   eyebrow: {
     fontFamily:    typography.body.family,
@@ -81,8 +81,8 @@ const styles = StyleSheet.create({
   },
   headline: {
     fontFamily:   typography.display.family,
-    fontSize:     30,
-    lineHeight:   36,
+    fontSize:     31,
+    lineHeight:   37,
     color:        colors.white,
     marginBottom: spacing.sm,
   },

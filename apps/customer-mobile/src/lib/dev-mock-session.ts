@@ -16,5 +16,6 @@ export function buildDevMockCustomer(tenant: Tenant): Customer {
     shopId: tenant.id,
     name: DEV_MOCK_CUSTOMER_NAME,
     phoneE164: DEV_MOCK_CUSTOMER_PHONE,
+    email: null,
   };
 }

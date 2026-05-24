@@ -12,14 +12,24 @@ interface HeroSectionProps {
   heroBanners: HeroBanner[];
 }
 
+const ASPIRATIONAL_HERO_IMAGE = '/demo-shop/campaign-necklace-showcase.jpg';
+const RETIRED_HERO_IMAGE = '/demo-shop/campaign-showroom-display.jpg';
+
 const FALLBACK_HERO = {
-  imageUrl: '/demo-shop/campaign-showroom-display.jpg',
+  imageUrl: ASPIRATIONAL_HERO_IMAGE,
   headlineHi: 'विवाह से रोज़मर्रा तक — हर पल के लिए',
   ctaUrl: '/products',
 };
 
+function polishHeroBanner(banner: HeroBanner): HeroBanner {
+  if (banner.imageUrl === RETIRED_HERO_IMAGE || banner.imageUrl.endsWith(RETIRED_HERO_IMAGE)) {
+    return { ...banner, imageUrl: ASPIRATIONAL_HERO_IMAGE };
+  }
+  return banner;
+}
+
 export function HeroSection({ shopName, heroBanners }: HeroSectionProps) {
-  const banners = heroBanners.length > 0 ? heroBanners : [FALLBACK_HERO];
+  const banners = (heroBanners.length > 0 ? heroBanners : [FALLBACK_HERO]).map(polishHeroBanner);
   const primary = banners[0]!;
   const supporting = banners.slice(1, 4);
 

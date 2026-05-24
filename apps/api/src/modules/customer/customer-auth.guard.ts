@@ -17,8 +17,10 @@ export const CUSTOMER_SELF_REGISTRATION_ACTOR_ID = '00000000-0000-4000-8000-0000
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface CustomerContext {
-  customerId: string;
-  shopId:     string;
+  customerId:     string;
+  shopId:         string;
+  firebaseUid:    string;
+  phoneFromToken: string | null;
 }
 
 export function getCustomerCtx(req: Request): CustomerContext {
@@ -57,26 +59,30 @@ export class CustomerAuthGuard implements CanActivate {
         throw new UnauthorizedException({ code: 'customer.dev_mock_not_allowed' });
       }
       await this.assertActiveShop(shopId);
-      req.customerCtx = { customerId: DEV_MOCK_CUSTOMER_ID, shopId };
+      req.customerCtx = {
+        customerId:     DEV_MOCK_CUSTOMER_ID,
+        shopId,
+        firebaseUid:    'dev-mock-firebase-uid',
+        phoneFromToken: '+919999999999',
+      };
       return true;
     }
 
-    // Real Firebase ID token path
-    let phoneE164: string;
+    // Real Firebase ID token path — no longer requires phone_number claim (OAuth support)
+    let firebaseUid: string;
+    let phoneFromToken: string | null;
     try {
       const decoded = await this.firebase.admin().auth().verifyIdToken(bearer, true);
-      const phone = (decoded['phone_number'] ?? decoded['phoneNumber']) as string | undefined;
-      if (!phone) throw new UnauthorizedException({ code: 'customer.phone_not_in_token' });
-      phoneE164 = phone;
-    } catch (err) {
-      if ((err as { code?: string })?.code === 'customer.phone_not_in_token') throw err;
+      firebaseUid    = decoded.uid;
+      phoneFromToken = (decoded['phone_number'] ?? decoded['phoneNumber'] ?? null) as string | null;
+    } catch {
       throw new UnauthorizedException({ code: 'customer.token_invalid' });
     }
 
     await this.assertActiveShop(shopId);
 
-    const customerId = await this.findOrCreateCustomer(shopId, phoneE164);
-    req.customerCtx = { customerId, shopId };
+    const customerId = await this.resolveCustomer(shopId, firebaseUid, phoneFromToken);
+    req.customerCtx = { customerId, shopId, firebaseUid, phoneFromToken };
     return true;
   }
 
@@ -95,29 +101,44 @@ export class CustomerAuthGuard implements CanActivate {
     if (shop.status !== 'ACTIVE') throw new ServiceUnavailableException({ code: 'tenant.inactive' });
   }
 
-  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- guard boundary validates x-tenant-id before creating customer context
-  private async findOrCreateCustomer(shopId: string, phoneE164: string): Promise<string> {
+  private async resolveCustomer(
+    // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- guard boundary validates x-tenant-id before creating customer context
+    shopId:         string,
+    firebaseUid:    string,
+    phoneFromToken: string | null,
+  ): Promise<string> {
     return withShopTx(this.pool, shopId, async (tx) => {
-      // customers.phone stores E.164 format (same format Firebase phone_number claim uses).
-      const existing = await tx.query<{ id: string }>(
-        `SELECT id FROM customers WHERE phone = $1 AND shop_id = $2 AND deleted_at IS NULL LIMIT 1`,
-        [phoneE164, shopId],
+      // Primary lookup: by firebase_uid (all new customers + lazy-migrated existing ones)
+      const byUid = await tx.query<{ id: string }>(
+        `SELECT id FROM customers
+         WHERE shop_id = $1 AND firebase_uid = $2 AND deleted_at IS NULL
+         LIMIT 1`,
+        [shopId, firebaseUid],
       );
-      if (existing.rows[0]) return existing.rows[0].id;
+      if (byUid.rows[0]) return byUid.rows[0].id;
 
-      const last4 = phoneE164.slice(-4);
-      const inserted = await tx.query<{ id: string }>(
-        `INSERT INTO customers (shop_id, phone, name, created_by_user_id)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (shop_id, phone) DO UPDATE
-           SET updated_at = customers.updated_at
-           WHERE customers.deleted_at IS NULL
-         RETURNING id`,
-        [shopId, phoneE164, `Mobile customer ${last4}`, CUSTOMER_SELF_REGISTRATION_ACTOR_ID],
-      );
-      if (inserted.rows[0]) return inserted.rows[0].id;
+      // Lazy migration: existing phone-OTP customer with firebase_uid = NULL
+      if (phoneFromToken) {
+        const byPhone = await tx.query<{ id: string }>(
+          `SELECT id FROM customers
+           WHERE shop_id = $1 AND phone = $2 AND firebase_uid IS NULL AND deleted_at IS NULL
+           LIMIT 1
+           FOR UPDATE`,
+          [shopId, phoneFromToken],
+        );
+        if (byPhone.rows[0]) {
+          const updated = await tx.query<{ id: string }>(
+            `UPDATE customers SET firebase_uid = $1
+             WHERE id = $2
+             RETURNING id`,
+            [firebaseUid, byPhone.rows[0].id],
+          );
+          if (updated.rows[0]) return updated.rows[0].id;
+        }
+      }
 
-      throw new UnauthorizedException({ code: 'customer.deleted' });
+      // Not found: OAuth user must call /auth/session first to provision record
+      throw new UnauthorizedException({ code: 'customer.not_provisioned' });
     });
   }
 }

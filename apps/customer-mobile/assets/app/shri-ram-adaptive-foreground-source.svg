@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Shri Ram Jewellers adaptive icon foreground">
+  <defs>
+    <linearGradient id="gold" x1="20%" y1="12%" x2="82%" y2="90%">
+      <stop offset="0%" stop-color="#F5D47B"/>
+      <stop offset="40%" stop-color="#C99A3D"/>
+      <stop offset="70%" stop-color="#A87524"/>
+      <stop offset="100%" stop-color="#E7C46D"/>
+    </linearGradient>
+    <linearGradient id="goldSoft" x1="18%" y1="8%" x2="86%" y2="92%">
+      <stop offset="0%" stop-color="#FFF0B5"/>
+      <stop offset="45%" stop-color="#D5A847"/>
+      <stop offset="100%" stop-color="#9F6A22"/>
+    </linearGradient>
+    <filter id="shadow" x="-22%" y="-22%" width="144%" height="144%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#031612" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <circle cx="512" cy="512" r="344" fill="url(#gold)"/>
+    <circle cx="512" cy="512" r="296" fill="#FFF8E9"/>
+    <circle cx="512" cy="512" r="257" fill="#123C34"/>
+    <circle cx="512" cy="512" r="238" fill="#FFF8E9"/>
+  </g>
+
+  <g fill="none" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M512 238 662 438 512 786 362 438Z" stroke="url(#goldSoft)" stroke-width="13"/>
+    <path d="M362 438h300M512 238v548" stroke="#A87524" stroke-width="10" opacity="0.78"/>
+    <path d="M430 438 512 238l82 200M430 438l82 348 82-348" stroke="#E2B95D" stroke-width="5" opacity="0.8"/>
+  </g>
+
+  <text
+    x="512"
+    y="548"
+    text-anchor="middle"
+    dominant-baseline="central"
+    font-family="Tiro Devanagari Hindi, Mangal, Nirmala UI, serif"
+    font-size="262"
+    font-weight="700"
+    fill="#143E35"
+  >श्री</text>
+
+  <text
+    x="512"
+    y="548"
+    text-anchor="middle"
+    dominant-baseline="central"
+    font-family="Tiro Devanagari Hindi, Mangal, Nirmala UI, serif"
+    font-size="262"
+    font-weight="700"
+    fill="none"
+    stroke="url(#goldSoft)"
+    stroke-width="6"
+    opacity="0.42"
+  >श्री</text>
+
+  <g fill="url(#goldSoft)" opacity="0.95">
+    <circle cx="356" cy="778" r="16"/>
+    <circle cx="408" cy="806" r="18"/>
+    <circle cx="466" cy="822" r="20"/>
+    <circle cx="512" cy="828" r="23"/>
+    <circle cx="558" cy="822" r="20"/>
+    <circle cx="616" cy="806" r="18"/>
+    <circle cx="668" cy="778" r="16"/>
+  </g>
+</svg>

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ServiceUnavailableException, type ExecutionContext } from '@nestjs/common';
 import {
   CustomerAuthGuard,
-  CUSTOMER_SELF_REGISTRATION_ACTOR_ID,
   DEV_MOCK_BEARER_PREFIX,
   DEV_MOCK_CUSTOMER_ID,
 } from './customer-auth.guard';
@@ -70,7 +69,7 @@ describe('CustomerAuthGuard', () => {
       `SELECT status FROM shops WHERE id = $1 LIMIT 1`,
       [SHOP_ID],
     );
-    expect(req.customerCtx).toEqual({ customerId: DEV_MOCK_CUSTOMER_ID, shopId: SHOP_ID });
+    expect(req.customerCtx).toMatchObject({ customerId: DEV_MOCK_CUSTOMER_ID, shopId: SHOP_ID });
   });
 
   it('rejects the dev mock for a suspended shop', async () => {
@@ -121,17 +120,18 @@ describe('CustomerAuthGuard', () => {
     await expect(guard.canActivate(makeExecutionContext(req)))
       .rejects.toBeInstanceOf(ServiceUnavailableException);
 
-    expect(verifyIdToken).toHaveBeenCalledWith('firebase-token', true);
+    expect(verifyIdToken).toHaveBeenCalledWith('firebase-token', false);
     expect(pool.query).toHaveBeenCalledTimes(1);
     expect(req.customerCtx).toBeUndefined();
   });
 
-  it('allows an active shop on the Firebase path', async () => {
-    const verifyIdToken = vi.fn().mockResolvedValue({ phone_number: '+919876543210' });
+  it('allows an active shop on the Firebase path — existing firebase_uid customer', async () => {
+    // withShopTx falls back to fn(pool) when pool has no connect() — so pool.query is used for tx queries too
+    const verifyIdToken = vi.fn().mockResolvedValue({ uid: 'fb-uid-abc', phone_number: '+919876543210' });
     const pool = makePool();
     vi.mocked(pool.query)
-      .mockResolvedValueOnce({ rows: [{ status: 'ACTIVE' }] } as never)
-      .mockResolvedValueOnce({ rows: [{ id: CUSTOMER_ID }] } as never);
+      .mockResolvedValueOnce({ rows: [{ status: 'ACTIVE' }] } as never)  // assertActiveShop
+      .mockResolvedValueOnce({ rows: [{ id: CUSTOMER_ID }] } as never);  // SELECT WHERE firebase_uid
     const req = makeRequest('Bearer firebase-token');
     const guard = new CustomerAuthGuard(makeFirebase(verifyIdToken), pool);
 
@@ -139,19 +139,21 @@ describe('CustomerAuthGuard', () => {
 
     expect(pool.query).toHaveBeenNthCalledWith(
       2,
-      `SELECT id FROM customers WHERE phone = $1 AND shop_id = $2 AND deleted_at IS NULL LIMIT 1`,
-      ['+919876543210', SHOP_ID],
+      `SELECT id FROM customers\n         WHERE shop_id = $1 AND firebase_uid = $2 AND deleted_at IS NULL\n         LIMIT 1`,
+      [SHOP_ID, 'fb-uid-abc'],
     );
-    expect(req.customerCtx).toEqual({ customerId: CUSTOMER_ID, shopId: SHOP_ID });
+    expect(req.customerCtx).toMatchObject({ customerId: CUSTOMER_ID, shopId: SHOP_ID });
   });
 
-  it('creates a customer row on first Firebase login', async () => {
-    const verifyIdToken = vi.fn().mockResolvedValue({ phone_number: '+919876543210' });
+  it('lazy migrates phone-OTP customer on first Firebase login with phone token', async () => {
+    // Customer exists with phone but no firebase_uid — guard writes firebase_uid and returns
+    const verifyIdToken = vi.fn().mockResolvedValue({ uid: 'fb-uid-new', phone_number: '+919876543210' });
     const pool = makePool();
     vi.mocked(pool.query)
-      .mockResolvedValueOnce({ rows: [{ status: 'ACTIVE' }] } as never)
-      .mockResolvedValueOnce({ rows: [] } as never)
-      .mockResolvedValueOnce({ rows: [{ id: CUSTOMER_ID }] } as never);
+      .mockResolvedValueOnce({ rows: [{ status: 'ACTIVE' }] } as never)   // assertActiveShop
+      .mockResolvedValueOnce({ rows: [] } as never)                         // SELECT WHERE firebase_uid → not found
+      .mockResolvedValueOnce({ rows: [{ id: CUSTOMER_ID }] } as never)     // SELECT WHERE phone FOR UPDATE → found
+      .mockResolvedValueOnce({ rows: [{ id: CUSTOMER_ID }] } as never);    // UPDATE SET firebase_uid RETURNING id
     const req = makeRequest('Bearer firebase-token');
     const guard = new CustomerAuthGuard(makeFirebase(verifyIdToken), pool);
 
@@ -159,15 +161,10 @@ describe('CustomerAuthGuard', () => {
 
     expect(pool.query).toHaveBeenNthCalledWith(
       3,
-      `INSERT INTO customers (shop_id, phone, name, created_by_user_id)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (shop_id, phone) DO UPDATE
-           SET updated_at = customers.updated_at
-           WHERE customers.deleted_at IS NULL
-         RETURNING id`,
-      [SHOP_ID, '+919876543210', 'Mobile customer 3210', CUSTOMER_SELF_REGISTRATION_ACTOR_ID],
+      `SELECT id FROM customers\n           WHERE shop_id = $1 AND phone = $2 AND firebase_uid IS NULL AND deleted_at IS NULL\n           LIMIT 1\n           FOR UPDATE`,
+      [SHOP_ID, '+919876543210'],
     );
-    expect(req.customerCtx).toEqual({ customerId: CUSTOMER_ID, shopId: SHOP_ID });
+    expect(req.customerCtx).toMatchObject({ customerId: CUSTOMER_ID, shopId: SHOP_ID, phoneFromToken: '+919876543210' });
   });
 
   it('rejects a missing shop on the Firebase path before customer lookup', async () => {

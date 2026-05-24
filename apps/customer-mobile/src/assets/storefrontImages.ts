@@ -11,12 +11,15 @@ import {
   storefrontFallbackUri,
   storefrontHeroUri,
 } from './storefrontImageData';
+import { demoShopCampaignImageUris } from './demoShopCampaignImageData';
 
 function dataImage(uri: string): ImageSourcePropType {
   return { uri };
 }
 
-export const storefrontHeroImage = dataImage(storefrontHeroUri);
+export const storefrontHeroImage = dataImage(
+  demoShopCampaignImageUris['campaign-necklace-showcase.jpg'] ?? storefrontHeroUri,
+);
 export const storefrontFallbackImage = dataImage(storefrontFallbackUri);
 
 export const categoryTileImages: Record<string, ImageSourcePropType> = {

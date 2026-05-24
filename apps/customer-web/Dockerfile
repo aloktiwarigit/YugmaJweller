@@ -44,6 +44,7 @@ ENV NEXT_PUBLIC_SHOP_SLUG=$NEXT_PUBLIC_SHOP_SLUG \
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json turbo.json .npmrc* ./
 COPY tsconfig.base.json tsconfig.json* ./
+COPY patches/ patches/
 COPY packages/ packages/
 COPY apps/customer-web/ apps/customer-web/
 

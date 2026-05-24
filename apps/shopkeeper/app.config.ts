@@ -33,42 +33,62 @@ type AndroidGoogleServices = {
   };
   client?: Array<{
     client_info?: {
+      android_client_info?: {
+        package_name?: string;
+      };
       mobilesdk_app_id?: string;
     };
     api_key?: Array<{
       current_key?: string;
     }>;
+    oauth_client?: Array<{
+      client_id?: string;
+      client_type?: number;
+    }>;
   }>;
 };
 
-function readAndroidFirebaseConfig(): {
+function readAndroidFirebaseConfig(packageName: string): {
   apiKey?: string;
   appId?: string;
   projectId?: string;
+  webClientId?: string;
 } {
   if (!fs.existsSync(androidGoogleServicesPath)) return {};
   const raw = fs.readFileSync(androidGoogleServicesPath, 'utf8');
   const parsed = JSON.parse(raw) as AndroidGoogleServices;
-  const firstClient = parsed.client?.[0];
+  const clients = parsed.client ?? [];
+  const configuredClient =
+    clients.find(
+      (client) => client.client_info?.android_client_info?.package_name === packageName,
+    ) ?? clients[0];
+  const webClient =
+    configuredClient?.oauth_client?.find((client) => client.client_type === 3) ??
+    clients
+      .flatMap((client) => client.oauth_client ?? [])
+      .find((client) => client.client_type === 3);
   return {
-    apiKey: firstClient?.api_key?.[0]?.current_key,
-    appId: firstClient?.client_info?.mobilesdk_app_id,
+    apiKey: configuredClient?.api_key?.[0]?.current_key,
+    appId: configuredClient?.client_info?.mobilesdk_app_id,
     projectId: parsed.project_info?.project_id,
+    webClientId: webClient?.client_id,
   };
 }
 
-const androidFirebaseConfig = readAndroidFirebaseConfig();
+const androidPackage = process.env['EXPO_PUBLIC_ANDROID_PACKAGE'] ?? devAndroidPackage;
+const iosBundleIdentifier =
+  process.env['EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER'] ?? devIosBundleIdentifier;
+const androidFirebaseConfig = readAndroidFirebaseConfig(androidPackage);
 const firebaseProjectId =
   process.env['EXPO_PUBLIC_FIREBASE_PROJECT_ID'] ?? androidFirebaseConfig.projectId ?? devFirebaseProjectId;
 const firebaseApiKey = process.env['EXPO_PUBLIC_FIREBASE_API_KEY'] ?? androidFirebaseConfig.apiKey;
 const firebaseAppId = process.env['EXPO_PUBLIC_FIREBASE_APP_ID'] ?? androidFirebaseConfig.appId;
+const googleWebClientId =
+  process.env['EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID'] ?? androidFirebaseConfig.webClientId;
 const firebaseAuthDomain =
   process.env['EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN'] ?? `${firebaseProjectId}.firebaseapp.com`;
 const apiBaseUrl = process.env['EXPO_PUBLIC_API_BASE_URL'] ?? devApiBaseUrl;
 const tenantSlug = process.env['EXPO_PUBLIC_TENANT_SLUG'] ?? devTenantSlug;
-const androidPackage = process.env['EXPO_PUBLIC_ANDROID_PACKAGE'] ?? devAndroidPackage;
-const iosBundleIdentifier =
-  process.env['EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER'] ?? devIosBundleIdentifier;
 const easProjectId = process.env['EXPO_PUBLIC_EAS_PROJECT_ID'] ?? placeholderEasProjectId;
 const usesCleartextTraffic = !isProductionProfile;
 
@@ -83,6 +103,7 @@ function requireProductionConfig(): void {
     EXPO_PUBLIC_FIREBASE_PROJECT_ID: process.env['EXPO_PUBLIC_FIREBASE_PROJECT_ID'],
     EXPO_PUBLIC_FIREBASE_API_KEY: firebaseApiKey,
     EXPO_PUBLIC_FIREBASE_APP_ID: firebaseAppId,
+    EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: googleWebClientId,
     EXPO_PUBLIC_ANDROID_PACKAGE: process.env['EXPO_PUBLIC_ANDROID_PACKAGE'],
     EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER: process.env['EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER'],
     EXPO_PUBLIC_EAS_PROJECT_ID: process.env['EXPO_PUBLIC_EAS_PROJECT_ID'],
@@ -215,6 +236,7 @@ const config: ExpoConfig = {
       projectId: firebaseProjectId,
       appId: firebaseAppId,
     },
+    googleWebClientId,
     router: { origin: false },
     eas: { projectId: easProjectId },
   },

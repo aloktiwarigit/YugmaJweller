@@ -42,3 +42,15 @@ describe('customer-write audit actions (story 19.13)', () => {
     expect(AuditAction[key as keyof typeof AuditAction]).toBe(key);
   });
 });
+
+describe('AuditAction — customer auth events (story 19.9)', () => {
+  it('has CUSTOMER_SESSION_CREATED', () => {
+    expect(AuditAction.CUSTOMER_SESSION_CREATED).toBe('CUSTOMER_SESSION_CREATED');
+  });
+  it('has CUSTOMER_AUTH_PROVIDER_LINKED', () => {
+    expect(AuditAction.CUSTOMER_AUTH_PROVIDER_LINKED).toBe('CUSTOMER_AUTH_PROVIDER_LINKED');
+  });
+  it('has CUSTOMER_AUTH_FAILED', () => {
+    expect(AuditAction.CUSTOMER_AUTH_FAILED).toBe('CUSTOMER_AUTH_FAILED');
+  });
+});

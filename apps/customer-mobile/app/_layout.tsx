@@ -12,11 +12,13 @@ import { CustomerAuthProvider } from '../src/providers/CustomerAuthProvider';
 import { RootErrorBoundary } from '../src/components/RootErrorBoundary';
 import { initSentry } from '../src/lib/sentry';
 import { initPostHog, captureEvent } from '../src/lib/posthog';
+import { configureGoogleSignIn } from '../src/lib/google-sign-in';
 import '../global.css';
 
-// Initialise Sentry and PostHog before any other app code runs.
+// Initialise Sentry, PostHog, and Google Sign-In before any other app code runs.
 initSentry();
 initPostHog();
+configureGoogleSignIn();
 
 const queryClient = new QueryClient();
 
