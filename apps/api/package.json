@@ -26,6 +26,7 @@
     "@goldsmith/db": "workspace:*",
     "@goldsmith/integrations-payments": "workspace:*",
     "@goldsmith/integrations-search": "workspace:*",
+    "@goldsmith/integrations-bg-removal": "workspace:*",
     "@goldsmith/integrations-storage": "workspace:*",
     "@goldsmith/money": "workspace:*",
     "@goldsmith/observability": "workspace:*",

@@ -147,6 +147,7 @@ beforeAll(async () => {
     new StubMalwareScanAdapter(),
     pool as never,
     new ImageKitTransformUrlBuilder(),
+    { add: async () => undefined } as never,
   );
 }, 180_000);
 
