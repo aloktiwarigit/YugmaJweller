@@ -52,4 +52,10 @@ export const products = tenantScopedTable('products', {
   // Drizzle does not model composite FKs natively; constraint lives in SQL.
   // -------------------------------------------------------------------------
   primary_image_id:           uuid('primary_image_id'),
+  // -------------------------------------------------------------------------
+  // Virtual try-on dimensions — added in migration 0077 (VTO foundation)
+  // -------------------------------------------------------------------------
+  try_on_length_mm:           decimal('try_on_length_mm',   { precision: 8, scale: 2 }),
+  try_on_width_mm:            decimal('try_on_width_mm',    { precision: 8, scale: 2 }),
+  try_on_diameter_mm:         decimal('try_on_diameter_mm', { precision: 8, scale: 2 }),
 });

@@ -10,6 +10,7 @@ export * from './role-permissions';
 export * from './product-categories';
 export * from './products';
 export * from './product-images';
+export * from './product-try-on-assets';
 export * from './ibja-rate-snapshots';
 export * from './shop-rate-overrides';
 export * from './tenant-sync-cursors';
