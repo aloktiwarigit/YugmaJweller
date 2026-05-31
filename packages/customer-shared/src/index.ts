@@ -16,6 +16,7 @@ export type {
   CatalogProductDetail,
   CategoryNode,
   Collection,
+  CatalogTryOnResponse,
 } from './catalog-types';
 
 export type {

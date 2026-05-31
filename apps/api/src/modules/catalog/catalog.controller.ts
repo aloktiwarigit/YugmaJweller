@@ -276,6 +276,22 @@ export class CatalogController {
   }
 
   // -------------------------------------------------------------------------
+  // GET /catalog/products/:id/try-on — VTO Plan 1 (public, tenant-scoped)
+  // -------------------------------------------------------------------------
+
+  @Get('products/:id/try-on')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
+  async getTryOn(
+    @Param('id', new ParseUUIDPipe()) productId: string,
+    @Headers('x-tenant-id') shopId: string,
+  ): Promise<import('@goldsmith/customer-shared').CatalogTryOnResponse> {
+    shopId = assertPublicTenantHeader(shopId);
+    return this.catalogService.getTryOn(productId, shopId);
+  }
+
+  // -------------------------------------------------------------------------
   // GET /catalog/products/:id/reviews — Story B4 (PII-redacted, public)
   // -------------------------------------------------------------------------
 
