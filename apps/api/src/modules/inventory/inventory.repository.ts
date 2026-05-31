@@ -90,8 +90,9 @@ export class InventoryRepository {
         `INSERT INTO products
            (shop_id, category_id, sku, metal, purity,
             gross_weight_g, net_weight_g, stone_weight_g, stone_details,
-            making_charge_override_pct, huid, huid_exemption_category, status, created_by_user_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+            making_charge_override_pct, huid, huid_exemption_category, status, created_by_user_id,
+            try_on_length_mm, try_on_width_mm, try_on_diameter_mm)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
          RETURNING ${SELECT_COLS}`,
         [
           input.shopId,
@@ -108,6 +109,9 @@ export class InventoryRepository {
           input.huidExemptionCategory ?? 'none',
           input.status ?? 'IN_STOCK',
           input.createdByUserId,
+          input.tryOnLengthMm ?? null,
+          input.tryOnWidthMm ?? null,
+          input.tryOnDiameterMm ?? null,
         ],
       );
       const row = r.rows[0] as ProductRow;
@@ -277,6 +281,9 @@ export class InventoryRepository {
         makingChargeOverridePct: 'making_charge_override_pct',
         huid: 'huid', huidExemptionCategory: 'huid_exemption_category',
         status: 'status', categoryId: 'category_id',
+        tryOnLengthMm: 'try_on_length_mm',
+        tryOnWidthMm: 'try_on_width_mm',
+        tryOnDiameterMm: 'try_on_diameter_mm',
       };
 
       for (const [key, col] of Object.entries(fieldMap)) {

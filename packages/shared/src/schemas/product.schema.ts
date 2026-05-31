@@ -23,6 +23,11 @@ const ProductBaseSchema = z.object({
   huid:                     HUID.optional(),
   huidExemptionCategory:    HUID_EXEMPTION_CATEGORY.optional().default('none'),
   status:                   STATUS.optional().default('IN_STOCK'),
+  // Virtual try-on fields — migration 0077
+  tryOnLengthMm:            z.string().regex(/^\d+(\.\d{1,2})?$/, 'MM_FORMAT_INVALID').optional(),
+  tryOnWidthMm:             z.string().regex(/^\d+(\.\d{1,2})?$/, 'MM_FORMAT_INVALID').optional(),
+  tryOnDiameterMm:          z.string().regex(/^\d+(\.\d{1,2})?$/, 'MM_FORMAT_INVALID').optional(),
+  tryOnBodyPart:            z.enum(['EAR', 'NECK', 'FINGER', 'WRIST']).optional(),
 });
 
 export const CreateProductSchema = ProductBaseSchema.superRefine((data, ctx) => {

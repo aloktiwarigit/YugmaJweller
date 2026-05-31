@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Inject, Injectable, NotFoundExc
 import { assertValidTransition } from './state-machine';
 import type { ProductStatus } from './state-machine';
 import type { Pool } from 'pg';
+import { withTenantTx } from '@goldsmith/db';
 import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { auditLog, AuditAction } from '@goldsmith/audit';
@@ -57,6 +58,18 @@ export class InventoryService {
       shopId: ctx.shopId,
       createdByUserId: ctx.userId,
     });
+
+    if (dto.tryOnBodyPart) {
+      await withTenantTx(this.pool, (tx) =>
+        tx.query(
+          `INSERT INTO product_try_on_assets (shop_id, product_id, body_part, status, enabled)
+             VALUES ($1, $2, $3, 'pending', false)
+           ON CONFLICT (shop_id, product_id)
+             DO UPDATE SET body_part = EXCLUDED.body_part, updated_at = now()`,
+          [ctx.shopId, row.id, dto.tryOnBodyPart],
+        ),
+      );
+    }
 
     void auditLog(this.pool, {
       action: AuditAction.INVENTORY_PRODUCT_CREATED,
@@ -119,6 +132,19 @@ export class InventoryService {
 
     const row = await this.repo.updateProduct(id, dto);
     if (!row) throw new NotFoundException({ code: 'inventory.product_not_found' });
+
+    if (dto.tryOnBodyPart) {
+      const updateCtx = tenantContext.requireCurrent() as AuthenticatedTenantContext;
+      await withTenantTx(this.pool, (tx) =>
+        tx.query(
+          `INSERT INTO product_try_on_assets (shop_id, product_id, body_part, status, enabled)
+             VALUES ($1, $2, $3, 'pending', false)
+           ON CONFLICT (shop_id, product_id)
+             DO UPDATE SET body_part = EXCLUDED.body_part, updated_at = now()`,
+          [updateCtx.shopId, row.id, dto.tryOnBodyPart],
+        ),
+      );
+    }
 
     const ctx = tenantContext.current();
     void auditLog(this.pool, {
