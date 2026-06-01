@@ -21,9 +21,22 @@ export default function MobileTryOnScreen(): React.ReactElement {
   // auto-granted (mediaCapturePermissionGrantType="grant") to spare a second
   // OS prompt after the native permission + in-page consent — so navigation
   // MUST be confined to our trusted origin, or a redirect could hand the
-  // camera to an arbitrary page.
-  const allowNavigation = (reqUrl: string): boolean =>
-    webBaseUrl !== '' && reqUrl.startsWith(webBaseUrl);
+  // camera to an arbitrary page. Compare scheme + host + port (NOT a string
+  // prefix, which `http://host:3000.evil.com` would bypass).
+  const allowNavigation = (reqUrl: string): boolean => {
+    if (webBaseUrl === '') return false;
+    try {
+      const trusted = new URL(webBaseUrl);
+      const u = new URL(reqUrl);
+      return (
+        u.protocol === trusted.protocol &&
+        u.hostname === trusted.hostname &&
+        u.port === trusted.port
+      );
+    } catch {
+      return false;
+    }
+  };
 
   useEffect(() => {
     void (async () => {
