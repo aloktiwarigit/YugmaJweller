@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { resolveShopSlug } from '@/lib/tenant-slug';
 import { fetchTenantConfig, fetchProduct, fetchProductReviews, fetchProductImages } from '@/lib/api';
+import { TryOnButton } from '@/components/try-on/TryOnButton';
 import { HuidBadge } from '@/components/HuidBadge';
 import { WishlistButton } from '@/components/WishlistButton';
 import { ReviewSection } from '@/components/ReviewSection';
@@ -12,6 +13,7 @@ import { StickyCTABar } from '@/components/pdp/StickyCTABar';
 import { TrustStrip } from '@/components/pdp/TrustStrip';
 import { CompleteTheLook } from '@/components/pdp/CompleteTheLook';
 import { ActionRow } from '@/components/pdp/ActionRow';
+import { storefrontImageUrl, storefrontSrcSet } from '@/lib/image-url';
 import { purityLabel, metalLabel } from '@/lib/theme';
 import { jsonLd } from '@/lib/storefront';
 
@@ -33,7 +35,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const displayMetal = metalLabel(product.metal);
   const title = `${displayName} | ${config.appName}`;
   const description = `${displayName} — ${displayMetal}`.trim();
-  const ogImages = product.primaryImage?.url ? [{ url: product.primaryImage.url }] : [];
+  const ogImages = product.primaryImage?.url ? [{ url: storefrontImageUrl(product.primaryImage.url) }] : [];
 
   return {
     title,
@@ -89,7 +91,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: displayPurity,
-    image: product.primaryImage?.url ? [product.primaryImage.url] : [],
+    image: product.primaryImage?.url ? [storefrontImageUrl(product.primaryImage.url)] : [],
     description: `${displayPurity} — ${displayMetal}`.trim(),
     brand: { '@type': 'Brand', name: config.appName },
     sku: product.sku ?? params.id,
@@ -135,10 +137,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
             <link
               rel="preload"
               as="image"
-              imageSrcSet={images[0]!.srcset}
+              imageSrcSet={storefrontSrcSet(images[0]!.srcset)}
               imageSizes="(max-width: 768px) 100vw, (max-width: 1280px) 60vw, 800px"
               fetchPriority="high"
-              href={images[0]!.default_url}
+              href={storefrontImageUrl(images[0]!.default_url)}
             />
           )}
           <div className="relative rounded-lg overflow-hidden border border-borderSubtle bg-bg">
@@ -234,6 +236,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
             {/* Primary CTAs */}
             {!isUnavailable && (
               <div className="flex flex-col gap-3 border-t border-borderSubtle pt-4">
+                {/* Virtual try-on — prominent CTA */}
+                <TryOnButton productId={product.id} />
                 <WishlistButton productId={product.id} productName={displayPurity} />
                 <a
                   href={`/try-at-home?product=${product.id}`}
