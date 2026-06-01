@@ -71,9 +71,10 @@ const repoMock = {
 };
 
 const poolMock = {} as never;
+const urlBuilderStub = { url: (key: string, _opts: unknown) => `https://ik.imagekit.io/goldsmith/${key}?tr=w-1024` };
 
 function makeService() {
-  const svc = new InventoryService(repoMock as never, poolMock);
+  const svc = new InventoryService(repoMock as never, poolMock, urlBuilderStub as never);
   return svc;
 }
 
@@ -135,5 +136,60 @@ describe('InventoryService.updateProduct — try-on asset upsert', () => {
     const svc = makeService();
     repoMock.getProduct.mockResolvedValueOnce(null as never);
     await expect(svc.updateProduct('missing', {})).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('InventoryService try-on asset admin', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    txMock.query.mockReset();
+  });
+
+  it('getTryOnAsset maps the row and builds the cutout URL', async () => {
+    txMock.query.mockResolvedValueOnce({
+      rows: [{
+        body_part: 'EAR', asset_storage_key: 'shop-A/p1.cutout.png',
+        anchor_x: '0.5000', anchor_y: '0.0000', status: 'ready', enabled: true,
+      }],
+    });
+    const svc = makeService();
+    const r = await svc.getTryOnAsset('prod-1');
+    expect(r.bodyPart).toBe('EAR');
+    expect(r.anchorX).toBe(0.5);
+    expect(r.status).toBe('ready');
+    expect(r.assetUrl).toContain('p1.cutout.png');
+  });
+
+  it('getTryOnAsset returns null assetUrl when the cutout is not ready', async () => {
+    txMock.query.mockResolvedValueOnce({
+      rows: [{ body_part: 'FINGER', asset_storage_key: null, anchor_x: '0.5000', anchor_y: '0.5000', status: 'pending', enabled: false }],
+    });
+    const r = await makeService().getTryOnAsset('prod-1');
+    expect(r.assetUrl).toBeNull();
+    expect(r.status).toBe('pending');
+  });
+
+  it('getTryOnAsset throws NotFound when no asset row exists', async () => {
+    txMock.query.mockResolvedValueOnce({ rows: [] });
+    await expect(makeService().getTryOnAsset('prod-1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('updateTryOnAsset writes anchors + enabled and returns the updated row', async () => {
+    txMock.query.mockResolvedValueOnce({
+      rows: [{ body_part: 'EAR', asset_storage_key: 'shop-A/p1.cutout.png', anchor_x: '0.4200', anchor_y: '0.1000', status: 'ready', enabled: true }],
+    });
+    const r = await makeService().updateTryOnAsset('prod-1', { anchorX: 0.42, anchorY: 0.1, enabled: true });
+    expect(r.anchorX).toBe(0.42);
+    expect(r.enabled).toBe(true);
+    const params = txMock.query.mock.calls[0][1] as unknown[];
+    expect(params[0]).toBe('0.4200');
+    expect(params[1]).toBe('0.1000');
+  });
+
+  it('updateTryOnAsset throws NotFound when the product has no asset row', async () => {
+    txMock.query.mockResolvedValueOnce({ rows: [] });
+    await expect(
+      makeService().updateTryOnAsset('prod-1', { anchorX: 0.5, anchorY: 0.5, enabled: false }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

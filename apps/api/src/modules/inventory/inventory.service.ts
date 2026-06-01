@@ -7,7 +7,8 @@ import { tenantContext } from '@goldsmith/tenant-context';
 import type { AuthenticatedTenantContext } from '@goldsmith/tenant-context';
 import { auditLog, AuditAction } from '@goldsmith/audit';
 import { validateHuidFormat } from '@goldsmith/compliance';
-import type { CreateProductDto, UpdateProductDto, ProductResponse } from '@goldsmith/shared';
+import type { CreateProductDto, UpdateProductDto, ProductResponse, AdminTryOnAssetResponse, UpdateTryOnAssetDto } from '@goldsmith/shared';
+import { IMAGEKIT_URL_BUILDER, ImageKitTransformUrlBuilder } from '@goldsmith/integrations-storage';
 import { trackEvent } from '@goldsmith/observability';
 import { InventoryRepository } from './inventory.repository';
 import type { ProductRow, ListProductsFilter } from './inventory.repository';
@@ -42,6 +43,7 @@ export class InventoryService {
   constructor(
     @Inject(InventoryRepository) private readonly repo: InventoryRepository,
     @Inject('PG_POOL') private readonly pool: Pool,
+    @Inject(IMAGEKIT_URL_BUILDER) private readonly urlBuilder: ImageKitTransformUrlBuilder,
   ) {}
 
   async createProduct(dto: CreateProductDto): Promise<ProductResponse> {
@@ -157,6 +159,76 @@ export class InventoryService {
     }).catch(() => undefined);
 
     return mapRow(row);
+  }
+
+  /** Map a try-on asset DB row to the admin response, building the cutout URL. */
+  private mapTryOnAssetRow(productId: string, row: {
+    body_part: string; asset_storage_key: string | null;
+    anchor_x: string; anchor_y: string; status: string; enabled: boolean;
+  }): AdminTryOnAssetResponse {
+    return {
+      productId,
+      bodyPart: row.body_part as AdminTryOnAssetResponse['bodyPart'],
+      assetUrl: row.asset_storage_key ? this.urlBuilder.url(row.asset_storage_key, { width: 1024 }) : null,
+      anchorX: Number(row.anchor_x),
+      anchorY: Number(row.anchor_y),
+      status: row.status as AdminTryOnAssetResponse['status'],
+      enabled: row.enabled,
+    };
+  }
+
+  /** Read the (single) try-on asset row for a product, for the admin nudge UI. */
+  async getTryOnAsset(productId: string): Promise<AdminTryOnAssetResponse> {
+    const r = await withTenantTx(this.pool, (tx) =>
+      tx.query<{
+        body_part: string; asset_storage_key: string | null;
+        anchor_x: string; anchor_y: string; status: string; enabled: boolean;
+      }>(
+        `SELECT body_part, asset_storage_key, anchor_x, anchor_y, status, enabled
+           FROM product_try_on_assets
+          WHERE product_id = $1
+          LIMIT 1`,
+        [productId],
+      ),
+    );
+    const row = r.rows[0];
+    if (!row) throw new NotFoundException({ code: 'inventory.try_on_asset_not_found' });
+    return this.mapTryOnAssetRow(productId, row);
+  }
+
+  /**
+   * Update the anchor + enabled flag. `enabled` only sticks when the cutout is
+   * 'ready' (`enabled = ($3 AND status = 'ready')`) so a shopkeeper can never
+   * publish an overlay that has no cutout. RLS-scoped via withTenantTx.
+   */
+  async updateTryOnAsset(productId: string, dto: UpdateTryOnAssetDto): Promise<AdminTryOnAssetResponse> {
+    const r = await withTenantTx(this.pool, (tx) =>
+      tx.query<{
+        body_part: string; asset_storage_key: string | null;
+        anchor_x: string; anchor_y: string; status: string; enabled: boolean;
+      }>(
+        `UPDATE product_try_on_assets
+            SET anchor_x = $1, anchor_y = $2,
+                enabled = ($3 AND status = 'ready'),
+                updated_at = now()
+          WHERE product_id = $4
+        RETURNING body_part, asset_storage_key, anchor_x, anchor_y, status, enabled`,
+        [dto.anchorX.toFixed(4), dto.anchorY.toFixed(4), dto.enabled, productId],
+      ),
+    );
+    const row = r.rows[0];
+    if (!row) throw new NotFoundException({ code: 'inventory.try_on_asset_not_found' });
+
+    const ctx = tenantContext.current();
+    void auditLog(this.pool, {
+      action: AuditAction.INVENTORY_PRODUCT_UPDATED,
+      subjectType: 'product_try_on_asset',
+      subjectId: productId,
+      actorUserId: ctx?.authenticated ? (ctx as AuthenticatedTenantContext).userId : undefined,
+      after: { anchorX: dto.anchorX, anchorY: dto.anchorY, enabled: row.enabled },
+    }).catch(() => undefined);
+
+    return this.mapTryOnAssetRow(productId, row);
   }
 
   async updateStatus(
