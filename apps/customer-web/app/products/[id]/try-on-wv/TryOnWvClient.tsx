@@ -11,10 +11,20 @@ interface Props {
 
 type State = 'loading' | 'ready' | 'unavailable';
 
-/** Notify a hosting react-native-webview (if any) that the user closed try-on. */
-function notifyNativeClose(): void {
+/**
+ * Close try-on. When hosted in the react-native-webview, post a message so the
+ * native screen pops the route. When this route is opened in a plain browser
+ * (it is a public Next route), there is no native host — fall back to normal
+ * back-navigation so the user is never stranded on the fullscreen overlay.
+ */
+function closeTryOn(productId: string): void {
   const rn = (window as unknown as { ReactNativeWebView?: { postMessage: (m: string) => void } }).ReactNativeWebView;
-  rn?.postMessage(JSON.stringify({ type: 'tryon-close' }));
+  if (rn) {
+    rn.postMessage(JSON.stringify({ type: 'tryon-close' }));
+    return;
+  }
+  if (window.history.length > 1) window.history.back();
+  else window.location.assign(`/products/${productId}`);
 }
 
 export function TryOnWvClient({ productId, shopId }: Props) {
@@ -33,8 +43,8 @@ export function TryOnWvClient({ productId, shopId }: Props) {
   }, [productId, shopId]);
 
   const handleClose = useCallback(() => {
-    notifyNativeClose();
-  }, []);
+    closeTryOn(productId);
+  }, [productId]);
 
   if (state === 'loading') {
     return (
