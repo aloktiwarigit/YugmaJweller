@@ -35,6 +35,9 @@ function mapRow(row: ProductRow): ProductResponse {
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
+    tryOnLengthMm: row.try_on_length_mm ?? null,
+    tryOnWidthMm: row.try_on_width_mm ?? null,
+    tryOnDiameterMm: row.try_on_diameter_mm ?? null,
   };
 }
 

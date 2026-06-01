@@ -26,6 +26,9 @@ export interface ProductRow {
   created_by_user_id: string;
   created_at: Date;
   updated_at: Date;
+  try_on_length_mm: string | null;
+  try_on_width_mm: string | null;
+  try_on_diameter_mm: string | null;
 }
 
 export interface CreateProductInput extends Omit<CreateProductDto, 'stoneWeightG'> {
@@ -74,7 +77,8 @@ const SELECT_COLS = `
   id, shop_id, category_id, sku, metal, purity,
   gross_weight_g, net_weight_g, stone_weight_g, stone_details,
   making_charge_override_pct, huid, huid_exemption_category, status, quantity,
-  published_at, published_by_user_id, created_by_user_id, created_at, updated_at
+  published_at, published_by_user_id, created_by_user_id, created_at, updated_at,
+  try_on_length_mm, try_on_width_mm, try_on_diameter_mm
 `;
 
 @Injectable()

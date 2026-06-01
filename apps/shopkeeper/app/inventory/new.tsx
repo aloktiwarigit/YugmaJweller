@@ -10,6 +10,8 @@ import { MetalSelector } from '../../src/features/inventory/components/MetalSele
 import { PuritySelector } from '../../src/features/inventory/components/PuritySelector';
 import { HuidInput } from '../../src/features/inventory/components/HuidInput';
 import { HuidExemptionPicker } from '../../src/features/inventory/components/HuidExemptionPicker';
+import { TryOnDimensionsField, type TryOnFieldValue } from '../../src/features/inventory/components/TryOnDimensionsField';
+import { mmFieldForBodyPart, type BodyPart } from '../../src/features/inventory/tryOnPresets';
 import { api } from '../../src/api/client';
 
 type Metal = 'GOLD' | 'SILVER' | 'PLATINUM';
@@ -75,9 +77,10 @@ export default function NewProductScreen(): React.ReactElement {
     huidExemptionCategory: HuidExemptionCategory.None,
   });
   const [errors, setErrors] = useState<FormErrors>({});
+  const [tryOn, setTryOn] = useState<TryOnFieldValue>({ bodyPart: undefined, mm: '' });
 
   const mutation = useMutation({
-    mutationFn: async (data: FormState) => {
+    mutationFn: async (data: FormState & { tryOnBodyPart?: BodyPart; tryOnMm?: string }) => {
       const res = await api.post('/api/v1/inventory/products', {
         sku: data.sku,
         metal: data.metal,
@@ -89,6 +92,14 @@ export default function NewProductScreen(): React.ReactElement {
         makingChargeOverridePct: data.makingChargeOverridePct || undefined,
         huid: data.huid || undefined,
         huidExemptionCategory: data.huidExemptionCategory,
+        ...(data.tryOnBodyPart
+          ? {
+              tryOnBodyPart: data.tryOnBodyPart,
+              ...(data.tryOnMm
+                ? { [mmFieldForBodyPart(data.tryOnBodyPart)]: data.tryOnMm }
+                : {}),
+            }
+          : {}),
       });
       return res.data;
     },
@@ -102,7 +113,11 @@ export default function NewProductScreen(): React.ReactElement {
     const errs = validateForm(form);
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
-    mutation.mutate(form);
+    mutation.mutate({
+      ...form,
+      tryOnBodyPart: tryOn.bodyPart,
+      tryOnMm: tryOn.mm.trim() || undefined,
+    });
   }
 
   return (
@@ -181,6 +196,8 @@ export default function NewProductScreen(): React.ReactElement {
         value={form.huidExemptionCategory}
         onChange={(cat) => setForm((p) => ({ ...p, huidExemptionCategory: cat }))}
       />
+
+      <TryOnDimensionsField value={tryOn} onChange={setTryOn} />
 
       <Pressable
         style={[styles.saveBtn, mutation.isPending && styles.saveBtnDisabled]}

@@ -77,6 +77,9 @@ export const ProductResponseSchema = z.object({
   createdByUserId:          z.string().uuid(),
   createdAt:                z.string(),
   updatedAt:                z.string(),
+  tryOnLengthMm:            z.string().nullable(),
+  tryOnWidthMm:             z.string().nullable(),
+  tryOnDiameterMm:          z.string().nullable(),
 });
 
 export type ProductResponse = z.infer<typeof ProductResponseSchema>;
