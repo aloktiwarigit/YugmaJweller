@@ -13,6 +13,7 @@ export type {
   PublicImageItem,
   StorefrontConfig,
   Collection,
+  CatalogTryOnResponse,
 } from '@goldsmith/customer-shared';
 
 import type {
@@ -24,6 +25,7 @@ import type {
   PublicImageItem,
   StorefrontConfig,
   Collection,
+  CatalogTryOnResponse,
 } from '@goldsmith/customer-shared';
 
 // Isomorphic base URL:
@@ -265,6 +267,26 @@ export async function fetchProductImages(
     return data.images ?? [];
   } catch {
     return [];
+  }
+}
+
+export async function fetchTryOnData(
+  productId: string,
+  shopId: string,
+): Promise<CatalogTryOnResponse | null> {
+  try {
+    const res = await fetch(
+      `${API_URL}/api/v1/catalog/products/${productId}/try-on`,
+      {
+        headers: { 'X-Tenant-Id': shopId },
+        next: { revalidate: 60 },
+        ...withTimeout(),
+      },
+    );
+    if (!res.ok) return null;
+    return res.json() as Promise<CatalogTryOnResponse>;
+  } catch {
+    return null;
   }
 }
 
