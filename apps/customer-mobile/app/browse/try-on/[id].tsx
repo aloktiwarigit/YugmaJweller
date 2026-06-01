@@ -15,7 +15,15 @@ export default function MobileTryOnScreen(): React.ReactElement {
 
   const webBaseUrl = (Constants.expoConfig?.extra?.['webBaseUrl'] as string | undefined) ?? '';
   const tenantSlug = (Constants.expoConfig?.extra?.['tenantSlug'] as string | undefined) ?? '';
-  const uri = `${webBaseUrl}/products/${id}/try-on-wv?shop=${encodeURIComponent(tenantSlug)}`;
+  const uri = `${webBaseUrl}/products/${encodeURIComponent(id ?? '')}/try-on-wv?shop=${encodeURIComponent(tenantSlug)}`;
+
+  // Hard-lock the WebView to the configured customer-web origin. Camera is
+  // auto-granted (mediaCapturePermissionGrantType="grant") to spare a second
+  // OS prompt after the native permission + in-page consent — so navigation
+  // MUST be confined to our trusted origin, or a redirect could hand the
+  // camera to an arbitrary page.
+  const allowNavigation = (reqUrl: string): boolean =>
+    webBaseUrl !== '' && reqUrl.startsWith(webBaseUrl);
 
   useEffect(() => {
     void (async () => {
@@ -89,11 +97,14 @@ export default function MobileTryOnScreen(): React.ReactElement {
           mediaPlaybackRequiresUserAction={false}
           javaScriptEnabled
           domStorageEnabled
-          // iOS: grant camera to the page without a second prompt.
+          // iOS: grant camera to the page without a second prompt — safe only
+          // because navigation is origin-locked below.
           // (Android grants via WebChromeClient.onPermissionRequest once the
           //  app holds CAMERA, handled by react-native-webview.)
           mediaCapturePermissionGrantType="grant"
-          originWhitelist={['*']}
+          // Confine to the trusted customer-web origin; reject anything else.
+          originWhitelist={webBaseUrl ? [`${webBaseUrl}/*`] : []}
+          onShouldStartLoadWithRequest={(req) => allowNavigation(req.url)}
         />
       )}
     </View>
