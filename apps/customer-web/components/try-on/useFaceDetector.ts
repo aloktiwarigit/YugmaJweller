@@ -33,7 +33,6 @@ export function useFaceDetector({ enabled }: UseFaceDetectorOptions): UseFaceDet
         baseOptions: { modelAssetPath: FACE_MODEL_URL, delegate: 'GPU' },
         runningMode: 'VIDEO',
         numFaces: 1,
-        refineLandmarks: true,
         outputFacialTransformationMatrixes: true,
         outputFaceBlendshapes: false,
       });

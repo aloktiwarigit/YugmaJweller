@@ -50,11 +50,11 @@ export function TryOnModal({ tryOnData, onClose }: TryOnModalProps) {
     }
   }, []);
 
-  // If consent was already given this session, request camera on mount
+  // If consent was already given this session, request camera on mount.
+  // Empty deps intentional — runs once on mount only.
   useEffect(() => {
     if (modalState === 'requesting') void requestCamera();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // eslint-disable-line -- mount-only effect
 
   const handleConsent = useCallback(() => {
     sessionStorage.setItem('tryon-consent', '1');
