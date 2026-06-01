@@ -86,3 +86,24 @@ export const UpdateStatusDtoSchema = z.object({
   note: z.string().max(500).optional(),
 });
 export type UpdateStatusDto = z.infer<typeof UpdateStatusDtoSchema>;
+
+// ─── Virtual try-on asset (Plan 3 — shopkeeper anchor/enable admin) ──────────
+export const UpdateTryOnAssetSchema = z.object({
+  /** Normalized anchor within the cutout [0,1]. */
+  anchorX: z.number().min(0).max(1),
+  anchorY: z.number().min(0).max(1),
+  /** Show this overlay to customers. Only takes effect once the cutout is ready. */
+  enabled: z.boolean(),
+});
+export type UpdateTryOnAssetDto = z.infer<typeof UpdateTryOnAssetSchema>;
+
+export interface AdminTryOnAssetResponse {
+  productId: string;
+  bodyPart: 'EAR' | 'NECK' | 'FINGER' | 'WRIST';
+  /** Cutout (transparent PNG) URL, or null while pending/failed. */
+  assetUrl: string | null;
+  anchorX: number;
+  anchorY: number;
+  status: 'pending' | 'ready' | 'failed';
+  enabled: boolean;
+}

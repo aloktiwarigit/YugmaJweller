@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CreateProductSchema } from './product.schema';
+import { CreateProductSchema, UpdateTryOnAssetSchema } from './product.schema';
 
 const BASE = {
   sku: 'RING-1', metal: 'GOLD', purity: '22K',
@@ -29,5 +29,21 @@ describe('CreateProductSchema try-on fields', () => {
   it('omits try-on fields cleanly when not provided', () => {
     const parsed = CreateProductSchema.parse({ ...BASE });
     expect(parsed.tryOnLengthMm).toBeUndefined();
+  });
+});
+
+describe('UpdateTryOnAssetSchema', () => {
+  it('accepts normalized anchors and an enabled flag', () => {
+    const parsed = UpdateTryOnAssetSchema.parse({ anchorX: 0.5, anchorY: 0.0, enabled: true });
+    expect(parsed.anchorX).toBe(0.5);
+    expect(parsed.enabled).toBe(true);
+  });
+
+  it('rejects an anchor outside 0..1', () => {
+    expect(() => UpdateTryOnAssetSchema.parse({ anchorX: 1.4, anchorY: 0, enabled: false })).toThrow();
+  });
+
+  it('requires the enabled flag', () => {
+    expect(() => UpdateTryOnAssetSchema.parse({ anchorX: 0.5, anchorY: 0.5 })).toThrow();
   });
 });
