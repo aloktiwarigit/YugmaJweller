@@ -777,9 +777,19 @@ export default function ProductDetailScreen(): React.ReactElement {
 
         <AssuranceGrid />
 
-        {/* Action CTAs — HUID scan + Try at Home */}
+        {/* Action CTAs — Try-on + HUID scan + Try at Home */}
         {!isUnavailable && (
           <View style={{ gap: spacing.sm }}>
+            <TouchableOpacity
+              onPress={() => router.push(`/browse/try-on/${product.id}` as Parameters<typeof router.push>[0])}
+              style={{ backgroundColor: colors.primary, borderRadius: radii.md, paddingVertical: spacing.md, alignItems: 'center', minHeight: 48 }}
+              accessibilityLabel="आभूषण पहनकर देखें — वर्चुअल ट्राय-ऑन"
+              accessibilityRole="button"
+            >
+              <Text style={{ fontFamily: typography.body.family, fontSize: 16, color: colors.white, fontWeight: '600' }}>
+                ✦ ट्राय करके देखें
+              </Text>
+            </TouchableOpacity>
             {product.huid && (
               <TouchableOpacity
                 onPress={() => setShowScanModal(true)}
