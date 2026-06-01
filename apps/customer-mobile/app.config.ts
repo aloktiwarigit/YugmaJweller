@@ -202,6 +202,9 @@ const config: ExpoConfig = {
   },
   extra: {
     apiBaseUrl:        process.env['EXPO_PUBLIC_API_BASE_URL'] ?? 'http://10.0.2.2:3001',
+    // customer-web origin for the virtual try-on WebView. getUserMedia needs a
+    // secure context: HTTPS in prod, or http://localhost (adb reverse) in dev.
+    webBaseUrl:        process.env['EXPO_PUBLIC_WEB_BASE_URL'] ?? 'http://10.0.2.2:3000',
     tenantSlug:        process.env['EXPO_PUBLIC_SHOP_SLUG'] ?? 'anchor-dev-2',
     devAuth,
     firebaseProjectId: process.env['EXPO_PUBLIC_FIREBASE_PROJECT_ID'] ?? 'goldsmith-dev',
