@@ -1,0 +1,17 @@
+title = "Goldsmith gitleaks config"
+
+# Keep the full default ruleset active across the repo...
+[extend]
+useDefault = true
+
+# ...except for these asset files, which embed large base64-encoded image
+# blobs (storefront/demo imagery). gitleaks' high-entropy `generic-api-key`
+# rule false-positives on those base64 chunks. They contain NO secrets — only
+# inlined image data — so the allowlist is scoped to exactly these paths.
+[allowlist]
+description = "Base64-embedded storefront/demo image data (image bytes, not secrets)"
+paths = [
+  '''apps/customer-mobile/src/assets/storefrontImageData\.ts''',
+  '''apps/customer-mobile/src/assets/demoShopImageData\.ts''',
+  '''apps/customer-mobile/src/assets/demoShopCampaignImageData\.ts''',
+]
