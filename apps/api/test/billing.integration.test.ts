@@ -108,7 +108,7 @@ function buildBillingService(): BillingService {
   const syncLogger = new SyncLogger();
 
   const invRepo = new InventoryRepository(pool as never, syncLogger);
-  const invSvc  = new InventoryService(invRepo, pool as never);
+  const invSvc  = new InventoryService(invRepo, pool as never, { url: (k: string) => `https://ik/${k}` } as never);
 
   const redis     = sharedRedis;
   const lkg       = new LastKnownGoodCache(redis as never);

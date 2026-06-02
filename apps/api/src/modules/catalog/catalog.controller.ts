@@ -94,6 +94,8 @@ export class CatalogController {
     @Query('purity')      purity?: string,
     @Query('priceMin')    priceMinRaw?: string,
     @Query('priceMax')    priceMaxRaw?: string,
+    @Query('weightMinG')  weightMinGRaw?: string,
+    @Query('weightMaxG')  weightMaxGRaw?: string,
     @Query('inStockOnly') inStockOnlyRaw?: string,
     @Query('style')       style?: string,
     @Query('occasion')    occasion?: string,
@@ -108,6 +110,8 @@ export class CatalogController {
 
     let priceMin: number | undefined;
     let priceMax: number | undefined;
+    let weightMinG: number | undefined;
+    let weightMaxG: number | undefined;
 
     if (priceMinRaw !== undefined) {
       priceMin = parseInt(priceMinRaw, 10);
@@ -116,6 +120,14 @@ export class CatalogController {
     if (priceMaxRaw !== undefined) {
       priceMax = parseInt(priceMaxRaw, 10);
       if (isNaN(priceMax)) throw new BadRequestException({ code: 'catalog.invalid_price_max' });
+    }
+    if (weightMinGRaw !== undefined) {
+      weightMinG = parseFloat(weightMinGRaw);
+      if (!Number.isFinite(weightMinG)) throw new BadRequestException({ code: 'catalog.invalid_weight_min' });
+    }
+    if (weightMaxGRaw !== undefined) {
+      weightMaxG = parseFloat(weightMaxGRaw);
+      if (!Number.isFinite(weightMaxG)) throw new BadRequestException({ code: 'catalog.invalid_weight_max' });
     }
 
     const parsedPage  = Math.max(1, parseInt(page, 10) || 1);
@@ -127,6 +139,7 @@ export class CatalogController {
       (!sort || sort === 'newest') &&
       !categoryId && !search && !metal &&
       !purity && !priceMinRaw && !priceMaxRaw &&
+      !weightMinGRaw && !weightMaxGRaw &&
       !inStockOnlyRaw && !style && !occasion && !giftPersona && !collection;
 
     res?.setHeader(
@@ -144,6 +157,8 @@ export class CatalogController {
       purity,
       priceMin,
       priceMax,
+      weightMinG,
+      weightMaxG,
       inStockOnly: inStockOnlyRaw === 'true',
       style,
       occasion,
@@ -258,6 +273,22 @@ export class CatalogController {
     shopId = assertPublicTenantHeader(shopId);
     const images = await this.catalogService.listPublicImages(productId, shopId);
     return { images };
+  }
+
+  // -------------------------------------------------------------------------
+  // GET /catalog/products/:id/try-on — VTO Plan 1 (public, tenant-scoped)
+  // -------------------------------------------------------------------------
+
+  @Get('products/:id/try-on')
+  @SkipAuth()
+  @SkipTenant()
+  @Header('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
+  async getTryOn(
+    @Param('id', new ParseUUIDPipe()) productId: string,
+    @Headers('x-tenant-id') shopId: string,
+  ): Promise<import('@goldsmith/customer-shared').CatalogTryOnResponse> {
+    shopId = assertPublicTenantHeader(shopId);
+    return this.catalogService.getTryOn(productId, shopId);
   }
 
   // -------------------------------------------------------------------------

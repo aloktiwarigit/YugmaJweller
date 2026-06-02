@@ -90,7 +90,7 @@ beforeAll(async () => {
   estSvc = new EstimateService(pool as never);
 
   const invRepo  = new InventoryRepository(pool as never, new SyncLogger());
-  const invSvc   = new InventoryService(invRepo, pool as never);
+  const invSvc   = new InventoryService(invRepo, pool as never, { url: (k: string) => `https://ik/${k}` } as never);
   const lkg      = new LastKnownGoodCache(redis as never);
   const chain    = new FallbackChain(
     new CircuitBreaker(new IbjaAdapter(), redis as never),

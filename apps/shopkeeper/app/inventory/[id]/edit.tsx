@@ -11,6 +11,8 @@ import { HuidInput } from '../../../src/features/inventory/components/HuidInput'
 import { StatusChipGroup } from '../../../src/features/inventory/components/StatusChipGroup';
 import type { ProductStatus } from '../../../src/features/inventory/components/StatusChipGroup';
 import { PublishToggle } from '../../../src/features/inventory/components/PublishToggle';
+import { TryOnDimensionsField, type TryOnFieldValue } from '../../../src/features/inventory/components/TryOnDimensionsField';
+import { mmFieldForBodyPart, type BodyPart } from '../../../src/features/inventory/tryOnPresets';
 import { api } from '../../../src/api/client';
 
 type Metal = 'GOLD' | 'SILVER' | 'PLATINUM';
@@ -32,13 +34,32 @@ export default function EditProductScreen(): React.ReactElement {
     sku: '', metal: undefined, purity: '',
     grossWeightG: '', netWeightG: '', stoneWeightG: '', huid: '',
   });
+  const [tryOn, setTryOn] = useState<TryOnFieldValue>({ bodyPart: undefined, mm: '' });
 
   const { data, isLoading } = useQuery({
     queryKey: ['product', id],
     queryFn: async () => {
       const res = await api.get(`/api/v1/inventory/products/${id}`);
-      return res.data as FormState & { metal: Metal; status: ProductStatus; publishedAt: string | null };
+      return res.data as FormState & {
+        metal: Metal; status: ProductStatus; publishedAt: string | null;
+        tryOnLengthMm: string | null; tryOnDiameterMm: string | null;
+      };
     },
+  });
+
+  // Body part lives on the try-on asset (not the product). 404 = no try-on set.
+  const { data: tryOnAsset } = useQuery({
+    queryKey: ['product-try-on-asset', id],
+    queryFn: async () => {
+      try {
+        const res = await api.get(`/api/v1/inventory/products/${id}/try-on-asset`);
+        return res.data as { bodyPart: BodyPart };
+      } catch {
+        return null;
+      }
+    },
+    enabled: id != null,
+    retry: false,
   });
 
   useEffect(() => {
@@ -54,6 +75,15 @@ export default function EditProductScreen(): React.ReactElement {
       });
     }
   }, [data]);
+
+  useEffect(() => {
+    const bp = tryOnAsset?.bodyPart;
+    if (!bp) return;
+    const mm = mmFieldForBodyPart(bp) === 'tryOnDiameterMm'
+      ? data?.tryOnDiameterMm
+      : data?.tryOnLengthMm;
+    setTryOn({ bodyPart: bp, mm: mm ?? '' });
+  }, [tryOnAsset, data]);
 
   const statusMutation = useMutation({
     mutationFn: async (newStatus: ProductStatus) => {
@@ -79,6 +109,10 @@ export default function EditProductScreen(): React.ReactElement {
       const cleaned: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(patch)) {
         if (v !== '' && v !== undefined) cleaned[k] = v;
+      }
+      if (tryOn.bodyPart) {
+        cleaned.tryOnBodyPart = tryOn.bodyPart;
+        if (tryOn.mm.trim()) cleaned[mmFieldForBodyPart(tryOn.bodyPart)] = tryOn.mm.trim();
       }
       const res = await api.patch(`/api/v1/inventory/products/${id}`, cleaned);
       return res.data;
@@ -123,6 +157,8 @@ export default function EditProductScreen(): React.ReactElement {
         value={form.huid}
         onChangeText={(v) => setForm((p) => ({ ...p, huid: v }))}
       />
+
+      <TryOnDimensionsField value={tryOn} onChange={setTryOn} />
 
       {data?.status != null && (
         <>
@@ -170,6 +206,15 @@ export default function EditProductScreen(): React.ReactElement {
         accessibilityRole="link"
         accessibilityLabel="ग्राहक रुचि">
         <Text style={styles.linkText}>ग्राहक रुचि (व्यू एनालिटिक्स) →</Text>
+      </Pressable>
+
+      <Pressable
+        style={styles.linkRow}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onPress={() => router.push(`/inventory/${id}/try-on` as any)}
+        accessibilityRole="link"
+        accessibilityLabel={t('inventory.tryon_anchor_link')}>
+        <Text style={styles.linkText}>{t('inventory.tryon_anchor_link')} →</Text>
       </Pressable>
 
       <Pressable

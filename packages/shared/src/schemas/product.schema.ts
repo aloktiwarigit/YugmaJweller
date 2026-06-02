@@ -23,6 +23,11 @@ const ProductBaseSchema = z.object({
   huid:                     HUID.optional(),
   huidExemptionCategory:    HUID_EXEMPTION_CATEGORY.optional().default('none'),
   status:                   STATUS.optional().default('IN_STOCK'),
+  // Virtual try-on fields — migration 0077
+  tryOnLengthMm:            z.string().regex(/^\d+(\.\d{1,2})?$/, 'MM_FORMAT_INVALID').optional(),
+  tryOnWidthMm:             z.string().regex(/^\d+(\.\d{1,2})?$/, 'MM_FORMAT_INVALID').optional(),
+  tryOnDiameterMm:          z.string().regex(/^\d+(\.\d{1,2})?$/, 'MM_FORMAT_INVALID').optional(),
+  tryOnBodyPart:            z.enum(['EAR', 'NECK', 'FINGER', 'WRIST']).optional(),
 });
 
 export const CreateProductSchema = ProductBaseSchema.superRefine((data, ctx) => {
@@ -72,6 +77,9 @@ export const ProductResponseSchema = z.object({
   createdByUserId:          z.string().uuid(),
   createdAt:                z.string(),
   updatedAt:                z.string(),
+  tryOnLengthMm:            z.string().nullable(),
+  tryOnWidthMm:             z.string().nullable(),
+  tryOnDiameterMm:          z.string().nullable(),
 });
 
 export type ProductResponse = z.infer<typeof ProductResponseSchema>;
@@ -81,3 +89,24 @@ export const UpdateStatusDtoSchema = z.object({
   note: z.string().max(500).optional(),
 });
 export type UpdateStatusDto = z.infer<typeof UpdateStatusDtoSchema>;
+
+// ─── Virtual try-on asset (Plan 3 — shopkeeper anchor/enable admin) ──────────
+export const UpdateTryOnAssetSchema = z.object({
+  /** Normalized anchor within the cutout [0,1]. */
+  anchorX: z.number().min(0).max(1),
+  anchorY: z.number().min(0).max(1),
+  /** Show this overlay to customers. Only takes effect once the cutout is ready. */
+  enabled: z.boolean(),
+});
+export type UpdateTryOnAssetDto = z.infer<typeof UpdateTryOnAssetSchema>;
+
+export interface AdminTryOnAssetResponse {
+  productId: string;
+  bodyPart: 'EAR' | 'NECK' | 'FINGER' | 'WRIST';
+  /** Cutout (transparent PNG) URL, or null while pending/failed. */
+  assetUrl: string | null;
+  anchorX: number;
+  anchorY: number;
+  status: 'pending' | 'ready' | 'failed';
+  enabled: boolean;
+}

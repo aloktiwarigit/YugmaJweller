@@ -1,0 +1,20 @@
+rules:
+  - id: goldsmith.no-try-on-direct-network
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: |
+      Direct network calls (fetch, XMLHttpRequest, WebSocket) are not allowed in
+      try-on components. All API calls must go through lib/api.ts. This enforces
+      the DPDPA invariant that no camera frame or landmark data leaves the device.
+    pattern-either:
+      - pattern: fetch(...)
+      - pattern: new XMLHttpRequest()
+      - pattern: new WebSocket(...)
+    paths:
+      include:
+        - "apps/customer-web/components/try-on/**"
+      exclude:
+        - "**/*.spec.ts"
+        - "**/*.spec.tsx"
+        - "**/*.test.ts"
+        - "**/*.test.tsx"

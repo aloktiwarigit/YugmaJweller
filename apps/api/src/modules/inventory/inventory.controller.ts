@@ -14,8 +14,8 @@ import {
 } from '@nestjs/common';
 import { TenantContextDec } from '@goldsmith/tenant-context';
 import type { TenantContext, AuthenticatedTenantContext } from '@goldsmith/tenant-context';
-import { CreateProductSchema, UpdateProductSchema, UpdateStatusDtoSchema, GenerateBarcodesRequestSchema } from '@goldsmith/shared';
-import type { CreateProductDto, UpdateProductDto, UpdateStatusDto, ProductResponse, BulkImportJobStatus, BarcodeData } from '@goldsmith/shared';
+import { CreateProductSchema, UpdateProductSchema, UpdateStatusDtoSchema, GenerateBarcodesRequestSchema, UpdateTryOnAssetSchema } from '@goldsmith/shared';
+import type { CreateProductDto, UpdateProductDto, UpdateStatusDto, ProductResponse, BulkImportJobStatus, BarcodeData, UpdateTryOnAssetDto, AdminTryOnAssetResponse } from '@goldsmith/shared';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { InventoryService } from './inventory.service';
@@ -171,6 +171,27 @@ export class InventoryController {
   ): Promise<ProductResponse> {
     if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
     return this.svc.updateStatus(id, dto);
+  }
+
+  @Get('/products/:id/try-on-asset')
+  @Roles('shop_admin', 'shop_manager')
+  async getTryOnAsset(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<AdminTryOnAssetResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.svc.getTryOnAsset(id);
+  }
+
+  @Patch('/products/:id/try-on-asset')
+  @Roles('shop_admin', 'shop_manager')
+  async updateTryOnAsset(
+    @TenantContextDec() ctx: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(UpdateTryOnAssetSchema)) dto: UpdateTryOnAssetDto,
+  ): Promise<AdminTryOnAssetResponse> {
+    if (!ctx.authenticated) throw new UnauthorizedException({ code: 'auth.not_authenticated' });
+    return this.svc.updateTryOnAsset(id, dto);
   }
 
   @Post('/products/:id/publish')

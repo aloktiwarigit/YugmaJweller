@@ -299,6 +299,8 @@ Each worktree gets its own implementer + reviewer cycle. Merge order respects mi
 
 **Anti-pattern:** running two implementers in the SAME working directory. Always different worktrees. The single-working-directory anti-pattern bit us in stories 5.7/5.9 and 6.9/8.1 (memory).
 
+**Worktree cleanup — mandatory after each story merges:** Run `git worktree remove C:/gs<N>` immediately after the story's branch merges to main. Orphaned worktree directories accumulate at 1–14 GB each and are not cleaned up automatically. Do NOT leave `C:\` littered with old `gs*` folders — they waste disk and cause confusion about what is active work vs. dead history.
+
 **When NOT to parallelize:**
 - Stories that touch `apps/api/src/modules/billing/billing.service.ts` (it's a serialization choke point per memory `project_epic_completion_plan.md`)
 - Stories that share a migration sequence number (one must land first; the other rebases)

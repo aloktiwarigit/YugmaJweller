@@ -37,6 +37,9 @@ describe('Browse route params', () => {
       search:      'necklace',
       inStockOnly: 'true',
       sort:        'priceDesc',
+      collection:  'bridal-edit',
+      weightMinG:  '2',
+      weightMaxG:  '5',
       page:        '2',
     });
 
@@ -48,6 +51,9 @@ describe('Browse route params', () => {
         search:      'necklace',
         inStockOnly: true,
         sort:        'priceDesc',
+        collection:  'bridal-edit',
+        weightMinG:  2,
+        weightMaxG:  5,
         page:        2,
         limit:       12,
       }));

@@ -67,6 +67,46 @@ describe('CatalogService.getTenantConfig()', () => {
     expect(result.logoUrl).toBe('https://cdn.example.com/logo.png');
   });
 
+  it('returns public shop profile fields when configured', async () => {
+    const pool = makePool([
+      {
+        rows: [{
+          id: 'shop-1',
+          slug: 'legacy-shop',
+          display_name: 'Legacy Jewellers',
+          logo_url: null,
+          config: {
+            contactWhatsApp: '+919876543210',
+            instagramUrl: 'https://instagram.example/legacy',
+          },
+          address_json: {
+            street: '9 Chowk Road',
+            city: 'Ayodhya',
+            state: 'Uttar Pradesh',
+            pin_code: '224001',
+          },
+          contact_phone: '+919999000001',
+          about_text: 'Trusted family jewellers for wedding and daily gold.',
+          bis_registration: 'BIS-123',
+          years_in_business: 90,
+        }],
+      },
+    ]);
+    const svc = new CatalogService(pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never);
+
+    const result = await svc.getTenantConfig('legacy-shop');
+
+    expect(result.address).toBe('9 Chowk Road, Ayodhya, Uttar Pradesh, 224001');
+    expect(result.shopAddress).toBe(result.address);
+    expect(result.contactPhone).toBe('+919999000001');
+    expect(result.contact_phone).toBe('+919999000001');
+    expect(result.contactWhatsApp).toBe('+919876543210');
+    expect(result.aboutText).toBe('Trusted family jewellers for wedding and daily gold.');
+    expect(result.bisRegistration).toBe('BIS-123');
+    expect(result.yearsInBusiness).toBe(90);
+    expect(result.instagramUrl).toBe('https://instagram.example/legacy');
+  });
+
   it('throws NotFoundException when shop slug not found', async () => {
     const pool = makePool([{ rows: [] }]);
     const svc = new CatalogService(pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never);
@@ -474,6 +514,17 @@ describe('CatalogService.getProducts() — B1 filter SQL (WS-A)', () => {
     const params = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][1] as unknown[];
     expect(sql).toContain('p.price_snapshot_paise <');
     expect(params).toContain(5_000_000);
+  });
+
+  it('appends net weight range filters when weightMinG and weightMaxG are provided', async () => {
+    const pool = makeFilterPool();
+    await makeSvc(pool).getProducts({ shopId: 'shop-1', weightMinG: 2, weightMaxG: 5, page: 1, limit: 12 });
+    const sql    = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][0] as string;
+    const params = (pool.query as ReturnType<typeof vi.fn>).mock.calls[1][1] as unknown[];
+    expect(sql).toContain('p.net_weight_g::numeric >=');
+    expect(sql).toContain('p.net_weight_g::numeric <');
+    expect(params).toContain(2);
+    expect(params).toContain(5);
   });
 
   it('appends collection EXISTS when collection is a UUID', async () => {
@@ -1113,5 +1164,45 @@ describe('CatalogService.getProducts() — purity normalization (raw stored valu
     expect(purities).toBeDefined();
     expect(purities).toContain('GOLD_22K');
     expect(purities).toContain('22K');
+  });
+});
+
+describe('CatalogService.getTryOn', () => {
+  it('returns the cutout URL + dimensions for an enabled, ready asset', async () => {
+    const row = {
+      product_id: 'p1', body_part: 'EAR', asset_storage_key: 'shop/p1.cutout.png',
+      anchor_x: '0.5000', anchor_y: '0.0000',
+      try_on_length_mm: '24.50', try_on_width_mm: null, try_on_diameter_mm: null,
+      metal: 'GOLD', purity: '22K', net_weight_g: '4.5000',
+    };
+    const pool = makePool([{ rows: [row] }]);
+    const svc = new CatalogService(pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never);
+    const r = await svc.getTryOn('p1', 'shop1');
+    expect(r.bodyPart).toBe('EAR');
+    expect(r.assetUrl).toContain('p1.cutout.png');
+    expect(r.trueToSize).toBe(true);
+    expect(r.lengthMm).toBe(24.5);
+    expect(r.anchorX).toBe(0.5);
+    expect(r.anchorY).toBe(0);
+  });
+
+  it('throws NotFoundException when the product has no enabled+ready try-on asset', async () => {
+    const pool = makePool([{ rows: [] }]);
+    const svc = new CatalogService(pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never);
+    await expect(svc.getTryOn('p1', 'shop1')).rejects.toThrow(NotFoundException);
+  });
+
+  it('returns trueToSize=false when no mm dimensions are set', async () => {
+    const row = {
+      product_id: 'p2', body_part: 'FINGER', asset_storage_key: null,
+      anchor_x: '0.5000', anchor_y: '0.5000',
+      try_on_length_mm: null, try_on_width_mm: null, try_on_diameter_mm: null,
+      metal: 'GOLD', purity: '22K', net_weight_g: '3.0000',
+    };
+    const pool = makePool([{ rows: [row] }]);
+    const svc = new CatalogService(pool as never, mockPricingService as never, mockSettingsRepo as never, stubUrlBuilder as never);
+    const r = await svc.getTryOn('p2', 'shop1');
+    expect(r.trueToSize).toBe(false);
+    expect(r.assetUrl).toBeNull();
   });
 });

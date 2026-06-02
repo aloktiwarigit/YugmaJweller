@@ -42,7 +42,7 @@ const repoMock = {
 const poolMock = { connect: vi.fn() } as unknown as import('pg').Pool;
 
 function makeService(): InventoryService {
-  return new InventoryService(repoMock as never, poolMock);
+  return new InventoryService(repoMock as never, poolMock, { url: (k: string) => `https://ik/${k}` } as never);
 }
 
 beforeEach(() => {

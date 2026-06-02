@@ -33,12 +33,12 @@ interface SessionResponse {
   authProvider: 'phone' | 'google' | 'email_password';
 }
 
-async function callSessionEndpoint(idToken: string, shopId: string): Promise<SessionResponse> {
+async function callSessionEndpoint(idToken: string, tenantScope: string): Promise<SessionResponse> {
   const resp = await axios.post<SessionResponse>(
     `${baseURL}/api/v1/customer/auth/session`,
     {},
     {
-      headers: { Authorization: `Bearer ${idToken}`, 'x-tenant-id': shopId },
+      headers: { Authorization: `Bearer ${idToken}`, 'x-tenant-id': tenantScope },
       timeout: 15_000,
     },
   );

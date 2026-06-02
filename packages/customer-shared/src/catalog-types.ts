@@ -25,6 +25,14 @@ export interface TenantConfigResponse {
   contact_phone?:             string | null;
   contactWhatsApp?:           string | null;
   contact_whatsapp?:          string | null;
+  aboutText?:                 string | null;
+  about_text?:                string | null;
+  bisRegistration?:           string | null;
+  bis_registration?:          string | null;
+  yearsInBusiness?:           number | null;
+  years_in_business?:         number | null;
+  operatingHours?:            string | null;
+  operating_hours?:           string | null;
   whatsappNumber?:            string | null;
   whatsapp_number?:           string | null;
   appDownloadUrl?:            string | null;
@@ -58,6 +66,9 @@ export interface EstimatedPrice {
 export interface CatalogProduct {
   id:                    string;
   sku:                   string;
+  displayName?:          string | null;
+  subtitle?:             string | null;
+  badges?:               string[];
   metal:                 string;
   purity:                string;
   categoryId:            string | null;
@@ -157,6 +168,9 @@ export interface CatalogImage {
 export interface CatalogProductCard {
   id:                    string;
   sku:                   string;
+  displayName?:          string | null;
+  subtitle?:             string | null;
+  badges?:               string[];
   metal:                 'GOLD' | 'SILVER' | 'PLATINUM' | string;
   purity:                string;
   categoryId:            string | null;
@@ -195,4 +209,25 @@ export interface Collection {
   heroImage:    CatalogImage | null;
   productCount: number;
   isPremium:    boolean;
+}
+
+// ─── Virtual try-on (Plan 1) ────────────────────────────────────────────────
+export interface CatalogTryOnResponse {
+  productId: string;
+  bodyPart: 'EAR' | 'NECK' | 'FINGER' | 'WRIST';
+  /** Transparent-PNG cutout URL (ImageKit). Null when not yet processed. */
+  assetUrl: string | null;
+  /** Normalized anchor within the cutout [0,1]. */
+  anchorX: number;
+  anchorY: number;
+  /** Real-world dimensions in mm (any may be null → engine uses weight fallback). */
+  lengthMm: number | null;
+  widthMm: number | null;
+  diameterMm: number | null;
+  /** Engine inputs for the weight fallback. */
+  metal: string;
+  purity: string;
+  netWeightG: string;
+  /** True only when at least one real mm dimension is present. */
+  trueToSize: boolean;
 }

@@ -22,11 +22,11 @@ export function HeroSection(): React.ReactElement {
       <Text style={styles.eyebrow}>{shopName}</Text>
 
       {/* Display headline */}
-      <Text style={styles.headline}>शादी से रोज़ाना तक{'\n'}नए डिज़ाइन</Text>
+      <Text style={styles.headline}>शादी, उपहार और{'\n'}रोज़ाना के डिज़ाइन</Text>
 
       {/* Subline */}
       <Text style={styles.subline}>
-        BIS हॉलमार्क · पारदर्शी भाव · घर पर ट्राय
+        BIS हॉलमार्क · लाइव भाव · स्टोर और घर पर ट्राय
       </Text>
 
       {/* CTA row */}
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
     marginTop:        spacing.md,
     borderRadius:     radii.lg,
     padding:          spacing.lg,
-    minHeight:        300,
+    minHeight:        264,
     justifyContent:   'flex-end',
     overflow:         'hidden',
     backgroundColor:  colors.ink,

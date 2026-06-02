@@ -24,7 +24,7 @@ import { captureEvent } from '../../src/lib/posthog';
 import { ProductGallery } from '../../src/components/products/ProductGallery';
 import { ReviewSubmitForm } from '../../src/components/ReviewSubmitForm';
 import { useProductImages } from '../../src/hooks/useProductImages';
-import { purityLabel } from '@goldsmith/customer-shared';
+import { productDisplayName, productMerchBadges, productSubtitle } from '@goldsmith/customer-shared';
 import { imageForCategoryName } from '../../src/assets/storefrontImages';
 import {
   optimisticallySetWishlist,
@@ -93,11 +93,162 @@ function StarRow({ rating }: { rating: number }): React.ReactElement {
   );
 }
 
+const ASSURANCE_ITEMS = [
+  { title: 'BIS / HUID', desc: 'हॉलमार्क और QR सत्यापन' },
+  { title: 'पूरा मूल्य', desc: 'धातु, बनाई और GST अलग' },
+  { title: 'स्टोर पुष्टि', desc: 'दुकान से उपलब्धता चेक' },
+  { title: 'सहायता', desc: 'WhatsApp और कॉल सपोर्ट' },
+] as const;
+
+function AssuranceGrid(): React.ReactElement {
+  return (
+    <View style={{ gap: spacing.sm }}>
+      <Text style={{ fontFamily: typography.serif.family, fontSize: 16, color: colors.ink }}>
+        भरोसा और सेवा
+      </Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+        {ASSURANCE_ITEMS.map((item) => (
+          <View
+            key={item.title}
+            style={{
+              width: '47%',
+              backgroundColor: colors.white,
+              borderRadius: radii.md,
+              borderWidth: 1,
+              borderColor: colors.borderSubtle,
+              padding: spacing.sm,
+              minHeight: 78,
+            }}
+          >
+            <Text style={{ fontFamily: typography.headingMid.family, fontSize: 13, color: colors.ink }}>
+              {item.title}
+            </Text>
+            <Text style={{ fontFamily: typography.body.family, fontSize: 11, color: colors.inkMute, marginTop: 4, lineHeight: 16 }}>
+              {item.desc}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function AvailabilityCheck({ isUnavailable }: { isUnavailable: boolean }): React.ReactElement {
+  const [pincode, setPincode] = useState('');
+  const hasPincode = pincode.length === 6;
+
+  return (
+    <View
+      style={{
+        backgroundColor: colors.surfaceElevated,
+        borderRadius: radii.md,
+        borderWidth: 1,
+        borderColor: colors.borderSubtle,
+        padding: spacing.md,
+        gap: spacing.sm,
+      }}
+    >
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontFamily: typography.headingMid.family, fontSize: 15, color: colors.ink }}>
+            स्टोर और घर पर उपलब्धता
+          </Text>
+          <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.inkMute, marginTop: 2 }}>
+            PIN डालकर दुकान से स्लॉट और डिज़ाइन पुष्टि करें।
+          </Text>
+        </View>
+        <View style={{
+          borderRadius: radii.pill,
+          backgroundColor: isUnavailable ? '#FEF2F2' : SUCCESS_WASH,
+          paddingHorizontal: spacing.sm,
+          height: 28,
+          justifyContent: 'center',
+        }}>
+          <Text style={{ fontFamily: typography.body.family, fontSize: 11, color: isUnavailable ? '#DC2626' : SUCCESS_JADE }}>
+            {isUnavailable ? 'स्टॉक नहीं' : 'रिक्वेस्ट करें'}
+          </Text>
+        </View>
+      </View>
+
+      <View style={{ flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.white, overflow: 'hidden', minHeight: 46 }}>
+        <TextInput
+          value={pincode}
+          onChangeText={(value) => setPincode(value.replace(/\D/g, '').slice(0, 6))}
+          placeholder="PIN code"
+          placeholderTextColor={colors.inkMute}
+          keyboardType="number-pad"
+          maxLength={6}
+          style={{ flex: 1, paddingHorizontal: spacing.sm, fontFamily: typography.body.family, color: colors.ink, fontSize: 14 }}
+          accessibilityLabel="PIN code availability"
+        />
+        <View style={{ justifyContent: 'center', paddingHorizontal: spacing.sm }}>
+          <Text style={{ fontFamily: typography.headingMid.family, fontSize: 12, color: hasPincode ? SUCCESS_JADE : colors.inkMute }}>
+            {hasPincode ? 'चेक होगा' : 'वैकल्पिक'}
+          </Text>
+        </View>
+      </View>
+
+      <View style={{ gap: 6 }}>
+        {[
+          { label: 'घर पर ट्राय', value: isUnavailable ? 'वैकल्पिक डिज़ाइन पूछें' : 'स्लॉट अनुरोध करें' },
+          { label: 'स्टोर में देखें', value: hasPincode ? `PIN ${pincode} के लिए पुष्टि` : 'PIN डालें या दुकान से पूछें' },
+          { label: 'रेट लॉक', value: 'आज का भाव अलग से लॉक करें' },
+        ].map((row) => (
+          <View key={row.label} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm }}>
+            <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.inkMute }}>{row.label}</Text>
+            <Text style={{ flex: 1, textAlign: 'right', fontFamily: typography.body.family, fontSize: 12, color: colors.ink }}>{row.value}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function ReviewSummary({
+  averageRating,
+  total,
+  breakdown,
+}: {
+  averageRating: number;
+  total: number;
+  breakdown: { 1: number; 2: number; 3: number; 4: number; 5: number };
+}): React.ReactElement {
+  return (
+    <View style={{ backgroundColor: colors.white, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, gap: spacing.sm }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <View>
+          <Text style={{ fontFamily: typography.headingMid.family, fontSize: 18, color: colors.ink }}>
+            {averageRating.toFixed(1)} / 5
+          </Text>
+          <StarRow rating={averageRating} />
+        </View>
+        <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.inkMute }}>
+          {total} सत्यापित समीक्षाएं
+        </Text>
+      </View>
+      {[5, 4, 3, 2, 1].map((star) => {
+        const count = breakdown[star as 1 | 2 | 3 | 4 | 5] ?? 0;
+        const pct = total > 0 ? Math.max(4, Math.round((count / total) * 100)) : 4;
+        return (
+          <View key={star} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Text style={{ width: 24, fontFamily: typography.body.family, fontSize: 11, color: colors.inkMute }}>{star}★</Text>
+            <View style={{ flex: 1, height: 6, borderRadius: radii.pill, backgroundColor: colors.surfaceRecessed, overflow: 'hidden' }}>
+              <View style={{ width: `${pct}%`, height: 6, backgroundColor: WARNING_SAFFRON }} />
+            </View>
+            <Text style={{ width: 26, textAlign: 'right', fontFamily: typography.body.family, fontSize: 11, color: colors.inkMute }}>{count}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // CompactProductCard — for "complete the look" row
 // ---------------------------------------------------------------------------
 
 function CompactProductCard({ product }: { product: CatalogProduct }): React.ReactElement {
+  const displayName = productDisplayName(product);
   return (
     <TouchableOpacity
       onPress={() => router.push(`/browse/${product.id}`)}
@@ -110,7 +261,7 @@ function CompactProductCard({ product }: { product: CatalogProduct }): React.Rea
         overflow: 'hidden',
         marginRight: spacing.sm,
       }}
-      accessibilityLabel={`${purityLabel(product.purity, product.metal)} — ${product.sku}`}
+      accessibilityLabel={`${displayName} — ${product.sku}`}
       accessibilityRole="button"
     >
       <Image
@@ -121,14 +272,14 @@ function CompactProductCard({ product }: { product: CatalogProduct }): React.Rea
         }
         style={{ width: 120, height: 150 }}
         contentFit="cover"
-        accessibilityLabel={`${purityLabel(product.purity, product.metal)} — अनुशंसित आभूषण`}
+        accessibilityLabel={`${displayName} — अनुशंसित आभूषण`}
       />
       <View style={{ padding: spacing.xs }}>
         <Text
           style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.ink, fontWeight: '600' }}
           numberOfLines={1}
         >
-          {purityLabel(product.purity, product.metal)}
+          {displayName}
         </Text>
         {product.priceAvailable && product.estimatedPrice && (
           <Text
@@ -381,6 +532,11 @@ export default function ProductDetailScreen(): React.ReactElement {
   const recommendations = recommendationsData?.items ?? [];
   const reviews         = reviewsData?.items ?? [];
   const visibleReviews  = reviewsExpanded ? reviews : reviews.slice(0, 6);
+  const reviewTotal     = reviewsData?.total ?? reviews.length;
+  const ratingBreakdown = reviewsData?.ratingBreakdown ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  const averageRating = reviewTotal > 0
+    ? ([1, 2, 3, 4, 5] as const).reduce((sum, star) => sum + star * ratingBreakdown[star], 0) / reviewTotal
+    : null;
 
   const openTryAtHome = (): void => {
     if (!id) return;
@@ -416,7 +572,9 @@ export default function ProductDetailScreen(): React.ReactElement {
   }
 
   const isUnavailable  = product.quantity === 0;
-  const displayPurity  = purityLabel(product.purity, product.metal);
+  const displayName    = productDisplayName(product);
+  const subtitle       = product.subtitle ?? productSubtitle(product);
+  const merchBadges    = product.badges ?? productMerchBadges(product);
   const displayCategory = localizedCategoryName(product.categoryName);
   const priceFormatted = product.priceAvailable && product.estimatedPrice
     ? product.estimatedPrice.totalFormatted
@@ -425,8 +583,8 @@ export default function ProductDetailScreen(): React.ReactElement {
   const handleShare = async (): Promise<void> => {
     try {
       await Share.share({
-        message: `${displayPurity} — SKU ${product.sku}${priceFormatted ? `\nअनुमानित मूल्य: ${priceFormatted}` : ''}`,
-        title: displayPurity,
+        message: `${displayName} — SKU ${product.sku}${priceFormatted ? `\nअनुमानित मूल्य: ${priceFormatted}` : ''}`,
+        title: displayName,
       });
     } catch {
       // user dismissed
@@ -457,7 +615,7 @@ export default function ProductDetailScreen(): React.ReactElement {
 
         {/* Product gallery */}
         <View style={{ marginHorizontal: -spacing.md, overflow: 'hidden' }}>
-          <ProductGallery images={productImages} productName={product.purity} />
+          <ProductGallery images={productImages} productName={displayName} />
           {isUnavailable && (
             <View
               style={{
@@ -478,13 +636,23 @@ export default function ProductDetailScreen(): React.ReactElement {
         {/* Title + badges */}
         <View style={{ gap: spacing.xs }}>
           <Text style={{ fontFamily: typography.serif.family, fontSize: 24, color: colors.ink }}>
-            {displayPurity}
+            {displayName}
           </Text>
           <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: colors.inkMute }}>
-            SKU: {product.sku}{displayCategory ? ` · ${displayCategory}` : ''}
+            {subtitle} · SKU: {product.sku}{displayCategory ? ` · ${displayCategory}` : ''}
           </Text>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs }}>
+            {merchBadges.filter((badge) => badge !== 'HUID').map((badge) => (
+              <View
+                key={badge}
+                style={{ backgroundColor: badge === 'HUID' ? SUCCESS_WASH : SURFACE_RECESSED, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 }}
+              >
+                <Text style={{ fontFamily: typography.body.family, fontSize: 12, color: badge === 'HUID' ? SUCCESS_JADE : colors.ink }}>
+                  {badge}
+                </Text>
+              </View>
+            ))}
             {product.huid && (
               <View style={{ backgroundColor: SUCCESS_WASH, borderColor: SUCCESS_JADE, borderWidth: 1, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 }}>
                 <Text
@@ -554,6 +722,8 @@ export default function ProductDetailScreen(): React.ReactElement {
           </View>
         )}
 
+        <AvailabilityCheck isUnavailable={isUnavailable} />
+
         {/* Weight */}
         <View style={{ backgroundColor: colors.white, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, flexDirection: 'row', gap: spacing.md }}>
           <View style={{ flex: 1 }}>
@@ -605,9 +775,21 @@ export default function ProductDetailScreen(): React.ReactElement {
           </View>
         )}
 
-        {/* Action CTAs — HUID scan + Try at Home */}
+        <AssuranceGrid />
+
+        {/* Action CTAs — Try-on + HUID scan + Try at Home */}
         {!isUnavailable && (
           <View style={{ gap: spacing.sm }}>
+            <TouchableOpacity
+              onPress={() => router.push(`/browse/try-on/${product.id}` as Parameters<typeof router.push>[0])}
+              style={{ backgroundColor: colors.primary, borderRadius: radii.md, paddingVertical: spacing.md, alignItems: 'center', minHeight: 48 }}
+              accessibilityLabel="आभूषण पहनकर देखें — वर्चुअल ट्राय-ऑन"
+              accessibilityRole="button"
+            >
+              <Text style={{ fontFamily: typography.body.family, fontSize: 16, color: colors.white, fontWeight: '600' }}>
+                ✦ ट्राय करके देखें
+              </Text>
+            </TouchableOpacity>
             {product.huid && (
               <TouchableOpacity
                 onPress={() => setShowScanModal(true)}
@@ -616,18 +798,28 @@ export default function ProductDetailScreen(): React.ReactElement {
                 accessibilityRole="button"
               >
                 <Text style={{ fontFamily: typography.body.family, fontSize: 16, color: colors.white, fontWeight: '600' }}>
-                  📷 HUID QR स्कैन करें
+                  HUID QR स्कैन करें
                 </Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
               onPress={openTryAtHome}
               style={{ backgroundColor: colors.white, borderRadius: radii.md, borderWidth: 1, borderColor: colors.primary, paddingVertical: spacing.md, alignItems: 'center', minHeight: 48 }}
-              accessibilityLabel="घर पर कोशिश करने की जानकारी"
+              accessibilityLabel="घर पर ट्राय बुक करें"
               accessibilityRole="button"
             >
               <Text style={{ fontFamily: typography.body.family, fontSize: 15, color: colors.primary }}>
-                🏠 कोशिश घर पर करें
+                घर पर ट्राय बुक करें
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push('/browse/support' as Parameters<typeof router.push>[0])}
+              style={{ backgroundColor: colors.surfaceElevated, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, paddingVertical: spacing.md, alignItems: 'center', minHeight: 48 }}
+              accessibilityLabel="स्टोर में उपलब्धता पूछें"
+              accessibilityRole="button"
+            >
+              <Text style={{ fontFamily: typography.body.family, fontSize: 15, color: colors.ink }}>
+                स्टोर में उपलब्धता पूछें
               </Text>
             </TouchableOpacity>
           </View>
@@ -707,6 +899,13 @@ export default function ProductDetailScreen(): React.ReactElement {
                 </Text>
               )}
             </View>
+            {averageRating !== null && (
+              <ReviewSummary
+                averageRating={averageRating}
+                total={reviewTotal}
+                breakdown={ratingBreakdown}
+              />
+            )}
             {visibleReviews.map((rev) => (
               <View
                 key={rev.id}
@@ -765,6 +964,19 @@ export default function ProductDetailScreen(): React.ReactElement {
       </ScrollView>
 
       {/* ── Sticky bottom bar ─────────────────────────────────────────────── */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: insets.top,
+          backgroundColor: colors.bg,
+          zIndex: 2,
+        }}
+      />
+
       <SafeAreaView
         style={{
           position: 'absolute',
@@ -840,7 +1052,27 @@ export default function ProductDetailScreen(): React.ReactElement {
               accessibilityRole="button"
             >
               <Text style={{ fontFamily: typography.body.family, fontSize: 16, fontWeight: '600', color: '#FFFFFF' }}>
-                जोड़ें
+                घर पर ट्राय
+              </Text>
+            </TouchableOpacity>
+          )}
+          {isUnavailable && (
+            <TouchableOpacity
+              onPress={() => router.push(`/(tabs)/browse?search=${encodeURIComponent(product.categoryName ?? product.metal)}` as Parameters<typeof router.push>[0])}
+              style={{
+                backgroundColor: colors.primaryWash,
+                borderRadius: radii.md,
+                paddingHorizontal: spacing.md,
+                height: 48,
+                justifyContent: 'center',
+                alignItems: 'center',
+                minWidth: 112,
+              }}
+              accessibilityLabel="मिलते-जुलते डिज़ाइन देखें"
+              accessibilityRole="button"
+            >
+              <Text style={{ fontFamily: typography.body.family, fontSize: 14, fontWeight: '600', color: colors.ink }}>
+                मिलते-जुलते
               </Text>
             </TouchableOpacity>
           )}

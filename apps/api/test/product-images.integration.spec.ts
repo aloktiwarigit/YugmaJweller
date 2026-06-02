@@ -138,6 +138,7 @@ beforeAll(async () => {
     new StubMalwareScanAdapter(),
     pool as never,
     urlBuilder,
+    { add: async () => undefined } as never,
   );
 
   // CatalogService with mocked pool for public catalog DTO tests.

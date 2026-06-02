@@ -11,14 +11,17 @@
     "test": "vitest run",
     "test:lighthouse-ci": "node scripts/run-lhci.mjs",
     "test:axe": "node scripts/run-lhci.mjs -- --config=lighthouserc.cjs --collect.settings.onlyCategories=accessibility",
+    "setup:mediapipe": "node scripts/copy-mediapipe-wasm.mjs && node scripts/download-mediapipe-models.mjs",
     "deploy": "firebase deploy --only apphosting:goldsmith-customer-web --project goldsmith-dev",
     "deploy:dry-run": "firebase deploy --only apphosting:goldsmith-customer-web --project goldsmith-dev --dry-run"
   },
   "dependencies": {
     "@goldsmith/auth-client": "workspace:*",
     "@goldsmith/customer-shared": "workspace:*",
+    "@goldsmith/try-on-core": "workspace:*",
     "@goldsmith/ui-tokens": "workspace:*",
     "@goldsmith/ui-web": "workspace:*",
+    "@mediapipe/tasks-vision": "^0.10.14",
     "@sentry/core": "8.55.2",
     "@sentry/nextjs": "^8.55.2",
     "class-variance-authority": "^0.7.0",

@@ -86,6 +86,8 @@ async function makeJpeg(
 // on thumbnail_url presence without depending on ImageKitTransformUrlBuilder internals.
 const urlBuilderStub = { url: (key: string, _opts: unknown) => `https://ik.imagekit.io/goldsmith/${key}?tr=w-200,mb-0.25` };
 
+const tryOnQueueMock = { add: vi.fn(async () => undefined) };
+
 function newSvc(): ProductImagesService {
   return new ProductImagesService(
     repoMock as never,
@@ -93,6 +95,7 @@ function newSvc(): ProductImagesService {
     malwareMock as never,
     poolMock,
     urlBuilderStub as never,
+    tryOnQueueMock as never,
   );
 }
 

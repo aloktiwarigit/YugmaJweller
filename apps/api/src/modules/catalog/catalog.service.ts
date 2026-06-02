@@ -12,7 +12,7 @@ import {
   IMAGEKIT_URL_BUILDER,
   ImageKitTransformUrlBuilder,
 } from '@goldsmith/integrations-storage';
-import type { CatalogImage, Collection, CategoryNode, PublicReviewItem, PublicReviewsResponse } from '@goldsmith/customer-shared';
+import type { CatalogImage, Collection, CategoryNode, PublicReviewItem, PublicReviewsResponse, CatalogTryOnResponse } from '@goldsmith/customer-shared';
 import { withSpan } from '@goldsmith/observability';
 import * as Sentry from '@sentry/node';
 
@@ -26,6 +26,25 @@ export interface TenantConfigResponse {
   logoUrl:         string | null;
   appName:         string;
   defaultLanguage: string;
+  address?:        string;
+  shopAddress?:    string;
+  shop_address?:   string;
+  contactPhone?:   string;
+  contact_phone?:  string;
+  contactWhatsApp?:  string;
+  contact_whatsapp?: string;
+  aboutText?:      string;
+  about_text?:     string;
+  bisRegistration?:  string;
+  bis_registration?: string;
+  yearsInBusiness?:  number;
+  years_in_business?: number;
+  instagramUrl?:   string;
+  instagram_url?:  string;
+  facebookUrl?:    string;
+  facebook_url?:   string;
+  youtubeUrl?:     string;
+  youtube_url?:    string;
 }
 
 export interface EstimatedPrice {
@@ -72,6 +91,8 @@ export interface GetProductsParams {
   purity?:      string;
   priceMin?:    number;
   priceMax?:    number;
+  weightMinG?:  number;
+  weightMaxG?:  number;
   inStockOnly?: boolean;
   style?:       string;
   occasion?:    string;
@@ -143,10 +164,15 @@ function certifyingBodyFromQr(payload: string): string {
 // ---------------------------------------------------------------------------
 
 interface ShopRow {
-  id:           string;
-  display_name: string;
-  logo_url:     string | null;
-  config:       Record<string, unknown> | null;
+  id:                string;
+  display_name:      string;
+  logo_url:          string | null;
+  config:            Record<string, unknown> | null;
+  address_json?:     Record<string, unknown> | null;
+  contact_phone?:    string | null;
+  about_text?:       string | null;
+  bis_registration?: string | null;
+  years_in_business?: number | null;
 }
 
 export interface ProductCatalogRow {
@@ -215,6 +241,40 @@ function buildSortClause(sort?: string): string {
   }
 }
 
+function cleanString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function configString(config: Record<string, unknown> | null, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = cleanString(config?.[key]);
+    if (value) return value;
+  }
+  return null;
+}
+
+function formatAddress(address: Record<string, unknown> | null | undefined): string | null {
+  if (!address) return null;
+  const parts = [
+    cleanString(address['street']),
+    cleanString(address['city']),
+    cleanString(address['state']),
+    cleanString(address['pin_code']),
+  ].filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join(', ') : null;
+}
+
+function withStringAliases(
+  target: Record<string, unknown>,
+  value: string | null,
+  keys: string[],
+): void {
+  if (!value) return;
+  for (const key of keys) {
+    target[key] = value;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -232,7 +292,8 @@ export class CatalogService {
     return withSpan('catalog.getTenantConfig', { 'catalog.slug': slug }, async () => {
       Sentry.addBreadcrumb({ category: 'catalog', message: 'getTenantConfig', data: { slug }, level: 'info' });
       const r = await this.pool.query<ShopRow>(
-        `SELECT id, display_name, logo_url, config
+        `SELECT id, display_name, logo_url, config,
+                address_json, contact_phone, about_text, bis_registration, years_in_business
            FROM shops
           WHERE slug = $1 AND status = 'ACTIVE'`,
         [slug],
@@ -241,13 +302,39 @@ export class CatalogService {
         throw new NotFoundException({ code: 'catalog.shop_not_found' });
       }
       const row = r.rows[0];
-      return {
+      const address = formatAddress(row.address_json);
+      const contactPhone = cleanString(row.contact_phone);
+      const aboutText = cleanString(row.about_text);
+      const bisRegistration = cleanString(row.bis_registration);
+      const contactWhatsApp = configString(row.config, ['contactWhatsApp', 'contact_whatsapp', 'whatsappNumber', 'whatsapp_number']);
+      const instagramUrl = configString(row.config, ['instagramUrl', 'instagram_url']);
+      const facebookUrl = configString(row.config, ['facebookUrl', 'facebook_url']);
+      const youtubeUrl = configString(row.config, ['youtubeUrl', 'youtube_url']);
+
+      const response: TenantConfigResponse = {
         shopId:          row.id,
         primaryColor:    (row.config?.['primaryColor'] as string | undefined) ?? '#B58A3C',
         logoUrl:         row.logo_url ?? null,
         appName:         row.display_name,
         defaultLanguage: (row.config?.['defaultLanguage'] as string | undefined) ?? 'hi',
       };
+      const responseRecord = response as unknown as Record<string, unknown>;
+
+      withStringAliases(responseRecord, address, ['address', 'shopAddress', 'shop_address']);
+      withStringAliases(responseRecord, contactPhone, ['contactPhone', 'contact_phone']);
+      withStringAliases(responseRecord, contactWhatsApp, ['contactWhatsApp', 'contact_whatsapp']);
+      withStringAliases(responseRecord, aboutText, ['aboutText', 'about_text']);
+      withStringAliases(responseRecord, bisRegistration, ['bisRegistration', 'bis_registration']);
+      withStringAliases(responseRecord, instagramUrl, ['instagramUrl', 'instagram_url']);
+      withStringAliases(responseRecord, facebookUrl, ['facebookUrl', 'facebook_url']);
+      withStringAliases(responseRecord, youtubeUrl, ['youtubeUrl', 'youtube_url']);
+
+      if (row.years_in_business !== undefined && row.years_in_business !== null) {
+        response.yearsInBusiness = row.years_in_business;
+        response.years_in_business = row.years_in_business;
+      }
+
+      return response;
     });
   }
 
@@ -255,7 +342,7 @@ export class CatalogService {
     Sentry.addBreadcrumb({ category: 'catalog', message: 'getProducts', data: { tenant_id: params.shopId, sort: params.sort }, level: 'info' });
     return withSpan('catalog.getProducts', { 'tenant.id': params.shopId, 'catalog.sort': params.sort ?? 'newest' }, async () => {
     const {
-      shopId, categoryId, search, metal, purity, priceMin, priceMax,
+      shopId, categoryId, search, metal, purity, priceMin, priceMax, weightMinG, weightMaxG,
       inStockOnly, style, occasion, giftPersona, collection, sort, page, limit,
     } = params;
     const safePage  = Math.max(1, page);
@@ -304,6 +391,14 @@ export class CatalogService {
         if (priceMax !== undefined) {
           queryParams.push(priceMax);
           whereExtra += ` AND p.price_snapshot_paise < $${queryParams.length}`;
+        }
+        if (weightMinG !== undefined) {
+          queryParams.push(weightMinG);
+          whereExtra += ` AND p.net_weight_g::numeric >= $${queryParams.length}`;
+        }
+        if (weightMaxG !== undefined) {
+          queryParams.push(weightMaxG);
+          whereExtra += ` AND p.net_weight_g::numeric < $${queryParams.length}`;
         }
         if (inStockOnly) {
           whereExtra += ` AND p.quantity > 0`;
@@ -1074,6 +1169,55 @@ export class CatalogService {
 
     return { items: merged.map((row) => this.computeCatalogProduct(row, ratesResult, mcMap)) };
     }); // withSpan catalog.getRecommendations
+  }
+
+  // eslint-disable-next-line goldsmith/no-raw-shop-id-param -- public catalog endpoint; shopId from x-tenant-id header, not TenantContext
+  async getTryOn(productId: string, shopId: string): Promise<CatalogTryOnResponse> {
+    const r = await withShopTx(this.pool, shopId, async (tx) =>
+      tx.query<{
+        product_id: string; body_part: string; asset_storage_key: string | null;
+        anchor_x: string; anchor_y: string;
+        try_on_length_mm: string | null; try_on_width_mm: string | null; try_on_diameter_mm: string | null;
+        metal: string; purity: string; net_weight_g: string;
+      }>(
+        `SELECT a.product_id, a.body_part, a.asset_storage_key, a.anchor_x, a.anchor_y,
+                p.try_on_length_mm, p.try_on_width_mm, p.try_on_diameter_mm,
+                p.metal, p.purity, p.net_weight_g
+           FROM product_try_on_assets a
+           JOIN products p ON p.id = a.product_id AND p.shop_id = a.shop_id
+          WHERE a.product_id = $1
+            AND a.shop_id = $2
+            AND a.enabled = true
+            AND a.status = 'ready'
+            AND p.published_at IS NOT NULL
+            AND EXISTS (SELECT 1 FROM shops WHERE id = $2 AND status = 'ACTIVE')
+          LIMIT 1`,
+        [productId, shopId],
+      ),
+    );
+    const row = r.rows[0];
+    if (!row) throw new NotFoundException({ code: 'catalog.try_on_unavailable' });
+
+    const lengthMm = row.try_on_length_mm !== null ? Number(row.try_on_length_mm) : null;
+    const widthMm  = row.try_on_width_mm  !== null ? Number(row.try_on_width_mm)  : null;
+    const diameterMm = row.try_on_diameter_mm !== null ? Number(row.try_on_diameter_mm) : null;
+
+    return {
+      productId:  row.product_id,
+      bodyPart:   row.body_part as CatalogTryOnResponse['bodyPart'],
+      assetUrl:   row.asset_storage_key
+        ? this.urlBuilder.url(row.asset_storage_key, { width: 1024 })
+        : null,
+      anchorX:    Number(row.anchor_x),
+      anchorY:    Number(row.anchor_y),
+      lengthMm,
+      widthMm,
+      diameterMm,
+      metal:      row.metal,
+      purity:     row.purity,
+      netWeightG: row.net_weight_g,
+      trueToSize: lengthMm !== null || widthMm !== null || diameterMm !== null,
+    };
   }
 
   private readonly logger = new Logger(CatalogService.name);

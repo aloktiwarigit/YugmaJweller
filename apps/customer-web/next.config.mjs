@@ -38,9 +38,16 @@ const nextConfig = {
     '@goldsmith/auth-client',
     '@goldsmith/ui-web',
     '@goldsmith/customer-shared',
+    '@goldsmith/try-on-core',
   ],
 
   images: {
+    // The public catalog API may return same-service absolute URLs such as
+    // https://<cloud-run-host>/demo-shop/*.jpg. Those are static assets, and
+    // routing them through /_next/image breaks when a release host is not in
+    // remotePatterns. Serve the image URL directly so storefront photos never
+    // disappear because of optimizer allowlist drift.
+    unoptimized: true,
     // Avoid generating huge 3840px image variants on high-DPR desktops. The
     // storefront is served directly from Cloud Run, so every oversized variant
     // adds optimizer CPU time before the browser can paint.
@@ -61,6 +68,16 @@ const nextConfig = {
 
   poweredByHeader: false,
   compress: true,
+
+  webpack(config) {
+    // Required for @mediapipe/tasks-vision WASM loading in Next.js
+    config.experiments = {
+      ...config.experiments,
+      asyncWebAssembly: true,
+      layers: true,
+    };
+    return config;
+  },
 
   async headers() {
     // Widen connect-src with the configured API origin so /admin fetches
@@ -94,7 +111,7 @@ const nextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Referrer-Policy', value: 'origin-when-cross-origin' },
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self), payment=()' },
+          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(self), payment=()' },
           // HSTS: only send in production. Sending on localhost bricks the dev
           // browser for 2 years (Chrome enforces HSTS on localhost; no override).
           ...(process.env.NODE_ENV === 'production' ? [{
@@ -105,7 +122,7 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''} https://www.gstatic.com https://apis.google.com`,
+              `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''} 'wasm-unsafe-eval' https://www.gstatic.com https://apis.google.com`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: https://*.blob.core.windows.net https://ik.imagekit.io",

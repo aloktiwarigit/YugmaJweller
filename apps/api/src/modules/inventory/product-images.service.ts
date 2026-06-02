@@ -35,7 +35,9 @@ import {
   type MalwareScanPort,
   ImageKitTransformUrlBuilder,
 } from '@goldsmith/integrations-storage';
+import { TenantQueue } from '@goldsmith/queue';
 import { ProductImagesRepository, type ImageRow } from './product-images.repository';
+import type { TryOnCutoutJob } from './try-on-asset.processor';
 
 const MAX_BYTES        = 5 * 1024 * 1024;          // 5 MB
 const PROBE_WIDTH      = 1920;
@@ -64,6 +66,7 @@ export class ProductImagesService {
     @Inject(MALWARE_SCAN_PORT) private readonly malwareScan: MalwareScanPort,
     @Inject('PG_POOL') private readonly pool: Pool,
     @Inject(IMAGEKIT_URL_BUILDER) private readonly urlBuilder: ImageKitTransformUrlBuilder,
+    @Inject('TRY_ON_QUEUE') private readonly tryOnQueue: TenantQueue<TryOnCutoutJob>,
   ) {}
 
   /** Decorates a DB row with the server-built thumbnail URL (F6-server). */
@@ -251,6 +254,20 @@ export class ProductImagesService {
           mimeType: sniffed.mime,
         },
       });
+
+      // Enqueue BG-removal cutout job. Queue/Redis failures must not fail the upload.
+      try {
+        const ctx = tenantContext.requireCurrent();
+        await this.tryOnQueue.add(ctx, 'cutout', {
+          productId,
+          imageId: inserted.id,
+          storageKey,
+        });
+      } catch {
+        // Non-blocking: log nothing, continue. A retry mechanism or reconcile
+        // sweep can recover missed jobs.
+      }
+
       return this.withThumbnail(inserted);
     } catch (err) {
       // Best-effort orphan cleanup. If the tx never committed, the storage blob

@@ -112,12 +112,15 @@ export {
   UpdateProductSchema,
   UpdateStatusDtoSchema,
   ProductResponseSchema,
+  UpdateTryOnAssetSchema,
 } from './schemas/product.schema';
 export type {
   CreateProductDto,
   UpdateProductDto,
   UpdateStatusDto,
   ProductResponse,
+  UpdateTryOnAssetDto,
+  AdminTryOnAssetResponse,
 } from './schemas/product.schema';
 
 export {

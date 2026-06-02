@@ -44,7 +44,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }): Rea
   const retryNonce = useTenantStore((s) => s.retryNonce);
 
   useEffect(() => {
-    const slug = (Constants.expoConfig?.extra?.['tenantSlug'] as string | undefined) ?? 'anchor-dev';
+    const slug = (Constants.expoConfig?.extra?.['tenantSlug'] as string | undefined) ?? 'anchor-dev-2';
     setSlug(slug);
     setLoading(true);
 

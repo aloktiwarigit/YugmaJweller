@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-23T16:55:23.142Z",
+  "generated": "2026-05-31T17:40:43.377Z",
   "apps": [
     {
       "name": "@goldsmith/api",
@@ -148,6 +148,16 @@
       ]
     },
     {
+      "name": "@goldsmith/integrations-bg-removal",
+      "path": "packages/integrations/bg-removal",
+      "scripts": [
+        "build",
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    },
+    {
       "name": "@goldsmith/integrations-payments",
       "path": "packages/integrations/payments",
       "scripts": [
@@ -287,6 +297,17 @@
       "name": "@goldsmith/testing-weight-precision",
       "path": "packages/testing/weight-precision",
       "scripts": [
+        "lint",
+        "test",
+        "test:unit",
+        "typecheck"
+      ]
+    },
+    {
+      "name": "@goldsmith/try-on-core",
+      "path": "packages/try-on-core",
+      "scripts": [
+        "build",
         "lint",
         "test",
         "test:unit",
@@ -528,6 +549,10 @@
         {
           "method": "GET",
           "path": "/api/v1/catalog/products/:id/images"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/catalog/products/:id/try-on"
         },
         {
           "method": "GET",
@@ -1718,12 +1743,10 @@
     ]
   },
   "migrations": {
-    "count": 66,
-    "current": "0076",
-    "latest": "packages/db/src/migrations/0076_customers_auth_identity.sql",
+    "count": 68,
+    "current": "0077",
+    "latest": "packages/db/src/migrations/0077_virtual_try_on.sql",
     "recent": [
-      "packages/db/src/migrations/0066_products_storefront_columns.sql",
-      "packages/db/src/migrations/0067_collections.sql",
       "packages/db/src/migrations/0068_products_primary_image.sql",
       "packages/db/src/migrations/0069_shop_storefront_config.sql",
       "packages/db/src/migrations/0070_product_reviews_visibility.sql",
@@ -1731,7 +1754,9 @@
       "packages/db/src/migrations/0073_security_definer_schema_resolution.sql",
       "packages/db/src/migrations/0074_payment_sessions.sql",
       "packages/db/src/migrations/0075_customer_self_deletion_extensions.sql",
-      "packages/db/src/migrations/0076_customers_auth_identity.sql"
+      "packages/db/src/migrations/0076_auth_lookup_by_firebase_uid.sql",
+      "packages/db/src/migrations/0076_customers_auth_identity.sql",
+      "packages/db/src/migrations/0077_virtual_try_on.sql"
     ]
   },
   "rootScripts": {
@@ -1743,6 +1768,7 @@
     "test:tenant-isolation": "turbo run test:tenant-isolation",
     "build": "turbo run build",
     "deploy:customer-release": "powershell -ExecutionPolicy Bypass -File scripts/deploy-customer-release.ps1",
+    "deploy:shopkeeper-release": "powershell -ExecutionPolicy Bypass -File scripts/deploy-shopkeeper-release.ps1",
     "db:reset": "bash scripts/db-reset.sh",
     "db:generate-rls": "tsx packages/db/src/codegen/generate-rls.ts",
     "db:assert-marked": "tsx packages/db/src/codegen/assert-all-tables-marked.ts",
@@ -1751,6 +1777,7 @@
     "seed:anchor-dev-2": "tsx scripts/seed-anchor-dev-2.ts",
     "seed:demo": "tsx scripts/seed/demo-tenant.ts",
     "seed:storefront-demo": "tsx scripts/seed/storefront-demo.ts",
+    "seed:storefront-prod-content": "tsx scripts/seed/storefront-demo.ts --production",
     "docs:context": "tsx scripts/docs/scan-repo-context.ts && tsx scripts/docs/extract-adrs.ts && tsx scripts/docs/extract-bmad-trace.ts && tsx scripts/docs/scan-docs.ts && tsx scripts/docs/extract-acceptance.ts && tsx scripts/docs/scan-current-state.ts && tsx scripts/docs/scan-implementation-map.ts",
     "docs:validate": "tsx scripts/docs/validate-agent-context.ts",
     "test:ci": "pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:integration && pnpm test:tenant-isolation && pnpm semgrep && pnpm docs:validate"

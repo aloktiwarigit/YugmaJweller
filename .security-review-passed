@@ -1,16 +1,3 @@
-Story 19.9 — Customer Multi-Provider Auth
-Reviewer: Claude Sonnet 4.6 security-review skill
-Date: 2026-05-23
-Branch: feat/customer-multi-provider-auth
-HEAD: f373723
-
-Findings:
-- P0 FIXED: Email account takeover via unverified Firebase email (customer-session.service.ts Path 3).
-  Root cause: Path 3 email-link ran without checking email_verified claim.
-  Fix: `if (email && decoded.email_verified)` guard in findOrCreateCustomerByFirebaseToken.
-  Test: "skips email link when email_verified is false (prevents account takeover)" added.
-- P1 false positive: stale auth_provider — no current code branches on it for security decisions.
-- P1 false positive: checkRevoked=false — pre-existing code, hardening measure, not a new regression.
-- P2 false positive: PATCH /profile/phone E.164 validation — value comes from Firebase Admin SDK signed token.
-
-All SQL queries parameterized. RLS enforced via withShopTx. Cross-tenant scoping verified.
+security-review passed on feat/try-on-plan3 (e888964) 2026-06-01
+New surfaces: PATCH/GET /inventory/products/:id/try-on-asset (RLS + role gate + ready-guard); /products/[id]/try-on-wv public route; customer-mobile WebView (origin-locked).
+2 HIGH findings from automated review fixed (commits 3da99b8, c16a62a). Sub-agent review: 0 remaining >=8-confidence findings.

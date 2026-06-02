@@ -17,7 +17,7 @@ pnpm --filter @goldsmith/customer-mobile start
 | Var | Required | Purpose |
 |---|---|---|
 | `EXPO_PUBLIC_API_BASE_URL` | yes | NestJS API origin — use `http://10.0.2.2:3001` on Android emulator |
-| `EXPO_PUBLIC_SHOP_SLUG` | yes | Tenant slug (`anchor-dev` for local dev) |
+| `EXPO_PUBLIC_SHOP_SLUG` | yes | Tenant slug (`anchor-dev-2` for the image-backed local storefront demo) |
 | `EXPO_PUBLIC_DEV_AUTH` | dev-only | Set to `1` to inject a mock customer session (bypasses Firebase). Must NOT be set in production builds. |
 | `EXPO_PUBLIC_APP_NAME` | optional | Override app display name (defaults to tenant displayName from boot API) |
 
