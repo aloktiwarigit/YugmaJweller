@@ -1,5 +1,28 @@
 {
   "title": "Settings",
+  "language": {
+    "title": "App language",
+    "subtitle": "Changes labels on this device",
+    "hi": "Hindi",
+    "en": "English"
+  },
+  "menu": {
+    "account": "My Account",
+    "shop_profile": "Shop Profile",
+    "staff": "Staff Management",
+    "making_charges": "Making Charges",
+    "wastage": "Wastage",
+    "rate_lock": "Rate Lock Duration",
+    "try_at_home": "Try at Home",
+    "custom_order_policy": "Custom Order Policy",
+    "return_policy": "Return Policy",
+    "notification_prefs": "Notification Preferences",
+    "loyalty": "Loyalty Programme",
+    "billing": "Billing",
+    "reports": "Reports",
+    "audit_log": "Activity Log",
+    "theme": "Change Theme (Demo)"
+  },
   "shop_profile": "Shop Profile",
   "staff": "Staff Management",
   "staff_revoke": {

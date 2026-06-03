@@ -4,7 +4,44 @@
   "subcopy": "पहले step पर: staff जोड़ें और roles दें",
   "cta_staff": "Staff जोड़ें",
   "cta_settings": "सेटिंग्स में जाएँ",
-  "tabs": { "dashboard": "डैशबोर्ड", "invoices": "इनवॉइस", "products": "प्रोडक्ट्स", "customers": "ग्राहक", "billing": "बिलिंग", "reports": "रिपोर्ट" },
+  "tabs": {
+    "dashboard": "डैशबोर्ड",
+    "home": "होम",
+    "inventory": "इन्वेंटरी",
+    "invoices": "इनवॉइस",
+    "products": "प्रोडक्ट्स",
+    "customers": "ग्राहक",
+    "billing": "बिलिंग",
+    "reports": "रिपोर्ट",
+    "more": "अधिक"
+  },
+  "role": {
+    "staff_workspace": "स्टाफ कार्यक्षेत्र",
+    "shop_operations": "दुकान संचालन"
+  },
+  "section": {
+    "today": "आज"
+  },
+  "actions": {
+    "new_bill": "नया बिल",
+    "inventory": "इन्वेंटरी",
+    "search_inventory": "इन्वेंटरी खोजें",
+    "customers": "ग्राहक",
+    "custom_orders": "कस्टम ऑर्डर",
+    "rate_lock": "दर-लॉक",
+    "reports": "रिपोर्ट",
+    "staff": "स्टाफ"
+  },
+  "more": {
+    "section": "दैनिक संचालन",
+    "staff_empty": "स्टाफ की पहुंच बिलिंग और इन्वेंटरी तक सीमित है।",
+    "customers": "ग्राहक सूची",
+    "custom_orders": "कस्टम ऑर्डर",
+    "try_at_home": "ट्राई-एट-होम",
+    "reviews": "समीक्षाएँ",
+    "rate_lock": "दर-लॉक बुकिंग",
+    "settings": "सेटिंग्स"
+  },
   "stub_story_1_2": "Story 1.2 में उपलब्ध",
   "stubs": {
     "billing": "बिलिंग — जल्द आ रहा है",

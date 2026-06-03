@@ -4,21 +4,25 @@
 
 - `app-icon-512.png`: 512x512 PNG with alpha, under 1024 KB.
 - `feature-graphic-1024x500.png`: 1024x500 PNG with no alpha.
+- `screenshots/play-phone/*.png`: six phone screenshots at 1200x2400.
 
-## Pending From Release Build
+## Phone Screenshots
 
-Capture real phone screenshots after installing a release APK. Google Play requires
-at least two screenshots across supported device types. For better app discovery,
-prepare four phone screenshots at 1080x1920 portrait.
+Upload these phone screenshots to Play Console:
 
-Suggested capture flow:
+- `screenshots/play-phone/01-home.png`
+- `screenshots/play-phone/02-new-bill.png`
+- `screenshots/play-phone/03-billing.png`
+- `screenshots/play-phone/04-inventory.png`
+- `screenshots/play-phone/05-reports.png`
+- `screenshots/play-phone/06-more.png`
 
-```powershell
-adb shell screencap -p /sdcard/shopkeeper-dashboard.png
-adb pull /sdcard/shopkeeper-dashboard.png apps/shopkeeper/assets/play-store/screenshots/
-```
+The older raw `final-*.png` and smoke screenshots are 1080x2400. Keep them as
+source captures, but use `screenshots/play-phone/` for Play Console upload.
 
-Recommended first screenshots:
+## Future Captures
+
+If screenshots need to be refreshed after UI changes, capture the same flows:
 
 - Dashboard with live billing, inventory, and rate cards.
 - New invoice or estimate flow.

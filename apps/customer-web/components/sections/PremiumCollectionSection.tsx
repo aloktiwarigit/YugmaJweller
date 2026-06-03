@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import type { Collection } from '@goldsmith/customer-shared';
+import { storefrontBlurDataUrl, storefrontImageUrl } from '@/lib/image-url';
 
 interface PremiumCollectionSectionProps {
   enabled?: boolean;
@@ -53,13 +54,13 @@ export function PremiumCollectionSection({ enabled = true, collections = [] }: P
                 >
                   <div className="relative flex-1 overflow-hidden">
                     <Image
-                      src={collection.heroImage!.url}
+                      src={storefrontImageUrl(collection.heroImage!.url)}
                       alt={collection.heroImage!.alt ?? collection.titleHi}
                       fill
                       sizes="280px"
                       className="object-cover transition-transform duration-500 group-hover:scale-105"
-                      placeholder={collection.heroImage!.placeholderUrl ? 'blur' : 'empty'}
-                      blurDataURL={collection.heroImage!.placeholderUrl || undefined}
+                      placeholder={storefrontBlurDataUrl(collection.heroImage!.placeholderUrl) ? 'blur' : 'empty'}
+                      blurDataURL={storefrontBlurDataUrl(collection.heroImage!.placeholderUrl)}
                     />
                   </div>
                   <div className="px-4 py-3" style={{ backgroundColor: '#232847' }}>
@@ -81,13 +82,13 @@ export function PremiumCollectionSection({ enabled = true, collections = [] }: P
                 style={{ aspectRatio: '16/9' }}
               >
                 <Image
-                  src={collectionTiles[0]!.heroImage!.url}
+                  src={storefrontImageUrl(collectionTiles[0]!.heroImage!.url)}
                   alt={collectionTiles[0]!.heroImage!.alt ?? collectionTiles[0]!.titleHi}
                   fill
                   sizes="100vw"
                   className="object-cover"
-                  placeholder={collectionTiles[0]!.heroImage!.placeholderUrl ? 'blur' : 'empty'}
-                  blurDataURL={collectionTiles[0]!.heroImage!.placeholderUrl || undefined}
+                  placeholder={storefrontBlurDataUrl(collectionTiles[0]!.heroImage!.placeholderUrl) ? 'blur' : 'empty'}
+                  blurDataURL={storefrontBlurDataUrl(collectionTiles[0]!.heroImage!.placeholderUrl)}
                 />
               </a>
               {collectionTiles.map((collection) => (

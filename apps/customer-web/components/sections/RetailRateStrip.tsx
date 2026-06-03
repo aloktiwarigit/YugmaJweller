@@ -13,7 +13,7 @@ export function RetailRateStrip({ rates }: RetailRateStripProps) {
     return (
       <section
         aria-labelledby="rates-strip-heading"
-        className="bg-surfaceElevated border-y border-borderSubtle py-4 px-4 text-center"
+        className="border-y border-borderSubtle bg-surfaceElevated px-4 py-3 text-center"
       >
         <span className="font-ui text-sm text-inkSoft">
           आज की दर के लिए{' '}
@@ -42,28 +42,33 @@ export function RetailRateStrip({ rates }: RetailRateStripProps) {
       role="region"
       aria-labelledby="rates-strip-heading"
       aria-live="polite"
-      className="bg-surfaceElevated border-y border-borderSubtle"
+      className="border-y border-primary/20 bg-ink text-white"
     >
       <h2 id="rates-strip-heading" className="sr-only">आज की धातु दरें</h2>
-      <div className="max-w-6xl mx-auto flex items-center divide-x divide-borderSubtle overflow-x-auto">
-        {cells.map(({ key, labelHi, rate }) => (
-          <div key={key} className="flex flex-col items-center px-8 py-4 min-w-[120px] flex-1">
-            <span className="font-ui text-xs text-inkSoft mb-0.5">{labelHi}</span>
-            <span
-              className="font-ui font-bold text-lg text-ink tabular-nums"
-              aria-label={`${labelHi}: ${rate.formattedINR} प्रति ग्राम`}
-            >
-              {rate.formattedINR}
-            </span>
-            <span className="font-ui text-xs text-inkSoft">प्रति ग्राम</span>
+      <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 md:flex-row md:items-center">
+        <div className="flex shrink-0 items-center justify-between gap-4 md:w-44 md:flex-col md:items-start md:justify-center">
+          <div>
+            <p className="font-prose text-xs uppercase tracking-[0.16em] text-primary">आज की दर</p>
+            <p className="mt-0.5 font-ui text-xs text-white/66">प्रति ग्राम</p>
           </div>
-        ))}
-        <div className="flex flex-col items-center px-8 py-4 min-w-[140px] flex-1">
-          <span className="font-ui text-xs text-inkSoft mb-0.5">{ageLabel}</span>
-          <span className="font-ui text-xs text-inkSoft text-center">प्रति ग्राम</span>
-          {rates.stale && (
-            <span className="mt-1 text-xs font-ui text-warningSaffron">पुरानी दर</span>
-          )}
+          <p className="font-ui text-xs text-white/66 md:mt-1">{ageLabel}</p>
+        </div>
+
+        <div className="grid flex-1 grid-cols-3 overflow-hidden rounded-md border border-white/10 bg-white/10">
+          {cells.map(({ key, labelHi, rate }) => (
+            <div key={key} className="min-w-0 border-r border-white/10 px-3 py-3 text-center last:border-r-0">
+              <span className="block truncate font-ui text-xs text-white/68">{labelHi}</span>
+              <span
+                className="mt-1 block truncate font-ui text-base font-bold tabular-nums text-white md:text-lg"
+                aria-label={`${labelHi}: ${rate.formattedINR} प्रति ग्राम`}
+              >
+                {rate.formattedINR}
+              </span>
+              {rates.stale && key === 'SILVER_999' ? (
+                <span className="mt-1 block text-xs font-ui text-warningSaffron">पुरानी दर</span>
+              ) : null}
+            </div>
+          ))}
         </div>
       </div>
     </section>

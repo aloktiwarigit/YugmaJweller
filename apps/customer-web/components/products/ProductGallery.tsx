@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ResponsiveImage } from '@goldsmith/ui-web';
 import { GoldTexturePlaceholder } from '@/components/GoldTexturePlaceholder';
+import { storefrontImageUrl, storefrontSrcSet } from '@/lib/image-url';
 
 export type PublicImageRow = {
   id: string;
@@ -55,8 +56,8 @@ export function ProductGallery({
         >
           {hero ? (
             <ResponsiveImage
-              src={hero.default_url}
-              srcset={hero.srcset}
+              src={storefrontImageUrl(hero.default_url)}
+              srcset={storefrontSrcSet(hero.srcset) ?? ''}
               sizes={SIZES}
               alt={heroAlt}
               width={hero.width}
@@ -87,8 +88,8 @@ export function ProductGallery({
                 } focus:outline-none focus:ring-2 focus:ring-amber-500`}
               >
                 <ResponsiveImage
-                  src={img.placeholder_url}
-                  srcset={img.srcset}
+                  src={storefrontImageUrl(img.placeholder_url)}
+                  srcset={storefrontSrcSet(img.srcset) ?? ''}
                   sizes="80px"
                   alt={altFor(img, productName, i)}
                   width={80}
@@ -130,8 +131,8 @@ export function ProductGallery({
         <div className="flex h-full items-center justify-center p-8">
           {hero ? (
             <ResponsiveImage
-              src={hero.default_url}
-              srcset={hero.srcset}
+              src={storefrontImageUrl(hero.default_url)}
+              srcset={storefrontSrcSet(hero.srcset) ?? ''}
               sizes="(max-width: 1280px) 100vw, 1280px"
               alt={heroAlt}
               width={hero.width}

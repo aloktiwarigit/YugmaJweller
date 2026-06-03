@@ -63,6 +63,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   if (!config) return <p className="p-8 font-ui text-inkMute text-center">दुकान उपलब्ध नहीं है।</p>;
 
   const page        = Math.max(1, parseInt(searchParams.page ?? '1', 10));
+  const pageSize    = 20;
   const search      = searchParams.search?.trim();
   const metal       = searchParams.metal;
   const purity      = searchParams.purity;
@@ -78,12 +79,12 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   const productsData = await fetchProducts(config.shopId, {
     search, metal, purity, priceMin, priceMax, inStockOnly,
     style, occasion, giftPersona, collection, sort,
-    page, limit: 12,
+    page, limit: pageSize,
   });
 
   const items    = productsData?.items ?? [];
   const total    = productsData?.total ?? 0;
-  const lastPage = Math.max(1, Math.ceil(total / 12));
+  const lastPage = Math.max(1, Math.ceil(total / pageSize));
 
   const activeFilters: ActiveFilters = {
     search, metal, purity, priceMin, priceMax,
@@ -111,16 +112,17 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 md:py-8">
+    <div className="bg-surface">
+      <div className="mx-auto max-w-7xl px-4 py-5 md:py-7">
       {/* Editorial header — filter-aware headline, hairline divider */}
-      <header className="border-b border-borderSubtle pb-6 mb-6">
+      <header className="mb-5 border-b border-borderSubtle pb-5">
         <p className="font-prose text-[11px] uppercase tracking-[0.28em] text-inkMute">
           {eyebrow}
         </p>
-        <h1 className="font-heading text-3xl md:text-[2.25rem] leading-tight text-ink mt-2">
+        <h1 className="font-heading text-2xl leading-tight text-ink md:text-[2rem]">
           {heading}
         </h1>
-        <p className="font-prose text-sm md:text-[15px] text-inkMute mt-3 max-w-xl leading-relaxed">
+        <p className="mt-2 max-w-xl font-prose text-sm leading-relaxed text-inkMute md:text-[15px]">
           BIS हॉलमार्क और HUID सत्यापित आभूषणों का चयन। आज की दर पर अनुमानित मूल्य —
           अंतिम मूल्य की पुष्टि दुकान पर।
         </p>
@@ -140,7 +142,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
         <label htmlFor="product-search" className="sr-only">उत्पाद खोज</label>
         <input
           id="product-search" type="search" name="search" defaultValue={search}
-          placeholder="SKU, धातु, शुद्धता खोजें..."
+          placeholder="नाम, धातु, शुद्धता खोजें..."
           className="flex-1 rounded-md border border-border bg-surface px-4 py-2 font-ui text-sm text-ink placeholder:text-inkSoft focus:outline-none focus-visible:outline-2 focus-visible:outline-primary"
         />
         <button type="submit"
@@ -166,7 +168,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
       </p>
 
       {/* Main two-column layout: sidebar (desktop) + products */}
-      <div className="flex gap-6 items-start">
+      <div className="flex items-start gap-6">
         <FilterSidebar filters={activeFilters} />
 
         <main className="flex-1 flex flex-col gap-4">
@@ -196,6 +198,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
             </nav>
           )}
         </main>
+      </div>
       </div>
     </div>
   );

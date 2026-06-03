@@ -1,5 +1,28 @@
 {
   "title": "सेटिंग्स",
+  "language": {
+    "title": "ऐप भाषा",
+    "subtitle": "इस डिवाइस पर लेबल बदलें",
+    "hi": "हिन्दी",
+    "en": "English"
+  },
+  "menu": {
+    "account": "मेरा खाता",
+    "shop_profile": "शॉप प्रोफाइल",
+    "staff": "स्टाफ प्रबंधन",
+    "making_charges": "मेकिंग चार्जेस",
+    "wastage": "वेस्टेज",
+    "rate_lock": "दर-लॉक की अवधि",
+    "try_at_home": "घर पर आज़माएँ",
+    "custom_order_policy": "कस्टम ऑर्डर नीति",
+    "return_policy": "वापसी नीति",
+    "notification_prefs": "सूचना प्राथमिकताएँ",
+    "loyalty": "लॉयल्टी प्रोग्राम",
+    "billing": "बिलिंग",
+    "reports": "रिपोर्ट्स",
+    "audit_log": "गतिविधि लॉग",
+    "theme": "थीम बदलें (Demo)"
+  },
   "shop_profile": "शॉप प्रोफाइल",
   "staff": "स्टाफ प्रबंधन",
   "staff_revoke": {

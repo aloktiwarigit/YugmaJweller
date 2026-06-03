@@ -1,4 +1,4 @@
-type Locale = 'hi-IN' | 'en-IN';
+export type Locale = 'hi-IN' | 'en-IN';
 
 import hiAuth from './locales/hi-IN/auth.json';
 import hiCommon from './locales/hi-IN/common.json';

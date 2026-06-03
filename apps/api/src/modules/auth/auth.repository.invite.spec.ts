@@ -60,6 +60,41 @@ describe('AuthRepository.inviteStaff', () => {
   });
 });
 
+describe('AuthRepository.lookupByFirebaseUid', () => {
+  it('uses the pre-auth SECURITY DEFINER lookup function', async () => {
+    const mockClient = {
+      query: vi.fn()
+        .mockResolvedValueOnce(undefined) // SET ROLE app_user
+        .mockResolvedValueOnce({
+          rows: [{
+            shop_id: 'shop-1',
+            user_id: 'user-1',
+            role: 'shop_admin',
+            status: 'ACTIVE',
+            firebase_uid: 'firebase-uid-1',
+          }],
+          rowCount: 1,
+        })
+        .mockResolvedValueOnce(undefined) // POISON
+        .mockResolvedValueOnce(undefined), // RESET ROLE
+      release: vi.fn(),
+    };
+    const pool = { connect: vi.fn().mockResolvedValue(mockClient) } as unknown as import('pg').Pool;
+    const repo = new AuthRepository(pool);
+
+    const result = await repo.lookupByFirebaseUid('firebase-uid-1');
+
+    expect(mockClient.query).toHaveBeenNthCalledWith(2, 'SELECT * FROM auth_lookup_user_by_firebase_uid($1)', ['firebase-uid-1']);
+    expect(result).toEqual({
+      shopId: 'shop-1',
+      userId: 'user-1',
+      role: 'shop_admin',
+      status: 'ACTIVE',
+      firebaseUid: 'firebase-uid-1',
+    });
+  });
+});
+
 describe('AuthRepository.listUsers', () => {
   it('returns mapped user rows', async () => {
     const rows = [{

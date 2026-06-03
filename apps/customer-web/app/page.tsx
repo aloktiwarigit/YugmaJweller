@@ -23,6 +23,7 @@ import { EverydayCollectionSection } from '@/components/sections/EverydayCollect
 import { PremiumCollectionSection }  from '@/components/sections/PremiumCollectionSection';
 import { RecommendedSection }        from '@/components/sections/RecommendedSection';
 import { PromiseSection }            from '@/components/sections/PromiseSection';
+import { LegacyTrustSection }        from '@/components/sections/LegacyTrustSection';
 
 export default async function HomePage() {
   const slug = resolveShopSlug(headers());
@@ -70,19 +71,22 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* 1. Hero */}
+      {/* 1. Live rate strip */}
+      <RetailRateStrip rates={rates} />
+
+      {/* 2. Hero */}
       <HeroSection
         shopName={config.appName}
         heroBanners={heroBanners}
       />
 
-      {/* 2. Live rate strip */}
-      <RetailRateStrip rates={rates} />
+      {/* 3. Store-specific trust */}
+      <LegacyTrustSection config={config} />
 
-      {/* 3. Editorial campaign band */}
+      {/* 4. Editorial campaign band */}
       <CampaignStorySection />
 
-      {/* 4. Shop by category */}
+      {/* 5. Shop by category */}
       <section aria-labelledby="category-heading" className="py-10 bg-bg">
         <div className="max-w-6xl mx-auto px-4">
           <h2 id="category-heading" className="font-heading text-2xl text-ink mb-6">
@@ -92,31 +96,31 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* 5. New arrivals */}
+      {/* 6. New arrivals */}
       <NewArrivalsSection products={newArrivals} />
 
-      {/* 5. Spotlight — hidden when empty */}
+      {/* 7. Spotlight — hidden when empty */}
       <SpotlightSection
         featuredCollection={spotlightCollection}
         spotlightProducts={recommended.slice(0, 4)}
       />
 
-      {/* 7. Gift personas */}
+      {/* 8. Gift personas */}
       <GiftPersonasSection collections={collections} />
 
-      {/* 8. Top sellers */}
+      {/* 9. Top sellers */}
       <TopSellersSection products={topSellers} />
 
-      {/* 9. Everyday collection */}
+      {/* 10. Everyday collection */}
       <EverydayCollectionSection collections={collections} />
 
-      {/* 9. Premium collection — dark surface */}
+      {/* 11. Premium collection — dark surface */}
       <PremiumCollectionSection enabled collections={collections} />
 
-      {/* 10. Recommended — hidden when empty */}
+      {/* 12. Recommended — hidden when empty */}
       <RecommendedSection products={recommended} />
 
-      {/* 12. Promise pillars */}
+      {/* 13. Promise pillars */}
       <PromiseSection />
     </>
   );

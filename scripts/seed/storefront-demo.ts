@@ -7,6 +7,12 @@
  * Usage:
  *   pnpm seed:storefront-demo
  *   DEMO_SHOP_SLUG=shri-ram-jewellers pnpm seed:storefront-demo
+ *
+ * Production-safe dry run:
+ *   STOREFRONT_SHOP_SLUG=anchor-dev \
+ *   STOREFRONT_UPLOADER_PHONE_E164=+91... \
+ *   STOREFRONT_PROD_SEED_CONFIRM=seed-prod-storefront:anchor-dev \
+ *   pnpm seed:storefront-prod-content
  */
 
 import { config as loadEnv } from 'dotenv';
@@ -14,14 +20,39 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { Pool, type PoolClient } from 'pg';
 
-loadEnv({ path: 'apps/api/.env.local' });
-loadEnv({ path: 'apps/customer-web/.env.local', override: false });
+const ARGUMENTS = new Set(process.argv.slice(2));
+const IS_PRODUCTION_CONTENT_SEED =
+  process.env['STOREFRONT_SEED_MODE'] === 'production' ||
+  ARGUMENTS.has('--production') ||
+  ARGUMENTS.has('--prod');
+
+if (!IS_PRODUCTION_CONTENT_SEED) {
+  loadEnv({ path: 'apps/api/.env.local' });
+  loadEnv({ path: 'apps/customer-web/.env.local', override: false });
+}
 loadEnv({ override: false });
 
-const DB_URL = process.env['DATABASE_URL'];
-const TARGET_SLUG = process.env['DEMO_SHOP_SLUG'] ?? process.env['NEXT_PUBLIC_SHOP_SLUG'] ?? 'anchor-dev-2';
+const DB_URL = process.env['DATABASE_URL_ADMIN'] ?? process.env['DATABASE_URL'];
+const TARGET_SLUG = IS_PRODUCTION_CONTENT_SEED
+  ? process.env['STOREFRONT_SHOP_SLUG'] ?? ''
+  : process.env['DEMO_SHOP_SLUG'] ?? process.env['NEXT_PUBLIC_SHOP_SLUG'] ?? 'anchor-dev-2';
 const SEED_PHONE = '+919999000001';
 const GOLD_24K_PAISE_PER_G = 740_000;
+const PROD_CONFIRM_TOKEN = TARGET_SLUG ? `seed-prod-storefront:${TARGET_SLUG}` : 'seed-prod-storefront:<shop-slug>';
+const APPLY_CHANGES =
+  ARGUMENTS.has('--apply') ||
+  process.env['STOREFRONT_SEED_DRY_RUN'] === '0';
+const IS_DRY_RUN = IS_PRODUCTION_CONTENT_SEED && !APPLY_CHANGES;
+const PROD_UPLOADER_USER_ID = process.env['STOREFRONT_UPLOADER_USER_ID'];
+const PROD_UPLOADER_PHONE = process.env['STOREFRONT_UPLOADER_PHONE_E164'];
+const SHOULD_GENERATE_SYNTHETIC_HUIDS =
+  !IS_PRODUCTION_CONTENT_SEED ||
+  process.env['STOREFRONT_ALLOW_SYNTHETIC_HUIDS'] === '1' ||
+  ARGUMENTS.has('--allow-synthetic-huids');
+const SHOULD_HIDE_IMAGELESS_PLACEHOLDERS =
+  !IS_PRODUCTION_CONTENT_SEED ||
+  process.env['STOREFRONT_HIDE_IMAGELESS_PLACEHOLDERS'] === '1' ||
+  ARGUMENTS.has('--hide-imageless-placeholders');
 
 type Metal = 'GOLD' | 'SILVER';
 
@@ -271,6 +302,83 @@ function validateCampaignAssets(): void {
   }
 }
 
+function validateRuntimeConfig(): void {
+  if (!IS_PRODUCTION_CONTENT_SEED) return;
+
+  const errors: string[] = [];
+  if (!process.env['STOREFRONT_SHOP_SLUG']) {
+    errors.push('STOREFRONT_SHOP_SLUG is required in production mode.');
+  }
+  if (process.env['STOREFRONT_PROD_SEED_CONFIRM'] !== PROD_CONFIRM_TOKEN) {
+    errors.push(`STOREFRONT_PROD_SEED_CONFIRM must equal "${PROD_CONFIRM_TOKEN}".`);
+  }
+  if (!PROD_UPLOADER_USER_ID && !PROD_UPLOADER_PHONE) {
+    errors.push('Provide STOREFRONT_UPLOADER_USER_ID or STOREFRONT_UPLOADER_PHONE_E164 for an existing active shop user.');
+  }
+  if (!DB_URL) {
+    errors.push('DATABASE_URL_ADMIN or DATABASE_URL is required in production mode.');
+  }
+  const dbUrlLooksLocal = DB_URL
+    ? /(^|[@/])(localhost|127\.0\.0\.1|0\.0\.0\.0|host\.docker\.internal)(:|\/|$)/i.test(DB_URL) ||
+      /\bhost=(localhost|127\.0\.0\.1|0\.0\.0\.0|host\.docker\.internal)\b/i.test(DB_URL)
+    : false;
+  if (dbUrlLooksLocal && process.env['STOREFRONT_ALLOW_LOCAL_DB'] !== '1') {
+    errors.push('Database URL appears local; set STOREFRONT_ALLOW_LOCAL_DB=1 only for a local validation dry run.');
+  }
+  if (TARGET_SLUG === 'anchor-dev-2' && process.env['STOREFRONT_ALLOW_DEV_SLUG'] !== '1') {
+    errors.push('anchor-dev-2 is the local demo slug; set STOREFRONT_ALLOW_DEV_SLUG=1 only if that is intentionally the target.');
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`Production storefront content seed is not configured:\n- ${errors.join('\n- ')}`);
+  }
+}
+
+async function resolveSeedUserId(client: PoolClient, shopId: string): Promise<string> {
+  if (!IS_PRODUCTION_CONTENT_SEED) {
+    const user = await client.query<{ id: string }>(
+      `INSERT INTO shop_users (shop_id, phone, display_name, role, status, activated_at)
+       VALUES ($1, $2, 'Demo curator', 'shop_admin', 'ACTIVE', NOW())
+       ON CONFLICT (shop_id, phone) DO UPDATE SET
+         display_name = EXCLUDED.display_name,
+         status = EXCLUDED.status,
+         updated_at = NOW()
+       RETURNING id`,
+      [shopId, SEED_PHONE],
+    );
+    return user.rows[0].id;
+  }
+
+  const lookup = PROD_UPLOADER_USER_ID
+    ? await client.query<{ id: string }>(
+        `SELECT id
+           FROM shop_users
+          WHERE shop_id = $1
+            AND id = $2
+            AND status = 'ACTIVE'
+          LIMIT 1`,
+        [shopId, PROD_UPLOADER_USER_ID],
+      )
+    : await client.query<{ id: string }>(
+        `SELECT id
+           FROM shop_users
+          WHERE shop_id = $1
+            AND phone = $2
+            AND status = 'ACTIVE'
+          LIMIT 1`,
+        [shopId, PROD_UPLOADER_PHONE],
+      );
+
+  if (!lookup.rows[0]) {
+    const identifier = PROD_UPLOADER_USER_ID
+      ? `id ${PROD_UPLOADER_USER_ID}`
+      : `phone ${PROD_UPLOADER_PHONE}`;
+    throw new Error(`No active shop user found for ${identifier} in shop "${TARGET_SLUG}".`);
+  }
+
+  return lookup.rows[0].id;
+}
+
 async function getOrCreateCategory(client: PoolClient, shopId: string, name: string): Promise<string> {
   const existing = await client.query<{ id: string }>(
     `SELECT id FROM product_categories WHERE shop_id = $1 AND name = $2 LIMIT 1`,
@@ -371,16 +479,20 @@ async function seed(client: PoolClient): Promise<void> {
   const shopId = shop.rows[0].id;
   validateCampaignAssets();
 
-  const hiddenPlaceholderProducts = await client.query(
-    `UPDATE products
-        SET published_at = NULL,
-            quantity = 0,
-            updated_at = NOW()
-      WHERE shop_id = $1
-        AND sku NOT LIKE 'DMO-%'
-        AND primary_image_id IS NULL`,
-    [shopId],
-  );
+  let hiddenPlaceholderProductCount = 0;
+  if (SHOULD_HIDE_IMAGELESS_PLACEHOLDERS) {
+    const hiddenPlaceholderProducts = await client.query(
+      `UPDATE products
+          SET published_at = NULL,
+              quantity = 0,
+              updated_at = NOW()
+        WHERE shop_id = $1
+          AND sku NOT LIKE 'DMO-%'
+          AND primary_image_id IS NULL`,
+      [shopId],
+    );
+    hiddenPlaceholderProductCount = hiddenPlaceholderProducts.rowCount ?? 0;
+  }
 
   await client.query(
     `UPDATE shops
@@ -399,17 +511,7 @@ async function seed(client: PoolClient): Promise<void> {
     ],
   );
 
-  const user = await client.query<{ id: string }>(
-    `INSERT INTO shop_users (shop_id, phone, display_name, role, status, activated_at)
-     VALUES ($1, $2, 'Demo curator', 'shop_admin', 'ACTIVE', NOW())
-     ON CONFLICT (shop_id, phone) DO UPDATE SET
-       display_name = EXCLUDED.display_name,
-       status = EXCLUDED.status,
-       updated_at = NOW()
-     RETURNING id`,
-    [shopId, SEED_PHONE],
-  );
-  const seedUserId = user.rows[0].id;
+  const seedUserId = await resolveSeedUserId(client, shopId);
 
   const categoryIds = new Map<string, string>();
   for (const category of CATEGORIES) {
@@ -471,7 +573,7 @@ async function seed(client: PoolClient): Promise<void> {
         product.purity,
         product.grossWeightG.toFixed(4),
         netWeightG,
-        product.metal === 'GOLD' ? huid() : null,
+        product.metal === 'GOLD' && SHOULD_GENERATE_SYNTHETIC_HUIDS ? huid() : null,
         Math.round(Number(priceSnapshotPaise(product)) * 0.62),
         seedUserId,
         minutesAgo(i + 1),
@@ -626,35 +728,56 @@ async function seed(client: PoolClient): Promise<void> {
     [shopId, JSON.stringify(storefrontConfig)],
   );
 
-  console.log(`Seeded storefront demo for "${TARGET_SLUG}" (${shop.rows[0].display_name})`);
+  const label = IS_PRODUCTION_CONTENT_SEED ? 'production storefront content' : 'storefront demo';
+  const verb = IS_DRY_RUN ? 'Validated' : 'Seeded';
+  console.log(`${verb} ${label} for "${TARGET_SLUG}" (${shop.rows[0].display_name})`);
   console.log(`  products:    ${PRODUCTS.length}`);
   console.log(`  images:      ${imageIds.size}`);
   console.log(`  collections: ${COLLECTIONS.length}`);
-  console.log(`  hidden placeholders without images: ${hiddenPlaceholderProducts.rowCount ?? 0}`);
+  console.log(`  synthetic HUIDs: ${SHOULD_GENERATE_SYNTHETIC_HUIDS ? 'enabled' : 'disabled'}`);
+  console.log(`  hidden placeholders without images: ${hiddenPlaceholderProductCount}`);
+  if (IS_DRY_RUN) {
+    console.log('  transaction: rolled back (dry run)');
+  }
 }
 
 async function main(): Promise<void> {
+  validateRuntimeConfig();
+
+  // app.current_shop_id is set as an ALTER ROLE default on the postgres user;
+  // Cloud SQL may reject unrecognized GUCs at startup unless primed via options.
+  const GUC_PRIME = "-c app.current_shop_id=''";
   const pool = DB_URL
-    ? new Pool({ connectionString: DB_URL })
+    ? new Pool({ connectionString: DB_URL, options: GUC_PRIME })
     : new Pool({
         host: process.env['PGHOST'] ?? 'localhost',
         port: parseInt(process.env['PGPORT'] ?? '5433', 10),
         database: process.env['PGDATABASE'] ?? 'goldsmith_dev',
         user: process.env['PGUSER'] ?? 'postgres',
         password: process.env['PGPASSWORD'] ?? 'postgres',
+        options: GUC_PRIME,
       });
 
   const client = await pool.connect();
+  let transactionOpen = false;
   try {
     // Cloud SQL `postgres` is NOT a true superuser and cannot bypass FORCE RLS.
     // Switch to platform_admin (rolbypassrls=true). No-op locally when
     // already connected as a real superuser.
     await client.query('SET ROLE platform_admin').catch(() => undefined);
     await client.query('BEGIN');
+    transactionOpen = true;
     await seed(client);
-    await client.query('COMMIT');
+    if (IS_DRY_RUN) {
+      await client.query('ROLLBACK');
+    } else {
+      await client.query('COMMIT');
+    }
+    transactionOpen = false;
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (transactionOpen) {
+      await client.query('ROLLBACK').catch(() => undefined);
+    }
     throw err;
   } finally {
     client.release();
@@ -663,6 +786,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('Storefront demo seed failed:', err);
+  console.error('Storefront seed failed:', err);
   process.exit(1);
 });

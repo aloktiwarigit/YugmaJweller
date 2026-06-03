@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import type { Collection } from '@goldsmith/customer-shared';
+import { storefrontBlurDataUrl, storefrontImageUrl } from '@/lib/image-url';
 import { SectionHeading } from './SectionHeading';
 
 interface EverydayCollectionSectionProps {
@@ -47,13 +48,13 @@ export function EverydayCollectionSection({ collections = [] }: EverydayCollecti
                 <div className="relative bg-bg" style={{ aspectRatio: '4/3' }}>
                   {image ? (
                     <Image
-                      src={image.url}
+                      src={storefrontImageUrl(image.url)}
                       alt={image.alt ?? tile.labelHi}
                       fill
                       sizes="(max-width: 768px) 50vw, 360px"
                       className="object-cover transition-transform duration-300 group-hover:scale-105"
-                      placeholder={image.placeholderUrl ? 'blur' : 'empty'}
-                      blurDataURL={image.placeholderUrl || undefined}
+                      placeholder={storefrontBlurDataUrl(image.placeholderUrl) ? 'blur' : 'empty'}
+                      blurDataURL={storefrontBlurDataUrl(image.placeholderUrl)}
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center" aria-hidden="true">

@@ -56,10 +56,10 @@ PowerShell 5.1 wraps every stderr line from a native executable as an `ErrorReco
 
 **Fix already in deploy script:** `cmd /c "pnpm install --frozen-lockfile"`.
 
-## compileSdk asymmetry
+## compileSdk / targetSdk
 
 - **Customer-mobile:** `compileSdk=35` / `targetSdk=35` with `android.suppressUnsupportedCompileSdk=35` in `gradle.properties` and `patches/expo-modules-core@1.12.26.patch` for the Kotlin nullable-receiver case. JVM heap `-Xmx4096m` / `MaxMetaspaceSize=1024m`.
-- **Shopkeeper:** `compileSdk=34` / `targetSdk=34`. Do not bump to 35 speculatively.
+- **Shopkeeper:** `compileSdk=35` / `targetSdk=35` with the same local Gradle release posture.
 
 ## Shopkeeper: JVM target mismatch with JDK 21
 
@@ -75,17 +75,20 @@ subprojects {
 ```
 Do not remove this block. Do not install JDK 17 as a workaround — the fix is in the repo.
 
-## Shopkeeper release build (no deploy script yet)
+## Shopkeeper release build
 
 ```powershell
-# Copy repo to C:\g first (robocopy + pnpm install) if not already done
-$env:EXPO_PUBLIC_API_BASE_URL = "https://goldsmith-api-528920018833.asia-south1.run.app"
-$env:EXPO_PUBLIC_TENANT_SLUG  = "anchor-dev"
-Push-Location C:\g\apps\shopkeeper\android
-.\gradlew.bat :app:assembleRelease
-adb -s <serial> install -r app\build\outputs\apk\release\app-release.apk
-Pop-Location
+# AAB for Play Console internal testing
+pnpm deploy:shopkeeper-release -- -Aab -BuildOnly
+
+# APK build + install on connected device
+pnpm deploy:shopkeeper-release
 ```
+
+Shopkeeper production values live in `apps/shopkeeper/.env.production`
+(gitignored). The example is `apps/shopkeeper/.env.production.example`.
+The Firebase config is generated with Firebase CLI into
+`apps/shopkeeper/android/app/google-services.json`.
 
 Both `android/` directories are git-tracked (bare workflow). Do not run `expo prebuild` without re-committing the generated output.
 

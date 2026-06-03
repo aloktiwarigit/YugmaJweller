@@ -2,22 +2,22 @@ import type { ExpoConfig } from 'expo/config';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const appName = process.env['EXPO_PUBLIC_APP_NAME'] ?? 'Ayodhya Swarnkar';
+const appName = process.env['EXPO_PUBLIC_APP_NAME'] ?? 'Ayodhya Swarnkar Manager';
 const easBuildProfile = process.env['EAS_BUILD_PROFILE'];
 const easBuildPlatform = process.env['EAS_BUILD_PLATFORM'];
-const isProductionProfile = easBuildProfile === 'production';
+const appEnv = process.env['APP_ENV'];
+const buildTargetPlatform = process.env['BUILD_TARGET_PLATFORM'] ?? easBuildPlatform;
+const isProductionProfile = appEnv === 'production' || easBuildProfile === 'production';
 const iosGoogleServicesFile = './GoogleService-Info.plist';
 const iosGoogleServicesPath = path.resolve(__dirname, iosGoogleServicesFile);
 const hasIosGoogleServicesFile = fs.existsSync(iosGoogleServicesPath);
-const androidGoogleServicesFile = './google-services.json';
+const androidGoogleServicesFile = process.env['GOOGLE_SERVICES_JSON'] ?? './android/app/google-services.json';
 const androidGoogleServicesPath = path.resolve(__dirname, androidGoogleServicesFile);
-const productionFirebaseProjectId = 'goldsmith-prod';
 const devFirebaseProjectId = 'goldsmith-dev';
 const devApiBaseUrl = 'http://10.0.2.2:3000';
 const devTenantSlug = 'anchor-dev';
 const devAndroidPackage = 'com.goldsmith.shopkeeper.dev';
 const devIosBundleIdentifier = 'com.goldsmith.shopkeeper.dev';
-const placeholderEasProjectId = 'TBD-post-SOW';
 const appIcon = './assets/app/icon.png';
 const splashIcon = './assets/app/splash-icon.png';
 const splashBackgroundColor = '#F8EFE3';
@@ -47,6 +47,17 @@ type AndroidGoogleServices = {
     }>;
   }>;
 };
+
+function valueLooksLikePlaceholder(value: string): boolean {
+  return value.includes('REPLACE_WITH_') || value.startsWith('SET-');
+}
+
+function targetPlatforms(): { android: boolean; ios: boolean } {
+  const target = (buildTargetPlatform ?? '').toLowerCase();
+  if (target === 'android') return { android: true, ios: false };
+  if (target === 'ios') return { android: false, ios: true };
+  return { android: true, ios: true };
+}
 
 function readAndroidFirebaseConfig(packageName: string): {
   apiKey?: string;
@@ -89,7 +100,6 @@ const firebaseAuthDomain =
   process.env['EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN'] ?? `${firebaseProjectId}.firebaseapp.com`;
 const apiBaseUrl = process.env['EXPO_PUBLIC_API_BASE_URL'] ?? devApiBaseUrl;
 const tenantSlug = process.env['EXPO_PUBLIC_TENANT_SLUG'] ?? devTenantSlug;
-const easProjectId = process.env['EXPO_PUBLIC_EAS_PROJECT_ID'] ?? placeholderEasProjectId;
 const usesCleartextTraffic = !isProductionProfile;
 
 function requireProductionConfig(): void {
@@ -98,19 +108,18 @@ function requireProductionConfig(): void {
   const failures: string[] = [];
 
   const requiredEnvVars: Record<string, string | undefined> = {
+    EXPO_PUBLIC_APP_NAME: process.env['EXPO_PUBLIC_APP_NAME'],
     EXPO_PUBLIC_API_BASE_URL: process.env['EXPO_PUBLIC_API_BASE_URL'],
     EXPO_PUBLIC_TENANT_SLUG: process.env['EXPO_PUBLIC_TENANT_SLUG'],
     EXPO_PUBLIC_FIREBASE_PROJECT_ID: process.env['EXPO_PUBLIC_FIREBASE_PROJECT_ID'],
-    EXPO_PUBLIC_FIREBASE_API_KEY: firebaseApiKey,
-    EXPO_PUBLIC_FIREBASE_APP_ID: firebaseAppId,
-    EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: googleWebClientId,
     EXPO_PUBLIC_ANDROID_PACKAGE: process.env['EXPO_PUBLIC_ANDROID_PACKAGE'],
-    EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER: process.env['EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER'],
-    EXPO_PUBLIC_EAS_PROJECT_ID: process.env['EXPO_PUBLIC_EAS_PROJECT_ID'],
   };
 
   for (const [name, value] of Object.entries(requiredEnvVars)) {
     if (!value) failures.push(`${name} is required`);
+    if (value && valueLooksLikePlaceholder(value)) {
+      failures.push(`${name} still contains a placeholder value`);
+    }
   }
 
   if (
@@ -122,31 +131,26 @@ function requireProductionConfig(): void {
     failures.push('EXPO_PUBLIC_API_BASE_URL must point at the HTTPS production API');
   }
 
-  if (tenantSlug === devTenantSlug || tenantSlug.endsWith('-dev')) {
-    failures.push('EXPO_PUBLIC_TENANT_SLUG must be a production tenant slug');
+  const targets = targetPlatforms();
+  if (targets.android && !fs.existsSync(androidGoogleServicesPath)) {
+    failures.push(`${androidGoogleServicesFile} is required for production Android builds`);
   }
 
-  if (firebaseProjectId === devFirebaseProjectId || firebaseProjectId.endsWith('-dev')) {
-    failures.push('EXPO_PUBLIC_FIREBASE_PROJECT_ID must be a production Firebase project');
+  if (targets.android && fs.existsSync(androidGoogleServicesPath)) {
+    if (!androidFirebaseConfig.projectId) {
+      failures.push(`${androidGoogleServicesFile} must include a Firebase project id`);
+    }
+    if (androidFirebaseConfig.projectId !== firebaseProjectId) {
+      failures.push(
+        `${androidGoogleServicesFile} project id (${androidFirebaseConfig.projectId}) must match EXPO_PUBLIC_FIREBASE_PROJECT_ID (${firebaseProjectId})`,
+      );
+    }
+    if (!androidFirebaseConfig.appId || !firebaseApiKey || !googleWebClientId) {
+      failures.push(`${androidGoogleServicesFile} must include app id, API key, and Type-3 web OAuth client`);
+    }
   }
 
-  if (firebaseProjectId !== productionFirebaseProjectId) {
-    failures.push(`EXPO_PUBLIC_FIREBASE_PROJECT_ID must be ${productionFirebaseProjectId}`);
-  }
-
-  if (easBuildPlatform === 'android' && !fs.existsSync(androidGoogleServicesPath)) {
-    failures.push('google-services.json is required for production Android builds');
-  }
-
-  if (
-    easBuildPlatform === 'android' &&
-    fs.existsSync(androidGoogleServicesPath) &&
-    androidFirebaseConfig.projectId !== productionFirebaseProjectId
-  ) {
-    failures.push(`google-services.json must target ${productionFirebaseProjectId}`);
-  }
-
-  if (easBuildPlatform === 'ios' && !hasIosGoogleServicesFile) {
+  if (targets.ios && !hasIosGoogleServicesFile) {
     failures.push('GoogleService-Info.plist is required for production iOS builds');
   }
 
@@ -162,12 +166,8 @@ function requireProductionConfig(): void {
     failures.push('EXPO_PUBLIC_ANDROID_PACKAGE must be a production Android package');
   }
 
-  if (iosBundleIdentifier === devIosBundleIdentifier || iosBundleIdentifier.endsWith('.dev')) {
+  if (targets.ios && (iosBundleIdentifier === devIosBundleIdentifier || iosBundleIdentifier.endsWith('.dev'))) {
     failures.push('EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER must be a production iOS bundle identifier');
-  }
-
-  if (easProjectId === placeholderEasProjectId) {
-    failures.push('EXPO_PUBLIC_EAS_PROJECT_ID must be the real EAS project ID');
   }
 
   if (failures.length > 0) {
@@ -183,7 +183,7 @@ const config: ExpoConfig = {
   name: appName,
   slug: 'goldsmith-shopkeeper',
   scheme: 'goldsmithshopkeeper',
-  version: '0.0.0',
+  version: process.env['EXPO_PUBLIC_APP_VERSION'] ?? (isProductionProfile ? '1.0.0' : '0.0.0'),
   orientation: 'portrait',
   userInterfaceStyle: 'light',
   platforms: ['ios', 'android'],
@@ -197,7 +197,7 @@ const config: ExpoConfig = {
     '@react-native-firebase/app',
     '@react-native-firebase/auth',
     '@react-native-google-signin/google-signin',
-    'expo-dev-client',
+    ...(isProductionProfile ? [] : ['expo-dev-client' as const]),
     'expo-font',
     'expo-router',
     [
@@ -238,7 +238,6 @@ const config: ExpoConfig = {
     },
     googleWebClientId,
     router: { origin: false },
-    eas: { projectId: easProjectId },
   },
   web: {
     favicon,

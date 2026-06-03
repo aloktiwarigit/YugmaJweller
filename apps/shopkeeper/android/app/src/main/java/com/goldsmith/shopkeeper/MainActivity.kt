@@ -1,4 +1,4 @@
-package com.goldsmith.shopkeeper.dev
+package com.goldsmith.shopkeeper
 
 import android.os.Build
 import android.os.Bundle

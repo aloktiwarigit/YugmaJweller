@@ -4,7 +4,44 @@
   "subcopy": "First step: add staff and assign roles",
   "cta_staff": "Add staff",
   "cta_settings": "Go to settings",
-  "tabs": { "dashboard": "Dashboard", "invoices": "Invoices", "products": "Products", "customers": "Customers", "billing": "Billing", "reports": "Reports" },
+  "tabs": {
+    "dashboard": "Dashboard",
+    "home": "Home",
+    "inventory": "Inventory",
+    "invoices": "Invoices",
+    "products": "Products",
+    "customers": "Customers",
+    "billing": "Billing",
+    "reports": "Reports",
+    "more": "More"
+  },
+  "role": {
+    "staff_workspace": "Staff workspace",
+    "shop_operations": "Shop operations"
+  },
+  "section": {
+    "today": "Today"
+  },
+  "actions": {
+    "new_bill": "New Bill",
+    "inventory": "Inventory",
+    "search_inventory": "Search Inventory",
+    "customers": "Customers",
+    "custom_orders": "Custom Order",
+    "rate_lock": "Rate Lock",
+    "reports": "Reports",
+    "staff": "Staff"
+  },
+  "more": {
+    "section": "Daily operations",
+    "staff_empty": "Staff access is limited to billing and inventory.",
+    "customers": "Customer List",
+    "custom_orders": "Custom Order",
+    "try_at_home": "Try at Home",
+    "reviews": "Reviews",
+    "rate_lock": "Rate Lock Booking",
+    "settings": "Settings"
+  },
   "stub_story_1_2": "Available in Story 1.2",
   "stubs": {
     "billing": "Billing — Coming Soon",

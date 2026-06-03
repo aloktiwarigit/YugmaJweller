@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import type { Collection, CatalogProductCard } from '@goldsmith/customer-shared';
+import { storefrontBlurDataUrl, storefrontImageUrl } from '@/lib/image-url';
 import { SectionHeading } from './SectionHeading';
 
 interface SpotlightSectionProps {
@@ -20,18 +21,18 @@ function ProductSpotlightTile({ product }: { product: CatalogProductCard }) {
   return (
     <a
       href={`/products/${product.id}`}
-      className="group flex min-h-[170px] flex-col overflow-hidden rounded-md border border-borderSubtle bg-surface transition-all hover:border-borderStrong hover:shadow-sm focus-visible:outline-2 focus-visible:outline-primary"
+      className="group flex min-h-[170px] flex-col overflow-hidden rounded-md border border-borderSubtle bg-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-primary"
     >
       <div className="relative flex-1 bg-bg">
         {product.primaryImage ? (
           <Image
-            src={product.primaryImage.url}
+            src={storefrontImageUrl(product.primaryImage.url)}
             alt={product.primaryImage.alt ?? label}
             fill
             sizes="(max-width: 768px) 50vw, 200px"
             className="object-cover transition-transform duration-300 group-hover:scale-105"
-            placeholder={product.primaryImage.placeholderUrl ? 'blur' : 'empty'}
-            blurDataURL={product.primaryImage.placeholderUrl || undefined}
+            placeholder={storefrontBlurDataUrl(product.primaryImage.placeholderUrl) ? 'blur' : 'empty'}
+            blurDataURL={storefrontBlurDataUrl(product.primaryImage.placeholderUrl)}
           />
         ) : (
           <div className="flex h-full items-center justify-center p-4" aria-hidden="true">
@@ -63,30 +64,32 @@ export function SpotlightSection({ featuredCollection, spotlightProducts }: Spot
         <SectionHeading
           id="spotlight-heading"
           titleHi="स्पॉटलाइट में"
-          eyebrowHi="इस सीज़न की पसंद"
+          eyebrowHi="इस सीजन की पसंद"
         />
 
         <div className="hidden gap-4 md:grid" style={{ gridTemplateColumns: '1.12fr 0.88fr' }}>
           <a
             href={collectionHref}
-            className="group relative flex min-h-[340px] flex-col justify-end overflow-hidden rounded-lg border border-borderSubtle bg-surface transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-primary"
+            className="group overflow-hidden rounded-md border border-borderSubtle bg-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-primary"
           >
-            {featuredCollection?.heroImage ? (
-              <Image
-                src={featuredCollection.heroImage.url}
-                alt={featuredCollection.heroImage.alt ?? collectionTitle}
-                fill
-                sizes="(max-width: 768px) 100vw, 620px"
-                className="object-cover transition-transform duration-500 group-hover:scale-105"
-                placeholder={featuredCollection.heroImage.placeholderUrl ? 'blur' : 'empty'}
-                blurDataURL={featuredCollection.heroImage.placeholderUrl || undefined}
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-primaryWash" aria-hidden="true">
-                <span className="font-heading text-6xl text-primary/20">✦</span>
-              </div>
-            )}
-            <div className="relative bg-gradient-to-t from-surfaceElevated/95 to-transparent p-6 pt-16">
+            <div className="relative min-h-[270px] bg-bg">
+              {featuredCollection?.heroImage ? (
+                <Image
+                  src={storefrontImageUrl(featuredCollection.heroImage.url)}
+                  alt={featuredCollection.heroImage.alt ?? collectionTitle}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 620px"
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  placeholder={storefrontBlurDataUrl(featuredCollection.heroImage.placeholderUrl) ? 'blur' : 'empty'}
+                  blurDataURL={storefrontBlurDataUrl(featuredCollection.heroImage.placeholderUrl)}
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center bg-primaryWash" aria-hidden="true">
+                  <span className="font-heading text-6xl text-primary/20">✦</span>
+                </div>
+              )}
+            </div>
+            <div className="p-6">
               <p className="mb-1 font-prose text-xs italic text-inkSoft">संग्रह / Collection</p>
               <p className="font-heading text-2xl text-ink">{collectionTitle}</p>
               <span className="mt-2 inline-block font-ui text-sm text-primaryDeep underline group-hover:opacity-80">
@@ -119,25 +122,26 @@ export function SpotlightSection({ featuredCollection, spotlightProducts }: Spot
         <div className="flex flex-col gap-3 md:hidden">
           <a
             href={collectionHref}
-            className="group relative flex flex-col justify-end overflow-hidden rounded-lg border border-borderSubtle bg-surface focus-visible:outline-2 focus-visible:outline-primary"
-            style={{ aspectRatio: '16/10' }}
+            className="group overflow-hidden rounded-md border border-borderSubtle bg-surface focus-visible:outline-2 focus-visible:outline-primary"
           >
-            {featuredCollection?.heroImage ? (
-              <Image
-                src={featuredCollection.heroImage.url}
-                alt={featuredCollection.heroImage.alt ?? collectionTitle}
-                fill
-                sizes="100vw"
-                className="object-cover"
-                placeholder={featuredCollection.heroImage.placeholderUrl ? 'blur' : 'empty'}
-                blurDataURL={featuredCollection.heroImage.placeholderUrl || undefined}
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-primaryWash" aria-hidden="true">
-                <span className="font-heading text-5xl text-primary/20">✦</span>
-              </div>
-            )}
-            <div className="relative bg-gradient-to-t from-surfaceElevated/95 to-transparent p-4 pt-12">
+            <div className="relative bg-bg" style={{ aspectRatio: '16/10' }}>
+              {featuredCollection?.heroImage ? (
+                <Image
+                  src={storefrontImageUrl(featuredCollection.heroImage.url)}
+                  alt={featuredCollection.heroImage.alt ?? collectionTitle}
+                  fill
+                  sizes="100vw"
+                  className="object-cover"
+                  placeholder={storefrontBlurDataUrl(featuredCollection.heroImage.placeholderUrl) ? 'blur' : 'empty'}
+                  blurDataURL={storefrontBlurDataUrl(featuredCollection.heroImage.placeholderUrl)}
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center bg-primaryWash" aria-hidden="true">
+                  <span className="font-heading text-5xl text-primary/20">✦</span>
+                </div>
+              )}
+            </div>
+            <div className="p-4">
               <p className="font-heading text-xl text-ink">{collectionTitle}</p>
             </div>
           </a>

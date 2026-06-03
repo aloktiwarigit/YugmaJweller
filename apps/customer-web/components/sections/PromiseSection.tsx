@@ -69,7 +69,7 @@ export function PromiseSection() {
       className="border-t border-borderSubtle bg-bg py-12"
     >
       <div className="mx-auto grid max-w-6xl gap-8 px-4 md:grid-cols-[0.95fr_1.05fr] md:items-center">
-        <div className="relative min-h-[320px] overflow-hidden rounded-md bg-ink md:min-h-[440px]">
+        <div className="relative min-h-[320px] overflow-hidden rounded-md bg-bg md:min-h-[440px]">
           <Image
             src="/demo-shop/campaign-gift-table.jpg"
             alt="Curated jewellery display tray"
@@ -77,11 +77,6 @@ export function PromiseSection() {
             sizes="(max-width: 768px) 100vw, 520px"
             className="object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-ink/72 via-transparent to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 p-5">
-            <p className="font-prose text-xs uppercase tracking-[0.18em] text-primary">दुकान का वादा</p>
-            <p className="mt-2 font-heading text-2xl text-white">भरोसे के साथ खरीदारी</p>
-          </div>
         </div>
 
         <div>

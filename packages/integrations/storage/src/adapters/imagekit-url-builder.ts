@@ -13,7 +13,10 @@ export class ImageKitTransformUrlBuilder {
   }
 
   private publicAssetUrl(key: string): string | null {
-    if (key.startsWith('public/')) return `/${key.slice('public/'.length)}`;
+    if (key.startsWith('public/')) {
+      const base = (process.env['PUBLIC_ASSET_BASE_URL'] ?? '').replace(/\/$/, '');
+      return `${base}/${key.slice('public/'.length)}`;
+    }
     if (key.startsWith('/')) return key;
     return null;
   }

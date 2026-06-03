@@ -10,32 +10,39 @@ Dev Client app for the anchor jeweller shopkeeper. See `docs/runbook.md` for fir
 4. Run `pnpm install` at repo root.
 5. Run `pnpm --filter @goldsmith/shopkeeper start`.
 
-## EAS Builds
+## Local Production Android Builds
 
-Checked-in profiles live in `eas.json`:
+Shopkeeper production builds do not use EAS. They follow the same local Gradle
+release path as customer-mobile.
 
-- `development`: internal dev-client builds.
-- `preview`: internal preview builds.
-- `production`: store-ready production builds.
+Production build inputs:
 
-Development and preview builds keep local ergonomics: when env vars are omitted, `app.config.ts` falls back to dev package IDs, `goldsmith-dev`, `http://10.0.2.2:3000`, `anchor-dev`, and the placeholder EAS project ID.
+- `apps/shopkeeper/.env.production`: local, gitignored production values.
+- `apps/shopkeeper/android/app/google-services.json`: Firebase Android config,
+  generated with Firebase CLI and gitignored.
+- Azure Key Vault signing secrets referenced by `.env.production`.
 
-Production builds fail fast when `EAS_BUILD_PROFILE=production` and any required production value is missing or still points at a dev default. Configure these as EAS environment variables before running `eas build --profile production`:
+Build an Android App Bundle for Play Console:
 
-- `EXPO_PUBLIC_API_BASE_URL`: production API URL. Must not be `localhost` or `10.0.2.2`.
-- `EXPO_PUBLIC_TENANT_SLUG`: production tenant slug. Must not be `anchor-dev` or end in `-dev`.
-- `EXPO_PUBLIC_FIREBASE_PROJECT_ID`: must be `goldsmith-prod`.
-- `EXPO_PUBLIC_FIREBASE_API_KEY`: Firebase web/native API key used by app runtime config.
-- `EXPO_PUBLIC_FIREBASE_APP_ID`: Firebase app ID used by app runtime config.
-- `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`: Type-3 Web OAuth client ID from `google-services.json`, used by Google Sign-In.
-- `EXPO_PUBLIC_ANDROID_PACKAGE`: production Android package, for example `com.goldsmith.shopkeeper`.
-- `EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER`: production iOS bundle identifier, for example `com.goldsmith.shopkeeper`.
-- `EXPO_PUBLIC_EAS_PROJECT_ID`: real EAS project UUID.
+```powershell
+pnpm deploy:shopkeeper-release -- -Aab -BuildOnly
+```
 
-Production native Firebase files must also match the production Firebase project:
+Build and install a release APK on a connected device:
 
-- `google-services.json` for Android.
-- `GoogleService-Info.plist` for iOS builds.
+```powershell
+pnpm deploy:shopkeeper-release
+```
+
+Production builds fail fast when `APP_ENV=production` and required values are
+missing. Required values are documented in `.env.production.example`.
+
+The current release mirrors customer-mobile's Firebase/API setup:
+
+- Android package: `com.goldsmith.shopkeeper`
+- Firebase project: `goldsmith-dev`
+- Firebase Android app: `1:528920018833:android:12db8e62cd0877dce3e430`
+- API: `https://goldsmith-api-528920018833.asia-south1.run.app`
 
 ## App and Store Assets
 

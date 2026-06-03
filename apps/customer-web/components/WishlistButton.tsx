@@ -136,7 +136,7 @@ export function WishlistButton({ productId, productName, compact }: WishlistButt
         <button
           onClick={handleClick}
           disabled={busy}
-          className={`h-10 w-10 flex items-center justify-center rounded-full border text-lg transition-all duration-[280ms] focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50 ${
+          className={`flex h-8 w-8 items-center justify-center rounded-full border text-base transition-all duration-[280ms] focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50 ${
             wishlisted
               ? 'border-accent bg-accentWash text-accent scale-110'
               : 'border-border bg-surface hover:bg-borderSubtle'

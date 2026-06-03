@@ -11,6 +11,7 @@ import { AuthProvider } from '../src/providers/AuthProvider';
 import { TenantProvider } from '../src/providers/TenantProvider';
 import { ThemeProvider } from '../src/providers/ThemeProvider';
 import { OfflineProvider } from '../src/providers/OfflineProvider';
+import { LocaleProvider } from '../src/providers/LocaleProvider';
 
 const POSTHOG_API_KEY = process.env.EXPO_PUBLIC_POSTHOG_API_KEY;
 const posthogClient = POSTHOG_API_KEY
@@ -73,15 +74,17 @@ export default function RootLayout(): JSX.Element | null {
         <ThemeProvider>
           <AuthProvider>
             <TenantProvider>
-              <OfflineProvider>
-                <ScreenTracker />
-                <StatusBar style="dark" />
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                  }}
-                />
-              </OfflineProvider>
+              <LocaleProvider>
+                <OfflineProvider>
+                  <ScreenTracker />
+                  <StatusBar style="dark" />
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                    }}
+                  />
+                </OfflineProvider>
+              </LocaleProvider>
             </TenantProvider>
           </AuthProvider>
         </ThemeProvider>

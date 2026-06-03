@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { STOREFRONT_GIFT_PERSONAS } from '@goldsmith/customer-shared';
 import type { Collection } from '@goldsmith/customer-shared';
+import { storefrontBlurDataUrl, storefrontImageUrl } from '@/lib/image-url';
 import { SectionHeading } from './SectionHeading';
 
 interface GiftPersonasSectionProps {
@@ -45,28 +46,26 @@ export function GiftPersonasSection({ collections = [] }: GiftPersonasSectionPro
               <a
                 key={persona.key}
                 href={persona.href}
-                className="group relative flex flex-col overflow-hidden rounded-lg border border-borderSubtle transition-all hover:border-borderStrong hover:shadow-md focus-visible:outline-2 focus-visible:outline-primary"
-                style={{ aspectRatio: '4/5' }}
+                className="group overflow-hidden rounded-md border border-borderSubtle bg-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-primary"
               >
-                {image ? (
-                  <Image
-                    src={image.url}
-                    alt={image.alt ?? persona.labelHi}
-                    fill
-                    sizes="180px"
-                    className="object-cover transition-transform duration-300 group-hover:scale-105"
-                    placeholder={image.placeholderUrl ? 'blur' : 'empty'}
-                    blurDataURL={image.placeholderUrl || undefined}
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center bg-primaryWash" aria-hidden="true">
-                    <span className="font-heading text-5xl text-primary/30">{persona.labelHi.slice(0, 1)}</span>
-                  </div>
-                )}
-                <div
-                  className="absolute inset-x-0 bottom-0 px-3 pb-3 pt-8"
-                  style={{ background: 'linear-gradient(to top, rgba(245,237,221,0.94) 0%, transparent 100%)' }}
-                >
+                <div className="relative bg-bg" style={{ aspectRatio: '4/5' }}>
+                  {image ? (
+                    <Image
+                      src={storefrontImageUrl(image.url)}
+                      alt={image.alt ?? persona.labelHi}
+                      fill
+                      sizes="180px"
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      placeholder={storefrontBlurDataUrl(image.placeholderUrl) ? 'blur' : 'empty'}
+                      blurDataURL={storefrontBlurDataUrl(image.placeholderUrl)}
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center bg-primaryWash" aria-hidden="true">
+                      <span className="font-heading text-5xl text-primary/30">{persona.labelHi.slice(0, 1)}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="px-3 py-3">
                   <p className="font-prose text-xs italic text-inkSoft">गिफ्ट / Gift</p>
                   <p className="font-heading text-base leading-tight text-ink">{persona.labelHi}</p>
                 </div>
@@ -87,28 +86,27 @@ export function GiftPersonasSection({ collections = [] }: GiftPersonasSectionPro
               <a
                 key={persona.key}
                 href={persona.href}
-                className="relative flex shrink-0 snap-start flex-col overflow-hidden rounded-lg border border-borderSubtle focus-visible:outline-2 focus-visible:outline-primary"
-                style={{ width: '56vw', aspectRatio: '4/5' }}
+                className="shrink-0 snap-start overflow-hidden rounded-md border border-borderSubtle bg-surface focus-visible:outline-2 focus-visible:outline-primary"
+                style={{ width: '56vw' }}
               >
-                {image ? (
-                  <Image
-                    src={image.url}
-                    alt={image.alt ?? persona.labelHi}
-                    fill
-                    sizes="56vw"
-                    className="object-cover"
-                    placeholder={image.placeholderUrl ? 'blur' : 'empty'}
-                    blurDataURL={image.placeholderUrl || undefined}
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center bg-primaryWash" aria-hidden="true">
-                    <span className="font-heading text-5xl text-primary/30">{persona.labelHi.slice(0, 1)}</span>
-                  </div>
-                )}
-                <div
-                  className="absolute inset-x-0 bottom-0 px-3 pb-3 pt-8"
-                  style={{ background: 'linear-gradient(to top, rgba(245,237,221,0.94) 0%, transparent 100%)' }}
-                >
+                <div className="relative bg-bg" style={{ aspectRatio: '4/5' }}>
+                  {image ? (
+                    <Image
+                      src={storefrontImageUrl(image.url)}
+                      alt={image.alt ?? persona.labelHi}
+                      fill
+                      sizes="56vw"
+                      className="object-cover"
+                      placeholder={storefrontBlurDataUrl(image.placeholderUrl) ? 'blur' : 'empty'}
+                      blurDataURL={storefrontBlurDataUrl(image.placeholderUrl)}
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center bg-primaryWash" aria-hidden="true">
+                      <span className="font-heading text-5xl text-primary/30">{persona.labelHi.slice(0, 1)}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="px-3 py-3">
                   <p className="font-prose text-xs italic text-inkSoft">गिफ्ट</p>
                   <p className="font-heading text-base text-ink">{persona.labelHi}</p>
                 </div>

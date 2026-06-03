@@ -82,6 +82,7 @@ const ModalMock = React.forwardRef<unknown, AnyProps>(
 export const View = passthrough('view');
 export const Text = passthrough('text');
 export const Pressable = PressableMock;
+export const TouchableOpacity = PressableMock;
 export const TextInput = TextInputMock;
 export const Image = ImageMock;
 export const Modal = ModalMock;

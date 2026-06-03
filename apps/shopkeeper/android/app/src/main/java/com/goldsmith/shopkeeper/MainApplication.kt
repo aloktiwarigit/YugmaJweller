@@ -1,4 +1,4 @@
-package com.goldsmith.shopkeeper.dev
+package com.goldsmith.shopkeeper
 
 import android.app.Application
 import android.content.res.Configuration

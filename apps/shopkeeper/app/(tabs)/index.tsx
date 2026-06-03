@@ -3,26 +3,28 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Skeleton } from '@goldsmith/ui-mobile';
+import { t } from '@goldsmith/i18n';
 import { spacing, typography } from '@goldsmith/ui-tokens';
 import { useTenantStore } from '../../src/stores/tenantStore';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useThemeTokens } from '../../src/hooks/useThemeTokens';
+import { useLocaleStore } from '../../src/stores/localeStore';
 import { DashboardKpiCard } from '../../src/components/DashboardKpiCard';
 
 type QuickAction = {
-  label: string;
+  labelKey: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
   href: string;
   managerOnly?: boolean;
 };
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { label: 'नया बिल', icon: 'receipt-outline', href: '/billing/new' },
-  { label: 'इन्वेंटरी', icon: 'cube-outline', href: '/inventory' },
-  { label: 'ग्राहक', icon: 'people-outline', href: '/customers', managerOnly: true },
-  { label: 'कस्टम ऑर्डर', icon: 'construct-outline', href: '/custom-orders', managerOnly: true },
-  { label: 'दर-लॉक', icon: 'lock-closed-outline', href: '/rate-lock', managerOnly: true },
-  { label: 'रिपोर्ट', icon: 'bar-chart-outline', href: '/reports', managerOnly: true },
+  { labelKey: 'dashboard.actions.new_bill', icon: 'receipt-outline', href: '/billing/new' },
+  { labelKey: 'dashboard.actions.inventory', icon: 'cube-outline', href: '/inventory' },
+  { labelKey: 'dashboard.actions.customers', icon: 'people-outline', href: '/customers', managerOnly: true },
+  { labelKey: 'dashboard.actions.custom_orders', icon: 'construct-outline', href: '/custom-orders', managerOnly: true },
+  { labelKey: 'dashboard.actions.rate_lock', icon: 'lock-closed-outline', href: '/rate-lock', managerOnly: true },
+  { labelKey: 'dashboard.actions.reports', icon: 'bar-chart-outline', href: '/reports', managerOnly: true },
 ];
 
 export default function DashboardScreen(): React.ReactElement {
@@ -30,6 +32,7 @@ export default function DashboardScreen(): React.ReactElement {
   const tenant = useTenantStore((s) => s.tenant);
   const loading = useTenantStore((s) => s.loading);
   const role = useAuthStore((s) => s.user?.role);
+  useLocaleStore((s) => s.locale);
   const isStaff = role === 'shop_staff';
   const showKpis = process.env['EXPO_PUBLIC_DASHBOARD_KPIS'] === '1' && !isStaff;
   const isLoading = loading || tenant === null;
@@ -59,7 +62,7 @@ export default function DashboardScreen(): React.ReactElement {
                   {tenant.displayName}
                 </Text>
                 <Text style={{ ...styles.roleText, color: colors.inkMute }}>
-                  {isStaff ? 'स्टाफ कार्यक्षेत्र' : 'दुकान संचालन'}
+                  {isStaff ? t('dashboard.role.staff_workspace') : t('dashboard.role.shop_operations')}
                 </Text>
               </>
             )}
@@ -70,7 +73,7 @@ export default function DashboardScreen(): React.ReactElement {
           <Pressable
             onPress={() => router.push('/settings')}
             accessibilityRole="button"
-            accessibilityLabel="सेटिंग्स"
+            accessibilityLabel={t('settings.title')}
             testID="dashboard-settings-icon"
             style={styles.iconButton}
           >
@@ -88,14 +91,14 @@ export default function DashboardScreen(): React.ReactElement {
         <>
           <View style={styles.primaryActions}>
             <Button
-              label="नया बिल"
+              label={t('dashboard.actions.new_bill')}
               variant="primary"
               onPress={() => router.push('/billing/new')}
               testID="dashboard-cta-invoice"
             />
             <View style={{ width: spacing.sm }} />
             <Button
-              label="इन्वेंटरी खोजें"
+              label={t('dashboard.actions.search_inventory')}
               variant="secondary"
               onPress={() => router.push('/inventory')}
               testID="dashboard-cta-inventory"
@@ -103,35 +106,42 @@ export default function DashboardScreen(): React.ReactElement {
           </View>
 
           <View style={styles.sectionHeader}>
-            <Text style={{ ...styles.sectionTitle, color: colors.ink }}>आज</Text>
+            <Text style={{ ...styles.sectionTitle, color: colors.ink }}>
+              {t('dashboard.section.today')}
+            </Text>
             {!isStaff ? (
               <Pressable
                 onPress={() => router.push('/settings/staff')}
                 accessibilityRole="button"
-              testID="dashboard-cta-staff"
+                testID="dashboard-cta-staff"
               >
-                <Text style={{ ...styles.headerLink, color: colors.primary }}>स्टाफ</Text>
+                <Text style={{ ...styles.headerLink, color: colors.primary }}>
+                  {t('dashboard.actions.staff')}
+                </Text>
               </Pressable>
             ) : null}
           </View>
 
           <View style={styles.actionGrid}>
-            {visibleActions.map((action) => (
-              <Pressable
-                key={action.href}
-                style={{
-                  ...styles.actionCard,
-                  backgroundColor: colors.white,
-                  borderColor: colors.border,
-                }}
-                onPress={() => router.push(action.href as Parameters<typeof router.push>[0])}
-                accessibilityRole="button"
-                accessibilityLabel={action.label}
-              >
-                <Ionicons name={action.icon} size={22} color={colors.primary} />
-                <Text style={{ ...styles.actionLabel, color: colors.ink }}>{action.label}</Text>
-              </Pressable>
-            ))}
+            {visibleActions.map((action) => {
+              const label = t(action.labelKey);
+              return (
+                <Pressable
+                  key={action.href}
+                  style={{
+                    ...styles.actionCard,
+                    backgroundColor: colors.white,
+                    borderColor: colors.border,
+                  }}
+                  onPress={() => router.push(action.href as Parameters<typeof router.push>[0])}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                >
+                  <Ionicons name={action.icon} size={22} color={colors.primary} />
+                  <Text style={{ ...styles.actionLabel, color: colors.ink }}>{label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           {showKpis ? <DashboardKpiCard /> : null}

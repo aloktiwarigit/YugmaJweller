@@ -15,9 +15,9 @@ export function ProductGrid({ products, emptyMessage = 'अभी कोई उ�
     );
   }
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" aria-label="उत्पाद सूची">
-      {products.map((product) => (
-        <ProductCard key={product.id} product={product} />
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-6" aria-label="उत्पाद सूची">
+      {products.map((product, index) => (
+        <ProductCard key={product.id} product={product} variant="compact" priority={index < 10} />
       ))}
     </div>
   );

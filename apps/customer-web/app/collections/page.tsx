@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { headers } from 'next/headers';
 import { resolveShopSlug } from '@/lib/tenant-slug';
+import { storefrontBlurDataUrl, storefrontImageUrl } from '@/lib/image-url';
 import {
   STOREFRONT_CATEGORY_TILES,
   STOREFRONT_GIFT_PERSONAS,
@@ -27,31 +28,28 @@ function CollectionCard({ collection }: { collection: Collection }) {
       <div className="relative bg-bg" style={{ aspectRatio: '4/5' }}>
         {collection.heroImage ? (
           <Image
-            src={collection.heroImage.url}
+            src={storefrontImageUrl(collection.heroImage.url)}
             alt={collection.heroImage.alt ?? collection.titleHi}
             fill
             sizes="(max-width: 768px) 50vw, 280px"
             className="object-cover transition-transform duration-300 group-hover:scale-105"
-            placeholder={collection.heroImage.placeholderUrl ? 'blur' : 'empty'}
-            blurDataURL={collection.heroImage.placeholderUrl || undefined}
+            placeholder={storefrontBlurDataUrl(collection.heroImage.placeholderUrl) ? 'blur' : 'empty'}
+            blurDataURL={storefrontBlurDataUrl(collection.heroImage.placeholderUrl)}
           />
         ) : (
           <div className="flex h-full items-center justify-center" aria-hidden="true">
             <span className="font-heading text-5xl text-primary/25">✦</span>
           </div>
         )}
-        <div
-          className="absolute inset-x-0 bottom-0 px-4 pb-4 pt-12"
-          style={{ background: 'linear-gradient(to top, rgba(255,255,255,0.95) 0%, transparent 100%)' }}
-        >
-          <h3 className="font-heading text-xl leading-tight text-ink">{collection.titleHi}</h3>
-          {collection.subtitleHi ? (
-            <p className="mt-1 line-clamp-2 font-prose text-sm text-inkMute">{collection.subtitleHi}</p>
-          ) : null}
-          <p className="mt-2 font-ui text-xs font-semibold text-primaryDeep">
-            {collection.productCount} designs
-          </p>
-        </div>
+      </div>
+      <div className="px-4 py-4">
+        <h3 className="font-heading text-xl leading-tight text-ink">{collection.titleHi}</h3>
+        {collection.subtitleHi ? (
+          <p className="mt-1 line-clamp-2 font-prose text-sm text-inkMute">{collection.subtitleHi}</p>
+        ) : null}
+        <p className="mt-2 font-ui text-xs font-semibold text-primaryDeep">
+          {collection.productCount} designs
+        </p>
       </div>
     </a>
   );

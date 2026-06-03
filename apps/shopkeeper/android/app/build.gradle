@@ -3,6 +3,49 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+def appEnv = (System.getenv("APP_ENV") ?: findProperty("APP_ENV") ?: "development").toString()
+
+def envOrProp(String name, Object fallback) {
+  def value = System.getenv(name)
+  if (value == null || value.toString().trim().isEmpty()) {
+    value = project.findProperty(name)
+  }
+  return (value == null || value.toString().trim().isEmpty()) ? fallback : value
+}
+
+def androidApplicationId = envOrProp("EXPO_PUBLIC_ANDROID_PACKAGE", "com.goldsmith.shopkeeper.dev").toString()
+def androidVersionName = envOrProp(
+    "EXPO_PUBLIC_APP_VERSION",
+    appEnv == "production" ? "1.0.0" : "0.0.0"
+).toString()
+def androidVersionCode = envOrProp("ANDROID_VERSION_CODE", "1").toString().toInteger()
+
+// Signing: reads from key.properties if present, otherwise falls back to env vars.
+// key.properties lives at android/app/key.properties (gitignored). Format:
+//   storeFile=../../goldsmith-shopkeeper.keystore
+//   storePassword=<password>
+//   keyAlias=<alias>
+//   keyPassword=<password>
+def keyPropertiesFile = file("key.properties")
+def keyProps = new Properties()
+if (keyPropertiesFile.exists()) {
+  keyPropertiesFile.withReader('UTF-8') { reader -> keyProps.load(reader) }
+}
+def releaseStorePath = keyProps.getProperty("storeFile") ?: envOrProp("ANDROID_RELEASE_STORE_FILE", "").toString()
+def hasReleaseSigning = !releaseStorePath.trim().isEmpty()
+
+def pathForWindowsShell(String absolutePath) {
+  if (!org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+    return absolutePath
+  }
+  def stdout = new ByteArrayOutputStream()
+  project.exec {
+    commandLine "cmd", "/c", "for %I in (\"${absolutePath}\") do @echo %~sI"
+    standardOutput = stdout
+  }
+  def shortPath = stdout.toString().trim()
+  return shortPath.isEmpty() ? absolutePath : shortPath
+}
 
 static def versionToNumber(major, minor, patch) {
   return patch * 100 + minor * 10000 + major * 1000000
@@ -31,8 +74,9 @@ def rnVersion = getRNVersion()
  */
 react {
     entryFile = file(["node", "-e", "require('expo/scripts/resolveAppEntry')", projectRoot, "android", "absolute"].execute(null, rootDir).text.trim())
-    reactNativeDir = new File(["node", "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
-    hermesCommand = new File(["node", "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsolutePath() + "/sdks/hermesc/%OS-BIN%/hermesc"
+    def reactNativePackageDir = new File(["node", "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
+    reactNativeDir = reactNativePackageDir
+    hermesCommand = pathForWindowsShell(reactNativePackageDir.getAbsolutePath()) + "/sdks/hermesc/%OS-BIN%/hermesc"
     codegenDir = new File(["node", "--print", "require.resolve('@react-native/codegen/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
 
     // Use Expo CLI to bundle the app, this ensures the Metro config
@@ -109,13 +153,17 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.goldsmith.shopkeeper.dev'
+    namespace 'com.goldsmith.shopkeeper'
     defaultConfig {
-        applicationId 'com.goldsmith.shopkeeper.dev'
+        applicationId androidApplicationId
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "0.0.0"
+        versionCode androidVersionCode
+        versionName androidVersionName
+        manifestPlaceholders = [
+            appAuthRedirectScheme: androidApplicationId,
+            usesCleartextTraffic: appEnv == "production" ? "false" : "true"
+        ]
     }
     signingConfigs {
         debug {
@@ -124,20 +172,33 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(releaseStorePath)
+                storePassword (keyProps.getProperty("storePassword") ?: envOrProp("ANDROID_RELEASE_STORE_PASSWORD", "").toString())
+                keyAlias     (keyProps.getProperty("keyAlias")       ?: envOrProp("ANDROID_RELEASE_KEY_ALIAS", "").toString())
+                keyPassword  (keyProps.getProperty("keyPassword")    ?: envOrProp("ANDROID_RELEASE_KEY_PASSWORD", "").toString())
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            if (appEnv == "production" && !hasReleaseSigning) {
+                throw new GradleException("Production release builds require ANDROID_RELEASE_STORE_FILE, ANDROID_RELEASE_STORE_PASSWORD, ANDROID_RELEASE_KEY_ALIAS, and ANDROID_RELEASE_KEY_PASSWORD.")
+            }
+            signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             crunchPngs (findProperty('android.enablePngCrunchInReleaseBuilds')?.toBoolean() ?: true)
         }
+    }
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
     }
     packagingOptions {
         jniLibs {
@@ -200,4 +261,8 @@ if (rnVersion < versionToNumber(0, 75, 0)) {
     applyNativeModulesAppBuildGradle(project)
 }
 
-apply plugin: 'com.google.gms.google-services'
+if (file("$projectDir/google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
+} else if (appEnv == "production") {
+    throw new GradleException("Production Android builds require apps/shopkeeper/android/app/google-services.json generated from the Firebase Android client config.")
+}

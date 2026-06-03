@@ -57,6 +57,10 @@ function firstConfigValue(config: TenantConfigResponse, keys: TenantStringKey[])
   return null;
 }
 
+function numberValue(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
 export function tenantAddress(config: TenantConfigResponse): string | null {
   return firstConfigValue(config, ['address', 'shopAddress', 'shop_address']);
 }
@@ -74,6 +78,18 @@ export function tenantWhatsapp(config: TenantConfigResponse): string | null {
     'contactPhone',
     'contact_phone',
   ]);
+}
+
+export function tenantAboutText(config: TenantConfigResponse): string | null {
+  return firstConfigValue(config, ['aboutText', 'about_text']);
+}
+
+export function tenantBisRegistration(config: TenantConfigResponse): string | null {
+  return firstConfigValue(config, ['bisRegistration', 'bis_registration']);
+}
+
+export function tenantYearsInBusiness(config: TenantConfigResponse): number | null {
+  return numberValue(config.yearsInBusiness) ?? numberValue(config.years_in_business);
 }
 
 export function tenantAppDownloadUrl(config: TenantConfigResponse): string | null {

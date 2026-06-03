@@ -13,6 +13,7 @@
     "test:tenant-isolation": "turbo run test:tenant-isolation",
     "build": "turbo run build",
     "deploy:customer-release": "powershell -ExecutionPolicy Bypass -File scripts/deploy-customer-release.ps1",
+    "deploy:shopkeeper-release": "powershell -ExecutionPolicy Bypass -File scripts/deploy-shopkeeper-release.ps1",
     "db:reset": "bash scripts/db-reset.sh",
     "db:generate-rls": "tsx packages/db/src/codegen/generate-rls.ts",
     "db:assert-marked": "tsx packages/db/src/codegen/assert-all-tables-marked.ts",
@@ -21,6 +22,7 @@
     "seed:anchor-dev-2": "tsx scripts/seed-anchor-dev-2.ts",
     "seed:demo": "tsx scripts/seed/demo-tenant.ts",
     "seed:storefront-demo": "tsx scripts/seed/storefront-demo.ts",
+    "seed:storefront-prod-content": "tsx scripts/seed/storefront-demo.ts --production",
     "docs:context": "tsx scripts/docs/scan-repo-context.ts && tsx scripts/docs/extract-adrs.ts && tsx scripts/docs/extract-bmad-trace.ts && tsx scripts/docs/scan-docs.ts && tsx scripts/docs/extract-acceptance.ts && tsx scripts/docs/scan-current-state.ts && tsx scripts/docs/scan-implementation-map.ts",
     "docs:validate": "tsx scripts/docs/validate-agent-context.ts",
     "test:ci": "pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:integration && pnpm test:tenant-isolation && pnpm semgrep && pnpm docs:validate"

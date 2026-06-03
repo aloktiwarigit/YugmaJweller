@@ -14,6 +14,7 @@ google-services.json
 GoogleService-Info.plist
 ios/
 release-artifacts/
+.env.production
 
 # Raw UI automation dumps can include personal device/account metadata.
 assets/play-store/screenshots/*.xml

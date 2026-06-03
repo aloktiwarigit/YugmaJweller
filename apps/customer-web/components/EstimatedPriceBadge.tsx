@@ -15,8 +15,8 @@ export function EstimatedPriceBadge({ priceAvailable, totalFormatted, compact = 
   if (compact) {
     return (
       <div className="flex flex-col">
-        <span className="font-body font-semibold text-ink text-base">{totalFormatted}</span>
-        <span className="font-body text-xs text-inkMute">अनुमानित</span>
+        <span className="font-body text-sm font-semibold leading-5 text-ink">{totalFormatted}</span>
+        <span className="font-body text-[11px] leading-4 text-inkMute">अनुमानित</span>
       </div>
     );
   }
