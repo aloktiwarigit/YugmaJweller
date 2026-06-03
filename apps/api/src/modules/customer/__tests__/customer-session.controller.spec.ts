@@ -65,3 +65,74 @@ describe('CustomerSessionController', () => {
     await expect(controller.createSession(req as never)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });
+
+// A pool whose `connect()` yields a client drives withShopTx down its real
+// transaction path (BEGIN → SET LOCAL ROLE → set_config → fn → COMMIT), so we can
+// assert the tenant GUC is applied around the controller's writes (the semgrep
+// require-tenant-transaction fix). The lightweight `{ query }` mock above can't —
+// withShopTx short-circuits to fn(pool) when no `connect` exists.
+describe('CustomerSessionController — tenant transaction wrapping', () => {
+  const shopId = '11111111-1111-4111-8111-111111111111';
+
+  function buildTxPool() {
+    const client = { query: vi.fn().mockResolvedValue({ rows: [] }), release: vi.fn() };
+    const pool = { connect: vi.fn().mockResolvedValue(client), query: vi.fn() };
+    return { pool, client };
+  }
+
+  function queriedSql(client: { query: ReturnType<typeof vi.fn> }): string[] {
+    return client.query.mock.calls.map((c) => String(c[0]));
+  }
+
+  it('writes the auth-failure audit event inside a shop transaction (GUC set)', async () => {
+    const verify = vi.fn().mockRejectedValue(new Error('bad token'));
+    const firebase = { admin: () => ({ auth: () => ({ verifyIdToken: verify }) }) };
+    const { pool, client } = buildTxPool();
+    const controller = new CustomerSessionController(
+      firebase as never, pool as never, { findOrCreateCustomerByFirebaseToken: vi.fn() } as never,
+    );
+
+    await expect(
+      controller.createSession({ headers: { authorization: 'Bearer x', 'x-tenant-id': shopId } } as never),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    const sql = queriedSql(client);
+    expect(sql).toContain('BEGIN');
+    expect(sql).toContain('COMMIT');
+    // tenant GUC is bound to this shop before the audit insert runs
+    expect(client.query).toHaveBeenCalledWith('SELECT set_config($1, $2, true)', [
+      'app.current_shop_id', shopId,
+    ]);
+    expect(sql.some((s) => s.includes('INSERT INTO audit_events'))).toBe(true);
+  });
+
+  it('a fire-and-forget audit failure never masks the 401', async () => {
+    const verify = vi.fn().mockRejectedValue(new Error('bad token'));
+    const firebase = { admin: () => ({ auth: () => ({ verifyIdToken: verify }) }) };
+    const pool = { connect: vi.fn().mockRejectedValue(new Error('pool exhausted')), query: vi.fn() };
+    const controller = new CustomerSessionController(
+      firebase as never, pool as never, { findOrCreateCustomerByFirebaseToken: vi.fn() } as never,
+    );
+
+    await expect(
+      controller.createSession({ headers: { authorization: 'Bearer x', 'x-tenant-id': shopId } } as never),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('runs the profile phone update inside a shop transaction', async () => {
+    const { pool, client } = buildTxPool();
+    const controller = new CustomerSessionController(
+      { admin: () => ({}) } as never, pool as never, { findOrCreateCustomerByFirebaseToken: vi.fn() } as never,
+    );
+    const req = {
+      customerCtx: { customerId: 'cust-1', shopId, firebaseUid: 'fb-1', phoneFromToken: '+919999999999' },
+    };
+
+    await expect(controller.addPhone(req as never)).resolves.toEqual({ ok: true });
+
+    expect(client.query).toHaveBeenCalledWith('SELECT set_config($1, $2, true)', [
+      'app.current_shop_id', shopId,
+    ]);
+    expect(queriedSql(client).some((s) => s.includes('UPDATE customers SET phone'))).toBe(true);
+  });
+});

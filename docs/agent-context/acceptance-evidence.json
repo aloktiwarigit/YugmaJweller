@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-31T17:40:42.579Z",
+  "generated": "2026-06-03T00:24:31.859Z",
   "summary": {
     "total": 24,
     "implemented": 15,
@@ -11,14 +11,10 @@
   "stories": [
     {
       "id": "1.1",
-      "title": "Shop Owner reaches the empty shop dashboard (Firebase Auth + Hindi-first Expo shell)",
+      "title": "2026-04-18-story-1.1-auth-and-dashboard-design.md",
       "class": "B",
       "status": "complete",
-      "frs": [
-        "FR8 (shopkeeper OTP login)",
-        "FR10 (session persistence across app restarts — via Firebase SDK native Keystore)",
-        "FR5 (tenant-isolation invariant — first authenticated consumer)"
-      ],
+      "frs": [],
       "specFile": "docs/superpowers/specs/2026-04-18-story-1.1-auth-and-dashboard-design.md",
       "testFiles": [
         "apps/api/test/_auth-test-setup.ts",
@@ -41,12 +37,10 @@
     },
     {
       "id": "1.2",
-      "title": "Shop Owner invites a staff member by phone and assigns a role",
+      "title": "2026-04-19-story-1.2-staff-invite-design.md",
       "class": "B",
       "status": "complete",
-      "frs": [
-        "FR12 (invite staff by phone + role)"
-      ],
+      "frs": [],
       "specFile": "docs/superpowers/specs/2026-04-19-story-1.2-staff-invite-design.md",
       "testFiles": [
         "apps/api/test/_auth-test-setup.ts",

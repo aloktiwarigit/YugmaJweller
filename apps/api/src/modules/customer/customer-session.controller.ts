@@ -10,6 +10,7 @@ import { FirebaseAdminProvider } from '../auth/firebase-admin.provider';
 import { CustomerAuthGuard, getCustomerCtx } from './customer-auth.guard';
 import { CustomerSessionService } from './customer-session.service';
 import { AuditAction } from '@goldsmith/audit';
+import { withShopTx } from '@goldsmith/db';
 
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -42,12 +43,17 @@ export class CustomerSessionController {
     try {
       decoded = await this.firebase.admin().auth().verifyIdToken(bearer, true);
     } catch {
-      await this.pool.query(
-        `INSERT INTO audit_events (shop_id, action, subject_type, metadata)
-         VALUES ($1, $2, 'customer', $3::jsonb)
-         ON CONFLICT DO NOTHING`,
-        [shopId, AuditAction.CUSTOMER_AUTH_FAILED, JSON.stringify({ reason: 'token_invalid' })],
-      ).catch(() => { /* fire-and-forget */ });
+      // Tenant-scoped audit write goes through withShopTx so the RLS GUC
+      // (app.current_shop_id) is set — defense-in-depth on top of the explicit
+      // shop_id column. Fire-and-forget: never let an audit failure mask the 401.
+      await withShopTx(this.pool, shopId, async (tx) => {
+        await tx.query(
+          `INSERT INTO audit_events (shop_id, action, subject_type, metadata)
+           VALUES ($1, $2, 'customer', $3::jsonb)
+           ON CONFLICT DO NOTHING`,
+          [shopId, AuditAction.CUSTOMER_AUTH_FAILED, JSON.stringify({ reason: 'token_invalid' })],
+        );
+      }).catch(() => { /* fire-and-forget */ });
       throw new UnauthorizedException({ code: 'customer.token_invalid' });
     }
 
@@ -74,10 +80,12 @@ export class CustomerSessionController {
     if (!phoneFromToken) {
       throw new UnauthorizedException({ code: 'customer.no_phone_in_token' });
     }
-    await this.pool.query(
-      `UPDATE customers SET phone = $1 WHERE id = $2 AND shop_id = $3 AND deleted_at IS NULL`,
-      [phoneFromToken, customerId, shopId],
-    );
+    await withShopTx(this.pool, shopId, async (tx) => {
+      await tx.query(
+        `UPDATE customers SET phone = $1 WHERE id = $2 AND shop_id = $3 AND deleted_at IS NULL`,
+        [phoneFromToken, customerId, shopId],
+      );
+    });
     return { ok: true };
   }
 }
