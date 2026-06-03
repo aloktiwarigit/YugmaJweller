@@ -17,6 +17,10 @@ const devApiBaseUrl = 'http://10.0.2.2:3000';
 const devTenantSlug = 'anchor-dev';
 const devAndroidPackage = 'com.goldsmith.shopkeeper.dev';
 const devIosBundleIdentifier = 'com.goldsmith.shopkeeper.dev';
+// Dev Type-3 web OAuth client placeholder. Local builds normally read this from
+// the gitignored google-services.json; this fallback keeps the dev profile
+// self-contained (and CI-runnable) without that file. Production never uses it.
+const devGoogleWebClientId = '000000000000-devplaceholder.apps.googleusercontent.com';
 const placeholderEasProjectId = 'TBD-post-SOW';
 const appIcon = './assets/app/icon.png';
 const splashIcon = './assets/app/splash-icon.png';
@@ -84,7 +88,9 @@ const firebaseProjectId =
 const firebaseApiKey = process.env['EXPO_PUBLIC_FIREBASE_API_KEY'] ?? androidFirebaseConfig.apiKey;
 const firebaseAppId = process.env['EXPO_PUBLIC_FIREBASE_APP_ID'] ?? androidFirebaseConfig.appId;
 const googleWebClientId =
-  process.env['EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID'] ?? androidFirebaseConfig.webClientId;
+  process.env['EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID'] ??
+  androidFirebaseConfig.webClientId ??
+  (isProductionProfile ? undefined : devGoogleWebClientId);
 const firebaseAuthDomain =
   process.env['EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN'] ?? `${firebaseProjectId}.firebaseapp.com`;
 const apiBaseUrl = process.env['EXPO_PUBLIC_API_BASE_URL'] ?? devApiBaseUrl;
